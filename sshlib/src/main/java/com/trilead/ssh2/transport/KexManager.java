@@ -25,6 +25,7 @@ import com.trilead.ssh2.crypto.dh.Curve25519Exchange;
 import com.trilead.ssh2.crypto.dh.DhGroupExchange;
 import com.trilead.ssh2.crypto.dh.GenericDhExchange;
 import com.trilead.ssh2.crypto.digest.MAC;
+import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketKexDHInit;
 import com.trilead.ssh2.packets.PacketKexDHReply;
@@ -38,6 +39,7 @@ import com.trilead.ssh2.packets.PacketNewKeys;
 import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 
 
@@ -65,6 +67,7 @@ public class KexManager
 
 	private static final Set<String> HOSTKEY_ALGS = new LinkedHashSet<String>();
 	static {
+		HOSTKEY_ALGS.add(Ed25519Verify.ED25519_ID);
 		if (supportsEc) {
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp256");
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp384");
@@ -380,6 +383,15 @@ public class KexManager
 
 	private boolean verifySignature(byte[] sig, byte[] hostkey) throws IOException
 	{
+		if (kxs.np.server_host_key_algo.equals(Ed25519Verify.ED25519_ID)) {
+			byte[] eds = Ed25519Verify.decodeSSHEd25519Signature(sig);
+			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(hostkey);
+
+			log.log(50, "Verifying ed25519 signature");
+
+			return Ed25519Verify.verifySignature(kxs.H, eds, edpk);
+
+		}
 		if (kxs.np.server_host_key_algo.startsWith("ecdsa-sha2-"))
 		{
 			byte[] rs = ECDSASHA2Verify.decodeSSHECDSASignature(sig);

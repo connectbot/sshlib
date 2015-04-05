@@ -15,6 +15,8 @@ import java.util.Vector;
 
 import com.trilead.ssh2.InteractiveCallback;
 import com.trilead.ssh2.crypto.PEMDecoder;
+import com.trilead.ssh2.crypto.key.Ed25519PrivateKey;
+import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.packets.PacketServiceAccept;
 import com.trilead.ssh2.packets.PacketServiceRequest;
 import com.trilead.ssh2.packets.PacketUserauthBanner;
@@ -29,6 +31,7 @@ import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.packets.TypesWriter;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 import com.trilead.ssh2.transport.MessageHandler;
 import com.trilead.ssh2.transport.TransportManager;
@@ -273,6 +276,39 @@ public class AuthenticationManager implements MessageHandler
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
 						algo, pk_enc, ec_sig_enc);
+
+				tm.sendMessage(ua.getPayload());
+			}
+			else if (key instanceof Ed25519PrivateKey)
+			{
+				Ed25519PrivateKey pk = (Ed25519PrivateKey) key;
+
+				final String algo = Ed25519Verify.ED25519_ID;
+
+				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((Ed25519PublicKey) pair.getPublic());
+
+				TypesWriter tw = new TypesWriter();
+				{
+					byte[] H = tm.getSessionIdentifier();
+
+					tw.writeString(H, 0, H.length);
+					tw.writeByte(Packets.SSH_MSG_USERAUTH_REQUEST);
+					tw.writeString(user);
+					tw.writeString("ssh-connection");
+					tw.writeString("publickey");
+					tw.writeBoolean(true);
+					tw.writeString(algo);
+					tw.writeString(pk_enc, 0, pk_enc.length);
+				}
+
+				byte[] msg = tw.getBytes();
+
+				byte[] ds = Ed25519Verify.generateSignature(msg, pk);
+
+				byte[] ed_sig_enc = Ed25519Verify.encodeSSHEd25519Signature(ds);
+
+				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
+						algo, pk_enc, ed_sig_enc);
 
 				tm.sendMessage(ua.getPayload());
 			}
