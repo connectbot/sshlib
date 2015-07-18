@@ -69,6 +69,7 @@ bintray {
   key = bintrayApiKey
   publish = true
   pkg {
+    userOrg = 'connectbot'
     repo = 'maven'
     name = project.name
 
