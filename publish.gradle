@@ -1,0 +1,86 @@
+apply plugin: 'maven'
+
+task sourcesJar(type: Jar, dependsOn: classes) { 
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) { 
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+artifacts { 
+  archives sourcesJar, javadocJar
+}
+
+uploadArchives {
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+    }
+  }
+}
+
+install {
+  repositories.mavenInstaller {
+    pom {
+      project {
+        name project.name
+        description project.description
+        url gitHubUrl
+        licenses {
+          license {
+            name 'Apache License, Version 2.0'
+            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+        developers {
+          developer {
+            id 'kruton'
+            name 'Kenny Root'
+            email 'kenny@the-b.org'
+          }
+        }
+        scm {
+          connection "${gitHubUrl}.git"
+          developerConnection "${gitHubUrl}.git"
+          url gitHubUrl
+        }
+      }
+    }
+  }
+}
+
+//Load data from environment if present to support Travis
+['bintrayUser', 'bintrayApiKey'].each{
+  if (System.env[it])
+    project[it] = System.env[it]
+}
+
+//This is only needed if bintrayUpload is done as part of releasing
+task updateBintrayVersion << {
+  bintray.pkg.version.name = project.version
+}
+bintrayUpload.dependsOn updateBintrayVersion
+
+bintray {
+  user = bintrayUser
+  key = bintrayApiKey
+  publish = true
+  pkg {
+    repo = 'maven'
+    name = project.name
+
+    licenses = ['Apache-2.0']
+    configurations = ['archives']
+
+    websiteUrl = gitHubUrl
+    vcsUrl = "${gitHubUrl}.git"
+  }
+}
+
+bintrayUpload.onlyIf {
+  System.env.TRAVIS_JDK_VERSION == officialJdk &&
+  !(version ==~ /.*SNAPSHOT/)
+}
