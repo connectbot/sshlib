@@ -6,6 +6,7 @@ jdk:
 cache:
   directories:
   - "$HOME/.gradle/caches"
+  - "$HOME/.gradle/wrapper"
 before_cache:
 - rm -rf $HOME/.gradle/caches/[1-9]*
 after_success:
