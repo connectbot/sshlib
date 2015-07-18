@@ -442,8 +442,8 @@ public class Session
 	 * This method returns as soon as one of the following happens:
 	 * <ul>
 	 * <li>at least of the specified conditions (see {@link ChannelCondition}) holds true</li>
-	 * <li>timeout > 0 and a timeout occured (TIMEOUT will be set in result conditions)</a> 
-	 * <li>the underlying channel was closed (CLOSED will be set in result conditions)</a>
+	 * <li>timeout &gt; 0 and a timeout occured (TIMEOUT will be set in result conditions)</li> 
+	 * <li>the underlying channel was closed (CLOSED will be set in result conditions)</li>
 	 * </ul>
 	 * <p>
 	 * In any case, the result value contains ALL current conditions, which may be more
@@ -472,7 +472,7 @@ public class Session
 	 * Get the exit code/status from the remote command - if available. Be
 	 * careful - not all server implementations return this value. It is
 	 * generally a good idea to call this method only when all data from the
-	 * remote side has been consumed (see also the <code<WaitForCondition</code> method).
+	 * remote side has been consumed (see also the <code>WaitForCondition</code> method).
 	 * 
 	 * @return An <code>Integer</code> holding the exit code, or
 	 *         <code>null</code> if no exit code is (yet) available.

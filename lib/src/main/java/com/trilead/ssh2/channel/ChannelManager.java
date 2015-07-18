@@ -535,7 +535,8 @@ public class ChannelManager implements MessageHandler
 	}
 
 	/**
-	 * @param agent
+	 * @param c
+	 * @param authAgent
 	 * @throws IOException
 	 */
 	public boolean requestChannelAgentForwarding(Channel c, AuthAgentCallback authAgent) throws IOException {

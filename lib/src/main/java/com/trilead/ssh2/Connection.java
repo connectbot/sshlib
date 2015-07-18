@@ -468,7 +468,7 @@ public class Connection
 	 * 
 	 * @param user
 	 *            A <code>String</code> holding the username.
-	 * @param key
+	 * @param pair
 	 *            A <code>RSAPrivateKey</code> or <code>DSAPrivateKey</code>
 	 *            containing a DSA or RSA private key of
 	 *            the user in Trilead object format.

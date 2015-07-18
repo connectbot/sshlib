@@ -1209,8 +1209,8 @@ public class SFTPv3Client
 	 * <ul>
 	 * <li>The server will read as many bytes as it can from the file (up to <code>len</code>),
 	 * and return them.</li>
-	 * <li>If EOF is encountered before reading any data, <code>-1</code> is returned.
-	 * <li>If an error occurs, an exception is thrown</li>.
+	 * <li>If EOF is encountered before reading any data, <code>-1</code> is returned.</li>
+	 * <li>If an error occurs, an exception is thrown.</li>
 	 * <li>For normal disk files, it is guaranteed that the server will return the specified
 	 * number of bytes, or up to end of file. For, e.g., device files this may return
 	 * fewer bytes than requested.</li>
