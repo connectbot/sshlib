@@ -13,12 +13,12 @@ apply from: "${rootDir}/publish.gradle"
 
 repositories {
     maven {
-        url 'https://dl.bintray.com/kruton/maven'
+        url 'https://dl.bintray.com/connectbot/maven/'
     }
 }
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.jcraft:jzlib:1.1.3'
-    compile 'org.connectbot.jsocks:jsocks:1.0.0'
+    compile 'org.connectbot:simplesocks:1.0.1'
 }
