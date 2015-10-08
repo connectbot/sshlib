@@ -350,7 +350,7 @@ public class Connection
 	 * <code>getRemainingAuthMethods</code> method to get a list of the
 	 * remaining possible methods).
 	 * 
-	 * @param user
+	 * @param user the username to attempt to log in as
 	 * @return if the connection is now authenticated.
 	 * @throws IOException
 	 */
