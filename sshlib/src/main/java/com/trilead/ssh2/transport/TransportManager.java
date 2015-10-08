@@ -2,24 +2,18 @@
 package com.trilead.ssh2.transport;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.util.Vector;
 
 import com.trilead.ssh2.ConnectionInfo;
 import com.trilead.ssh2.ConnectionMonitor;
 import com.trilead.ssh2.DHGexParameters;
-import com.trilead.ssh2.HTTPProxyData;
-import com.trilead.ssh2.HTTPProxyException;
 import com.trilead.ssh2.ProxyData;
 import com.trilead.ssh2.ServerHostKeyVerifier;
 import com.trilead.ssh2.compression.ICompressor;
-import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.digest.MAC;
@@ -27,7 +21,6 @@ import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketDisconnect;
 import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.packets.TypesReader;
-import com.trilead.ssh2.util.Tokenizer;
 
 
 /*
@@ -72,7 +65,7 @@ public class TransportManager
 		{
 			while (true)
 			{
-				byte[] msg = null;
+				byte[] msg;
 
 				synchronized (asynchronousQueue)
 				{
@@ -125,7 +118,7 @@ public class TransportManager
 
 	String hostname;
 	int port;
-	final Socket sock = new Socket();
+	Socket sock;
 
 	Object connectionSemaphore = new Object();
 
@@ -183,7 +176,8 @@ public class TransportManager
 
 			try
 			{
-				sock.close();
+				if (sock != null)
+					sock.close();
 			}
 			catch (IOException ignore)
 			{
@@ -214,7 +208,8 @@ public class TransportManager
 
 					try
 					{
-						sock.close();
+						if (sock != null)
+							sock.close();
 					}
 					catch (IOException ignore)
 					{
@@ -261,122 +256,22 @@ public class TransportManager
 		}
 	}
 
-	private static void tryAllAddresses(Socket sock, String host, int port, int connectTimeout) throws IOException {
-		InetAddress[] addresses = InetAddress.getAllByName(host);
-		for (InetAddress addr : addresses) {
-			try {
-				sock.connect(new InetSocketAddress(addr, port), connectTimeout);
-				return;
-			} catch (SocketTimeoutException e) {
-			}
-		}
-		throw new SocketTimeoutException("Could not connect; socket timed out");
-	}
-
 	private void establishConnection(ProxyData proxyData, int connectTimeout) throws IOException
 	{
 		if (proxyData == null)
-		{
-			tryAllAddresses(sock, hostname, port, connectTimeout);
-			sock.setSoTimeout(0);
-			return;
-		}
+			sock = connectDirect(hostname, port, connectTimeout);
+		else
+			sock = proxyData.openConnection(hostname, port, connectTimeout);
+	}
 
-		if (proxyData instanceof HTTPProxyData)
-		{
-			HTTPProxyData pd = (HTTPProxyData) proxyData;
-
-			/* At the moment, we only support HTTP proxies */
-
-			tryAllAddresses(sock, pd.proxyHost, pd.proxyPort, connectTimeout);
-			sock.setSoTimeout(0);
-
-			/* OK, now tell the proxy where we actually want to connect to */
-
-			StringBuffer sb = new StringBuffer();
-
-			sb.append("CONNECT ");
-			sb.append(hostname);
-			sb.append(':');
-			sb.append(port);
-			sb.append(" HTTP/1.0\r\n");
-
-			if ((pd.proxyUser != null) && (pd.proxyPass != null))
-			{
-				String credentials = pd.proxyUser + ":" + pd.proxyPass;
-				char[] encoded = Base64.encode(credentials.getBytes("ISO-8859-1"));
-				sb.append("Proxy-Authorization: Basic ");
-				sb.append(encoded);
-				sb.append("\r\n");
-			}
-
-			if (pd.requestHeaderLines != null)
-			{
-				for (int i = 0; i < pd.requestHeaderLines.length; i++)
-				{
-					if (pd.requestHeaderLines[i] != null)
-					{
-						sb.append(pd.requestHeaderLines[i]);
-						sb.append("\r\n");
-					}
-				}
-			}
-
-			sb.append("\r\n");
-
-			OutputStream out = sock.getOutputStream();
-
-			out.write(sb.toString().getBytes("ISO-8859-1"));
-			out.flush();
-
-			/* Now parse the HTTP response */
-
-			byte[] buffer = new byte[1024];
-			InputStream in = sock.getInputStream();
-
-			int len = ClientServerHello.readLineRN(in, buffer);
-
-			String httpReponse = new String(buffer, 0, len, "ISO-8859-1");
-
-			if (httpReponse.startsWith("HTTP/") == false)
-				throw new IOException("The proxy did not send back a valid HTTP response.");
-
-			/* "HTTP/1.X XYZ X" => 14 characters minimum */
-
-			if ((httpReponse.length() < 14) || (httpReponse.charAt(8) != ' ') || (httpReponse.charAt(12) != ' '))
-				throw new IOException("The proxy did not send back a valid HTTP response.");
-
-			int errorCode = 0;
-
-			try
-			{
-				errorCode = Integer.parseInt(httpReponse.substring(9, 12));
-			}
-			catch (NumberFormatException ignore)
-			{
-				throw new IOException("The proxy did not send back a valid HTTP response.");
-			}
-
-			if ((errorCode < 0) || (errorCode > 999))
-				throw new IOException("The proxy did not send back a valid HTTP response.");
-
-			if (errorCode != 200)
-			{
-				throw new HTTPProxyException(httpReponse.substring(13), errorCode);
-			}
-
-			/* OK, read until empty line */
-
-			while (true)
-			{
-				len = ClientServerHello.readLineRN(in, buffer);
-				if (len == 0)
-					break;
-			}
-			return;
-		}
-
-		throw new IOException("Unsupported ProxyData");
+	private static Socket connectDirect(String hostname, int port, int connectTimeout)
+			throws IOException
+	{
+		Socket sock = new Socket();
+		InetAddress addr = InetAddress.getByName(hostname);
+		sock.connect(new InetSocketAddress(addr, port), connectTimeout);
+		sock.setSoTimeout(0);
+		return sock;
 	}
 
 	public void initialize(CryptoWishList cwl, ServerHostKeyVerifier verifier, DHGexParameters dhgex,
