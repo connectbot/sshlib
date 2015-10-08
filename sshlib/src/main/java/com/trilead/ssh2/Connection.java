@@ -391,7 +391,7 @@ public class Connection
 	 * <p>
 	 * The private key contained in the PEM file may also be encrypted
 	 * ("Proc-Type: 4,ENCRYPTED"). The library supports DES-CBC and DES-EDE3-CBC
-	 * encryption, as well as the more exotic PEM encrpytions AES-128-CBC,
+	 * encryption, as well as the more exotic PEM encryption AES-128-CBC,
 	 * AES-192-CBC and AES-256-CBC.
 	 * <p>
 	 * If the authentication phase is complete, <code>true</code> will be
