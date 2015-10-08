@@ -9,8 +9,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.security.KeyPair;
 import java.security.SecureRandom;
-import java.security.Security;
-import java.util.Set;
 import java.util.Vector;
 
 import com.trilead.ssh2.auth.AuthenticationManager;
@@ -136,63 +134,6 @@ public class Connection
 	{
 		this.hostname = hostname;
 		this.port = port;
-	}
-
-	/**
-	 * After a successful connect, one has to authenticate oneself. This method
-	 * is based on DSA (it uses DSA to sign a challenge sent by the server).
-	 * <p>
-	 * If the authentication phase is complete, <code>true</code> will be
-	 * returned. If the server does not accept the request (or if further
-	 * authentication steps are needed), <code>false</code> is returned and
-	 * one can retry either by using this or any other authentication method
-	 * (use the <code>getRemainingAuthMethods</code> method to get a list of
-	 * the remaining possible methods).
-	 * 
-	 * @param user
-	 *            A <code>String</code> holding the username.
-	 * @param pem
-	 *            A <code>String</code> containing the DSA private key of the
-	 *            user in OpenSSH key format (PEM, you can't miss the
-	 *            "-----BEGIN DSA PRIVATE KEY-----" tag). The string may contain
-	 *            linefeeds.
-	 * @param password
-	 *            If the PEM string is 3DES encrypted ("DES-EDE3-CBC"), then you
-	 *            must specify the password. Otherwise, this argument will be
-	 *            ignored and can be set to <code>null</code>.
-	 * 
-	 * @return whether the connection is now authenticated.
-	 * @throws IOException
-	 * 
-	 * @deprecated You should use one of the
-	 *             {@link #authenticateWithPublicKey(String, File, String) authenticateWithPublicKey()}
-	 *             methods, this method is just a wrapper for it and will
-	 *             disappear in future builds.
-	 * 
-	 */
-	public synchronized boolean authenticateWithDSA(String user, String pem, String password) throws IOException
-	{
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
-
-		if (pem == null)
-			throw new IllegalArgumentException("pem argument is null");
-
-		authenticated = am.authenticatePublicKey(user, pem.toCharArray(), password, getOrCreateSecureRND());
-
-		return authenticated;
 	}
 
 	/**
