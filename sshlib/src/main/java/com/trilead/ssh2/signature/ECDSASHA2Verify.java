@@ -267,6 +267,24 @@ public class ECDSASHA2Verify {
 		}
 	}
 
+	private static final int readLength(byte[] sig, int offset, int numOctets) throws IOException {
+		if (numOctets > 4 || numOctets <= 0) {
+			throw new IOException("Cannot decode DER length");
+		}
+
+		long length = 0L;
+		for (int i = 0; i < numOctets; i++) {
+			length <<= 8;
+			length |= sig[offset++];
+		}
+
+		if (length > 0xFFFFFFL || length < 0L) {
+			throw new IOException("Invalid DER length");
+		}
+
+		return (int) length;
+	}
+
 	public static byte[] encodeSSHECDSASignature(byte[] sig, ECParameterSpec params) throws IOException
 	{
 		TypesWriter tw = new TypesWriter();
@@ -274,25 +292,68 @@ public class ECDSASHA2Verify {
 		String curveName = getCurveName(params);
 		tw.writeString(ECDSA_SHA2_PREFIX + curveName);
 
-		if ((sig[0] != 0x30) || (sig[1] != sig.length - 2) || (sig[2] != 0x02)) {
+		/*
+		 * This is a signature in ASN.1 DER format. It should look like:
+		 *  0x30 <len>
+		 *      0x02 <len> <data[len]>
+		 *      0x02 <len> <data[len]>
+		 */
+
+		if (sig[0] != 0x30) {
 			throw new IOException("Invalid signature format");
 		}
 
-		int rLength = sig[3];
-		if ((rLength + 6 > sig.length) || (sig[4 + rLength] != 0x02)) {
+		final int seqHeaderLength;
+		final int seqLength;
+		if ((sig[1] & 0x80) != 0) {
+			int seqHeaderOctets = sig[1] & 0x7F;
+			seqHeaderLength = seqHeaderOctets + 1;
+			seqLength = readLength(sig, 2, seqHeaderOctets);
+		} else {
+			seqHeaderLength = 1;
+			seqLength = sig[1];
+		}
+
+		if ((seqLength == 0) || (1 + seqHeaderLength + seqLength != sig.length) || (sig[1 + seqHeaderLength] != 0x02)) {
 			throw new IOException("Invalid signature format");
 		}
 
-		int sLength = sig[5 + rLength];
-		if (6 + rLength + sLength > sig.length) {
+		final int rHeaderLength;
+		final int rLength;
+		if ((sig[1 + seqHeaderLength + 1] & 0x80) != 0) {
+			int rHeaderOctets = sig[seqHeaderLength + 2] & 0x7F;
+			rHeaderLength = rHeaderOctets + 1;
+			rLength = readLength(sig, seqHeaderLength + 3, rHeaderOctets);
+		} else {
+			rHeaderLength = 1;
+			rLength = sig[seqHeaderLength + 2];
+		}
+
+		if ((rLength == 0) || (rLength > seqLength - (rHeaderLength + 1 + 1 + 1)) ||
+				sig[1 + seqHeaderLength + 1 + rHeaderLength + rLength] != 0x02)  {
+			throw new IOException("Invalid signature format");
+		}
+
+		final int sHeaderLength;
+		final int sLength;
+		if ((sig[1 + seqHeaderLength + 1 + rHeaderLength + rLength + 1] & 0x80) != 0) {
+			int sHeaderOctets = sig[1 + seqHeaderLength + 1 + rHeaderLength + rLength + 1] & 0x7F;
+			sHeaderLength = sHeaderOctets + 1;
+			sLength = readLength(sig, 4 + rHeaderLength + rLength, sHeaderOctets);
+		} else {
+			sHeaderLength = 1;
+			sLength = sig[1 + seqHeaderLength + 1 + rHeaderLength + rLength + 1];
+		}
+
+		if ((sLength == 0) || 2 + rHeaderLength + rLength + sHeaderLength + sLength > seqLength) {
 			throw new IOException("Invalid signature format");
 		}
 
 		byte[] rArray = new byte[rLength];
 		byte[] sArray = new byte[sLength];
 
-		System.arraycopy(sig, 4, rArray, 0, rLength);
-		System.arraycopy(sig, 6 + rLength, sArray, 0, sLength);
+		System.arraycopy(sig, 1 + seqHeaderLength + 1, rArray, 0, rLength);
+		System.arraycopy(sig, 1 + seqHeaderLength + 1 + rLength + 1 + sHeaderLength, sArray, 0, sLength);
 
 		BigInteger r = new BigInteger(1, rArray);
 		BigInteger s = new BigInteger(1, sArray);
