@@ -105,8 +105,6 @@ public class Connection
 
 	private TransportManager tm;
 
-	private boolean tcpNoDelay = false;
-
 	private ProxyData proxyData = null;
 
 	private Vector<ConnectionMonitor> connectionMonitors = new Vector<ConnectionMonitor>();
@@ -812,8 +810,6 @@ public class Connection
 						"The connect() operation on the socket timed out.").initCause(se);
 			}
 
-			tm.setTcpNoDelay(tcpNoDelay);
-
 			/* Wait until first KEX has finished */
 
 			ConnectionInfo ci = tm.getConnectionInfo(1);
@@ -1406,27 +1402,6 @@ public class Connection
 		algos = removeDuplicates(algos);
 		KexManager.checkServerHostkeyAlgorithmsList(algos);
 		cryptoWishList.serverHostKeyAlgorithms = algos;
-	}
-
-	/**
-	 * Enable/disable TCP_NODELAY (disable/enable Nagle's algorithm) on the
-	 * underlying socket.
-	 * <p>
-	 * Can be called at any time. If the connection has not yet been established
-	 * then the passed value will be stored and set after the socket has been
-	 * set up. The default value that will be used is <code>false</code>.
-	 * 
-	 * @param enable
-	 *            the argument passed to the <code>Socket.setTCPNoDelay()</code>
-	 *            method.
-	 * @throws IOException
-	 */
-	public synchronized void setTCPNoDelay(boolean enable) throws IOException
-	{
-		tcpNoDelay = enable;
-
-		if (tm != null)
-			tm.setTcpNoDelay(enable);
 	}
 
 	/**

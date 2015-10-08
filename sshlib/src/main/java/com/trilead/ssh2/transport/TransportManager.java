@@ -7,7 +7,6 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.SecureRandom;
 import java.util.Vector;
@@ -154,16 +153,6 @@ public class TransportManager
 	public int getPacketOverheadEstimate()
 	{
 		return tc.getPacketOverheadEstimate();
-	}
-
-	public void setTcpNoDelay(boolean state) throws IOException
-	{
-		sock.setTcpNoDelay(state);
-	}
-
-	public void setSoTimeout(int timeout) throws IOException
-	{
-		sock.setSoTimeout(timeout);
 	}
 
 	public ConnectionInfo getConnectionInfo(int kexNumber) throws IOException
