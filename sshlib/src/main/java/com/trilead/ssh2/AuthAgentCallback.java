@@ -17,9 +17,9 @@ public interface AuthAgentCallback {
 	Map<String,byte[]> retrieveIdentities();
 
 	/**
-	 * @param pair A <code>RSAPrivateKey</code> or <code>DSAPrivateKey</code>
-	 *             containing a DSA or RSA private key of
-	 *             the user in Trilead object format.
+	 * @param pair A <code>RSAPrivateKey</code>, <code>ECPrivateKey</code>, or
+	 *             <code>DSAPrivateKey</code> containing a DSA, EC, or RSA private
+	 *             and corresponding <code>PublicKey</code>.
 	 * @param comment comment associated with this key
 	 * @param confirmUse whether to prompt before using this key
 	 * @param lifetime lifetime in seconds for key to be remembered
