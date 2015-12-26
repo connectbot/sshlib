@@ -3,6 +3,7 @@ package com.trilead.ssh2.crypto;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.math.BigInteger;
 
 import static org.junit.Assert.*;
 import static org.hamcrest.CoreMatchers.*;
@@ -63,5 +64,52 @@ public class SimpleDERReaderTest {
         };
         SimpleDERReader reader = new SimpleDERReader(vector);
         assertEquals(9, reader.readLength());
+    }
+
+    @Test
+    public void readInt_MaxInt() throws Exception {
+        byte[] vector = new byte[] {
+                (byte) 0x02, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+        };
+        SimpleDERReader reader = new SimpleDERReader(vector);
+        assertEquals(BigInteger.valueOf(0xFFFFFFFF), reader.readInt());
+    }
+
+    @Test
+    public void readInt_NotReallyInteger() throws Exception {
+        byte[] vector = new byte[] {
+                (byte) 0x01, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+        };
+        SimpleDERReader reader = new SimpleDERReader(vector);
+        try {
+            reader.readInt();
+        } catch (IOException expected) {
+            assertThat(expected.getMessage(), containsString("Expected DER Integer"));
+        }
+    }
+
+    @Test
+    public void readInt_InvalidLength() throws Exception {
+        byte[] vector = new byte[] {
+                (byte) 0x02, (byte) 0x80, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+        };
+        SimpleDERReader reader = new SimpleDERReader(vector);
+        try {
+            reader.readInt();
+        } catch (IOException expected) {
+            assertThat(expected.getMessage(), containsString("Illegal len"));
+        }
+    }
+
+    @Test
+    public void readInt_ShortArray() throws Exception {
+        byte[] vector = new byte[] {
+                (byte) 0x02, (byte) 0x02, (byte) 0xFF
+        };
+        SimpleDERReader reader = new SimpleDERReader(vector);
+        try {
+            reader.readInt();
+        } catch (IOException expected) {
+        }
     }
 }
