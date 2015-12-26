@@ -68,7 +68,8 @@ public class SimpleDERReader
 		return count;
 	}
 
-	private int readLength() throws IOException
+	/* visible for testing */
+	int readLength() throws IOException
 	{
 		int len = readByte() & 0xff;
 
@@ -79,6 +80,8 @@ public class SimpleDERReader
 
 		if (remain == 0)
 			return -1;
+		else if (remain > 4)
+			return -1;
 
 		len = 0;
 		
@@ -88,6 +91,9 @@ public class SimpleDERReader
 			len = len | (readByte() & 0xff);
 			remain--;
 		}
+
+		if (len < 0)
+			return -1;
 
 		return len;
 	}
