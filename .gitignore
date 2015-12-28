@@ -1,7 +1,18 @@
+# Gradle files
 .gradle
 /local.properties
+
+# IDEA files
 /.idea/
 *.iml
+*.ipr
+*.iws
+
+# MacOS X stuff
 .DS_Store
+
+# Build output artifacts
 /build
+
+# Testing files
 /captures
