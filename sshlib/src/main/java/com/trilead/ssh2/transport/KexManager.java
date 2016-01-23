@@ -21,6 +21,7 @@ import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.KeyMaterial;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
+import com.trilead.ssh2.crypto.dh.Curve25519Exchange;
 import com.trilead.ssh2.crypto.dh.DhGroupExchange;
 import com.trilead.ssh2.crypto.dh.GenericDhExchange;
 import com.trilead.ssh2.crypto.digest.MAC;
@@ -75,6 +76,7 @@ public class KexManager
 
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<String>();
 	static {
+		KEX_ALGS.add(Curve25519Exchange.NAME);
 		if (supportsEc) {
 			KEX_ALGS.add("ecdh-sha2-nistp256");
 			KEX_ALGS.add("ecdh-sha2-nistp384");
@@ -495,7 +497,8 @@ public class KexManager
 					|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha1")
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
-					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")) {
+					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
+					|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)) {
 				kxs.dhx = GenericDhExchange.getInstance(kxs.np.kex_algo);
 
 				kxs.dhx.init(kxs.np.kex_algo);
@@ -633,7 +636,8 @@ public class KexManager
 				|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha1")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
-				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521"))
+				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
+				|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME))
 		{
 			if (kxs.state == 1)
 			{
