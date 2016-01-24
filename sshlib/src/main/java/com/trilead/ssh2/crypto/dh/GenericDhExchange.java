@@ -28,6 +28,9 @@ public abstract class GenericDhExchange
 	}
 
 	public static GenericDhExchange getInstance(String algo) {
+		if (algo.startsWith("curve25519-sha256@libssh.org")) {
+			return new Curve25519Exchange();
+		}
 		if (algo.startsWith("ecdh-sha2-")) {
 			return new EcDhExchange();
 		} else {
