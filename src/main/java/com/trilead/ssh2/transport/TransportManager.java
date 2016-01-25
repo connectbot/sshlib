@@ -175,6 +175,21 @@ public class TransportManager implements ITransportConnection
 		return km.sessionId;
 	}
 
+	public String getHostname()
+	{
+		return hostname;
+	}
+
+	public int getPort()
+	{
+		return port;
+	}
+
+	public ServerHostKeyVerifier getServerHostKeyVerifier()
+	{
+		return km != null ? km.getServerHostKeyVerifier() : null;
+	}
+
 	public void close(Throwable cause, boolean useDisconnectPacket)
 	{
 		if (!useDisconnectPacket)

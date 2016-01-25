@@ -2,6 +2,9 @@ package com.trilead.ssh2.transport;
 
 import java.io.IOException;
 
+import com.trilead.ssh2.ConnectionInfo;
+import com.trilead.ssh2.ServerHostKeyVerifier;
+
 /**
  * Interface for SSH transport layer operations.
  * <p>
@@ -64,4 +67,41 @@ public interface ITransportConnection {
 	 * @return the estimated overhead in bytes
 	 */
 	int getPacketOverheadEstimate();
+
+	/**
+	 * Get connection information for a given key exchange number.
+	 *
+	 * @param kexNumber the key exchange number
+	 * @return connection information
+	 * @throws IOException if an error occurs
+	 */
+	ConnectionInfo getConnectionInfo(int kexNumber) throws IOException;
+
+	/**
+	 * Get the session identifier from the initial key exchange.
+	 *
+	 * @return the session identifier
+	 */
+	byte[] getSessionIdentifier();
+
+	/**
+	 * Get the hostname of the remote server.
+	 *
+	 * @return the hostname
+	 */
+	String getHostname();
+
+	/**
+	 * Get the port of the remote server.
+	 *
+	 * @return the port number
+	 */
+	int getPort();
+
+	/**
+	 * Get the server host key verifier.
+	 *
+	 * @return the server host key verifier or null if not set
+	 */
+	ServerHostKeyVerifier getServerHostKeyVerifier();
 }

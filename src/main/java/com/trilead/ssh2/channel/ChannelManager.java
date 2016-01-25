@@ -2,12 +2,18 @@
 package com.trilead.ssh2.channel;
 
 import java.io.IOException;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.trilead.ssh2.AuthAgentCallback;
 import com.trilead.ssh2.ChannelCondition;
+import com.trilead.ssh2.ConnectionInfo;
+import com.trilead.ssh2.ExtendedServerHostKeyVerifier;
+import com.trilead.ssh2.ServerHostKeyVerifier;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketChannelAuthAgentReq;
 import com.trilead.ssh2.packets.PacketChannelOpenConfirmation;
@@ -15,6 +21,8 @@ import com.trilead.ssh2.packets.PacketChannelOpenFailure;
 import com.trilead.ssh2.packets.PacketChannelTrileadPing;
 import com.trilead.ssh2.packets.PacketGlobalCancelForwardRequest;
 import com.trilead.ssh2.packets.PacketGlobalForwardRequest;
+import com.trilead.ssh2.packets.PacketGlobalHostkeys;
+import com.trilead.ssh2.packets.PacketGlobalHostkeysProve;
 import com.trilead.ssh2.packets.PacketGlobalTrileadPing;
 import com.trilead.ssh2.packets.PacketOpenDirectTCPIPChannel;
 import com.trilead.ssh2.packets.PacketOpenSessionChannel;
@@ -26,6 +34,14 @@ import com.trilead.ssh2.packets.PacketSessionSubsystemRequest;
 import com.trilead.ssh2.packets.PacketSessionX11Request;
 import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.packets.TypesReader;
+import com.trilead.ssh2.packets.TypesWriter;
+import com.trilead.ssh2.signature.DSASHA1Verify;
+import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
+import com.trilead.ssh2.signature.RSASHA1Verify;
+import com.trilead.ssh2.signature.RSASHA256Verify;
+import com.trilead.ssh2.signature.RSASHA512Verify;
+import com.trilead.ssh2.signature.SSHSignature;
 import com.trilead.ssh2.transport.ITransportConnection;
 import com.trilead.ssh2.transport.MessageHandler;
 
@@ -62,6 +78,9 @@ public class ChannelManager implements MessageHandler
 {
 	private static final Logger log = Logger.getLogger(ChannelManager.class);
 
+	private static final int MAX_ADVERTISED_HOSTKEYS = 20;
+	private static final int MAX_KEYS_TO_PROVE = 10;
+
 	private final HashMap<String, X11ServerData> x11_magic_cookies = new HashMap<>();
 
 	private final ITransportConnection tm;
@@ -71,6 +90,30 @@ public class ChannelManager implements MessageHandler
 	private boolean shutdown = false;
 	private int globalSuccessCounter = 0;
 	private int globalFailedCounter = 0;
+
+	private volatile HostkeysProveRequest pendingHostkeysProve = null;
+	private final Object hostkeysProveLock = new Object();
+
+	private static class HostkeysProveRequest
+	{
+		final List<byte[]> requestedKeys;
+		final String requestName;
+		final String hostname;
+		final int port;
+		List<byte[]> responseSignatures;
+		boolean succeeded;
+		boolean completed;
+
+		HostkeysProveRequest(List<byte[]> keys, String reqName, String host, int p)
+		{
+			this.requestedKeys = keys;
+			this.requestName = reqName;
+			this.hostname = host;
+			this.port = p;
+			this.succeeded = false;
+			this.completed = false;
+		}
+	}
 
 	private final HashMap<Integer, RemoteForwardingData> remoteForwardings = new HashMap<>();
 
@@ -1653,13 +1696,47 @@ public class ChannelManager implements MessageHandler
 
 		if (log.isEnabled())
 			log.log(80, "Got SSH_MSG_GLOBAL_REQUEST (" + requestName + ")");
+
+		if (PacketGlobalHostkeys.HOSTKEYS_VENDOR.equals(requestName) ||
+				PacketGlobalHostkeys.HOSTKEYS_STANDARD.equals(requestName)) {
+			try {
+				PacketGlobalHostkeys hostkeys = new PacketGlobalHostkeys(msg, 0, msglen);
+				processHostkeysAdvertisement(hostkeys, requestName);
+			} catch (IOException e) {
+				if (log.isEnabled())
+					log.log(20, "Failed to parse hostkeys advertisement: " + e.getMessage());
+			}
+		}
 	}
 
-	public void msgGlobalSuccess() {
+	public void msgGlobalSuccess(byte[] msg, int msglen) throws IOException {
 		synchronized (channels)
 		{
 			globalSuccessCounter++;
 			channels.notifyAll();
+		}
+
+		synchronized (hostkeysProveLock) {
+			if (pendingHostkeysProve != null && !pendingHostkeysProve.completed) {
+				try {
+					PacketGlobalHostkeysProve response =
+						new PacketGlobalHostkeysProve(msg, 0, msglen, true);
+
+					pendingHostkeysProve.responseSignatures = response.getSignatures();
+					pendingHostkeysProve.succeeded = true;
+					pendingHostkeysProve.completed = true;
+
+					processHostkeysProveResponse(pendingHostkeysProve);
+				} catch (IOException e) {
+					if (log.isEnabled())
+						log.log(20, "Failed to parse hostkeys-prove response: " + e.getMessage());
+					pendingHostkeysProve.completed = true;
+					pendingHostkeysProve.succeeded = false;
+				} finally {
+					hostkeysProveLock.notifyAll();
+				}
+				return;
+			}
 		}
 
 		if (log.isEnabled())
@@ -1671,6 +1748,20 @@ public class ChannelManager implements MessageHandler
 		{
 			globalFailedCounter++;
 			channels.notifyAll();
+		}
+
+		synchronized (hostkeysProveLock) {
+			if (pendingHostkeysProve != null && !pendingHostkeysProve.completed) {
+				pendingHostkeysProve.completed = true;
+				pendingHostkeysProve.succeeded = false;
+				hostkeysProveLock.notifyAll();
+
+				if (log.isEnabled())
+					log.log(50, "Server refused hostkeys-prove request");
+
+				pendingHostkeysProve = null;
+				return;
+			}
 		}
 
 		if (log.isEnabled())
@@ -1759,7 +1850,7 @@ public class ChannelManager implements MessageHandler
 			msgGlobalRequest(msg, msglen);
 			break;
 		case Packets.SSH_MSG_REQUEST_SUCCESS:
-			msgGlobalSuccess();
+			msgGlobalSuccess(msg, msglen);
 			break;
 		case Packets.SSH_MSG_REQUEST_FAILURE:
 			msgGlobalFailure();
@@ -1767,5 +1858,239 @@ public class ChannelManager implements MessageHandler
 		default:
 			throw new IOException("Cannot handle unknown channel message " + (msg[0] & 0xff));
 		}
+	}
+
+	private void processHostkeysAdvertisement(PacketGlobalHostkeys hostkeys, String requestName) throws IOException
+	{
+		ServerHostKeyVerifier verifier = tm.getServerHostKeyVerifier();
+		if (!(verifier instanceof ExtendedServerHostKeyVerifier)) {
+			if (log.isEnabled())
+				log.log(50, "Received hostkeys but verifier doesn't extend ExtendedServerHostKeyVerifier");
+			return;
+		}
+
+		ExtendedServerHostKeyVerifier extVerifier = (ExtendedServerHostKeyVerifier) verifier;
+		String hostname = tm.getHostname();
+		int port = tm.getPort();
+
+		List<byte[]> advertisedKeys = hostkeys.getHostkeys();
+
+		if (advertisedKeys.size() > MAX_ADVERTISED_HOSTKEYS) {
+			if (log.isEnabled())
+				log.log(20, "Server advertised too many keys: " + advertisedKeys.size());
+			return;
+		}
+
+		List<String> knownAlgos = extVerifier.getKnownKeyAlgorithmsForHost(hostname, port);
+		Set<String> knownAlgoSet = (knownAlgos != null) ? new HashSet<>(knownAlgos) : new HashSet<>();
+
+		List<byte[]> newKeys = new ArrayList<>();
+		Set<String> advertisedAlgoSet = new HashSet<>();
+
+		for (byte[] keyBlob : advertisedKeys) {
+			String keyAlgo = extractKeyAlgorithm(keyBlob);
+			if (keyAlgo == null)
+				continue;
+
+			advertisedAlgoSet.add(keyAlgo);
+
+			if (!knownAlgoSet.contains(keyAlgo)) {
+				newKeys.add(keyBlob);
+			}
+		}
+
+		if (knownAlgos != null) {
+			for (String knownAlgo : knownAlgos) {
+				if (!advertisedAlgoSet.contains(knownAlgo)) {
+					extVerifier.removeServerHostKey(hostname, port, knownAlgo, null);
+					if (log.isEnabled())
+						log.log(50, "Removed hostkey algorithm no longer advertised: " + knownAlgo);
+				}
+			}
+		}
+
+		if (!newKeys.isEmpty()) {
+			if (log.isEnabled())
+				log.log(50, "Server advertised " + newKeys.size() + " new hostkey(s)");
+			requestHostkeysProve(newKeys, requestName, hostname, port);
+		}
+	}
+
+	private void requestHostkeysProve(List<byte[]> newKeys, String hostkeysRequestName,
+									String hostname, int port) throws IOException
+	{
+		String proveRequestName;
+		if (PacketGlobalHostkeys.HOSTKEYS_STANDARD.equals(hostkeysRequestName)) {
+			proveRequestName = PacketGlobalHostkeysProve.HOSTKEYS_PROVE_STANDARD;
+		} else {
+			proveRequestName = PacketGlobalHostkeysProve.HOSTKEYS_PROVE_VENDOR;
+		}
+
+		ConnectionInfo connInfo = tm.getConnectionInfo(1);
+		List<byte[]> keysToProve = filterRSAKeys(newKeys, connInfo.serverHostKeyAlgorithm);
+
+		if (keysToProve.isEmpty()) {
+			if (log.isEnabled())
+				log.log(50, "No keys to prove after RSA filtering");
+			return;
+		}
+
+		if (keysToProve.size() > MAX_KEYS_TO_PROVE) {
+			if (log.isEnabled())
+				log.log(20, "Too many keys to prove, limiting to " + MAX_KEYS_TO_PROVE);
+			keysToProve = keysToProve.subList(0, MAX_KEYS_TO_PROVE);
+		}
+
+		synchronized (hostkeysProveLock) {
+			if (pendingHostkeysProve != null) {
+				if (log.isEnabled())
+					log.log(20, "Hostkeys-prove request already pending, ignoring new request");
+				return;
+			}
+			pendingHostkeysProve = new HostkeysProveRequest(keysToProve, proveRequestName,
+															hostname, port);
+		}
+
+		PacketGlobalHostkeysProve provePacket = new PacketGlobalHostkeysProve(proveRequestName, keysToProve);
+		tm.sendMessage(provePacket.getPayload());
+
+		if (log.isEnabled())
+			log.log(50, "Sent " + proveRequestName + " request for " + keysToProve.size() + " keys");
+	}
+
+	private List<byte[]> filterRSAKeys(List<byte[]> keys, String negotiatedHostKeyAlgo) throws IOException
+	{
+		List<byte[]> filtered = new ArrayList<>();
+
+		for (byte[] keyBlob : keys) {
+			String keyAlgo = extractKeyAlgorithm(keyBlob);
+
+			if (RSASHA1Verify.ID_SSH_RSA.equals(keyAlgo) ||
+				RSASHA256Verify.ID_RSA_SHA_2_256.equals(keyAlgo) ||
+				RSASHA512Verify.ID_RSA_SHA_2_512.equals(keyAlgo)) {
+
+				if (RSASHA1Verify.ID_SSH_RSA.equals(negotiatedHostKeyAlgo)) {
+					if (log.isEnabled())
+						log.log(50, "Skipping RSA key because ssh-rsa was negotiated");
+					continue;
+				}
+			}
+
+			filtered.add(keyBlob);
+		}
+
+		return filtered;
+	}
+
+	private void processHostkeysProveResponse(final HostkeysProveRequest request)
+	{
+		Thread processor = new Thread(new Runnable() {
+			public void run() {
+				processHostkeysProveResponseImpl(request);
+			}
+		}, "HostkeysProve-Processor");
+		processor.setDaemon(true);
+		processor.start();
+	}
+
+	private void processHostkeysProveResponseImpl(HostkeysProveRequest request)
+	{
+		try {
+			List<byte[]> signatures = request.responseSignatures;
+			List<byte[]> requestedKeys = request.requestedKeys;
+
+			if (signatures.size() != requestedKeys.size()) {
+				if (log.isEnabled())
+					log.log(20, "Signature count mismatch: expected " + requestedKeys.size() +
+								" but got " + signatures.size());
+				return;
+			}
+
+			byte[] sessionId = tm.getSessionIdentifier();
+			ServerHostKeyVerifier verifier = tm.getServerHostKeyVerifier();
+
+			if (!(verifier instanceof ExtendedServerHostKeyVerifier)) {
+				if (log.isEnabled())
+					log.log(20, "Verifier is not ExtendedServerHostKeyVerifier, cannot add keys");
+				return;
+			}
+
+			ExtendedServerHostKeyVerifier extVerifier = (ExtendedServerHostKeyVerifier) verifier;
+
+			for (int i = 0; i < requestedKeys.size(); i++) {
+				byte[] hostkey = requestedKeys.get(i);
+				byte[] signature = signatures.get(i);
+
+				if (verifyHostkeyProof(hostkey, signature, sessionId, request.requestName)) {
+					String keyAlgo = extractKeyAlgorithm(hostkey);
+					extVerifier.addServerHostKey(request.hostname, request.port, keyAlgo, hostkey);
+
+					if (log.isEnabled())
+						log.log(50, "Verified and added hostkey: " + keyAlgo);
+				} else {
+					if (log.isEnabled())
+						log.log(20, "Failed to verify hostkey proof for key " + i);
+				}
+			}
+		} catch (Exception e) {
+			if (log.isEnabled())
+				log.log(20, "Error processing hostkeys-prove response: " + e.getMessage());
+		} finally {
+			synchronized (hostkeysProveLock) {
+				pendingHostkeysProve = null;
+			}
+		}
+	}
+
+	private String extractKeyAlgorithm(byte[] keyBlob) throws IOException
+	{
+		TypesReader tr = new TypesReader(keyBlob);
+		return tr.readString();
+	}
+
+	private SSHSignature getSignatureVerifier(String algorithm)
+	{
+		if (RSASHA1Verify.ID_SSH_RSA.equals(algorithm))
+			return RSASHA1Verify.get();
+		if (RSASHA256Verify.ID_RSA_SHA_2_256.equals(algorithm))
+			return RSASHA256Verify.get();
+		if (RSASHA512Verify.ID_RSA_SHA_2_512.equals(algorithm))
+			return RSASHA512Verify.get();
+		if (DSASHA1Verify.ID_SSH_DSS.equals(algorithm))
+			return DSASHA1Verify.get();
+		if (Ed25519Verify.ED25519_ID.equals(algorithm))
+			return Ed25519Verify.get();
+
+		if (algorithm.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX)) {
+			if (ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat().equals(algorithm))
+				return ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
+			if (ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat().equals(algorithm))
+				return ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
+			if (ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat().equals(algorithm))
+				return ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
+		}
+
+		return null;
+	}
+
+	private boolean verifyHostkeyProof(byte[] hostkey, byte[] signature, byte[] sessionId, String requestName) throws IOException
+	{
+		String keyAlgo = extractKeyAlgorithm(hostkey);
+
+		TypesWriter signedData = new TypesWriter();
+		signedData.writeString(requestName);
+		signedData.writeString(sessionId, 0, sessionId.length);
+		signedData.writeString(hostkey, 0, hostkey.length);
+		byte[] dataToVerify = signedData.getBytes();
+
+		SSHSignature verifier = getSignatureVerifier(keyAlgo);
+		if (verifier == null) {
+			if (log.isEnabled())
+				log.log(20, "No signature verifier for algorithm: " + keyAlgo);
+			return false;
+		}
+
+		PublicKey publicKey = verifier.decodePublicKey(hostkey);
+		return verifier.verifySignature(dataToVerify, signature, publicKey);
 	}
 }

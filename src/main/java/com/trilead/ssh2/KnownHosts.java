@@ -55,7 +55,7 @@ import com.trilead.ssh2.transport.KexManager;
  * @version $Id: KnownHosts.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
 
-public class KnownHosts
+public class KnownHosts extends ExtendedServerHostKeyVerifier
 {
 	public static final int HOSTKEY_IS_OK = 0;
 	public static final int HOSTKEY_IS_NEW = 1;
@@ -890,5 +890,97 @@ public class KnownHosts
 	{
 		byte[] raw = rawFingerPrint("sha1", keytype, publickey);
 		return rawToBubblebabbleFingerprint(raw);
+	}
+
+	@Override
+	public List<String> getKnownKeyAlgorithmsForHost(String hostname, int port)
+	{
+		List<PublicKey> keys = getAllKeys(hostname);
+		List<String> algorithms = new ArrayList<>();
+
+		for (PublicKey key : keys) {
+			String algo = publicKeyToAlgorithm(key);
+			if (algo != null && !algorithms.contains(algo)) {
+				algorithms.add(algo);
+			}
+		}
+
+		return algorithms;
+	}
+
+	@Override
+	public void addServerHostKey(String hostname, int port, String keyAlgorithm, byte[] serverHostKey)
+	{
+		try {
+			addVerifiedHostkey(hostname, keyAlgorithm, serverHostKey);
+		} catch (IOException e) {
+			// Log but don't throw - this is called from async context
+			// Cannot use logger here since it's not available
+		}
+	}
+
+	@Override
+	public void removeServerHostKey(String hostname, int port, String serverHostKeyAlgorithm, byte[] serverHostKey)
+	{
+		synchronized (publicKeys) {
+			publicKeys.removeIf(entry -> {
+				if (!hostnameMatches(entry.patterns, hostname))
+					return false;
+
+				String algo = publicKeyToAlgorithm(entry.key);
+				return serverHostKeyAlgorithm.equals(algo);
+			});
+		}
+	}
+
+	@Override
+	public boolean verifyServerHostKey(String hostname, int port,
+										String serverHostKeyAlgorithm,
+										byte[] serverHostKey) throws Exception
+	{
+		int result = verifyHostkey(hostname, serverHostKeyAlgorithm, serverHostKey);
+
+		if (result == HOSTKEY_IS_OK) {
+			return true;
+		} else if (result == HOSTKEY_IS_NEW) {
+			addHostkey(new String[]{hostname}, serverHostKeyAlgorithm, serverHostKey);
+			return true;
+		}
+
+		return false;
+	}
+
+	public boolean addVerifiedHostkey(String hostname, String serverHostKeyAlgorithm,
+										byte[] serverHostKey) throws IOException
+	{
+		int result = verifyHostkey(hostname, serverHostKeyAlgorithm, serverHostKey);
+		if (result == HOSTKEY_IS_OK) {
+			return false;
+		}
+
+		addHostkey(new String[]{hostname}, serverHostKeyAlgorithm, serverHostKey);
+		return true;
+	}
+
+	private String publicKeyToAlgorithm(PublicKey key)
+	{
+		if (key instanceof RSAPublicKey) {
+			return RSASHA1Verify.ID_SSH_RSA;
+		} else if (key instanceof DSAPublicKey) {
+			return DSASHA1Verify.ID_SSH_DSS;
+		} else if (key instanceof ECPublicKey) {
+			ECPublicKey ecKey = (ECPublicKey) key;
+			int fieldSize = ecKey.getParams().getCurve().getField().getFieldSize();
+			if (fieldSize == 256) {
+				return "ecdsa-sha2-nistp256";
+			} else if (fieldSize == 384) {
+				return "ecdsa-sha2-nistp384";
+			} else if (fieldSize == 521) {
+				return "ecdsa-sha2-nistp521";
+			}
+		} else if (key instanceof Ed25519PublicKey) {
+			return Ed25519Verify.ED25519_ID;
+		}
+		return null;
 	}
 }
