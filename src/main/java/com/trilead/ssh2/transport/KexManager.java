@@ -208,6 +208,11 @@ public class KexManager
 		}
 	}
 
+	public ServerHostKeyVerifier getServerHostKeyVerifier()
+	{
+		return verifier;
+	}
+
 	private String getFirstMatch(String[] client, String[] server) throws NegotiateException
 	{
 		if (client == null || server == null)

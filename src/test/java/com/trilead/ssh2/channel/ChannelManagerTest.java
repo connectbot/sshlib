@@ -412,8 +412,9 @@ public class ChannelManagerTest {
 	}
 
 	@Test
-	public void testMsgGlobalSuccess() {
-		channelManager.msgGlobalSuccess();
+	public void testMsgGlobalSuccess() throws Exception {
+		byte[] msg = new byte[]{(byte) Packets.SSH_MSG_REQUEST_SUCCESS};
+		channelManager.msgGlobalSuccess(msg, 1);
 		// Just verify it doesn't throw
 		// The internal state change can't be easily tested without reflection
 	}
