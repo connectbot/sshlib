@@ -28,8 +28,10 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.trilead.ssh2.crypto.Base64;
+import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 
 
@@ -121,12 +123,22 @@ public class KnownHosts
 		{
 			ECPublicKey epk = ECDSASHA2Verify.decodeSSHECDSAPublicKey(serverHostKey);
 
-			synchronized (publicKeys) {
+			synchronized (publicKeys)
+			{
 				publicKeys.add(new KnownHostsEntry(hostnames, epk));
 			}
 		}
+		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
+		{
+			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
+
+			synchronized (publicKeys)
+			{
+				publicKeys.add(new KnownHostsEntry(hostnames, edpk));
+			}
+		}
 		else
-			throw new IOException("Unknwon host key type (" + serverHostKeyAlgorithm + ")");
+			throw new IOException("Unknown host key type (" + serverHostKeyAlgorithm + ")");
 	}
 
 	/**
@@ -604,6 +616,10 @@ public class KnownHosts
 		{
 			remoteKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(serverHostKey);
 		}
+		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
+		{
+			remoteKey = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
+		}
 		else
 			throw new IllegalArgumentException("Unknown hostkey type " + serverHostKeyAlgorithm);
 
@@ -719,7 +735,10 @@ public class KnownHosts
 			throw new IllegalArgumentException("Unknown hash type " + type);
 		}
 
-		if (keyType.startsWith("ecdsa-sha2-"))
+		if (Ed25519Verify.ED25519_ID.equals(keyType))
+		{
+		}
+		else if (keyType.startsWith("ecdsa-sha2-"))
 		{
 		}
 		else if ("ssh-rsa".equals(keyType))
