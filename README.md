@@ -8,6 +8,7 @@ but has had several features added to it since then.
 ##### Key support:
   * ECDSA (RFC 5656)
   * Ed25519 (draft-bjh21-ssh-ed25519-02)
+
 ##### Key exchange:
   * ECDH (RFC 5656)
   * X25519 (curve25519-sha256@libssh.org)
