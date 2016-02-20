@@ -11,7 +11,7 @@ before_cache:
 - find $HOME/.gradle -name "*.lock" -exec rm {} \;
 - rm -rf $HOME/.gradle/caches/[1-9]*
 after_success:
-- "./gradlew bintrayUpload"
+- "./gradlew bintrayUpload artifactoryPublish"
 env:
   global:
   - bintrayUser=kruton
