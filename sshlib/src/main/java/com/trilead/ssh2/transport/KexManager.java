@@ -8,12 +8,14 @@ import java.security.SecureRandom;
 import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
 
 import com.trilead.ssh2.ConnectionInfo;
 import com.trilead.ssh2.DHGexParameters;
+import com.trilead.ssh2.ExtendedServerHostKeyVerifier;
 import com.trilead.ssh2.ServerHostKeyVerifier;
 import com.trilead.ssh2.compression.CompressionFactory;
 import com.trilead.ssh2.compression.ICompressor;
@@ -282,6 +284,8 @@ public class KexManager
 	public synchronized void initiateKEX(CryptoWishList cwl, DHGexParameters dhgex) throws IOException
 	{
 		nextKEXcryptoWishList = cwl;
+		filterHostKeyTypes(nextKEXcryptoWishList);
+
 		nextKEXdhgexParameters = dhgex;
 
 		if (kxs == null)
@@ -292,6 +296,40 @@ public class KexManager
 			PacketKexInit kp = new PacketKexInit(nextKEXcryptoWishList);
 			kxs.localKEX = kp;
 			tm.sendKexMessage(kp.getPayload());
+		}
+	}
+
+	/**
+	 * If the verifier can indicate which algorithms it knows about for this host, then
+	 * filter out our crypto wish list to only include those algorithms. Otherwise we'll
+	 * negotiate a host key we have not previously confirmed.
+	 *
+	 * @param cwl crypto wish list to filter
+	 */
+	private void filterHostKeyTypes(CryptoWishList cwl) {
+		if (verifier instanceof ExtendedServerHostKeyVerifier) {
+			ExtendedServerHostKeyVerifier extendedVerifier = (ExtendedServerHostKeyVerifier) verifier;
+
+			List<String> knownAlgorithms = extendedVerifier.getKnownKeyAlgorithmsForHost(hostname, port);
+			if (knownAlgorithms != null && knownAlgorithms.size() > 0) {
+				ArrayList<String> filteredAlgorithms = new ArrayList<String>(knownAlgorithms.size());
+
+				/*
+				 * Look at our current wish list and adjust it based on what the client already knows, but
+				 * be careful to keep it in the order desired by the wish list.
+				 */
+				for (String capableAlgo : cwl.serverHostKeyAlgorithms) {
+					for (String knownAlgo : knownAlgorithms) {
+						if (capableAlgo.equals(knownAlgo)) {
+							filteredAlgorithms.add(knownAlgo);
+						}
+					}
+				}
+
+				if (filteredAlgorithms.size() > 0) {
+					cwl.serverHostKeyAlgorithms = filteredAlgorithms.toArray(new String[filteredAlgorithms.size()]);
+				}
+			}
 		}
 	}
 
