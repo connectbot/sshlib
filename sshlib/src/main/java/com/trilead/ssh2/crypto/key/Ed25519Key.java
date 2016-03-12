@@ -18,6 +18,7 @@
 package com.trilead.ssh2.crypto.key;
 
 import java.security.Key;
+import java.util.Arrays;
 
 /**
  * Java representation of a native Ed25519 key.
@@ -41,5 +42,20 @@ public class Ed25519Key implements Key {
 
 	public byte[] getEncoded() {
 		return keyBytes;
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(keyBytes);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (!(other instanceof Ed25519Key)) {
+			return false;
+		}
+
+		Ed25519Key otherKey = (Ed25519Key) other;
+		return Arrays.equals(keyBytes, otherKey.keyBytes);
 	}
 }
