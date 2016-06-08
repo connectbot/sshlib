@@ -23,13 +23,16 @@ import java.security.spec.KeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
+import java.util.Arrays;
 
 import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.CBCMode;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
+import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
 
 /**
  * PEM Support.
@@ -42,6 +45,11 @@ public class PEMDecoder
 	public static final int PEM_RSA_PRIVATE_KEY = 1;
 	public static final int PEM_DSA_PRIVATE_KEY = 2;
 	public static final int PEM_EC_PRIVATE_KEY = 3;
+	public static final int PEM_OPENSSH_PRIVATE_KEY = 4;
+
+	private static final byte[] OPENSSH_V1_MAGIC = new byte[] {
+		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1',
+	};
 
 	private static final int hexToInt(char c)
 	{
@@ -184,6 +192,12 @@ public class PEMDecoder
 			if (line.startsWith("-----BEGIN EC PRIVATE KEY-----")) {
 				endLine = "-----END EC PRIVATE KEY-----";
 				ps.pemType = PEM_EC_PRIVATE_KEY;
+				break;
+			}
+
+			if (line.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----")) {
+				endLine = "-----END OPENSSH PRIVATE KEY-----";
+				ps.pemType = PEM_OPENSSH_PRIVATE_KEY;
 				break;
 			}
 		}
@@ -466,6 +480,72 @@ public class PEMDecoder
 			ECPublicKeySpec pubSpec = new ECPublicKeySpec(w, params);
 
 			return generateKeyPair("EC", privSpec, pubSpec);
+		}
+
+		if (ps.pemType == PEM_OPENSSH_PRIVATE_KEY) {
+			TypesReader tr = new TypesReader(ps.data);
+			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
+			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, "US-ASCII"));
+			}
+
+			String ciphername = tr.readString();
+			String kdfname = tr.readString();
+			byte[] kdfoptions = tr.readByteString();
+			int numberOfKeys = tr.readUINT32();
+
+			// TODO support multiple keys
+			if (numberOfKeys != 1) {
+				throw new IOException("Only one key supported, but encountered bundle of " + numberOfKeys);
+			}
+
+			byte[] publicBytes = tr.readByteString();
+
+			TypesReader trPub = new TypesReader(publicBytes);
+			String keyType = trPub.readString();
+
+			byte[] encryptedBytes = tr.readByteString();
+
+			TypesReader trEnc = new TypesReader(encryptedBytes);
+
+			int checkInt1 = trEnc.readUINT32();
+			int checkInt2 = trEnc.readUINT32();
+
+			if (checkInt1 != checkInt2) {
+				throw new IOException("Decryption failed when trying to read private keys");
+			}
+
+			byte[] privateBytes = tr.readByteString();
+			byte[] comment = tr.readByteString();
+
+			// Make sure the padding is correct first.
+			int remaining = tr.remain();
+			for (int i = 1; i <= remaining; i++) {
+				if (i != tr.readByte()) {
+					throw new IOException("Bad padding value on decrypted private keys");
+				}
+			}
+
+			PrivateKey privKey;
+			PublicKey pubKey;
+			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
+				pubKey = Ed25519Verify.decodeSSHEd25519PublicKey(publicBytes);
+				privKey = Ed25519Verify.decodeSSHEd25519PrivateKey(privateBytes);
+			} else if (keyType.startsWith("ecdsa-sha2-")) {
+				pubKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(publicBytes);
+				privKey = ECDSASHA2Verify.decodeSSHECDSAPrivateKey(privateBytes);
+                        // TODO write decode private key support for these two:
+			//} else if ("ssh-rsa".equals(keyType)) {
+			//	pubKey = RSASHA1Verify.decodeSSHRSAPublicKey(publicBytes);
+			//	privKey = RSASHA1Verify.decodeSSHRSAPrivateKey(privateBytes);
+			//} else if ("ssh-dss".equals(keyType)) {
+			//	pubKey = DSASHA1Verify.decodeSSHDSAPublicKey(publicBytes);
+			//	privKey = DSASHA1Verify.decodeSSHDSAPrivateKey(privateBytes);
+			} else {
+				throw new IOException("Unknown key type " + keyType);
+			}
+
+			return new KeyPair(pubKey, privKey);
 		}
 
 		throw new IOException("PEM problem: it is of unknown type");

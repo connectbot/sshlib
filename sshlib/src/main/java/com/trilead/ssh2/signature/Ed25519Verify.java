@@ -24,6 +24,7 @@ import net.i2p.crypto.eddsa.EdDSAEngine;
 import net.i2p.crypto.eddsa.EdDSAPrivateKey;
 import net.i2p.crypto.eddsa.EdDSAPublicKey;
 import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 import java.io.IOException;
@@ -52,6 +53,28 @@ public class Ed25519Verify {
 		tw.writeString(encoded, 0, encoded.length);
 
 		return tw.getBytes();
+	}
+
+	public static EdDSAPrivateKey decodeSSHEd25519PrivateKey(byte[] key) throws IOException {
+		TypesReader tr = new TypesReader(key);
+
+		String key_format = tr.readString();
+		if (key_format.equals(ED25519_ID) == false) {
+			throw new IOException("This is not an Ed25519 key");
+		}
+
+		byte[] keyBytes = tr.readByteString();
+
+		if (tr.remain() != 0) {
+			throw new IOException("Padding in Ed25519 private key! " + tr.remain() + " bytes left.");
+		}
+
+		if (keyBytes.length != ED25519_PK_SIZE_BYTES) {
+			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
+		}
+
+		return new EdDSAPrivateKey(new EdDSAPrivateKeySpec(keyBytes,
+				EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512)));
 	}
 
 	public static EdDSAPublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {

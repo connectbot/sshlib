@@ -30,6 +30,7 @@ import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECFieldFp;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
+import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.ECPublicKeySpec;
 import java.security.spec.EllipticCurve;
 import java.security.spec.InvalidKeySpecException;
@@ -94,6 +95,53 @@ public class ECDSASHA2Verify {
 			return null;
 		}
 		return CURVES.get(name);
+	}
+
+	public static ECPrivateKey decodeSSHECDSAPrivateKey(byte[] key) throws IOException
+	{
+		TypesReader tr = new TypesReader(key);
+
+		String key_format = tr.readString();
+
+		if (key_format.startsWith(ECDSA_SHA2_PREFIX) == false)
+			throw new IllegalArgumentException("This is not an ECDSA private key");
+
+		String curveName = tr.readString();
+		byte[] groupBytes = tr.readByteString();
+		BigInteger privPoint = tr.readMPINT();
+
+		if (tr.remain() != 0)
+			throw new IOException("Padding in ECDSA private key!");
+
+		if (key_format.equals(ECDSA_SHA2_PREFIX + curveName) == false) {
+			throw new IOException("Key format is inconsistent with curve name: " + key_format
+					+ " != " + curveName);
+		}
+
+		ECParameterSpec params = CURVES.get(curveName);
+		if (params == null) {
+			throw new IOException("Curve is not supported: " + curveName);
+		}
+
+		ECPoint group = ECDSASHA2Verify.decodeECPoint(groupBytes, params.getCurve());
+		if (group == null) {
+			throw new IOException("Invalid ECDSA group");
+		}
+
+		KeySpec keySpec = new ECPrivateKeySpec(privPoint, params);
+
+		try {
+			KeyFactory kf = KeyFactory.getInstance("EC");
+			return (ECPrivateKey) kf.generatePrivate(keySpec);
+		} catch (NoSuchAlgorithmException nsae) {
+			IOException ioe = new IOException("No EC KeyFactory available");
+			ioe.initCause(nsae);
+			throw ioe;
+		} catch (InvalidKeySpecException ikse) {
+			IOException ioe = new IOException("No EC KeyFactory available");
+			ioe.initCause(ikse);
+			throw ioe;
+		}
 	}
 
 	public static ECPublicKey decodeSSHECDSAPublicKey(byte[] key) throws IOException
