@@ -133,7 +133,7 @@ public class Ed25519Verify {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		tw.writeBytes(sig);
+		tw.writeString(sig, 0, sig.length);
 
 		return tw.getBytes();
 	}

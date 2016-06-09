@@ -1,5 +1,6 @@
 package com.trilead.ssh2.signature;
 
+import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.crypto.PEMDecoder;
 import net.i2p.crypto.eddsa.EdDSAPrivateKey;
 import net.i2p.crypto.eddsa.EdDSAPublicKey;
@@ -11,6 +12,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import javax.xml.bind.DatatypeConverter;
+import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -96,17 +98,25 @@ public class Ed25519VerifyTest {
 		assertTrue(Ed25519Verify.verifySignature(digest, sig, pubKey));
 	}
 
+	private static final char[] SSH_PRIVATE_KEY = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" +
+		"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n" +
+		"QyNTUxOQAAACDfbA2PEVsvCpsNiLURs0nifELRIq5CEhDFQ+4i10W1cQAAAKhBsisTQbIr\n" +
+		"EwAAAAtzc2gtZWQyNTUxOQAAACDfbA2PEVsvCpsNiLURs0nifELRIq5CEhDFQ+4i10W1cQ\n" +
+		"AAAEAIbXzBNVlb+eO63rEGkFFLzIu9IfdiU7Q+fBgcD14R999sDY8RWy8Kmw2ItRGzSeJ8\n" +
+		"QtEirkISEMVD7iLXRbVxAAAAH2tyb290QGtyb290Lm10di5jb3JwLmdvb2dsZS5jb20BAg\n" +
+		"MEBQY=\n" +
+		"-----END OPENSSH PRIVATE KEY-----\n").toCharArray();
+	private static final String SSH_PUBLIC_KEY = "AAAAC3NzaC1lZDI1NTE5AAAAIN9sDY8RWy8Kmw2ItRGzSeJ8QtEirkISEMVD7iLXRbVx";
+
 	@Test
 	public void privateKeyDecodeSuccess() throws Exception {
-		char[] pemKey = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" +
-			"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n" +
-			"QyNTUxOQAAACDd4c82N3RMipI3LlmjN4BBrJv8d6RhjF56hdwpH0mBEwAAAKjXjeu7143r\n" +
-			"uwAAAAtzc2gtZWQyNTUxOQAAACDd4c82N3RMipI3LlmjN4BBrJv8d6RhjF56hdwpH0mBEw\n" +
-			"AAAEADrhyPk5eQ1m2ug2lkKnDLrfxnzolJjMpDSRomN1TWwt3hzzY3dEyKkjcuWaM3gEGs\n" +
-			"m/x3pGGMXnqF3CkfSYETAAAAH2tyb290QGtyb290Lm10di5jb3JwLmdvb2dsZS5jb20BAg\n" +
-			"MEBQY=\n" +
-			"-----END OPENSSH PRIVATE KEY-----\n").toCharArray();
-		PEMDecoder.decode(pemKey, null);
+		KeyPair pair = PEMDecoder.decode(SSH_PRIVATE_KEY, null);
 	}
 
+	@Test
+	public void publicKeyEncodeSuccess() throws Exception {
+		EdDSAPublicKey pubKey = (EdDSAPublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
+		byte[] pubKeyBytes = Base64.decode(SSH_PUBLIC_KEY.toCharArray());
+		assertArrayEquals(pubKeyBytes, Ed25519Verify.encodeSSHEd25519PublicKey(pubKey));
+	}
 }
