@@ -106,7 +106,7 @@ public class Ed25519VerifyTest {
 			"m/x3pGGMXnqF3CkfSYETAAAAH2tyb290QGtyb290Lm10di5jb3JwLmdvb2dsZS5jb20BAg\n" +
 			"MEBQY=\n" +
 			"-----END OPENSSH PRIVATE KEY-----\n").toCharArray();
-		PEMDecoder.parsePEM(pemKey);
+		PEMDecoder.decode(pemKey, null);
 	}
 
 }

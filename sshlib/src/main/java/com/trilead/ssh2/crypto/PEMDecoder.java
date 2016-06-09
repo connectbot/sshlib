@@ -33,6 +33,12 @@ import com.trilead.ssh2.crypto.cipher.DESede;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
+import net.i2p.crypto.eddsa.EdDSAPrivateKey;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 /**
  * PEM Support.
@@ -48,7 +54,7 @@ public class PEMDecoder
 	public static final int PEM_OPENSSH_PRIVATE_KEY = 4;
 
 	private static final byte[] OPENSSH_V1_MAGIC = new byte[] {
-		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1',
+		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1', '\0',
 	};
 
 	private static final int hexToInt(char c)
@@ -506,6 +512,11 @@ public class PEMDecoder
 
 			byte[] encryptedBytes = tr.readByteString();
 
+			// TODO support encryption
+			if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
+				throw new IOException("encryption not supported");
+			}
+
 			TypesReader trEnc = new TypesReader(encryptedBytes);
 
 			int checkInt1 = trEnc.readUINT32();
@@ -515,26 +526,23 @@ public class PEMDecoder
 				throw new IOException("Decryption failed when trying to read private keys");
 			}
 
-			byte[] privateBytes = tr.readByteString();
-			byte[] comment = tr.readByteString();
-
-			// Make sure the padding is correct first.
-			int remaining = tr.remain();
-			for (int i = 1; i <= remaining; i++) {
-				if (i != tr.readByte()) {
-					throw new IOException("Bad padding value on decrypted private keys");
-				}
+			String privateKeyType = trEnc.readString();
+			if (!keyType.equals(privateKeyType)) {
+				throw new IOException("Public and private key types do not match!");
 			}
 
 			PrivateKey privKey;
 			PublicKey pubKey;
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
+				byte[] privateBytes = trEnc.readByteString();
+				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(
+						EdDSANamedCurveTable.CURVE_ED25519_SHA512);
+				privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(privateBytes, spec));
 				pubKey = Ed25519Verify.decodeSSHEd25519PublicKey(publicBytes);
-				privKey = Ed25519Verify.decodeSSHEd25519PrivateKey(privateBytes);
-			} else if (keyType.startsWith("ecdsa-sha2-")) {
-				pubKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(publicBytes);
-				privKey = ECDSASHA2Verify.decodeSSHECDSAPrivateKey(privateBytes);
-                        // TODO write decode private key support for these two:
+			// TODO write decode private key support for these two:
+			//} else if (keyType.startsWith("ecdsa-sha2-")) {
+			//	pubKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(publicBytes);
+			//	privKey = ECDSASHA2Verify.decodeSSHECDSAPrivateKey(privateBytes);
 			//} else if ("ssh-rsa".equals(keyType)) {
 			//	pubKey = RSASHA1Verify.decodeSSHRSAPublicKey(publicBytes);
 			//	privKey = RSASHA1Verify.decodeSSHRSAPrivateKey(privateBytes);
@@ -543,6 +551,16 @@ public class PEMDecoder
 			//	privKey = DSASHA1Verify.decodeSSHDSAPrivateKey(privateBytes);
 			} else {
 				throw new IOException("Unknown key type " + keyType);
+			}
+
+			byte[] comment = trEnc.readByteString();
+
+			// Make sure the padding is correct first.
+			int remaining = tr.remain();
+			for (int i = 1; i <= remaining; i++) {
+				if (i != tr.readByte()) {
+					throw new IOException("Bad padding value on decrypted private keys");
+				}
 			}
 
 			return new KeyPair(pubKey, privKey);
