@@ -1,5 +1,6 @@
 package com.trilead.ssh2.signature;
 
+import com.trilead.ssh2.crypto.PEMDecoder;
 import net.i2p.crypto.eddsa.EdDSAPrivateKey;
 import net.i2p.crypto.eddsa.EdDSAPublicKey;
 import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
@@ -94,4 +95,18 @@ public class Ed25519VerifyTest {
 		byte[] sig = Ed25519Verify.generateSignature(digest, privKey);
 		assertTrue(Ed25519Verify.verifySignature(digest, sig, pubKey));
 	}
+
+	@Test
+	public void privateKeyDecodeSuccess() throws Exception {
+		char[] pemKey = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" +
+			"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n" +
+			"QyNTUxOQAAACDd4c82N3RMipI3LlmjN4BBrJv8d6RhjF56hdwpH0mBEwAAAKjXjeu7143r\n" +
+			"uwAAAAtzc2gtZWQyNTUxOQAAACDd4c82N3RMipI3LlmjN4BBrJv8d6RhjF56hdwpH0mBEw\n" +
+			"AAAEADrhyPk5eQ1m2ug2lkKnDLrfxnzolJjMpDSRomN1TWwt3hzzY3dEyKkjcuWaM3gEGs\n" +
+			"m/x3pGGMXnqF3CkfSYETAAAAH2tyb290QGtyb290Lm10di5jb3JwLmdvb2dsZS5jb20BAg\n" +
+			"MEBQY=\n" +
+			"-----END OPENSSH PRIVATE KEY-----\n").toCharArray();
+		PEMDecoder.parsePEM(pemKey);
+	}
+
 }
