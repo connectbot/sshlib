@@ -23,14 +23,14 @@ import com.trilead.ssh2.packets.TypesWriter;
 import net.i2p.crypto.eddsa.EdDSAEngine;
 import net.i2p.crypto.eddsa.EdDSAPrivateKey;
 import net.i2p.crypto.eddsa.EdDSAPublicKey;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
 
 /**
  * @author Kenny Root
@@ -71,11 +71,8 @@ public class Ed25519Verify {
 			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
 		}
 
-		try {
-			return new EdDSAPublicKey(new X509EncodedKeySpec(keyBytes));
-		} catch (InvalidKeySpecException e) {
-			throw new IOException(e);
-		}
+		return new EdDSAPublicKey(new EdDSAPublicKeySpec(keyBytes,
+				EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512)));
 	}
 
 	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
