@@ -75,6 +75,6 @@ public class ECDSASHA2VerifyTest {
 			"H5mVXAO0t2YQq7qfAMCBawq2HfC+rfCikl5mrSYg6d0bshQ5ZIYAwU85VIK9kdjA\n" +
 			"ImRIKkyB7MN7qqQUASFcYZLFwwdeRZw/0Yp7Ma/+\n" +
 			"-----END EC PRIVATE KEY-----\n").toCharArray();
-		PEMDecoder.parsePEM(pemKey);
+		PEMDecoder.decode(pemKey, null);
 	}
 }

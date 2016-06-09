@@ -76,8 +76,8 @@ public class ECDSASHA2Verify {
 	private static final Map<String, String> CURVE_OIDS = new TreeMap<String, String>();
 	static {
 		CURVE_OIDS.put(NISTP256_OID, NISTP256);
-		CURVE_OIDS.put(NISTP384_OID, NISTP256);
-		CURVE_OIDS.put(NISTP521_OID, NISTP256);
+		CURVE_OIDS.put(NISTP384_OID, NISTP384);
+		CURVE_OIDS.put(NISTP521_OID, NISTP521);
 	}
 
 	public static int[] getCurveSizes() {
