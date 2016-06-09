@@ -28,11 +28,11 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.trilead.ssh2.crypto.Base64;
-import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 
 /**
@@ -130,7 +130,7 @@ public class KnownHosts
 		}
 		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
 		{
-			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
+			EdDSAPublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
