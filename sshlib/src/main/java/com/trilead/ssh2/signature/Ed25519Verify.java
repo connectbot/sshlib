@@ -17,23 +17,20 @@
 
 package com.trilead.ssh2.signature;
 
-import com.trilead.ssh2.crypto.key.Ed25519PrivateKey;
-import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
 import net.i2p.crypto.eddsa.EdDSAEngine;
 import net.i2p.crypto.eddsa.EdDSAPrivateKey;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
-import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
-import net.vrallev.java.ecc.Ecc25519Helper;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 
 /**
  * @author Kenny Root
@@ -47,16 +44,16 @@ public class Ed25519Verify {
 	private static final int ED25519_PK_SIZE_BYTES = 32;
 	private static final int ED25519_SIG_SIZE_BYTES = 64;
 
-	public static byte[] encodeSSHEd25519PublicKey(Ed25519PublicKey key) {
+	public static byte[] encodeSSHEd25519PublicKey(EdDSAPublicKey key) {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		tw.writeBytes(key.getEncoded());
+		tw.writeBytes(key.getAbyte());
 
 		return tw.getBytes();
 	}
 
-	public static Ed25519PublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {
+	public static EdDSAPublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {
 		TypesReader tr = new TypesReader(key);
 
 		String key_format = tr.readString();
@@ -74,18 +71,17 @@ public class Ed25519Verify {
 			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
 		}
 
-		return Ed25519PublicKey.getInstance(keyBytes);
+		try {
+			return new EdDSAPublicKey(new X509EncodedKeySpec(keyBytes));
+		} catch (InvalidKeySpecException e) {
+			throw new IOException(e);
+		}
 	}
 
-	public static byte[] generateSignature(byte[] msg, Ed25519PrivateKey privateKey) throws IOException {
-		byte[] privateKeyBytes = privateKey.getEncoded();
-
-		EdDSANamedCurveSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512);
-		EdDSAPrivateKeySpec privKeySpec = new EdDSAPrivateKeySpec(privateKeyBytes, spec);
-
+	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
 		try {
 			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
-			engine.initSign(new EdDSAPrivateKey(privKeySpec));
+			engine.initSign(privateKey);
 			engine.update(msg);
 			return engine.sign();
 		} catch (NoSuchAlgorithmException e) {
@@ -97,13 +93,19 @@ public class Ed25519Verify {
 		}
 	}
 
-	public static boolean verifySignature(byte[] msg, byte[] sig, Ed25519PublicKey publicKey) throws IOException {
-		byte[] publicKeyBytes = publicKey.getEncoded();
-		if (publicKeyBytes.length != ED25519_PK_SIZE_BYTES) {
-			throw new IOException("Invalid Ed25519 key length " + publicKeyBytes.length);
+	public static boolean verifySignature(byte[] msg, byte[] sig, EdDSAPublicKey publicKey) throws IOException {
+		try {
+			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
+			engine.initVerify(publicKey);
+			engine.update(msg);
+			return engine.verify(sig);
+		} catch (NoSuchAlgorithmException e) {
+			throw new IOException(e);
+		} catch (InvalidKeyException e) {
+			throw new IOException(e);
+		} catch (SignatureException e) {
+			throw new IOException(e);
 		}
-		Ecc25519Helper helper = new Ecc25519Helper();
-		return helper.isValidSignature(msg, sig, publicKeyBytes);
 	}
 
 	public static byte[] encodeSSHEd25519Signature(byte[] sig) {

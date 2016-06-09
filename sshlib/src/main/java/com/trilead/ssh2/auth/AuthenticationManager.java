@@ -15,8 +15,6 @@ import java.util.Vector;
 
 import com.trilead.ssh2.InteractiveCallback;
 import com.trilead.ssh2.crypto.PEMDecoder;
-import com.trilead.ssh2.crypto.key.Ed25519PrivateKey;
-import com.trilead.ssh2.crypto.key.Ed25519PublicKey;
 import com.trilead.ssh2.packets.PacketServiceAccept;
 import com.trilead.ssh2.packets.PacketServiceRequest;
 import com.trilead.ssh2.packets.PacketUserauthBanner;
@@ -35,6 +33,8 @@ import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 import com.trilead.ssh2.transport.MessageHandler;
 import com.trilead.ssh2.transport.TransportManager;
+import net.i2p.crypto.eddsa.EdDSAPrivateKey;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 
 /**
@@ -279,13 +279,13 @@ public class AuthenticationManager implements MessageHandler
 
 				tm.sendMessage(ua.getPayload());
 			}
-			else if (key instanceof Ed25519PrivateKey)
+			else if (key instanceof EdDSAPrivateKey)
 			{
-				Ed25519PrivateKey pk = (Ed25519PrivateKey) key;
+				EdDSAPrivateKey pk = (EdDSAPrivateKey) key;
 
 				final String algo = Ed25519Verify.ED25519_ID;
 
-				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((Ed25519PublicKey) pair.getPublic());
+				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((EdDSAPublicKey) pair.getPublic());
 
 				TypesWriter tw = new TypesWriter();
 				{
