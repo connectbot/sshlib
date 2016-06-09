@@ -48,7 +48,8 @@ public class Ed25519Verify {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		tw.writeBytes(key.getAbyte());
+		byte[] encoded = key.getAbyte();
+		tw.writeString(encoded, 0, encoded.length);
 
 		return tw.getBytes();
 	}
