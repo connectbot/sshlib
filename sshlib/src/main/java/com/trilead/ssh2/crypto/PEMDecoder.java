@@ -505,10 +505,8 @@ public class PEMDecoder
 				throw new IOException("Only one key supported, but encountered bundle of " + numberOfKeys);
 			}
 
-			byte[] publicBytes = tr.readByteString();
-
-			TypesReader trPub = new TypesReader(publicBytes);
-			String keyType = trPub.readString();
+			// OpenSSH discards this, so we will as well.
+			tr.readByteString();
 
 			byte[] encryptedBytes = tr.readByteString();
 
@@ -526,19 +524,18 @@ public class PEMDecoder
 				throw new IOException("Decryption failed when trying to read private keys");
 			}
 
-			String privateKeyType = trEnc.readString();
-			if (!keyType.equals(privateKeyType)) {
-				throw new IOException("Public and private key types do not match!");
-			}
+			String keyType = trEnc.readString();
 
 			PrivateKey privKey;
 			PublicKey pubKey;
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
+				byte[] publicBytes = trEnc.readByteString();
 				byte[] privateBytes = trEnc.readByteString();
 				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(
 						EdDSANamedCurveTable.CURVE_ED25519_SHA512);
-				privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(privateBytes, spec));
-				pubKey = Ed25519Verify.decodeSSHEd25519PublicKey(publicBytes);
+				privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(
+						Arrays.copyOfRange(privateBytes, 0, 32), spec));
+				pubKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(publicBytes, spec));
 			// TODO write decode private key support for these two:
 			//} else if (keyType.startsWith("ecdsa-sha2-")) {
 			//	pubKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(publicBytes);

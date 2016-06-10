@@ -28,6 +28,7 @@ import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -102,12 +103,15 @@ public class Ed25519Verify {
 	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
 		try {
 			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
+			engine.setParameter(EdDSAEngine.ONE_SHOT_MODE);
 			engine.initSign(privateKey);
 			engine.update(msg);
 			return engine.sign();
 		} catch (NoSuchAlgorithmException e) {
 			throw new IOException(e);
 		} catch (SignatureException e) {
+			throw new IOException(e);
+		} catch (InvalidAlgorithmParameterException e) {
 			throw new IOException(e);
 		} catch (InvalidKeyException e) {
 			throw new IOException(e);
@@ -118,9 +122,12 @@ public class Ed25519Verify {
 		try {
 			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
 			engine.initVerify(publicKey);
+			engine.setParameter(EdDSAEngine.ONE_SHOT_MODE);
 			engine.update(msg);
 			return engine.verify(sig);
 		} catch (NoSuchAlgorithmException e) {
+			throw new IOException(e);
+		} catch (InvalidAlgorithmParameterException e) {
 			throw new IOException(e);
 		} catch (InvalidKeyException e) {
 			throw new IOException(e);
