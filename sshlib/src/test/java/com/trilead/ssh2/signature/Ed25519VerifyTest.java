@@ -28,6 +28,21 @@ public class Ed25519VerifyTest {
 	private static final byte[] PUBLIC_KEY = toByteArray("ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf");
 	private static final byte[] MESSAGE = toByteArray("616263");
 	private static final byte[] SIGNATURE = toByteArray("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704");
+
+	private static final byte[] SSH_KAT_MESSAGE = toByteArray("4885f67437486e61");
+	private static final byte[] SSH_KAT_SIGNATURE = toByteArray("0000000b7373682d656432353531390000004022e82017bd03b6d3ac969b3c519e8f25af0ec058e9c0d1263a93ac010be7270c6a4cccbfb3ca7dbd6ee993e2764e95c18b5a620a1794501f85a4d8a7946af106");
+	private static final char[] SSH_KAT_PRIVATE = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" +
+		"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n" +
+		"QyNTUxOQAAACBThupGO0X+FLQhbz8CoKPwc7V3JNsQuGtlsgN+F7SMGQAAAJjnj4Ao54+A\n" +
+		"KAAAAAtzc2gtZWQyNTUxOQAAACBThupGO0X+FLQhbz8CoKPwc7V3JNsQuGtlsgN+F7SMGQ\n" +
+		"AAAED3KgoDbjR54V7bdNpfKlQY5m20UK1QaHytkCR+6rZEDFOG6kY7Rf4UtCFvPwKgo/Bz\n" +
+		"tXck2xC4a2WyA34XtIwZAAAAE0VEMjU1MTkgdGVzdCBrZXkgIzEBAg==\n" +
+		"-----END OPENSSH PRIVATE KEY-----").toCharArray();
+	private static final byte[] SSH_KAT_ED25519_PK = toByteArray("5386ea463b45fe14b4216f3f02a0a3f073b57724db10b86b65b2037e17b48c19");
+	private static final byte[] SSH_KAT_ED25519_SK = toByteArray("f72a0a036e3479e15edb74da5f2a5418e66db450ad50687cad90247eeab6440c");
+        // There is actually another 32 bytes in the key, but it's not used.
+        // 5386ea463b45fe14b4216f3f02a0a3f073b57724db10b86b65b2037e17b48c19
+
 	private EdDSANamedCurveSpec spec;
 
 	private static byte[] toByteArray(String s) {
@@ -118,5 +133,28 @@ public class Ed25519VerifyTest {
 		EdDSAPublicKey pubKey = (EdDSAPublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
 		byte[] pubKeyBytes = Base64.decode(SSH_PUBLIC_KEY.toCharArray());
 		assertArrayEquals(pubKeyBytes, Ed25519Verify.encodeSSHEd25519PublicKey(pubKey));
+	}
+
+	@Test
+	public void opensshVectorVerifies() throws Exception {
+		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
+		assertTrue(Ed25519Verify.verifySignature(SSH_KAT_MESSAGE,
+				Ed25519Verify.decodeSSHEd25519Signature(SSH_KAT_SIGNATURE),
+				(EdDSAPublicKey) pair.getPublic()));
+	}
+
+	@Test
+	public void opensshPrivateDecodesCorrectly() throws Exception {
+		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
+		assertArrayEquals(SSH_KAT_ED25519_SK, ((EdDSAPrivateKey) pair.getPrivate()).getSeed());
+		assertArrayEquals(SSH_KAT_ED25519_PK, ((EdDSAPublicKey) pair.getPublic()).getAbyte());
+	}
+
+	@Test
+	public void opensshVectorSigns() throws Exception {
+		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
+		byte[] sig = Ed25519Verify.generateSignature(SSH_KAT_MESSAGE, (EdDSAPrivateKey) pair.getPrivate());
+		byte[] encoded = Ed25519Verify.encodeSSHEd25519Signature(sig);
+		assertArrayEquals(SSH_KAT_SIGNATURE, Ed25519Verify.encodeSSHEd25519Signature(sig));
 	}
 }
