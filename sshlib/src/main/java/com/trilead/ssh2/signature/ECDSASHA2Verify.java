@@ -297,10 +297,10 @@ public class ECDSASHA2Verify {
 		 */
 
 		SimpleDERReader reader = new SimpleDERReader(sig);
-		SimpleDERReader seqReader = new SimpleDERReader(reader.readSequenceAsByteArray());
+		reader.resetInput(reader.readSequenceAsByteArray());
 
-		BigInteger r = seqReader.readInt();
-		BigInteger s = seqReader.readInt();
+		BigInteger r = reader.readInt();
+		BigInteger s = reader.readInt();
 
 		// Write the <r,s> to its own types writer.
 		TypesWriter rsWriter = new TypesWriter();
