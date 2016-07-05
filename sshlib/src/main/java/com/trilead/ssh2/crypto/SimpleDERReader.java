@@ -126,7 +126,7 @@ public class SimpleDERReader
 
 		byte[] b = readBytes(len);
 		
-		BigInteger bi = new BigInteger(b);
+		BigInteger bi = new BigInteger(1, b);
 		
 		return bi;
 	}

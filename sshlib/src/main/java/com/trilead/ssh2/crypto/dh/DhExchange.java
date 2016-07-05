@@ -109,7 +109,7 @@ public class DhExchange extends GenericDhExchange {
 			KeyFactory kf = KeyFactory.getInstance("DH");
 			DHParameterSpec params = clientPublic.getParams();
 			this.serverPublic = (DHPublicKey) kf.generatePublic(new DHPublicKeySpec(
-					new BigInteger(f), params.getP(), params.getG()));
+					new BigInteger(1, f), params.getP(), params.getG()));
 
 			ka = KeyAgreement.getInstance("DH");
 			ka.init(clientPrivate);
@@ -122,7 +122,7 @@ public class DhExchange extends GenericDhExchange {
 			throw (IOException) new IOException("Invalid DH key").initCause(e);
 		}
 
-		sharedSecret = new BigInteger(ka.generateSecret());
+		sharedSecret = new BigInteger(1, ka.generateSecret());
 	}
 
 	@Override
