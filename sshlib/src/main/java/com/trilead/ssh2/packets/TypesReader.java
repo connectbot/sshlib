@@ -119,7 +119,7 @@ public class TypesReader
 		if (raw.length == 0)
 			b = BigInteger.ZERO;
 		else
-			b = new BigInteger(raw);
+			b = new BigInteger(1, raw);
 
 		return b;
 	}

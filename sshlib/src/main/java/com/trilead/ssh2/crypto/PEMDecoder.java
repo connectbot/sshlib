@@ -477,7 +477,7 @@ public class PEMDecoder
 			if (params == null)
 				throw new IOException("invalid OID");
 
-			BigInteger s = new BigInteger(privateBytes);
+			BigInteger s = new BigInteger(1, privateBytes);
 			byte[] publicBytesSlice = new byte[publicBytes.length - 1];
 			System.arraycopy(publicBytes, 1, publicBytesSlice, 0, publicBytesSlice.length);
 			ECPoint w = ECDSASHA2Verify.decodeECPoint(publicBytesSlice, params.getCurve());

@@ -72,7 +72,7 @@ public class SimpleDERReaderTest {
                 (byte) 0x02, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
         };
         SimpleDERReader reader = new SimpleDERReader(vector);
-        assertEquals(BigInteger.valueOf(0xFFFFFFFF), reader.readInt());
+        assertEquals("ffffffff", reader.readInt().toString(16));
     }
 
     @Test
