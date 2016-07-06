@@ -24,6 +24,7 @@ import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Arrays;
+import java.util.Locale;
 
 import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
@@ -39,6 +40,7 @@ import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
 import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
+import org.mindrot.jbcrypt.BCrypt;
 
 /**
  * PEM Support.
@@ -275,6 +277,90 @@ public class PEMDecoder
 		return ps;
 	}
 
+	private static final byte[] decryptData(byte[] data, byte[] pw, byte[] salt, int rounds, String algo) throws IOException
+	{
+		BlockCipher rawCipher;
+		BlockCipher bc;
+		int keySize;
+
+		String algoLower = algo.toLowerCase(Locale.US);
+		if (algoLower.equals("des-ede3-cbc"))
+		{
+			rawCipher = new DESede();
+			keySize = 24;
+			bc = new CBCMode(rawCipher, salt, false);
+		}
+		else if (algoLower.equals("des-cbc"))
+		{
+			rawCipher = new DES();
+			keySize = 8;
+			bc = new CBCMode(rawCipher, salt, false);
+		}
+		else if (algoLower.equals("aes-128-cbc") || algoLower.equals("aes128-cbc"))
+		{
+			rawCipher = new AES();
+			keySize = 16;
+			bc = new CBCMode(rawCipher, salt, false);
+		}
+		else if (algoLower.equals("aes-192-cbc") || algoLower.equals("aes192-cbc"))
+		{
+			rawCipher = new AES();
+			keySize = 24;
+		}
+		else if (algoLower.equals("aes-256-cbc") || algoLower.equals("aes256-cbc"))
+		{
+			rawCipher = new AES();
+			keySize = 32;
+			bc = new CBCMode(rawCipher, salt, false);
+		}
+		else
+		{
+			throw new IOException("Cannot decrypt PEM structure, unknown cipher " + algo);
+		}
+
+		if (rounds == -1)
+		{
+			rawCipher.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, keySize));
+			bc = new CBCMode(rawCipher, salt, false);
+		}
+		else
+		{
+			byte[] key = new byte[keySize];
+			byte[] iv = new byte[rawCipher.getBlockSize()];
+
+			byte[] keyAndIV = new byte[key.length + iv.length];
+
+			new BCrypt().pbkdf(pw, salt, rounds, keyAndIV);
+
+			System.arraycopy(keyAndIV, 0, key, 0, key.length);
+			System.arraycopy(keyAndIV, key.length, iv, 0, iv.length);
+
+			rawCipher.init(false, key);
+			bc = new CBCMode(rawCipher, iv, false);
+		}
+
+
+		if ((data.length % bc.getBlockSize()) != 0)
+			throw new IOException("Invalid PEM structure, size of encrypted block is not a multiple of "
+					+ bc.getBlockSize());
+
+		/* Now decrypt the content */
+		byte[] dz = new byte[data.length];
+
+		for (int i = 0; i < data.length / bc.getBlockSize(); i++)
+		{
+			bc.transformBlock(data, i * bc.getBlockSize(), dz, i * bc.getBlockSize());
+		}
+
+		if (rounds == -1) {
+			/* Now check and remove RFC 1423/PKCS #7 padding */
+			return removePadding(dz, bc.getBlockSize());
+		} else {
+			/* New style is to check the padding after reading the comment. */
+			return dz;
+		}
+	}
+
 	private static final void decryptPEM(PEMStructure ps, byte[] pw) throws IOException
 	{
 		if (ps.dekInfo == null)
@@ -286,59 +372,7 @@ public class PEMDecoder
 		String algo = ps.dekInfo[0];
 		byte[] salt = hexToByteArray(ps.dekInfo[1]);
 
-		BlockCipher bc = null;
-
-		if (algo.equals("DES-EDE3-CBC"))
-		{
-			DESede des3 = new DESede();
-			des3.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, 24));
-			bc = new CBCMode(des3, salt, false);
-		}
-		else if (algo.equals("DES-CBC"))
-		{
-			DES des = new DES();
-			des.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, 8));
-			bc = new CBCMode(des, salt, false);
-		}
-		else if (algo.equals("AES-128-CBC"))
-		{
-			AES aes = new AES();
-			aes.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, 16));
-			bc = new CBCMode(aes, salt, false);
-		}
-		else if (algo.equals("AES-192-CBC"))
-		{
-			AES aes = new AES();
-			aes.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, 24));
-			bc = new CBCMode(aes, salt, false);
-		}
-		else if (algo.equals("AES-256-CBC"))
-		{
-			AES aes = new AES();
-			aes.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, 32));
-			bc = new CBCMode(aes, salt, false);
-		}
-		else
-		{
-			throw new IOException("Cannot decrypt PEM structure, unknown cipher " + algo);
-		}
-
-		if ((ps.data.length % bc.getBlockSize()) != 0)
-			throw new IOException("Invalid PEM structure, size of encrypted block is not a multiple of "
-					+ bc.getBlockSize());
-
-		/* Now decrypt the content */
-
-		byte[] dz = new byte[ps.data.length];
-
-		for (int i = 0; i < ps.data.length / bc.getBlockSize(); i++)
-		{
-			bc.transformBlock(ps.data, i * bc.getBlockSize(), dz, i * bc.getBlockSize());
-		}
-
-		/* Now check and remove RFC 1423/PKCS #7 padding */
-
-		dz = removePadding(dz, bc.getBlockSize());
+		byte[] dz = decryptData(ps.data, pw, salt, -1, algo);
 
 		ps.data = dz;
 		ps.dekInfo = null;
@@ -347,6 +381,18 @@ public class PEMDecoder
 
 	public static final boolean isPEMEncrypted(PEMStructure ps) throws IOException
 	{
+		if (ps.pemType == PEM_OPENSSH_PRIVATE_KEY) {
+			TypesReader tr = new TypesReader(ps.data);
+			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
+			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, "US-ASCII"));
+			}
+
+			tr.readString();
+			String kdfname = tr.readString();
+			return !"none".equals(kdfname);
+		}
+
 		if (ps.procType == null)
 			return false;
 
@@ -370,7 +416,7 @@ public class PEMDecoder
 
 	public static KeyPair decode(PEMStructure ps, String password) throws IOException
 	{
-		if (isPEMEncrypted(ps))
+		if (isPEMEncrypted(ps) && ps.pemType != PEM_OPENSSH_PRIVATE_KEY)
 		{
 			if (password == null)
 				throw new IOException("PEM is encrypted, but no password was specified");
@@ -508,14 +554,22 @@ public class PEMDecoder
 			// OpenSSH discards this, so we will as well.
 			tr.readByteString();
 
-			byte[] encryptedBytes = tr.readByteString();
+			byte[] dataBytes = tr.readByteString();
 
-			// TODO support encryption
-			if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
+			if ("bcrypt".equals(kdfname)) {
+				if (password == null) {
+					throw new IOException("PEM is encrypted, but no password was specified");
+				}
+
+				TypesReader optionsReader = new TypesReader(kdfoptions);
+				byte[] salt = optionsReader.readByteString();
+				int rounds = optionsReader.readUINT32();
+				dataBytes = decryptData(dataBytes, password.getBytes("UTF-8"), salt, rounds, ciphername);
+			} else if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
 				throw new IOException("encryption not supported");
 			}
 
-			TypesReader trEnc = new TypesReader(encryptedBytes);
+			TypesReader trEnc = new TypesReader(dataBytes);
 
 			int checkInt1 = trEnc.readUINT32();
 			int checkInt2 = trEnc.readUINT32();
