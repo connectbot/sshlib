@@ -28,7 +28,9 @@ import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
 import com.trilead.ssh2.crypto.dh.Curve25519Exchange;
 import com.trilead.ssh2.crypto.dh.DhGroupExchange;
 import com.trilead.ssh2.crypto.dh.GenericDhExchange;
+import com.trilead.ssh2.crypto.digest.HMAC;
 import com.trilead.ssh2.crypto.digest.MAC;
+import com.trilead.ssh2.crypto.digest.MACs;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketKexDHInit;
 import com.trilead.ssh2.packets.PacketKexDHReply;
@@ -332,11 +334,11 @@ public class KexManager
 	{
 		try
 		{
-			int mac_cs_key_len = MAC.getKeyLen(kxs.np.mac_algo_client_to_server);
+			int mac_cs_key_len = MACs.getKeyLen(kxs.np.mac_algo_client_to_server);
 			int enc_cs_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_client_to_server);
 			int enc_cs_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_client_to_server);
 
-			int mac_sc_key_len = MAC.getKeyLen(kxs.np.mac_algo_server_to_client);
+			int mac_sc_key_len = MACs.getKeyLen(kxs.np.mac_algo_server_to_client);
 			int enc_sc_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_server_to_client);
 			int enc_sc_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_server_to_client);
 
@@ -371,7 +373,7 @@ public class KexManager
 			cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_client_to_server, true, km.enc_key_client_to_server,
 					km.initial_iv_client_to_server);
 
-			mac = new MAC(kxs.np.mac_algo_client_to_server, km.integrity_key_client_to_server);
+			mac = new HMAC(kxs.np.mac_algo_client_to_server, km.integrity_key_client_to_server);
 			
 			comp = CompressionFactory.createCompressor(kxs.np.comp_algo_client_to_server);
 
@@ -592,7 +594,7 @@ public class KexManager
 				cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_server_to_client, false,
 						km.enc_key_server_to_client, km.initial_iv_server_to_client);
 
-				mac = new MAC(kxs.np.mac_algo_server_to_client, km.integrity_key_server_to_client);
+				mac = new HMAC(kxs.np.mac_algo_server_to_client, km.integrity_key_server_to_client);
 				
 				comp = CompressionFactory.createCompressor(kxs.np.comp_algo_server_to_client);
 			}

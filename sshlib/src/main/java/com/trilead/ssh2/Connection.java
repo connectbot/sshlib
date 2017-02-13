@@ -17,6 +17,7 @@ import com.trilead.ssh2.channel.ChannelManager;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
 import com.trilead.ssh2.crypto.digest.MAC;
+import com.trilead.ssh2.crypto.digest.MACs;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketIgnore;
 import com.trilead.ssh2.transport.KexManager;
@@ -74,7 +75,7 @@ public class Connection
 	 */
 	public static synchronized String[] getAvailableMACs()
 	{
-		return MAC.getMacList();
+		return MACs.getMacList();
 	}
 
 	/**
@@ -1273,7 +1274,7 @@ public class Connection
 		if ((macs == null) || (macs.length == 0))
 			throw new IllegalArgumentException();
 		macs = removeDuplicates(macs);
-		MAC.checkMacList(macs);
+		MACs.checkMacList(macs);
 		cryptoWishList.c2s_mac_algos = macs;
 	}
 
@@ -1319,7 +1320,7 @@ public class Connection
 			throw new IllegalArgumentException();
 
 		macs = removeDuplicates(macs);
-		MAC.checkMacList(macs);
+		MACs.checkMacList(macs);
 		cryptoWishList.s2c_mac_algos = macs;
 	}
 
