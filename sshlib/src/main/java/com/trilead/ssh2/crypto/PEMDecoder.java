@@ -481,7 +481,7 @@ public class PEMDecoder
 			BigInteger expQ = dr.readInt();
 			BigInteger coeff = dr.readInt();
 
-			RSAPrivateKeySpec privSpec = new RSAPrivateKeySpec(n, d);
+			RSAPrivateKeySpec privSpec = new RSAPrivateCrtKeySpec(n, e, d, primeP, primeQ, expP, expQ, coeff);
 			RSAPublicKeySpec pubSpec = new RSAPublicKeySpec(n, e);
 
 			return generateKeyPair("RSA", privSpec, pubSpec);
@@ -614,12 +614,21 @@ public class PEMDecoder
 				BigInteger e = trEnc.readMPINT();
 				BigInteger d = trEnc.readMPINT();
 
-				//P and Q may be null and we don't actually use them, so parse the value but don't use it
-				/*BigInteger p = */trEnc.readMPINT();
-				/*BigInteger q = */trEnc.readMPINT();
+				BigInteger crtCoefficient = trEnc.readMPINT();
+				BigInteger p = trEnc.readMPINT();
+
+				RSAPrivateKeySpec privateKeySpec;
+				if (null == p || null == crtCoefficient) {
+					privateKeySpec = new RSAPrivateKeySpec(n, d);
+				} else {
+					BigInteger q = crtCoefficient.modInverse(p);
+					BigInteger pE = d.mod(p.subtract(BigInteger.ONE));
+					BigInteger qE = d.mod(q.subtract(BigInteger.ONE));
+					privateKeySpec = new RSAPrivateCrtKeySpec(n, e, d, p, q, pE, qE, crtCoefficient);
+
+				}
 
 				RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
-				RSAPrivateKeySpec privateKeySpec = new RSAPrivateKeySpec(n, d);
 
 				keyPair = generateKeyPair("RSA", privateKeySpec, publicKeySpec);
 			} else if ("ssh-dss".equals(keyType)) {
