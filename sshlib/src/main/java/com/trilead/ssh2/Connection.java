@@ -12,6 +12,7 @@ import java.security.SecureRandom;
 import java.util.Vector;
 
 import com.trilead.ssh2.auth.AuthenticationManager;
+import com.trilead.ssh2.auth.SignatureProxy;
 import com.trilead.ssh2.channel.ChannelManager;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
@@ -196,20 +197,7 @@ public class Connection
 		if (cb == null)
 			throw new IllegalArgumentException("Callback may not ne NULL!");
 
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
+		checkRequirements(user);
 
 		authenticated = am.authenticateInteractive(user, submethods, cb);
 
@@ -244,23 +232,10 @@ public class Connection
 	 */
 	public synchronized boolean authenticateWithPassword(String user, String password) throws IOException
 	{
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
-
 		if (password == null)
 			throw new IllegalArgumentException("password argument is null");
+
+		checkRequirements(user);
 
 		authenticated = am.authenticatePassword(user, password);
 
@@ -295,20 +270,7 @@ public class Connection
 	 */
 	public synchronized boolean authenticateWithNone(String user) throws IOException
 	{
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
+		checkRequirements(user);
 
 		/* Trigger the sending of the PacketUserauthRequestNone packet */
 		/* (if not already done) */
@@ -365,23 +327,10 @@ public class Connection
 	public synchronized boolean authenticateWithPublicKey(String user, char[] pemPrivateKey, String password)
 			throws IOException
 	{
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
-
 		if (pemPrivateKey == null)
 			throw new IllegalArgumentException("pemPrivateKey argument is null");
+
+		checkRequirements(user);
 
 		authenticated = am.authenticatePublicKey(user, pemPrivateKey, password, getOrCreateSecureRND());
 
@@ -418,23 +367,10 @@ public class Connection
 	public synchronized boolean authenticateWithPublicKey(String user, KeyPair pair)
 			throws IOException
 	{
-		if (tm == null)
-			throw new IllegalStateException("Connection is not established!");
-
-		if (authenticated)
-			throw new IllegalStateException("Connection is already authenticated!");
-
-		if (am == null)
-			am = new AuthenticationManager(tm);
-
-		if (cm == null)
-			cm = new ChannelManager(tm);
-
-		if (user == null)
-			throw new IllegalArgumentException("user argument is null");
-
 		if (pair == null)
 			throw new IllegalArgumentException("Key pair argument is null");
+
+		checkRequirements(user);
 
 		authenticated = am.authenticatePublicKey(user, pair, getOrCreateSecureRND());
 
@@ -490,6 +426,73 @@ public class Connection
 		fr.close();
 
 		return authenticateWithPublicKey(user, cw.toCharArray(), password);
+	}
+
+	/**
+	 * After a successful connect, one has to authenticate oneself. The
+	 * authentication method "publickey" works by signing a challenge sent by
+	 * the server. The signature is either DSA, EC, EdDSA or RSA based depending
+	 * on the SignatureProxy specified. The SignatureProxy should sign the
+	 * server's challenge in order to authenticate the user. The user of this library
+	 * is no longer forced to pass the private key.
+	 * <p>
+	 * If the authentication phase is complete, <code>true</code> will be
+	 * returned. If the server does not accept the request (or if further
+	 * authentication steps are needed), <code>false</code> is returned and
+	 * one can retry either by using this or any other authentication method
+	 * (use the <code>getRemainingAuthMethods</code> method to get a list of
+	 * the remaining possible methods).
+	 *
+	 * @param user
+	 *            A <code>String</code> holding the username.
+	 * @param signatureProxy
+	 *            A <code>SignatureProxy</code> containing a public key and implementing
+	 *            a sign method.
+	 *
+	 * @return Whether the connection is now authenticated.
+	 * @throws IOException Might be thrown if the authentication process threw an error.
+	 */
+	public synchronized boolean authenticateWithPublicKey(String user, SignatureProxy signatureProxy)
+			throws IOException
+	{
+		checkRequirements(user);
+
+		if (signatureProxy.getPublicKey() == null)
+		{
+			throw new IllegalArgumentException("Signature manager does not contain a public key.");
+		}
+
+		authenticated = am.authenticatePublicKey(user, signatureProxy);
+
+		return authenticated;
+	}
+
+	private void checkRequirements(String user)
+	{
+		if (tm == null)
+		{
+			throw new IllegalStateException("Connection is not established!");
+		}
+
+		if (authenticated)
+		{
+			throw new IllegalStateException("Connection is already authenticated!");
+		}
+
+		if (am == null)
+		{
+			am = new AuthenticationManager(tm);
+		}
+
+		if (cm == null)
+		{
+			cm = new ChannelManager(tm);
+		}
+
+		if (user == null)
+		{
+			throw new IllegalArgumentException("user argument is null");
+		}
 	}
 
 	/**
