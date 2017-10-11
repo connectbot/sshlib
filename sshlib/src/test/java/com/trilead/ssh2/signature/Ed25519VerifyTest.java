@@ -56,7 +56,7 @@ public class Ed25519VerifyTest {
 
 	@Before
 	public void setupSpec() {
-		this.spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512);
+		this.spec = EdDSANamedCurveTable.getByName(Ed25519Verify.ED25519_CURVE_NAME);
 	}
 
 	@Test
