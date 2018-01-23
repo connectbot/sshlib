@@ -17,6 +17,8 @@
 
 package com.trilead.ssh2.channel;
 
+import com.trilead.ssh2.signature.RSASHA256Verify;
+import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -86,6 +88,9 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 	// Flags for signature requests
 //	private static final int SSH_AGENT_OLD_SIGNATURE = 1;
+	// https://tools.ietf.org/html/draft-miller-ssh-agent-02#section-7.3
+	private static final int SSH_AGENT_RSA_SHA2_256 = 0x02;
+	private static final int SSH_AGENT_RSA_SHA2_512 = 0x04;
 
 	private static final Logger log = Logger.getLogger(RemoteAcceptThread.class);
 
@@ -464,8 +469,9 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 			int flags = tr.readUINT32();
 
-			if (flags != 0) {
-				// We don't understand any flags; abort!
+			if ((flags & ~SSH_AGENT_RSA_SHA2_512 & ~SSH_AGENT_RSA_SHA2_256) != 0) {
+				// We don't understand these flags; abort!
+				log.log(2, "Unrecognized ssh-agent flags: " + flags);
 				os.write(SSH_AGENT_FAILURE);
 				return;
 			}
@@ -481,9 +487,17 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 			PrivateKey privKey = pair.getPrivate();
 			if (privKey instanceof RSAPrivateKey) {
-				byte[] signature = RSASHA1Verify.generateSignature(challenge,
-						(RSAPrivateKey) privKey);
-				response = RSASHA1Verify.encodeSSHRSASignature(signature);
+				RSAPrivateKey rsaPrivKey = (RSAPrivateKey) privKey;
+				if ((flags & SSH_AGENT_RSA_SHA2_512) != 0) {
+					byte[] signature = RSASHA512Verify.generateSignature(challenge, rsaPrivKey);
+					response = RSASHA512Verify.encodeRSASHA512Signature(signature);
+				} else if ((flags & SSH_AGENT_RSA_SHA2_256) != 0) {
+					byte[] signature = RSASHA256Verify.generateSignature(challenge, rsaPrivKey);
+					response = RSASHA256Verify.encodeRSASHA256Signature(signature);
+				} else {
+					byte[] signature = RSASHA1Verify.generateSignature(challenge, rsaPrivKey);
+					response = RSASHA1Verify.encodeSSHRSASignature(signature);
+				}
 			} else if (privKey instanceof DSAPrivateKey) {
 				byte[] signature = DSASHA1Verify.generateSignature(challenge,
 						(DSAPrivateKey) privKey, new SecureRandom());

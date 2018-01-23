@@ -1,6 +1,8 @@
 
 package com.trilead.ssh2.transport;
 
+import com.trilead.ssh2.ExtensionInfo;
+import com.trilead.ssh2.packets.PacketExtInfo;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -137,6 +139,8 @@ public class TransportManager
 	Vector connectionMonitors = new Vector();
 	boolean monitorsWereInformed = false;
 
+	private volatile ExtensionInfo extensionInfo = ExtensionInfo.noExtInfoSeen();
+
 	public TransportManager(String host, int port) throws IOException
 	{
 		this.hostname = host;
@@ -151,6 +155,11 @@ public class TransportManager
 	public ConnectionInfo getConnectionInfo(int kexNumber) throws IOException
 	{
 		return km.getOrWaitForConnectionInfo(kexNumber);
+	}
+
+	public ExtensionInfo getExtensionInfo()
+	{
+		return extensionInfo;
 	}
 
 	public Throwable getReasonClosedCause()
@@ -611,6 +620,13 @@ public class TransportManager
 
 			if (type == Packets.SSH_MSG_USERAUTH_SUCCESS) {
 				tc.startCompression();
+			}
+
+			if (type == Packets.SSH_MSG_EXT_INFO) {
+				// Update most-recently seen ext info (server can send this multiple times)
+				extensionInfo = ExtensionInfo.fromPacketExtInfo(
+						new PacketExtInfo(msg, 0, msglen));
+				continue;
 			}
 			
 			MessageHandler mh = null;

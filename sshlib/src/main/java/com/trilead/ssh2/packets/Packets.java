@@ -15,6 +15,7 @@ public class Packets
 	public static final int SSH_MSG_DEBUG = 4;
 	public static final int SSH_MSG_SERVICE_REQUEST = 5;
 	public static final int SSH_MSG_SERVICE_ACCEPT = 6;
+	public static final int SSH_MSG_EXT_INFO = 7;
 
 	public static final int SSH_MSG_KEXINIT = 20;
 	public static final int SSH_MSG_NEWKEYS = 21;
@@ -84,6 +85,7 @@ public class Packets
 		reverseNames[4] = "SSH_MSG_DEBUG";
 		reverseNames[5] = "SSH_MSG_SERVICE_REQUEST";
 		reverseNames[6] = "SSH_MSG_SERVICE_ACCEPT";
+		reverseNames[7] = "SSH_MSG_EXT_INFO";
 
 		reverseNames[20] = "SSH_MSG_KEXINIT";
 		reverseNames[21] = "SSH_MSG_NEWKEYS";
