@@ -1,7 +1,7 @@
 language: java
 jdk:
+- oraclejdk9
 - oraclejdk8
-- oraclejdk7
 - openjdk7
 cache:
   directories:
@@ -10,6 +10,13 @@ cache:
 before_cache:
 - find $HOME/.gradle -name "*.lock" -exec rm {} \;
 - rm -rf $HOME/.gradle/caches/[1-9]*
+install:
+- |
+  if [ -d "${JAVA_HOME}"/jre/lib/ext ]; then \
+    sudo wget "https://bouncycastle.org/download/bcprov-ext-jdk15on-158.jar" -O "${JAVA_HOME}"/jre/lib/ext/bcprov-ext-jdk15on-158.jar && \
+    sudo perl -pi.bak -e 's/^(security\.provider\.)([0-9]+)/$1.($2+1)/ge' /etc/java-7-openjdk/security/java.security && \
+    echo "security.provider.1=org.bouncycastle.jce.provider.BouncyCastleProvider" | sudo tee -a /etc/java-7-openjdk/security/java.security
+  fi
 after_success:
 - "./gradlew bintrayUpload artifactoryPublish"
 env:
