@@ -5,6 +5,9 @@
 This is ConnectBot's SSH library. It started as a continuation of the Trilead SSH2 library,
 but has had several features added to it since then.
 
+This library retains its original [3-Clause BSD license](
+https://opensource.org/licenses/BSD-3-Clause).
+
 ##### Key support:
   * ECDSA (RFC 5656)
   * Ed25519 (draft-bjh21-ssh-ed25519-02)
