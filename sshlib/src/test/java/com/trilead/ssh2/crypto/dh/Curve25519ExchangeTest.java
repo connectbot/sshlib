@@ -3,7 +3,6 @@ package com.trilead.ssh2.crypto.dh;
 import djb.Curve25519;
 import org.junit.Test;
 
-import javax.xml.bind.DatatypeConverter;
 import java.math.BigInteger;
 import java.security.SecureRandom;
 
@@ -23,7 +22,13 @@ public class Curve25519ExchangeTest {
 	private static final BigInteger KNOWN_SHARED_SECRET_BI = new BigInteger(1, KNOWN_SHARED_SECRET);
 
 	private static byte[] toByteArray(String s) {
-		return DatatypeConverter.parseHexBinary(s);
+		byte[] b = new byte[s.length() / 2];
+		for (int i = 0; i < b.length; i++) {
+			int hexIndex = i * 2;
+			int hexDigit = Integer.parseInt(s.substring(hexIndex, hexIndex + 2), 16);
+			b[i] = (byte) hexDigit;
+		}
+		return b;
 	}
 
 	@Test

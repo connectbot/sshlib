@@ -11,7 +11,6 @@ import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.xml.bind.DatatypeConverter;
 import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -46,7 +45,13 @@ public class Ed25519VerifyTest {
 	private EdDSANamedCurveSpec spec;
 
 	private static byte[] toByteArray(String s) {
-		return DatatypeConverter.parseHexBinary(s);
+		byte[] b = new byte[s.length() / 2];
+		for (int i = 0; i < b.length; i++) {
+			int hexIndex = i * 2;
+			int hexDigit = Integer.parseInt(s.substring(hexIndex, hexIndex + 2), 16);
+			b[i] = (byte) hexDigit;
+		}
+		return b;
 	}
 
 	@Before
