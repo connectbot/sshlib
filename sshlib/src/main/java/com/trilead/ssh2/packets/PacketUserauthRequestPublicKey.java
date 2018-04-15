@@ -1,6 +1,7 @@
 package com.trilead.ssh2.packets;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 /**
  * PacketUserauthRequestPublicKey.
@@ -45,13 +46,12 @@ public class PacketUserauthRequestPublicKey
 		throw new IOException("Not implemented!");
 	}
 
-	public byte[] getPayload()
-	{
+	public byte[] getPayload() throws UnsupportedEncodingException {
 		if (payload == null)
 		{
 			TypesWriter tw = new TypesWriter();
 			tw.writeByte(Packets.SSH_MSG_USERAUTH_REQUEST);
-			tw.writeString(userName);
+			tw.writeString(userName, "UTF-8");
 			tw.writeString(serviceName);
 			tw.writeString("publickey");
 			tw.writeBoolean(true);

@@ -1,6 +1,8 @@
 
 package com.trilead.ssh2.packets;
 
+import java.io.UnsupportedEncodingException;
+
 /**
  * PacketUserauthRequestInteractive.
  * 
@@ -22,13 +24,12 @@ public class PacketUserauthRequestInteractive
 		this.submethods = submethods;
 	}
 
-	public byte[] getPayload()
-	{
+	public byte[] getPayload() throws UnsupportedEncodingException {
 		if (payload == null)
 		{
 			TypesWriter tw = new TypesWriter();
 			tw.writeByte(Packets.SSH_MSG_USERAUTH_REQUEST);
-			tw.writeString(userName);
+			tw.writeString(userName, "UTF-8");
 			tw.writeString(serviceName);
 			tw.writeString("keyboard-interactive");
 			tw.writeString(""); // draft-ietf-secsh-newmodes-04.txt says that
