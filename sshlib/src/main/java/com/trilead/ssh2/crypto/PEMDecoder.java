@@ -580,25 +580,67 @@ public class PEMDecoder
 
 			String keyType = trEnc.readString();
 
-			PrivateKey privKey;
-			PublicKey pubKey;
+			KeyPair keyPair;
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
 				byte[] publicBytes = trEnc.readByteString();
 				byte[] privateBytes = trEnc.readByteString();
 				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(Ed25519Verify.ED25519_CURVE_NAME);
-				privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(
+				PrivateKey privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(
 						Arrays.copyOfRange(privateBytes, 0, 32), spec));
-				pubKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(publicBytes, spec));
-			// TODO write decode private key support for these two:
-			//} else if (keyType.startsWith("ecdsa-sha2-")) {
-			//	pubKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(publicBytes);
-			//	privKey = ECDSASHA2Verify.decodeSSHECDSAPrivateKey(privateBytes);
-			//} else if ("ssh-rsa".equals(keyType)) {
-			//	pubKey = RSASHA1Verify.decodeSSHRSAPublicKey(publicBytes);
-			//	privKey = RSASHA1Verify.decodeSSHRSAPrivateKey(privateBytes);
-			//} else if ("ssh-dss".equals(keyType)) {
-			//	pubKey = DSASHA1Verify.decodeSSHDSAPublicKey(publicBytes);
-			//	privKey = DSASHA1Verify.decodeSSHDSAPrivateKey(privateBytes);
+				PublicKey pubKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(publicBytes, spec));
+				keyPair = new KeyPair(pubKey, privKey);
+			} else if (keyType.startsWith("ecdsa-sha2-")) {
+				String curveName = trEnc.readString();
+
+				ECParameterSpec spec = ECDSASHA2Verify.getCurveForName(curveName);
+				if (null == spec) {
+					throw new IOException("Invalid curve name");
+				}
+
+				byte[] groupBytes = trEnc.readByteString();
+				BigInteger privateKey = trEnc.readMPINT();
+
+				ECPoint group = ECDSASHA2Verify.decodeECPoint(groupBytes, spec.getCurve());
+				if (null == group) {
+					throw new IOException("Invalid ECDSA group");
+				}
+
+				ECPublicKeySpec publicKeySpec = new ECPublicKeySpec(group, spec);
+				ECPrivateKeySpec privateKeySpec = new ECPrivateKeySpec(privateKey, spec);
+				keyPair = generateKeyPair("EC", privateKeySpec, publicKeySpec);
+			} else if ("ssh-rsa".equals(keyType)) {
+				BigInteger n = trEnc.readMPINT();
+				BigInteger e = trEnc.readMPINT();
+				BigInteger d = trEnc.readMPINT();
+
+				BigInteger crtCoefficient = trEnc.readMPINT();
+				BigInteger p = trEnc.readMPINT();
+
+				RSAPrivateKeySpec privateKeySpec;
+				if (null == p || null == crtCoefficient) {
+					privateKeySpec = new RSAPrivateKeySpec(n, d);
+				} else {
+					BigInteger q = crtCoefficient.modInverse(p);
+					BigInteger pE = d.mod(p.subtract(BigInteger.ONE));
+					BigInteger qE = d.mod(q.subtract(BigInteger.ONE));
+					privateKeySpec = new RSAPrivateCrtKeySpec(n, e, d, p, q, pE, qE, crtCoefficient);
+
+				}
+
+				RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
+
+				keyPair = generateKeyPair("RSA", privateKeySpec, publicKeySpec);
+			} else if ("ssh-dss".equals(keyType)) {
+				BigInteger p = trEnc.readMPINT();
+				BigInteger q = trEnc.readMPINT();
+				BigInteger g = trEnc.readMPINT();
+				BigInteger y = trEnc.readMPINT();
+				BigInteger x = trEnc.readMPINT();
+
+				DSAPrivateKeySpec privateKeySpec = new DSAPrivateKeySpec(x, p, q, g);
+				DSAPublicKeySpec publicKeySpec = new DSAPublicKeySpec(y, p, q, g);
+
+				keyPair = generateKeyPair("DSA", privateKeySpec, publicKeySpec);
 			} else {
 				throw new IOException("Unknown key type " + keyType);
 			}
@@ -613,7 +655,7 @@ public class PEMDecoder
 				}
 			}
 
-			return new KeyPair(pubKey, privKey);
+			return keyPair;
 		}
 
 		throw new IOException("PEM problem: it is of unknown type");

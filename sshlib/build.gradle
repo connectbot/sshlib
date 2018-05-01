@@ -15,4 +15,5 @@ dependencies {
     compile 'org.connectbot.jbcrypt:jbcrypt:1.0.0'
 
     testCompile 'junit:junit:4.11'
+    testCompile 'commons-io:commons-io:2.2'
 }
