@@ -1,6 +1,7 @@
 package com.trilead.ssh2.packets;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 /**
  * PacketUserauthRequestPassword.
@@ -49,17 +50,16 @@ public class PacketUserauthRequestPassword
 			throw new IOException("Padding in SSH_MSG_USERAUTH_REQUEST packet!");
 	}
 
-	public byte[] getPayload()
-	{
+	public byte[] getPayload() throws UnsupportedEncodingException {
 		if (payload == null)
 		{
 			TypesWriter tw = new TypesWriter();
 			tw.writeByte(Packets.SSH_MSG_USERAUTH_REQUEST);
-			tw.writeString(userName);
+			tw.writeString(userName, "UTF-8");
 			tw.writeString(serviceName);
 			tw.writeString("password");
 			tw.writeBoolean(false);
-			tw.writeString(password);
+			tw.writeString(password, "UTF-8");
 			payload = tw.getBytes();
 		}
 		return payload;
