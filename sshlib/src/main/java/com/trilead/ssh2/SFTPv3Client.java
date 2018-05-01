@@ -86,6 +86,7 @@ public class SFTPv3Client
 	 * @deprecated this constructor (debug version) will disappear in the future,
 	 *             use {@link #SFTPv3Client(Connection)} instead.
 	 */
+	@Deprecated
 	public SFTPv3Client(Connection conn, PrintStream debug) throws IOException
 	{
 		if (conn == null)

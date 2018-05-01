@@ -1,6 +1,8 @@
 
 package com.trilead.ssh2.auth;
 
+import com.trilead.ssh2.signature.RSASHA256Verify;
+import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -11,6 +13,7 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Set;
 import java.util.Vector;
 
 import com.trilead.ssh2.InteractiveCallback;
@@ -237,9 +240,26 @@ public class AuthenticationManager implements MessageHandler
 
 				byte[] msg = tw.getBytes();
 
-				byte[] ds = RSASHA1Verify.generateSignature(msg, pk);
-
-				byte[] rsa_sig_enc = RSASHA1Verify.encodeSSHRSASignature(ds);
+				// Servers support different hash algorithms for RSA keys
+				// https://tools.ietf.org/html/draft-ietf-curdle-rsa-sha2-12
+				Set<String> algsAccepted = tm.getExtensionInfo().getSignatureAlgorithmsAccepted();
+				final byte[] rsa_sig_enc;
+				if (algsAccepted.contains("rsa-sha2-512"))
+				{
+					byte[] ds = RSASHA512Verify.generateSignature(msg, pk);
+					rsa_sig_enc = RSASHA512Verify.encodeRSASHA512Signature(ds);
+				}
+				else if (algsAccepted.contains("rsa-sha2-256"))
+				{
+					byte[] ds = RSASHA256Verify.generateSignature(msg, pk);
+					rsa_sig_enc = RSASHA256Verify.encodeRSASHA256Signature(ds);
+				}
+				else
+				{
+					// Server always accepts RSA with SHA1
+					byte[] ds = RSASHA1Verify.generateSignature(msg, pk);
+					rsa_sig_enc = RSASHA1Verify.encodeSSHRSASignature(ds);
+				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
 						"ssh-rsa", pk_enc, rsa_sig_enc);

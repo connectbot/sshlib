@@ -1,6 +1,8 @@
 
 package com.trilead.ssh2.transport;
 
+import com.trilead.ssh2.signature.RSASHA256Verify;
+import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -77,6 +79,8 @@ public class KexManager
 		}
 		HOSTKEY_ALGS.add("ssh-rsa");
 		HOSTKEY_ALGS.add("ssh-dss");
+		HOSTKEY_ALGS.add("rsa-sha2-256");
+		HOSTKEY_ALGS.add("rsa-sha2-512");
 	}
 
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<String>();
@@ -91,6 +95,9 @@ public class KexManager
 		KEX_ALGS.add("diffie-hellman-group-exchange-sha1");
 		KEX_ALGS.add("diffie-hellman-group14-sha1");
 		KEX_ALGS.add("diffie-hellman-group1-sha1");
+
+		// Indicate client support for ext-info
+		KEX_ALGS.add("ext-info-c");
 	}
 
 	KexState kxs;
@@ -448,6 +455,26 @@ public class KexManager
 			log.log(50, "Verifying ssh-rsa signature");
 
 			return RSASHA1Verify.verifySignature(kxs.H, rs, rpk);
+		}
+
+		if (kxs.np.server_host_key_algo.equals("rsa-sha2-256"))
+		{
+			byte[] rs = RSASHA256Verify.decodeRSASHA256Signature(sig);
+			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
+
+			log.log(50, "Verifying rsa-sha2-256 signature");
+
+			return RSASHA256Verify.verifySignature(kxs.H, rs, rpk);
+		}
+
+		if (kxs.np.server_host_key_algo.equals("rsa-sha2-512"))
+		{
+			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
+			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
+
+			log.log(50, "Verifying rsa-sha2-512 signature");
+
+			return RSASHA512Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals("ssh-dss"))

@@ -43,6 +43,8 @@ public class Ed25519Verify {
 	/** Identifies this as an Ed25519 key in the protocol. */
 	public static final String ED25519_ID = "ssh-ed25519";
 
+	public static final String ED25519_CURVE_NAME = "Ed25519";
+
 	private static final int ED25519_PK_SIZE_BYTES = 32;
 	private static final int ED25519_SIG_SIZE_BYTES = 64;
 
@@ -74,8 +76,7 @@ public class Ed25519Verify {
 			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
 		}
 
-		return new EdDSAPublicKey(new EdDSAPublicKeySpec(keyBytes,
-				EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512)));
+		return new EdDSAPublicKey(new EdDSAPublicKeySpec(keyBytes, EdDSANamedCurveTable.getByName(ED25519_CURVE_NAME)));
 	}
 
 	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {

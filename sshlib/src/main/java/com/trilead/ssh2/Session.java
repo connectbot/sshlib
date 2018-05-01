@@ -414,6 +414,7 @@ public class Session
 	 *             interface and therefore acts only as a wrapper.
 	 * 
 	 */
+	@Deprecated
 	public int waitUntilDataAvailable(long timeout) throws IOException
 	{
 		if (timeout < 0)

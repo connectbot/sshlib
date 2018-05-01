@@ -584,8 +584,7 @@ public class PEMDecoder
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
 				byte[] publicBytes = trEnc.readByteString();
 				byte[] privateBytes = trEnc.readByteString();
-				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(
-						EdDSANamedCurveTable.CURVE_ED25519_SHA512);
+				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(Ed25519Verify.ED25519_CURVE_NAME);
 				PrivateKey privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(
 						Arrays.copyOfRange(privateBytes, 0, 32), spec));
 				PublicKey pubKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(publicBytes, spec));

@@ -11,10 +11,10 @@ import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 
 import static org.junit.Assert.*;
 
@@ -56,7 +56,7 @@ public class Ed25519VerifyTest {
 
 	@Before
 	public void setupSpec() {
-		this.spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512);
+		this.spec = EdDSANamedCurveTable.getByName(Ed25519Verify.ED25519_CURVE_NAME);
 	}
 
 	@Test
@@ -133,11 +133,30 @@ public class Ed25519VerifyTest {
 		KeyPair pair = PEMDecoder.decode(SSH_PRIVATE_KEY, null);
 	}
 
+	private EdDSAPublicKey getTestPubKey() throws IOException {
+		return (EdDSAPublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
+	}
+
+	private byte[] getTestPubKeyBytes() throws Exception {
+		return Base64.decode(SSH_PUBLIC_KEY.toCharArray());
+	}
+
 	@Test
-	public void publicKeyEncodeSuccess() throws Exception {
-		EdDSAPublicKey pubKey = (EdDSAPublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
-		byte[] pubKeyBytes = Base64.decode(SSH_PUBLIC_KEY.toCharArray());
-		assertArrayEquals(pubKeyBytes, Ed25519Verify.encodeSSHEd25519PublicKey(pubKey));
+	public void publicKeyEncodeDecodeSuccess() throws Exception {
+		assertArrayEquals(getTestPubKeyBytes(), Ed25519Verify.encodeSSHEd25519PublicKey(getTestPubKey()));
+	}
+
+	@Test
+	public void publicKeyDecodeSuccess() throws Exception {
+		assertArrayEquals(getTestPubKey().getEncoded(), Ed25519Verify.decodeSSHEd25519PublicKey(getTestPubKeyBytes()).getEncoded());
+	}
+
+	@Test(expected = IOException.class)
+	public void publicKeyDecode_ExcessPadding_Failure() throws Exception {
+		byte[] validKey = getTestPubKeyBytes();
+		byte[] invalidKey = new byte[validKey.length + 1];
+		System.arraycopy(validKey, 0, invalidKey, 0, validKey.length);
+		Ed25519Verify.decodeSSHEd25519PublicKey(invalidKey);
 	}
 
 	@Test
