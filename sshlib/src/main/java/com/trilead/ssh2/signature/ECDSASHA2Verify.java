@@ -97,6 +97,10 @@ public class ECDSASHA2Verify {
 		return CURVES.get(name);
 	}
 
+	public static ECParameterSpec getCurveForName(String name) {
+		return CURVES.get(name);
+	}
+
 	public static ECPublicKey decodeSSHECDSAPublicKey(byte[] key) throws IOException
 	{
 		TypesReader tr = new TypesReader(key);
