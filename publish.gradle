@@ -15,7 +15,7 @@ artifacts {
   archives jar, sourceJar, javadocJar
 }
 
-ext.isSnapshot = (VersionNumber.parse(rootProject.version).qualifier == "SNAPSHOT")
+ext.isSnapshot = rootProject.version.endsWith("SNAPSHOT")
 ext.isOfficialSdk = (System.env.TRAVIS_JDK_VERSION == officialJdk)
 ext.isMainline = (System.env.TRAVIS_PULL_REQUEST == "false")
 
@@ -26,44 +26,34 @@ publishing {
       artifact sourceJar
       artifact javadocJar
       groupId 'org.connectbot'
-    }
-  }
-}
-
-uploadArchives {
-  repositories {
-    mavenDeployer {
-      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-    }
-  }
-}
-
-install {
-  repositories.mavenInstaller {
-    pom {
-      project {
-        name project.name
-        description project.description
-        url gitHubUrl
+      pom {
+        name = project.name
+        description = project.description
+        url = gitHubUrl
         licenses {
           license {
-            name 'Apache License, Version 2.0'
-            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            name = 'Apache License, Version 2.0'
+            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
           }
         }
         developers {
           developer {
-            id 'kruton'
-            name 'Kenny Root'
-            email 'kenny@the-b.org'
+            id = 'kruton'
+            name = 'Kenny Root'
+            email = 'kenny@the-b.org'
           }
         }
         scm {
-          connection "${gitHubUrl}.git"
-          developerConnection "${gitHubUrl}.git"
-          url gitHubUrl
+          connection = "${gitHubUrl}.git".toString()
+          developerConnection = "${gitHubUrl}.git".toString()
+          url = gitHubUrl
         }
       }
+    }
+  }
+  repositories {
+    maven {
+      url = "$buildDir/repo"
     }
   }
 }
@@ -75,8 +65,10 @@ install {
 }
 
 //This is only needed if bintrayUpload is done as part of releasing
-task updateBintrayVersion << {
-  bintray.pkg.version.name = project.version
+task updateBintrayVersion {
+  doLast {
+    bintray.pkg.version.name = project.version
+  }
 }
 bintrayUpload.dependsOn updateBintrayVersion
 
