@@ -220,7 +220,7 @@ public class KnownHosts
 
 	private final boolean checkHashed(String entry, String hostname)
 	{
-		if (entry.startsWith("|1|") == false)
+		if (!entry.startsWith("|1|"))
 			return false;
 
 		int delim_idx = entry.indexOf('|', 3);
@@ -273,12 +273,12 @@ public class KnownHosts
 			{
 				KnownHostsEntry ke = i.next();
 
-				if (hostnameMatches(ke.patterns, remoteHostname) == false)
+				if (!hostnameMatches(ke.patterns, remoteHostname))
 					continue;
 
 				boolean res = matchKeys(ke.key, remoteKey);
 
-				if (res == true)
+				if (res)
 					return HOSTKEY_IS_OK;
 
 				result = HOSTKEY_HAS_CHANGED;
@@ -299,7 +299,7 @@ public class KnownHosts
 			{
 				KnownHostsEntry ke = i.next();
 
-				if (hostnameMatches(ke.patterns, hostname) == false)
+				if (!hostnameMatches(ke.patterns, hostname))
 					continue;
 
 				keys.addElement(ke.key);
@@ -381,7 +381,7 @@ public class KnownHosts
 
 			/* Optimize, no need to check this entry */
 
-			if ((isMatch) && (negate == false))
+			if ((isMatch) && (!negate))
 				continue;
 
 			/* Now compare */

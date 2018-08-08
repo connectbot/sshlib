@@ -35,7 +35,7 @@ public class RSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (key_format.equals("ssh-rsa") == false)
+		if (!key_format.equals("ssh-rsa"))
 			throw new IllegalArgumentException("This is not a ssh-rsa public key");
 
 		BigInteger e = tr.readMPINT();
@@ -77,7 +77,7 @@ public class RSASHA1Verify
 
 		String sig_format = tr.readString();
 
-		if (sig_format.equals("ssh-rsa") == false)
+		if (!sig_format.equals("ssh-rsa"))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string

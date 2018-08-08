@@ -399,7 +399,7 @@ public class PEMDecoder
 		if (ps.procType.length != 2)
 			throw new IOException("Unknown Proc-Type field.");
 
-		if ("4".equals(ps.procType[0]) == false)
+		if (!"4".equals(ps.procType[0]))
 			throw new IOException("Unknown Proc-Type field (" + ps.procType[0] + ")");
 
 		if ("ENCRYPTED".equals(ps.procType[1]))

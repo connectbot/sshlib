@@ -21,7 +21,7 @@ public class RSASHA256Verify
 
 		String sig_format = tr.readString();
 
-		if (sig_format.equals("rsa-sha2-256") == false)
+		if (!sig_format.equals("rsa-sha2-256"))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string

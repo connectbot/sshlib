@@ -217,7 +217,7 @@ public class ChannelManager implements MessageHandler
 			x11_magic_cookies.remove(hexFakeCookie);
 		}
 
-		if (killChannels == false)
+		if (!killChannels)
 			return;
 
 		if (log.isEnabled())
@@ -236,7 +236,7 @@ public class ChannelManager implements MessageHandler
 
 			synchronized (c)
 			{
-				if (hexFakeCookie.equals(c.hexX11FakeCookie) == false)
+				if (!hexFakeCookie.equals(c.hexX11FakeCookie))
 					continue;
 			}
 
@@ -310,7 +310,7 @@ public class ChannelManager implements MessageHandler
 
 		synchronized (c.channelSendLock)
 		{
-			if (c.closeMessageSent == true)
+			if (c.closeMessageSent)
 				return;
 			tm.sendMessage(msg);
 			c.closeMessageSent = true;
@@ -338,7 +338,7 @@ public class ChannelManager implements MessageHandler
 
 		synchronized (c.channelSendLock)
 		{
-			if (c.closeMessageSent == true)
+			if (c.closeMessageSent)
 				return;
 			tm.sendMessage(msg);
 		}
@@ -363,7 +363,7 @@ public class ChannelManager implements MessageHandler
 
 		synchronized (c.channelSendLock)
 		{
-			if (c.closeMessageSent == true)
+			if (c.closeMessageSent)
 				return;
 			tm.sendMessage(pcoc.getPayload());
 		}
@@ -433,7 +433,7 @@ public class ChannelManager implements MessageHandler
 
 			synchronized (c.channelSendLock)
 			{
-				if (c.closeMessageSent == true)
+				if (c.closeMessageSent)
 					throw new IOException("SSH channel is closed. (" + c.getReasonClosed() + ")");
 
 				tm.sendMessage(msg);
@@ -477,7 +477,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForGlobalRequestResult() == false)
+			if (!waitForGlobalRequestResult())
 				throw new IOException("The server denied the request (did you enable port forwarding?)");
 		}
 		catch (IOException e)
@@ -518,7 +518,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForGlobalRequestResult() == false)
+			if (!waitForGlobalRequestResult())
 				throw new IOException("The server denied the request.");
 		}
 		finally
@@ -557,7 +557,7 @@ public class ChannelManager implements MessageHandler
 		PacketChannelAuthAgentReq aar = new PacketChannelAuthAgentReq(c.remoteID);
 		tm.sendMessage(aar.getPayload());
 
-		if (waitForChannelRequestResult(c) == false) {
+		if (!waitForChannelRequestResult(c)) {
 			authAgent = null;
 			return false;
 		}
@@ -569,7 +569,7 @@ public class ChannelManager implements MessageHandler
 	{
 		synchronized (listenerThreads)
 		{
-			if (listenerThreadsAllowed == false)
+			if (!listenerThreadsAllowed)
 				throw new IOException("Too late, this connection is closed.");
 			listenerThreads.add(thr);
 		}
@@ -633,7 +633,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForGlobalRequestResult() == true)
+			if (waitForGlobalRequestResult())
 				throw new IOException("Your server is alive - but buggy. "
 						+ "It replied with SSH_MSG_REQUEST_SUCCESS when it actually should not.");
 
@@ -667,7 +667,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == true)
+			if (waitForChannelRequestResult(c))
 				throw new IOException("Your server is alive - but buggy. "
 						+ "It replied with SSH_MSG_SESSION_SUCCESS when it actually should not.");
 
@@ -703,7 +703,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == false)
+			if (!waitForChannelRequestResult(c))
 				throw new IOException("The server denied the request.");
 		}
 		catch (IOException e)
@@ -764,7 +764,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == false)
+			if (!waitForChannelRequestResult(c))
 				throw new IOException("The server denied the request.");
 		}
 		catch (IOException e)
@@ -796,7 +796,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == false)
+			if (!waitForChannelRequestResult(c))
 				throw new IOException("The server denied the request.");
 		}
 		catch (IOException e)
@@ -831,7 +831,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == false)
+			if (!waitForChannelRequestResult(c))
 				throw new IOException("The server denied the request.");
 		}
 		catch (IOException e)
@@ -863,7 +863,7 @@ public class ChannelManager implements MessageHandler
 
 		try
 		{
-			if (waitForChannelRequestResult(c) == false)
+			if (!waitForChannelRequestResult(c))
 				throw new IOException("The server denied the request.");
 		}
 		catch (IOException e)
@@ -1123,7 +1123,7 @@ public class ChannelManager implements MessageHandler
 				msg[7] = (byte) (increment >> 8);
 				msg[8] = (byte) (increment);
 
-				if (c.closeMessageSent == false)
+				if (!c.closeMessageSent)
 					tm.sendMessage(msg);
 			}
 		}
@@ -1359,7 +1359,7 @@ public class ChannelManager implements MessageHandler
 
 		if (type.equals("exit-status"))
 		{
-			if (wantReply != false)
+			if (wantReply)
 				throw new IOException("Badly formatted SSH_MSG_CHANNEL_REQUEST message, 'want reply' is true");
 
 			int exit_status = tr.readUINT32();
@@ -1381,7 +1381,7 @@ public class ChannelManager implements MessageHandler
 
 		if (type.equals("exit-signal"))
 		{
-			if (wantReply != false)
+			if (wantReply)
 				throw new IOException("Badly formatted SSH_MSG_CHANNEL_REQUEST message, 'want reply' is true");
 
 			String signame = tr.readString("US-ASCII");

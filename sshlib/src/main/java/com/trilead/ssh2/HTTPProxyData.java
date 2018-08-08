@@ -146,7 +146,7 @@ public class HTTPProxyData implements ProxyData
 
 		String httpReponse = new String(buffer, 0, len, "ISO-8859-1");
 
-		if (httpReponse.startsWith("HTTP/") == false)
+		if (!httpReponse.startsWith("HTTP/"))
 			throw new IOException("The proxy did not send back a valid HTTP response.");
 
 			/* "HTTP/1.X XYZ X" => 14 characters minimum */

@@ -37,7 +37,7 @@ public class DSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (key_format.equals("ssh-dss") == false)
+		if (!key_format.equals("ssh-dss"))
 			throw new IllegalArgumentException("This is not a ssh-dss public key!");
 
 		BigInteger p = tr.readMPINT();
@@ -138,7 +138,7 @@ public class DSASHA1Verify
 			TypesReader tr = new TypesReader(sig);
 
 			String sig_format = tr.readString();
-			if (sig_format.equals("ssh-dss") == false)
+			if (!sig_format.equals("ssh-dss"))
 				throw new IOException("Peer sent wrong signature format");
 
 			rsArray = tr.readByteString();

@@ -177,7 +177,7 @@ public class TransportManager
 
 	public void close(Throwable cause, boolean useDisconnectPacket)
 	{
-		if (useDisconnectPacket == false)
+		if (!useDisconnectPacket)
 		{
 			/* OK, hard shutdown - do not aquire the semaphore,
 			 * perhaps somebody is inside (and waits until the remote
@@ -200,9 +200,9 @@ public class TransportManager
 
 		synchronized (connectionSemaphore)
 		{
-			if (connectionClosed == false)
+			if (!connectionClosed)
 			{
-				if (useDisconnectPacket == true)
+				if (useDisconnectPacket)
 				{
 					try
 					{
@@ -242,7 +242,7 @@ public class TransportManager
 			 * (they may be modified concurrently)
 			 */
 
-			if (monitorsWereInformed == false)
+			if (!monitorsWereInformed)
 			{
 				monitorsWereInformed = true;
 				monitors = (Vector) connectionMonitors.clone();
@@ -500,7 +500,7 @@ public class TransportManager
 							.initCause(reasonClosedCause);
 				}
 
-				if (flagKexOngoing == false)
+				if (!flagKexOngoing)
 					break;
 
 				try

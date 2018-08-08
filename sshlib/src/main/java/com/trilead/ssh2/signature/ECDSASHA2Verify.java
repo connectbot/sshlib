@@ -107,7 +107,7 @@ public class ECDSASHA2Verify {
 
 		String key_format = tr.readString();
 
-		if (key_format.startsWith(ECDSA_SHA2_PREFIX) == false)
+		if (!key_format.startsWith(ECDSA_SHA2_PREFIX))
 			throw new IllegalArgumentException("This is not an ECDSA public key");
 
 		String curveName = tr.readString();
@@ -116,7 +116,7 @@ public class ECDSASHA2Verify {
 		if (tr.remain() != 0)
 			throw new IOException("Padding in ECDSA public key!");
 
-		if (key_format.equals(ECDSA_SHA2_PREFIX + curveName) == false) {
+		if (!key_format.equals(ECDSA_SHA2_PREFIX + curveName)) {
 			throw new IOException("Key format is inconsistent with curve name: " + key_format
 					+ " != " + curveName);
 		}
@@ -198,11 +198,11 @@ public class ECDSASHA2Verify {
 		TypesReader tr = new TypesReader(sig);
 
 		String sig_format = tr.readString();
-		if (sig_format.startsWith(ECDSA_SHA2_PREFIX) == false)
+		if (!sig_format.startsWith(ECDSA_SHA2_PREFIX))
 			throw new IOException("Peer sent wrong signature format");
 
 		String curveName = sig_format.substring(ECDSA_SHA2_PREFIX.length());
-		if (CURVES.containsKey(curveName) == false) {
+		if (!CURVES.containsKey(curveName)) {
 			throw new IOException("Unsupported curve: " + curveName);
 		}
 

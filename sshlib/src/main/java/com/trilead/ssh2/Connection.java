@@ -554,7 +554,7 @@ public class Connection
 
 		if (tm != null)
 		{
-			tm.close(t, hard == false);
+			tm.close(t, !hard);
 			tm = null;
 		}
 		am = null;
@@ -1230,7 +1230,7 @@ public class Connection
 
 			for (int j = 0; j < count; j++)
 			{
-				if (((element == null) && (list2[j] == null)) || ((element != null) && (element.equals(list2[j]))))
+				if (element == null ? list2[j] == null : element.equals(list2[j]))
 				{
 					duplicate = true;
 					break;
@@ -1494,7 +1494,7 @@ public class Connection
 	{
 		Logger.enabled = enable;
 
-		if (enable == false)
+		if (!enable)
 		{
 			Logger.logger = null;
 		}

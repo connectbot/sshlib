@@ -504,7 +504,7 @@ public class SCPClient
 			throw new IllegalArgumentException("Invalid mode.");
 
 		for (int i = 0; i < mode.length(); i++)
-			if (Character.isDigit(mode.charAt(i)) == false)
+			if (!Character.isDigit(mode.charAt(i)))
 				throw new IllegalArgumentException("Invalid mode.");
 
 		remoteTargetDirectory = remoteTargetDirectory.trim();
@@ -564,7 +564,7 @@ public class SCPClient
 			throw new IllegalArgumentException("Invalid mode.");
 
 		for (int i = 0; i < mode.length(); i++)
-			if (Character.isDigit(mode.charAt(i)) == false)
+			if (!Character.isDigit(mode.charAt(i)))
 				throw new IllegalArgumentException("Invalid mode.");
 
 		if (localFiles.length == 0)

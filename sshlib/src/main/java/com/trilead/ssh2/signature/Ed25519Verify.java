@@ -62,7 +62,7 @@ public class Ed25519Verify {
 		TypesReader tr = new TypesReader(key);
 
 		String key_format = tr.readString();
-		if (key_format.equals(ED25519_ID) == false) {
+		if (!key_format.equals(ED25519_ID)) {
 			throw new IOException("This is not an Ed25519 key");
 		}
 
@@ -130,7 +130,7 @@ public class Ed25519Verify {
 		TypesReader tr = new TypesReader(sig);
 
 		String sig_format = tr.readString();
-		if (sig_format.equals(ED25519_ID) == false) {
+		if (!sig_format.equals(ED25519_ID)) {
 			throw new IOException("Peer sent wrong signature format");
 		}
 
