@@ -25,9 +25,7 @@ public class StreamForwarder extends Thread
 	final Socket s;
 	final String mode;
 
-	StreamForwarder(Channel c, StreamForwarder sibling, Socket s, InputStream is, OutputStream os, String mode)
-			throws IOException
-	{
+	StreamForwarder(Channel c, StreamForwarder sibling, Socket s, InputStream is, OutputStream os, String mode) {
 		this.is = is;
 		this.os = os;
 		this.mode = mode;

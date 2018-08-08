@@ -37,7 +37,7 @@ public class DSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (key_format.equals("ssh-dss") == false)
+		if (!key_format.equals("ssh-dss"))
 			throw new IllegalArgumentException("This is not a ssh-dss public key!");
 
 		BigInteger p = tr.readMPINT();
@@ -53,14 +53,8 @@ public class DSASHA1Verify
 
 			KeySpec ks = new DSAPublicKeySpec(y, p, q, g);
 			return (DSAPublicKey) kf.generatePublic(ks);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeySpecException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -138,7 +132,7 @@ public class DSASHA1Verify
 			TypesReader tr = new TypesReader(sig);
 
 			String sig_format = tr.readString();
-			if (sig_format.equals("ssh-dss") == false)
+			if (!sig_format.equals("ssh-dss"))
 				throw new IOException("Peer sent wrong signature format");
 
 			rsArray = tr.readByteString();
@@ -216,18 +210,10 @@ public class DSASHA1Verify
 			s.initVerify(dpk);
 			s.update(message);
 			return s.verify(ds);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException("No such algorithm");
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException("No such algorithm");
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			throw new IOException("No such algorithm", e);
 		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+			throw new IOException(e);
 		}
 	}
 
@@ -238,18 +224,8 @@ public class DSASHA1Verify
 			s.initSign(pk);
 			s.update(message);
 			return s.sign();
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | SignatureException | InvalidKeyException e) {
+			throw new IOException(e);
 		}
 	}
 }

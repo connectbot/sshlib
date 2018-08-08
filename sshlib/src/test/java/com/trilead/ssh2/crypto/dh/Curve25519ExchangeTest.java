@@ -56,14 +56,14 @@ public class Curve25519ExchangeTest {
 	}
 
 	@Test
-	public void deriveAlicePublicKey() throws Exception {
+	public void deriveAlicePublicKey() {
 		byte[] pubKey = new byte[Curve25519.KEY_SIZE];
 		Curve25519.keygen(pubKey, null, ALICE_PRIVATE);
 		assertArrayEquals(ALICE_PUBLIC, pubKey);
 	}
 
 	@Test
-	public void deriveBobPublicKey() throws Exception {
+	public void deriveBobPublicKey() {
 		byte[] pubKey = new byte[Curve25519.KEY_SIZE];
 		Curve25519.keygen(pubKey, null, BOB_PRIVATE);
 		assertArrayEquals(BOB_PUBLIC, pubKey);

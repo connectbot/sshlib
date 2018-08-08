@@ -81,7 +81,7 @@ public class Ed25519VerifyTest {
 	}
 
 	@Test
-	public void publicKeyCalculatedCorrectly() throws Exception {
+	public void publicKeyCalculatedCorrectly() {
 		EdDSAPrivateKeySpec privKeySpec = new EdDSAPrivateKeySpec(SECRET_KEY, spec);
 		byte[] pubKeyBytes = privKeySpec.getA().toByteArray();
 		assertArrayEquals(PUBLIC_KEY, pubKeyBytes);

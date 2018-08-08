@@ -4,6 +4,7 @@ package com.trilead.ssh2.crypto.dh;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.crypto.digest.HashForSSH2Types;
 import com.trilead.ssh2.log.Logger;
@@ -76,8 +77,8 @@ public abstract class GenericDhExchange
 
 		if (log.isEnabled())
 		{
-			log.log(90, "Client: '" + new String(clientversion, "ISO-8859-1") + "'");
-			log.log(90, "Server: '" + new String(serverversion, "ISO-8859-1") + "'");
+			log.log(90, "Client: '" + new String(clientversion, StandardCharsets.ISO_8859_1) + "'");
+			log.log(90, "Server: '" + new String(serverversion, StandardCharsets.ISO_8859_1) + "'");
 		}
 
 		hash.updateByteString(clientversion);

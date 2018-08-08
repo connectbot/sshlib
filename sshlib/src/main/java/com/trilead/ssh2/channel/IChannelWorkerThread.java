@@ -9,5 +9,5 @@ package com.trilead.ssh2.channel;
  */
 interface IChannelWorkerThread
 {
-	public void stopWorking();
+	void stopWorking();
 }

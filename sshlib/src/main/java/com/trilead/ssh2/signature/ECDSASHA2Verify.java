@@ -107,7 +107,7 @@ public class ECDSASHA2Verify {
 
 		String key_format = tr.readString();
 
-		if (key_format.startsWith(ECDSA_SHA2_PREFIX) == false)
+		if (!key_format.startsWith(ECDSA_SHA2_PREFIX))
 			throw new IllegalArgumentException("This is not an ECDSA public key");
 
 		String curveName = tr.readString();
@@ -116,7 +116,7 @@ public class ECDSASHA2Verify {
 		if (tr.remain() != 0)
 			throw new IOException("Padding in ECDSA public key!");
 
-		if (key_format.equals(ECDSA_SHA2_PREFIX + curveName) == false) {
+		if (!key_format.equals(ECDSA_SHA2_PREFIX + curveName)) {
 			throw new IOException("Key format is inconsistent with curve name: " + key_format
 					+ " != " + curveName);
 		}
@@ -136,14 +136,8 @@ public class ECDSASHA2Verify {
 		try {
 			KeyFactory kf = KeyFactory.getInstance("EC");
 			return (ECPublicKey) kf.generatePublic(keySpec);
-		} catch (NoSuchAlgorithmException nsae) {
-			IOException ioe = new IOException("No EC KeyFactory available");
-			ioe.initCause(nsae);
-			throw ioe;
-		} catch (InvalidKeySpecException ikse) {
-			IOException ioe = new IOException("No EC KeyFactory available");
-			ioe.initCause(ikse);
-			throw ioe;
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException nsae) {
+			throw new IOException("No EC KeyFactory available", nsae);
 		}
 	}
 
@@ -198,11 +192,11 @@ public class ECDSASHA2Verify {
 		TypesReader tr = new TypesReader(sig);
 
 		String sig_format = tr.readString();
-		if (sig_format.startsWith(ECDSA_SHA2_PREFIX) == false)
+		if (!sig_format.startsWith(ECDSA_SHA2_PREFIX))
 			throw new IOException("Peer sent wrong signature format");
 
 		String curveName = sig_format.substring(ECDSA_SHA2_PREFIX.length());
-		if (CURVES.containsKey(curveName) == false) {
+		if (!CURVES.containsKey(curveName)) {
 			throw new IOException("Unsupported curve: " + curveName);
 		}
 
@@ -266,7 +260,7 @@ public class ECDSASHA2Verify {
 		return os.toByteArray();
 	}
 
-	private static final void writeLength(int length, OutputStream os) throws IOException {
+	private static void writeLength(int length, OutputStream os) throws IOException {
 		if (length <= 0x7F) {
 			os.write(length);
 			return;
@@ -325,18 +319,8 @@ public class ECDSASHA2Verify {
 			s.initSign(pk);
 			s.update(message);
 			return s.sign();
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -349,18 +333,10 @@ public class ECDSASHA2Verify {
 			s.initVerify(dpk);
 			s.update(message);
 			return s.verify(ds);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException("No such algorithm");
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException("No such algorithm");
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			throw new IOException("No such algorithm", e);
 		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+			throw new IOException(e);
 		}
 	}
 

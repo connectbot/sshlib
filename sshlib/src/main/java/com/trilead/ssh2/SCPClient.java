@@ -9,6 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * A very basic <code>SCPClient</code> that can be used to copy files from/to
@@ -141,7 +142,7 @@ public class SCPClient
 
 		String cline = "C" + mode + " " + data.length + " " + fileName + "\n";
 
-		os.write(cline.getBytes("ISO-8859-1"));
+		os.write(cline.getBytes(StandardCharsets.ISO_8859_1));
 		os.flush();
 
 		readResponse(is);
@@ -152,7 +153,7 @@ public class SCPClient
 
 		readResponse(is);
 
-		os.write("E\n".getBytes("ISO-8859-1"));
+		os.write("E\n".getBytes(StandardCharsets.ISO_8859_1));
 		os.flush();
 	}
 
@@ -179,7 +180,7 @@ public class SCPClient
 
 			String cline = "C" + mode + " " + remain + " " + remoteName + "\n";
 
-			os.write(cline.getBytes("ISO-8859-1"));
+			os.write(cline.getBytes(StandardCharsets.ISO_8859_1));
 			os.flush();
 
 			readResponse(is);
@@ -218,7 +219,7 @@ public class SCPClient
 			readResponse(is);
 		}
 
-		os.write("E\n".getBytes("ISO-8859-1"));
+		os.write("E\n".getBytes(StandardCharsets.ISO_8859_1));
 		os.flush();
 	}
 
@@ -504,7 +505,7 @@ public class SCPClient
 			throw new IllegalArgumentException("Invalid mode.");
 
 		for (int i = 0; i < mode.length(); i++)
-			if (Character.isDigit(mode.charAt(i)) == false)
+			if (!Character.isDigit(mode.charAt(i)))
 				throw new IllegalArgumentException("Invalid mode.");
 
 		remoteTargetDirectory = remoteTargetDirectory.trim();
@@ -520,7 +521,7 @@ public class SCPClient
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("Error during SCP transfer.").initCause(e);
+			throw new IOException("Error during SCP transfer.", e);
 		}
 		finally
 		{
@@ -564,7 +565,7 @@ public class SCPClient
 			throw new IllegalArgumentException("Invalid mode.");
 
 		for (int i = 0; i < mode.length(); i++)
-			if (Character.isDigit(mode.charAt(i)) == false)
+			if (!Character.isDigit(mode.charAt(i)))
 				throw new IllegalArgumentException("Invalid mode.");
 
 		if (localFiles.length == 0)
@@ -589,7 +590,7 @@ public class SCPClient
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("Error during SCP transfer.").initCause(e);
+			throw new IOException("Error during SCP transfer.", e);
 		}
 		finally
 		{
@@ -666,7 +667,7 @@ public class SCPClient
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("Error during SCP transfer.").initCause(e);
+			throw new IOException("Error during SCP transfer.", e);
 		}
 		finally
 		{
@@ -718,7 +719,7 @@ public class SCPClient
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("Error during SCP transfer.").initCause(e);
+			throw new IOException("Error during SCP transfer.", e);
 		}
 		finally
 		{

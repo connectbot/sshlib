@@ -21,7 +21,7 @@ public class RSASHA512Verify
 
 		String sig_format = tr.readString();
 
-		if (sig_format.equals("rsa-sha2-512") == false)
+		if (!sig_format.equals("rsa-sha2-512"))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
@@ -86,18 +86,8 @@ public class RSASHA512Verify
 			s.initSign(pk);
 			s.update(message);
 			return s.sign();
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -108,18 +98,8 @@ public class RSASHA512Verify
 			s.initVerify(dpk);
 			s.update(message);
 			return s.verify(ds);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 }

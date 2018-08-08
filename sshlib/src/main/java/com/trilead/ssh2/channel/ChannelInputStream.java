@@ -36,8 +36,7 @@ public final class ChannelInputStream extends InputStream
 		return (avail > 0) ? avail : 0;
 	}
 
-	public void close() throws IOException
-	{
+	public void close() {
 		isClosed = true;
 	}
 

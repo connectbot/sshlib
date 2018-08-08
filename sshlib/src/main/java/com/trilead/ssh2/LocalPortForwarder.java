@@ -53,11 +53,9 @@ public class LocalPortForwarder
 
 	/**
 	 * Stop TCP/IP forwarding of newly arriving connections.
-	 * 
-	 * @throws IOException
+	 *
 	 */
-	public void close() throws IOException
-	{
+	public void close() {
 		lat.stopWorking();
 	}
 }

@@ -53,9 +53,9 @@ public class EcDhExchange extends GenericDhExchange {
 			clientPrivate = (ECPrivateKey) pair.getPrivate();
 			clientPublic = (ECPublicKey) pair.getPublic();
 		} catch (NoSuchAlgorithmException e) {
-			throw (IOException) new IOException("No DH keypair generator").initCause(e);
+			throw new IOException("No DH keypair generator", e);
 		} catch (InvalidAlgorithmParameterException e) {
-			throw (IOException) new IOException("Invalid DH parameters").initCause(e);
+			throw new IOException("Invalid DH parameters", e);
 		}
 	}
 
@@ -89,11 +89,11 @@ public class EcDhExchange extends GenericDhExchange {
 			ka.init(clientPrivate);
 			ka.doPhase(serverPublic, true);
 		} catch (NoSuchAlgorithmException e) {
-			throw (IOException) new IOException("No ECDH key agreement method").initCause(e);
+			throw new IOException("No ECDH key agreement method", e);
 		} catch (InvalidKeyException e) {
-			throw (IOException) new IOException("Invalid ECDH key").initCause(e);
+			throw new IOException("Invalid ECDH key", e);
 		} catch (InvalidKeySpecException e) {
-			throw (IOException) new IOException("Invalid ECDH key").initCause(e);
+			throw new IOException("Invalid ECDH key", e);
 		}
 
 		sharedSecret = new BigInteger(1, ka.generateSecret());

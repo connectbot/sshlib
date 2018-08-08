@@ -95,7 +95,7 @@ public class CipherOutputStream
 		}
 		catch (Exception e)
 		{
-			throw (IOException) new IOException("Error while decrypting block.").initCause(e);
+			throw new IOException("Error while decrypting block.", e);
 		}
 
 		internal_write(enc, 0, blockSize);

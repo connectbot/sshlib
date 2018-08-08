@@ -146,8 +146,7 @@ public class KexManager
 					return lastConnInfo;
 
 				if (connectionClosed)
-					throw (IOException) new IOException("Key exchange was not finished, connection is closed.")
-							.initCause(tm.getReasonClosedCause());
+					throw new IOException("Key exchange was not finished, connection is closed.", tm.getReasonClosedCause());
 
 				try
 				{
@@ -198,23 +197,12 @@ public class KexManager
 		if (cpar == null || spar == null)
 			throw new IllegalArgumentException();
 
-		if (compareFirstOfNameList(cpar.kex_algorithms, spar.kex_algorithms) == false)
+		if (!compareFirstOfNameList(cpar.kex_algorithms, spar.kex_algorithms))
 		{
 			return false;
 		}
 
-		if (compareFirstOfNameList(cpar.server_host_key_algorithms, spar.server_host_key_algorithms) == false)
-		{
-			return false;
-		}
-
-		/*
-		 * We do NOT check here if the other algorithms can be agreed on, this
-		 * is just a check if kex_algorithms and server_host_key_algorithms were
-		 * guessed right!
-		 */
-
-		return true;
+		return compareFirstOfNameList(cpar.server_host_key_algorithms, spar.server_host_key_algorithms);
 	}
 
 	private NegotiatedParameters mergeKexParameters(KexParameters client, KexParameters server)
@@ -539,7 +527,7 @@ public class KexManager
 			if (kxs.np == null)
 				throw new IOException("Cannot negotiate, proposals do not match.");
 
-			if (kxs.remoteKEX.isFirst_kex_packet_follows() && (kxs.np.guessOK == false))
+			if (kxs.remoteKEX.isFirst_kex_packet_follows() && (!kxs.np.guessOK))
 			{
 				/*
 				 * Guess was wrong, we need to ignore the next kex packet.
@@ -672,11 +660,11 @@ public class KexManager
 					}
 					catch (Exception e)
 					{
-						throw (IOException) new IOException(
-								"The server hostkey was not accepted by the verifier callback.").initCause(e);
+						throw new IOException(
+								"The server hostkey was not accepted by the verifier callback.", e);
 					}
 
-					if (vres == false)
+					if (!vres)
 						throw new IOException("The server hostkey was not accepted by the verifier callback");
 				}
 
@@ -691,12 +679,12 @@ public class KexManager
 				}
 				catch (IllegalArgumentException e)
 				{
-					throw (IOException) new IOException("KEX error.").initCause(e);
+					throw new IOException("KEX error.", e);
 				}
 
 				boolean res = verifySignature(dhgexrpl.getSignature(), kxs.hostkey);
 
-				if (res == false)
+				if (!res)
 					throw new IOException("Hostkey signature sent by remote is wrong!");
 
 				kxs.K = kxs.dhgx.getK();
@@ -733,11 +721,11 @@ public class KexManager
 					}
 					catch (Exception e)
 					{
-						throw (IOException) new IOException(
-								"The server hostkey was not accepted by the verifier callback.").initCause(e);
+						throw new IOException(
+								"The server hostkey was not accepted by the verifier callback.", e);
 					}
 
-					if (vres == false)
+					if (!vres)
 						throw new IOException("The server hostkey was not accepted by the verifier callback");
 				}
 
@@ -750,12 +738,12 @@ public class KexManager
 				}
 				catch (IllegalArgumentException e)
 				{
-					throw (IOException) new IOException("KEX error.").initCause(e);
+					throw new IOException("KEX error.", e);
 				}
 
 				boolean res = verifySignature(dhr.getSignature(), kxs.hostkey);
 
-				if (res == false)
+				if (!res)
 					throw new IOException("Hostkey signature sent by remote is wrong!");
 
 				kxs.K = kxs.dhx.getK();

@@ -141,8 +141,7 @@ public class TransportManager
 
 	private volatile ExtensionInfo extensionInfo = ExtensionInfo.noExtInfoSeen();
 
-	public TransportManager(String host, int port) throws IOException
-	{
+	public TransportManager(String host, int port) {
 		this.hostname = host;
 		this.port = port;
 	}
@@ -177,7 +176,7 @@ public class TransportManager
 
 	public void close(Throwable cause, boolean useDisconnectPacket)
 	{
-		if (useDisconnectPacket == false)
+		if (!useDisconnectPacket)
 		{
 			/* OK, hard shutdown - do not aquire the semaphore,
 			 * perhaps somebody is inside (and waits until the remote
@@ -200,9 +199,9 @@ public class TransportManager
 
 		synchronized (connectionSemaphore)
 		{
-			if (connectionClosed == false)
+			if (!connectionClosed)
 			{
-				if (useDisconnectPacket == true)
+				if (useDisconnectPacket)
 				{
 					try
 					{
@@ -242,7 +241,7 @@ public class TransportManager
 			 * (they may be modified concurrently)
 			 */
 
-			if (monitorsWereInformed == false)
+			if (!monitorsWereInformed)
 			{
 				monitorsWereInformed = true;
 				monitors = (Vector) connectionMonitors.clone();
@@ -387,7 +386,7 @@ public class TransportManager
 		{
 			if (connectionClosed)
 			{
-				throw (IOException) new IOException("Sorry, this connection is closed.").initCause(reasonClosedCause);
+				throw new IOException("Sorry, this connection is closed.", reasonClosedCause);
 			}
 
 			flagKexOngoing = true;
@@ -404,8 +403,7 @@ public class TransportManager
 		}
 	}
 
-	public void kexFinished() throws IOException
-	{
+	public void kexFinished() {
 		synchronized (connectionSemaphore)
 		{
 			flagKexOngoing = false;
@@ -496,11 +494,10 @@ public class TransportManager
 			{
 				if (connectionClosed)
 				{
-					throw (IOException) new IOException("Sorry, this connection is closed.")
-							.initCause(reasonClosedCause);
+					throw new IOException("Sorry, this connection is closed.", reasonClosedCause);
 				}
 
-				if (flagKexOngoing == false)
+				if (!flagKexOngoing)
 					break;
 
 				try

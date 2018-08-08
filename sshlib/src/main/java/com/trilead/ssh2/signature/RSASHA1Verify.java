@@ -35,7 +35,7 @@ public class RSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (key_format.equals("ssh-rsa") == false)
+		if (!key_format.equals("ssh-rsa"))
 			throw new IllegalArgumentException("This is not a ssh-rsa public key");
 
 		BigInteger e = tr.readMPINT();
@@ -49,14 +49,8 @@ public class RSASHA1Verify
 		try {
 			KeyFactory kf = KeyFactory.getInstance("RSA");
 			return (RSAPublicKey) kf.generatePublic(keySpec);
-		} catch (NoSuchAlgorithmException nsae) {
-			IOException ioe = new IOException("No RSA KeyFactory available");
-			ioe.initCause(nsae);
-			throw ioe;
-		} catch (InvalidKeySpecException ikse) {
-			IOException ioe = new IOException("No RSA KeyFactory available");
-			ioe.initCause(ikse);
-			throw ioe;
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException nsae) {
+			throw new IOException("No RSA KeyFactory available", nsae);
 		}
 	}
 
@@ -77,7 +71,7 @@ public class RSASHA1Verify
 
 		String sig_format = tr.readString();
 
-		if (sig_format.equals("ssh-rsa") == false)
+		if (!sig_format.equals("ssh-rsa"))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
@@ -141,18 +135,8 @@ public class RSASHA1Verify
 			s.initSign(pk);
 			s.update(message);
 			return s.sign();
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -163,18 +147,8 @@ public class RSASHA1Verify
 			s.initVerify(dpk);
 			s.update(message);
 			return s.verify(ds);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 }

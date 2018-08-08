@@ -76,7 +76,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readInt_NotReallyInteger() throws Exception {
+    public void readInt_NotReallyInteger() {
         byte[] vector = new byte[] {
                 (byte) 0x01, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
         };
@@ -89,7 +89,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readInt_InvalidLength() throws Exception {
+    public void readInt_InvalidLength() {
         byte[] vector = new byte[] {
                 (byte) 0x02, (byte) 0x80, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
         };
@@ -102,7 +102,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readInt_ShortArray() throws Exception {
+    public void readInt_ShortArray() {
         byte[] vector = new byte[] {
                 (byte) 0x02, (byte) 0x02, (byte) 0xFF
         };
@@ -114,7 +114,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readOid_InvalidLength() throws Exception {
+    public void readOid_InvalidLength() {
         byte[] vector = new byte[]{
                 (byte) 0x02, (byte) 0x80, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
         };
@@ -126,7 +126,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readOid_TooShort() throws Exception {
+    public void readOid_TooShort() {
         byte[] vector = new byte[]{
                 (byte) 0x02, (byte) 0x00
         };
@@ -138,7 +138,7 @@ public class SimpleDERReaderTest {
     }
 
     @Test
-    public void readOid_NotOidValue() throws Exception {
+    public void readOid_NotOidValue() {
         byte[] vector = new byte[]{
                 (byte) 0x02, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
         };

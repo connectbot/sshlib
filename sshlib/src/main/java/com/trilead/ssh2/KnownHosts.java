@@ -11,6 +11,7 @@ import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -205,22 +206,14 @@ public class KnownHosts
 			throw new RuntimeException("Unable to create SecretKey", e);
 		}
 
-		try
-		{
-			hmac.update(hostname.getBytes("ISO-8859-1"));
-		}catch(UnsupportedEncodingException ignore)
-		{
-			/* Actually, ISO-8859-1 is supported by all correct
-			 * Java implementations. But... you never know. */
-			hmac.update(hostname.getBytes());
-		}
+		hmac.update(hostname.getBytes(StandardCharsets.ISO_8859_1));
 
 		return hmac.doFinal();
 	}
 
 	private final boolean checkHashed(String entry, String hostname)
 	{
-		if (entry.startsWith("|1|") == false)
+		if (!entry.startsWith("|1|"))
 			return false;
 
 		int delim_idx = entry.indexOf('|', 3);
@@ -273,12 +266,12 @@ public class KnownHosts
 			{
 				KnownHostsEntry ke = i.next();
 
-				if (hostnameMatches(ke.patterns, remoteHostname) == false)
+				if (!hostnameMatches(ke.patterns, remoteHostname))
 					continue;
 
 				boolean res = matchKeys(ke.key, remoteKey);
 
-				if (res == true)
+				if (res)
 					return HOSTKEY_IS_OK;
 
 				result = HOSTKEY_HAS_CHANGED;
@@ -299,7 +292,7 @@ public class KnownHosts
 			{
 				KnownHostsEntry ke = i.next();
 
-				if (hostnameMatches(ke.patterns, hostname) == false)
+				if (!hostnameMatches(ke.patterns, hostname))
 					continue;
 
 				keys.addElement(ke.key);
@@ -381,7 +374,7 @@ public class KnownHosts
 
 			/* Optimize, no need to check this entry */
 
-			if ((isMatch) && (negate == false))
+			if ((isMatch) && (!negate))
 				continue;
 
 			/* Now compare */
@@ -702,7 +695,7 @@ public class KnownHosts
 				raf.write('\n');
 		}
 		
-		raf.write(new String(entry).getBytes("ISO-8859-1"));
+		raf.write(new String(entry).getBytes(StandardCharsets.ISO_8859_1));
 		raf.close();
 	}
 

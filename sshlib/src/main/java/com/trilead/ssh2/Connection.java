@@ -554,7 +554,7 @@ public class Connection
 
 		if (tm != null)
 		{
-			tm.close(t, hard == false);
+			tm.close(t, !hard);
 			tm = null;
 		}
 		am = null;
@@ -805,8 +805,7 @@ public class Connection
 			if (e1 instanceof HTTPProxyException)
 				throw e1;
 
-			throw (IOException) new IOException("There was a problem while connecting to " + hostname + ":" + port)
-					.initCause(e1);
+			throw new IOException("There was a problem while connecting to " + hostname + ":" + port, e1);
 		}
 	}
 
@@ -959,10 +958,8 @@ public class Connection
 	 * Note: This factory method will probably disappear in the future.
 	 * 
 	 * @return A {@link SCPClient} object.
-	 * @throws IOException
 	 */
-	public synchronized SCPClient createSCPClient() throws IOException
-	{
+	public synchronized SCPClient createSCPClient() {
 		if (tm == null)
 			throw new IllegalStateException("Cannot create SCP client, you need to establish a connection first.");
 
@@ -1230,7 +1227,7 @@ public class Connection
 
 			for (int j = 0; j < count; j++)
 			{
-				if (((element == null) && (list2[j] == null)) || ((element != null) && (element.equals(list2[j]))))
+				if (element == null ? list2[j] == null : element.equals(list2[j]))
 				{
 					duplicate = true;
 					break;
@@ -1494,7 +1491,7 @@ public class Connection
 	{
 		Logger.enabled = enable;
 
-		if (enable == false)
+		if (!enable)
 		{
 			Logger.logger = null;
 		}

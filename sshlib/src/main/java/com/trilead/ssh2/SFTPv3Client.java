@@ -154,7 +154,7 @@ public class SFTPv3Client
 		}
 		catch (Exception e)
 		{
-			throw (IOException) new IOException("This charset is not supported").initCause(e);
+			throw new IOException("This charset is not supported", e);
 		}
 		charsetName = charset;
 	}
@@ -176,7 +176,7 @@ public class SFTPv3Client
 		if (handle.client != this)
 			throw new IOException("The file handle was created with another SFTPv3FileHandle instance.");
 
-		if (handle.isClosed == true)
+		if (handle.isClosed)
 			throw new IOException("The file handle is closed.");
 	}
 
@@ -1376,7 +1376,7 @@ public class SFTPv3Client
 
 		try
 		{
-			if (handle.isClosed == false)
+			if (!handle.isClosed)
 			{
 				closeHandle(handle.fileHandle);
 			}
