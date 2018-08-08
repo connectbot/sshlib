@@ -19,5 +19,5 @@ public interface DebugLogger
  * @param className the class that generated the message
  * @param message the debug message
  */
-	public void log(int level, String className, String message);	
+void log(int level, String className, String message);
 }

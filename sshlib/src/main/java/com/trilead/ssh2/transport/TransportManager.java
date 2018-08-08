@@ -141,8 +141,7 @@ public class TransportManager
 
 	private volatile ExtensionInfo extensionInfo = ExtensionInfo.noExtInfoSeen();
 
-	public TransportManager(String host, int port) throws IOException
-	{
+	public TransportManager(String host, int port) {
 		this.hostname = host;
 		this.port = port;
 	}
@@ -387,7 +386,7 @@ public class TransportManager
 		{
 			if (connectionClosed)
 			{
-				throw (IOException) new IOException("Sorry, this connection is closed.").initCause(reasonClosedCause);
+				throw new IOException("Sorry, this connection is closed.", reasonClosedCause);
 			}
 
 			flagKexOngoing = true;
@@ -404,8 +403,7 @@ public class TransportManager
 		}
 	}
 
-	public void kexFinished() throws IOException
-	{
+	public void kexFinished() {
 		synchronized (connectionSemaphore)
 		{
 			flagKexOngoing = false;
@@ -496,8 +494,7 @@ public class TransportManager
 			{
 				if (connectionClosed)
 				{
-					throw (IOException) new IOException("Sorry, this connection is closed.")
-							.initCause(reasonClosedCause);
+					throw new IOException("Sorry, this connection is closed.", reasonClosedCause);
 				}
 
 				if (!flagKexOngoing)

@@ -77,9 +77,9 @@ public class DhExchange extends GenericDhExchange {
 			clientPrivate = (DHPrivateKey) pair.getPrivate();
 			clientPublic = (DHPublicKey) pair.getPublic();
 		} catch (NoSuchAlgorithmException e) {
-			throw (IOException) new IOException("No DH keypair generator").initCause(e);
+			throw new IOException("No DH keypair generator", e);
 		} catch (InvalidAlgorithmParameterException e) {
-			throw (IOException) new IOException("Invalid DH parameters").initCause(e);
+			throw new IOException("Invalid DH parameters", e);
 		}
 	}
 
@@ -115,11 +115,11 @@ public class DhExchange extends GenericDhExchange {
 			ka.init(clientPrivate);
 			ka.doPhase(serverPublic, true);
 		} catch (NoSuchAlgorithmException e) {
-			throw (IOException) new IOException("No DH key agreement method").initCause(e);
+			throw new IOException("No DH key agreement method", e);
 		} catch (InvalidKeyException e) {
-			throw (IOException) new IOException("Invalid DH key").initCause(e);
+			throw new IOException("Invalid DH key", e);
 		} catch (InvalidKeySpecException e) {
-			throw (IOException) new IOException("Invalid DH key").initCause(e);
+			throw new IOException("Invalid DH key", e);
 		}
 
 		sharedSecret = new BigInteger(1, ka.generateSecret());

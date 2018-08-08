@@ -3,6 +3,7 @@ package com.trilead.ssh2.packets;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 /**
  * TypesWriter.
@@ -133,15 +134,8 @@ public class TypesWriter
 	{
 		byte[] b;
 
-		try
-		{
-			/* All Java JVMs must support ISO-8859-1 */
-			b = v.getBytes("ISO-8859-1");
-		}
-		catch (UnsupportedEncodingException ignore)
-		{
-			b = v.getBytes();
-		}
+		/* All Java JVMs must support ISO-8859-1 */
+		b = v.getBytes(StandardCharsets.ISO_8859_1);
 
 		writeUINT32(b.length);
 		writeBytes(b, 0, b.length);

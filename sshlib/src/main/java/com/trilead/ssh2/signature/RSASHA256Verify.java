@@ -85,18 +85,8 @@ public class RSASHA256Verify
 			s.initSign(pk);
 			s.update(message);
 			return s.sign();
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex =  new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 
@@ -107,18 +97,8 @@ public class RSASHA256Verify
 			s.initVerify(dpk);
 			s.update(message);
 			return s.verify(ds);
-		} catch (NoSuchAlgorithmException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (InvalidKeyException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
-		} catch (SignatureException e) {
-			IOException ex = new IOException();
-			ex.initCause(e);
-			throw ex;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+			throw new IOException(e);
 		}
 	}
 }

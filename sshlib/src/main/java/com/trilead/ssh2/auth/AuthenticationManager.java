@@ -87,8 +87,7 @@ public class AuthenticationManager implements MessageHandler
 			while (packets.size() == 0)
 			{
 				if (connectionClosed)
-					throw (IOException) new IOException("The connection is closed.").initCause(tm
-							.getReasonClosedCause());
+					throw new IOException("The connection is closed.", tm.getReasonClosedCause());
 
 				try
 				{
@@ -357,7 +356,7 @@ public class AuthenticationManager implements MessageHandler
 		{
 			e.printStackTrace();
 			tm.close(e, false);
-			throw (IOException) new IOException("Publickey authentication failed.").initCause(e);
+			throw new IOException("Publickey authentication failed.", e);
 		}
 	}
 
@@ -371,7 +370,7 @@ public class AuthenticationManager implements MessageHandler
 		catch (IOException e)
 		{
 			tm.close(e, false);
-			throw (IOException) new IOException("None authentication failed.").initCause(e);
+			throw new IOException("None authentication failed.", e);
 		}
 	}
 
@@ -394,7 +393,7 @@ public class AuthenticationManager implements MessageHandler
 		catch (IOException e)
 		{
 			tm.close(e, false);
-			throw (IOException) new IOException("Password authentication failed.").initCause(e);
+			throw new IOException("Password authentication failed.", e);
 		}
 	}
 
@@ -433,7 +432,7 @@ public class AuthenticationManager implements MessageHandler
 					}
 					catch (Exception e)
 					{
-						throw (IOException) new IOException("Exception in callback.").initCause(e);
+						throw new IOException("Exception in callback.", e);
 					}
 
 					if (responses == null)
@@ -451,7 +450,7 @@ public class AuthenticationManager implements MessageHandler
 		catch (IOException e)
 		{
 			tm.close(e, false);
-			throw (IOException) new IOException("Keyboard-interactive authentication failed.").initCause(e);
+			throw new IOException("Keyboard-interactive authentication failed.", e);
 		}
 	}
 

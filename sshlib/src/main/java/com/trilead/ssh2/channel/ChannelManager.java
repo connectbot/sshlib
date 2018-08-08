@@ -994,8 +994,7 @@ public class ChannelManager implements MessageHandler
 		}
 	}
 
-	public int getAvailable(Channel c, boolean extended) throws IOException
-	{
+	public int getAvailable(Channel c, boolean extended) {
 		synchronized (c)
 		{
 			int avail;
@@ -1634,8 +1633,7 @@ public class ChannelManager implements MessageHandler
 			log.log(80, "Got SSH_MSG_GLOBAL_REQUEST (" + requestName + ")");
 	}
 
-	public void msgGlobalSuccess() throws IOException
-	{
+	public void msgGlobalSuccess() {
 		synchronized (channels)
 		{
 			globalSuccessCounter++;
@@ -1646,8 +1644,7 @@ public class ChannelManager implements MessageHandler
 			log.log(80, "Got SSH_MSG_REQUEST_SUCCESS");
 	}
 
-	public void msgGlobalFailure() throws IOException
-	{
+	public void msgGlobalFailure() {
 		synchronized (channels)
 		{
 			globalFailedCounter++;

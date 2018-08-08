@@ -146,8 +146,7 @@ public class KexManager
 					return lastConnInfo;
 
 				if (connectionClosed)
-					throw (IOException) new IOException("Key exchange was not finished, connection is closed.")
-							.initCause(tm.getReasonClosedCause());
+					throw new IOException("Key exchange was not finished, connection is closed.", tm.getReasonClosedCause());
 
 				try
 				{
@@ -203,18 +202,7 @@ public class KexManager
 			return false;
 		}
 
-		if (!compareFirstOfNameList(cpar.server_host_key_algorithms, spar.server_host_key_algorithms))
-		{
-			return false;
-		}
-
-		/*
-		 * We do NOT check here if the other algorithms can be agreed on, this
-		 * is just a check if kex_algorithms and server_host_key_algorithms were
-		 * guessed right!
-		 */
-
-		return true;
+		return compareFirstOfNameList(cpar.server_host_key_algorithms, spar.server_host_key_algorithms);
 	}
 
 	private NegotiatedParameters mergeKexParameters(KexParameters client, KexParameters server)
@@ -672,8 +660,8 @@ public class KexManager
 					}
 					catch (Exception e)
 					{
-						throw (IOException) new IOException(
-								"The server hostkey was not accepted by the verifier callback.").initCause(e);
+						throw new IOException(
+								"The server hostkey was not accepted by the verifier callback.", e);
 					}
 
 					if (!vres)
@@ -691,7 +679,7 @@ public class KexManager
 				}
 				catch (IllegalArgumentException e)
 				{
-					throw (IOException) new IOException("KEX error.").initCause(e);
+					throw new IOException("KEX error.", e);
 				}
 
 				boolean res = verifySignature(dhgexrpl.getSignature(), kxs.hostkey);
@@ -733,8 +721,8 @@ public class KexManager
 					}
 					catch (Exception e)
 					{
-						throw (IOException) new IOException(
-								"The server hostkey was not accepted by the verifier callback.").initCause(e);
+						throw new IOException(
+								"The server hostkey was not accepted by the verifier callback.", e);
 					}
 
 					if (!vres)
@@ -750,7 +738,7 @@ public class KexManager
 				}
 				catch (IllegalArgumentException e)
 				{
-					throw (IOException) new IOException("KEX error.").initCause(e);
+					throw new IOException("KEX error.", e);
 				}
 
 				boolean res = verifySignature(dhr.getSignature(), kxs.hostkey);

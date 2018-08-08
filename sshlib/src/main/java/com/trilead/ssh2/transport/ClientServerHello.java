@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.Connection;
 
@@ -58,7 +59,7 @@ public class ClientServerHello
 	{
 		client_line = "SSH-2.0-" + Connection.identification;
 
-		bo.write((client_line + "\r\n").getBytes("ISO-8859-1"));
+		bo.write((client_line + "\r\n").getBytes(StandardCharsets.ISO_8859_1));
 		bo.flush();
 
 		byte[] serverVersion = new byte[512];
@@ -67,7 +68,7 @@ public class ClientServerHello
 		{
 			int len = readLineRN(bi, serverVersion);
 
-			server_line = new String(serverVersion, 0, len, "ISO-8859-1");
+			server_line = new String(serverVersion, 0, len, StandardCharsets.ISO_8859_1);
 
 			if (server_line.startsWith("SSH-"))
 				break;
@@ -92,14 +93,7 @@ public class ClientServerHello
 	{
 		byte[] result;
 
-		try
-		{
-			result = client_line.getBytes("ISO-8859-1");
-		}
-		catch (UnsupportedEncodingException ign)
-		{
-			result = client_line.getBytes();
-		}
+		result = client_line.getBytes(StandardCharsets.ISO_8859_1);
 
 		return result;
 	}
@@ -111,14 +105,7 @@ public class ClientServerHello
 	{
 		byte[] result;
 
-		try
-		{
-			result = server_line.getBytes("ISO-8859-1");
-		}
-		catch (UnsupportedEncodingException ign)
-		{
-			result = server_line.getBytes();
-		}
+		result = server_line.getBytes(StandardCharsets.ISO_8859_1);
 
 		return result;
 	}

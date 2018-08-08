@@ -3,6 +3,7 @@ package com.trilead.ssh2.packets;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.util.Tokenizer;
 
@@ -157,7 +158,7 @@ public class TypesReader
 		if ((len + pos) > max)
 			throw new IOException("Malformed SSH string.");
 
-		String res = new String(arr, pos, len, "ISO-8859-1");
+		String res = new String(arr, pos, len, StandardCharsets.ISO_8859_1);
 		
 		pos += len;
 

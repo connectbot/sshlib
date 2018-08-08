@@ -805,8 +805,7 @@ public class Connection
 			if (e1 instanceof HTTPProxyException)
 				throw e1;
 
-			throw (IOException) new IOException("There was a problem while connecting to " + hostname + ":" + port)
-					.initCause(e1);
+			throw new IOException("There was a problem while connecting to " + hostname + ":" + port, e1);
 		}
 	}
 
@@ -959,10 +958,8 @@ public class Connection
 	 * Note: This factory method will probably disappear in the future.
 	 * 
 	 * @return A {@link SCPClient} object.
-	 * @throws IOException
 	 */
-	public synchronized SCPClient createSCPClient() throws IOException
-	{
+	public synchronized SCPClient createSCPClient() {
 		if (tm == null)
 			throw new IllegalStateException("Cannot create SCP client, you need to establish a connection first.");
 

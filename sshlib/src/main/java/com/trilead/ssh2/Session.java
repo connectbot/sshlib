@@ -409,14 +409,12 @@ public class Session
 	 *            <li><code>-1</code> if a timeout occurred.</li>
 	 *            </ul>
 	 *            
-	 * @throws    IOException
 	 * @deprecated This method has been replaced with a much more powerful wait-for-condition
 	 *             interface and therefore acts only as a wrapper.
 	 * 
 	 */
 	@Deprecated
-	public int waitUntilDataAvailable(long timeout) throws IOException
-	{
+	public int waitUntilDataAvailable(long timeout) {
 		if (timeout < 0)
 			throw new IllegalArgumentException("timeout must not be negative!");
 

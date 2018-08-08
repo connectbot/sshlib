@@ -154,7 +154,7 @@ public class SFTPv3Client
 		}
 		catch (Exception e)
 		{
-			throw (IOException) new IOException("This charset is not supported").initCause(e);
+			throw new IOException("This charset is not supported", e);
 		}
 		charsetName = charset;
 	}

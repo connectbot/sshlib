@@ -119,25 +119,8 @@ public class DynamicAcceptThread extends Thread implements IChannelWorkerThread 
 
 			server.sendReply(Socks5Server.ResponseCode.SUCCESS);
 
-			final StreamForwarder r2l;
-			final StreamForwarder l2r;
-			try {
-				r2l = new StreamForwarder(cn, null, sock, cn.stdoutStream, out, "RemoteToLocal");
-				l2r = new StreamForwarder(cn, r2l, sock, in, cn.stdinStream, "LocalToRemote");
-			} catch (IOException e) {
-				try {
-					/*
-					 * This message is only visible during debugging, since we
-					 * discard the channel immediatelly
-					 */
-					cn.cm.closeChannel(cn,
-							"Weird error during creation of StreamForwarder ("
-									+ e.getMessage() + ")", true);
-				} catch (IOException ignore) {
-				}
-
-				return;
-			}
+			final StreamForwarder r2l = new StreamForwarder(cn, null, sock, cn.stdoutStream, out, "RemoteToLocal");
+			final StreamForwarder l2r = new StreamForwarder(cn, r2l, sock, in, cn.stdinStream, "LocalToRemote");
 
 			r2l.setDaemon(true);
 			l2r.setDaemon(true);

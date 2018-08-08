@@ -39,10 +39,8 @@ public class LocalStreamForwarder
 
 	/**
 	 * @return An <code>InputStream</code> object.
-	 * @throws IOException
 	 */
-	public InputStream getInputStream() throws IOException
-	{
+	public InputStream getInputStream() {
 		return cn.getStdoutStream();
 	}
 
@@ -54,10 +52,8 @@ public class LocalStreamForwarder
 	 * <code>close</code> method of the <code>OutputStream</code>.
 	 * 
 	 * @return An <code>OutputStream</code> object.
-	 * @throws IOException
 	 */
-	public OutputStream getOutputStream() throws IOException
-	{
+	public OutputStream getOutputStream() {
 		return cn.getStdinStream();
 	}
 

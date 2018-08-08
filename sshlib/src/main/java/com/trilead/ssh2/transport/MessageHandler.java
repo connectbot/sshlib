@@ -10,5 +10,5 @@ import java.io.IOException;
  */
 public interface MessageHandler
 {
-	public void handleMessage(byte[] msg, int msglen) throws IOException;
+	void handleMessage(byte[] msg, int msglen) throws IOException;
 }

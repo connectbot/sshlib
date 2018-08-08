@@ -5,6 +5,7 @@ import java.io.BufferedReader;
 import java.io.CharArrayReader;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.DigestException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -128,9 +129,7 @@ public class PEMDecoder
 			try {
 				md5.digest(tmp, 0, tmp.length);
 			} catch (DigestException e) {
-				IOException ex = new IOException("could not digest password");
-				ex.initCause(e);
-				throw ex;
+				throw new IOException("could not digest password", e);
 			}
 
 			System.arraycopy(tmp, 0, key, key.length - keyLen, copy);
@@ -385,7 +384,7 @@ public class PEMDecoder
 			TypesReader tr = new TypesReader(ps.data);
 			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
 			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, "US-ASCII"));
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, StandardCharsets.US_ASCII));
 			}
 
 			tr.readString();
@@ -402,10 +401,8 @@ public class PEMDecoder
 		if (!"4".equals(ps.procType[0]))
 			throw new IOException("Unknown Proc-Type field (" + ps.procType[0] + ")");
 
-		if ("ENCRYPTED".equals(ps.procType[1]))
-			return true;
+		return "ENCRYPTED".equals(ps.procType[1]);
 
-		return false;
 	}
 
 	public static KeyPair decode(char[] pem, String password) throws IOException
@@ -421,7 +418,7 @@ public class PEMDecoder
 			if (password == null)
 				throw new IOException("PEM is encrypted, but no password was specified");
 
-			decryptPEM(ps, password.getBytes("ISO-8859-1"));
+			decryptPEM(ps, password.getBytes(StandardCharsets.ISO_8859_1));
 		}
 
 		if (ps.pemType == PEM_DSA_PRIVATE_KEY)
@@ -538,7 +535,7 @@ public class PEMDecoder
 			TypesReader tr = new TypesReader(ps.data);
 			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
 			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, "US-ASCII"));
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, StandardCharsets.US_ASCII));
 			}
 
 			String ciphername = tr.readString();
@@ -564,7 +561,7 @@ public class PEMDecoder
 				TypesReader optionsReader = new TypesReader(kdfoptions);
 				byte[] salt = optionsReader.readByteString();
 				int rounds = optionsReader.readUINT32();
-				dataBytes = decryptData(dataBytes, password.getBytes("UTF-8"), salt, rounds, ciphername);
+				dataBytes = decryptData(dataBytes, password.getBytes(StandardCharsets.UTF_8), salt, rounds, ciphername);
 			} else if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
 				throw new IOException("encryption not supported");
 			}
@@ -672,13 +669,9 @@ public class PEMDecoder
 			final PrivateKey privKey = kf.generatePrivate(privSpec);
 			return new KeyPair(pubKey, privKey);
 		} catch (NoSuchAlgorithmException ex) {
-			IOException ioex = new IOException();
-			ioex.initCause(ex);
-			throw ioex;
+			throw new IOException(ex);
 		} catch (InvalidKeySpecException ex) {
-			IOException ioex = new IOException("invalid keyspec");
-			ioex.initCause(ex);
-			throw ioex;
+			throw new IOException("invalid keyspec", ex);
 		}
 	}
 }

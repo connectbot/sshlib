@@ -27,7 +27,7 @@ public class ExtensionInfo
 		String rawAlgs = packetExtInfo.getExtNameToValue().get("server-sig-algs");
 		if (rawAlgs == null)
 		{
-			return new ExtensionInfo(Collections.<String>emptySet());
+			return new ExtensionInfo(Collections.emptySet());
 		}
 
 		Set<String> algsSet = new HashSet<>();
@@ -37,7 +37,7 @@ public class ExtensionInfo
 
 	public static ExtensionInfo noExtInfoSeen()
 	{
-		return new ExtensionInfo(Collections.<String>emptySet());
+		return new ExtensionInfo(Collections.emptySet());
 	}
 
 	private ExtensionInfo(Set<String> signatureAlgorithmsAccepted)

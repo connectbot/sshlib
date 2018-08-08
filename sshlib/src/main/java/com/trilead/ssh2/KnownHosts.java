@@ -11,6 +11,7 @@ import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -205,15 +206,7 @@ public class KnownHosts
 			throw new RuntimeException("Unable to create SecretKey", e);
 		}
 
-		try
-		{
-			hmac.update(hostname.getBytes("ISO-8859-1"));
-		}catch(UnsupportedEncodingException ignore)
-		{
-			/* Actually, ISO-8859-1 is supported by all correct
-			 * Java implementations. But... you never know. */
-			hmac.update(hostname.getBytes());
-		}
+		hmac.update(hostname.getBytes(StandardCharsets.ISO_8859_1));
 
 		return hmac.doFinal();
 	}
@@ -702,7 +695,7 @@ public class KnownHosts
 				raf.write('\n');
 		}
 		
-		raf.write(new String(entry).getBytes("ISO-8859-1"));
+		raf.write(new String(entry).getBytes(StandardCharsets.ISO_8859_1));
 		raf.close();
 	}
 
