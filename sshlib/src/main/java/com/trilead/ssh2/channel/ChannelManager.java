@@ -2,8 +2,9 @@
 package com.trilead.ssh2.channel;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Vector;
+import java.util.List;
 
 import com.trilead.ssh2.AuthAgentCallback;
 import com.trilead.ssh2.ChannelCondition;
@@ -40,21 +41,21 @@ public class ChannelManager implements MessageHandler
 {
 	private static final Logger log = Logger.getLogger(ChannelManager.class);
 
-	private HashMap<String, X11ServerData> x11_magic_cookies = new HashMap<String, X11ServerData>();
+	private final HashMap<String, X11ServerData> x11_magic_cookies = new HashMap<>();
 
 	private TransportManager tm;
 
-	private Vector<Channel> channels = new Vector<Channel>();
+	private final List<Channel> channels = new ArrayList<>();
 	private int nextLocalChannel = 100;
 	private boolean shutdown = false;
 	private int globalSuccessCounter = 0;
 	private int globalFailedCounter = 0;
 
-	private HashMap<Integer, RemoteForwardingData> remoteForwardings = new HashMap<Integer, RemoteForwardingData>();
+	private final HashMap<Integer, RemoteForwardingData> remoteForwardings = new HashMap<>();
 
 	private AuthAgentCallback authAgent;
 
-	private Vector<IChannelWorkerThread> listenerThreads = new Vector<IChannelWorkerThread>();
+	private final List<IChannelWorkerThread> listenerThreads = new ArrayList<>();
 
 	private boolean listenerThreadsAllowed = true;
 
@@ -68,9 +69,8 @@ public class ChannelManager implements MessageHandler
 	{
 		synchronized (channels)
 		{
-			for (int i = 0; i < channels.size(); i++)
+			for (Channel c : channels)
 			{
-				Channel c = channels.elementAt(i);
 				if (c.localID == id)
 					return c;
 			}
@@ -84,10 +84,10 @@ public class ChannelManager implements MessageHandler
 		{
 			for (int i = 0; i < channels.size(); i++)
 			{
-				Channel c = channels.elementAt(i);
+				Channel c = channels.get(i);
 				if (c.localID == id)
 				{
-					channels.removeElementAt(i);
+					channels.remove(i);
 					break;
 				}
 			}
@@ -98,7 +98,7 @@ public class ChannelManager implements MessageHandler
 	{
 		synchronized (channels)
 		{
-			channels.addElement(c);
+			channels.add(c);
 			return nextLocalChannel++;
 		}
 	}
@@ -132,7 +132,7 @@ public class ChannelManager implements MessageHandler
 		}
 	}
 
-	private final boolean waitForGlobalRequestResult() throws IOException
+	private boolean waitForGlobalRequestResult() throws IOException
 	{
 		synchronized (channels)
 		{
@@ -163,7 +163,7 @@ public class ChannelManager implements MessageHandler
 		}
 	}
 
-	private final boolean waitForChannelRequestResult(Channel c) throws IOException
+	private boolean waitForChannelRequestResult(Channel c) throws IOException
 	{
 		synchronized (c)
 		{
@@ -223,16 +223,16 @@ public class ChannelManager implements MessageHandler
 		if (log.isEnabled())
 			log.log(50, "Closing all X11 channels for the given fake cookie");
 
-		Vector<Channel> channel_copy;
+		List<Channel> channel_copy;
 
 		synchronized (channels)
 		{
-			channel_copy = (Vector<Channel>) channels.clone();
+			channel_copy = new ArrayList<>(channels);
 		}
 
 		for (int i = 0; i < channel_copy.size(); i++)
 		{
-			Channel c = channel_copy.elementAt(i);
+			Channel c = channel_copy.get(i);
 
 			synchronized (c)
 			{
@@ -265,16 +265,16 @@ public class ChannelManager implements MessageHandler
 		if (log.isEnabled())
 			log.log(50, "Closing all channels");
 
-		Vector<Channel> channel_copy;
+		List<Channel> channel_copy;
 
 		synchronized (channels)
 		{
-			channel_copy = (Vector<Channel>) channels.clone();
+			channel_copy = new ArrayList<>(channels);
 		}
 
 		for (int i = 0; i < channel_copy.size(); i++)
 		{
-			Channel c = channel_copy.elementAt(i);
+			Channel c = channel_copy.get(i);
 			try
 			{
 				closeChannel(c, "Closing all channels", true);
@@ -456,14 +456,12 @@ public class ChannelManager implements MessageHandler
 
 		synchronized (remoteForwardings)
 		{
-			Integer key = Integer.valueOf(bindPort);
-
-			if (remoteForwardings.get(key) != null)
+			if (remoteForwardings.get(bindPort) != null)
 			{
 				throw new IOException("There is already a forwarding for remote port " + bindPort);
 			}
 
-			remoteForwardings.put(key, rfd);
+			remoteForwardings.put(bindPort, rfd);
 		}
 
 		synchronized (channels)
@@ -486,7 +484,7 @@ public class ChannelManager implements MessageHandler
 		{
 			synchronized (remoteForwardings)
 			{
-				remoteForwardings.remove(rfd);
+				remoteForwardings.remove(rfd.bindPort);
 			}
 			throw e;
 		}
@@ -500,7 +498,7 @@ public class ChannelManager implements MessageHandler
 
 		synchronized (remoteForwardings)
 		{
-			rfd = remoteForwardings.get(Integer.valueOf(bindPort));
+			rfd = remoteForwardings.get(bindPort);
 
 			if (rfd == null)
 				throw new IOException("Sorry, there is no known remote forwarding for remote port " + bindPort);
@@ -528,7 +526,7 @@ public class ChannelManager implements MessageHandler
 			synchronized (remoteForwardings)
 			{
 				/* Only now we are sure that no more forwarded connections will arrive */
-				remoteForwardings.remove(rfd);
+				remoteForwardings.remove(rfd.bindPort);
 			}
 		}
 
@@ -573,7 +571,7 @@ public class ChannelManager implements MessageHandler
 		{
 			if (listenerThreadsAllowed == false)
 				throw new IOException("Too late, this connection is closed.");
-			listenerThreads.addElement(thr);
+			listenerThreads.add(thr);
 		}
 	}
 
@@ -642,7 +640,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The ping request failed.").initCause(e);
+			throw new IOException("The ping request failed.", e);
 		}
 	}
 
@@ -676,7 +674,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The ping request failed.").initCause(e);
+			throw new IOException("The ping request failed.", e);
 		}
 	}
 
@@ -710,7 +708,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("PTY request failed").initCause(e);
+			throw new IOException("PTY request failed", e);
 		}
 	}
 	
@@ -771,7 +769,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The X11 request failed.").initCause(e);
+			throw new IOException("The X11 request failed.", e);
 		}
 	}
 
@@ -803,7 +801,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The subsystem request failed.").initCause(e);
+			throw new IOException("The subsystem request failed.", e);
 		}
 	}
 
@@ -838,7 +836,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The execute request failed.").initCause(e);
+			throw new IOException("The execute request failed.", e);
 		}
 	}
 
@@ -870,7 +868,7 @@ public class ChannelManager implements MessageHandler
 		}
 		catch (IOException e)
 		{
-			throw (IOException) new IOException("The shell request failed.").initCause(e);
+			throw new IOException("The shell request failed.", e);
 		}
 	}
 
@@ -1587,7 +1585,7 @@ public class ChannelManager implements MessageHandler
 			reasonCodeSymbolicName = "UNKNOWN REASON CODE (" + reasonCode + ")";
 		}
 
-		StringBuffer descriptionBuffer = new StringBuffer();
+		StringBuilder descriptionBuffer = new StringBuilder();
 		descriptionBuffer.append(description);
 
 		for (int i = 0; i < descriptionBuffer.length(); i++)
@@ -1669,9 +1667,8 @@ public class ChannelManager implements MessageHandler
 
 			synchronized (listenerThreads)
 			{
-				for (int i = 0; i < listenerThreads.size(); i++)
+				for (IChannelWorkerThread lat : listenerThreads)
 				{
-					IChannelWorkerThread lat = listenerThreads.elementAt(i);
 					lat.stopWorking();
 				}
 				listenerThreadsAllowed = false;
@@ -1681,9 +1678,8 @@ public class ChannelManager implements MessageHandler
 			{
 				shutdown = true;
 
-				for (int i = 0; i < channels.size(); i++)
+				for (Channel c : channels)
 				{
-					Channel c = channels.elementAt(i);
 					synchronized (c)
 					{
 						c.EOF = true;
@@ -1699,8 +1695,7 @@ public class ChannelManager implements MessageHandler
 					}
 				}
 				/* Works with J2ME */
-				channels.setSize(0);
-				channels.trimToSize();
+				channels.clear();
 				channels.notifyAll(); /* Notify global response waiters */
 				return;
 			}
