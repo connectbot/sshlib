@@ -36,8 +36,59 @@ public class DynamicAcceptThread extends Thread implements IChannelWorkerThread 
 	private ChannelManager cm;
 	private ServerSocket ss;
 
+	public DynamicAcceptThread(ChannelManager cm, int local_port)
+			throws IOException {
+		this.cm = cm;
+
+		setName("DynamicAcceptThread");
+
+		ss = new ServerSocket(local_port);
+	}
+
+	public DynamicAcceptThread(ChannelManager cm, InetSocketAddress localAddress)
+			throws IOException {
+		this.cm = cm;
+
+		ss = new ServerSocket();
+		ss.bind(localAddress);
+	}
+
+	@Override
+	public void run() {
+		try {
+			cm.registerThread(this);
+		} catch (IOException e) {
+			stopWorking();
+			return;
+		}
+
+		while (true) {
+			final Socket sock;
+			try {
+				sock = ss.accept();
+			} catch (IOException e) {
+				stopWorking();
+				return;
+			}
+
+			DynamicAcceptRunnable dar = new DynamicAcceptRunnable(sock);
+			Thread t = new Thread(dar);
+			t.setDaemon(true);
+			t.start();
+		}
+	}
+
+	@Override
+	public void stopWorking() {
+		try {
+			/* This will lead to an IOException in the ss.accept() call */
+			ss.close();
+		} catch (IOException ignore) {
+		}
+	}
+
 	class DynamicAcceptRunnable implements Runnable {
-		private static final int idleTimeout	= 180000; //3 minutes
+		private static final int idleTimeout = 180000; //3 minutes
 
 		private Socket sock;
 		private InputStream in;
@@ -126,57 +177,6 @@ public class DynamicAcceptThread extends Thread implements IChannelWorkerThread 
 			l2r.setDaemon(true);
 			r2l.start();
 			l2r.start();
-		}
-	}
-
-	public DynamicAcceptThread(ChannelManager cm, int local_port)
-			throws IOException {
-		this.cm = cm;
-
-		setName("DynamicAcceptThread");
-
-		ss = new ServerSocket(local_port);
-	}
-
-	public DynamicAcceptThread(ChannelManager cm, InetSocketAddress localAddress)
-			throws IOException {
-		this.cm = cm;
-
-		ss = new ServerSocket();
-		ss.bind(localAddress);
-	}
-
-	@Override
-	public void run() {
-		try {
-			cm.registerThread(this);
-		} catch (IOException e) {
-			stopWorking();
-			return;
-		}
-
-		while (true) {
-			final Socket sock;
-			try {
-				sock = ss.accept();
-			} catch (IOException e) {
-				stopWorking();
-				return;
-			}
-
-			DynamicAcceptRunnable dar = new DynamicAcceptRunnable(sock);
-			Thread t = new Thread(dar);
-			t.setDaemon(true);
-			t.start();
-		}
-	}
-
-	@Override
-	public void stopWorking() {
-		try {
-			/* This will lead to an IOException in the ss.accept() call */
-			ss.close();
-		} catch (IOException ignore) {
 		}
 	}
 }
