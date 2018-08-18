@@ -55,7 +55,8 @@ public class DES implements BlockCipher
 	 * @exception IllegalArgumentException
 	 *                if the params argument is inappropriate.
 	 */
-	public void init(boolean encrypting, byte[] key)
+	@Override
+	public void init(boolean encrypting, byte[] key, byte[] iv)
 	{
 		this.workingKey = generateWorkingKey(encrypting, key, 0);
 	}
@@ -65,6 +66,7 @@ public class DES implements BlockCipher
 		return "DES";
 	}
 
+	@Override
 	public int getBlockSize()
 	{
 		return 8;
@@ -78,10 +80,6 @@ public class DES implements BlockCipher
 		}
 
 		desFunc(workingKey, in, inOff, out, outOff);
-	}
-
-	public void reset()
-	{
 	}
 
 	/**
@@ -369,5 +367,26 @@ public class DES implements BlockCipher
 		out[outOff + 5] = (byte) ((left >>> 16) & 0xff);
 		out[outOff + 6] = (byte) ((left >>> 8) & 0xff);
 		out[outOff + 7] = (byte) (left & 0xff);
+	}
+
+	public static class CBC implements BlockCipher {
+		protected BlockCipher bc;
+
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new DESede();
+			rawCipher.init(forEncryption, key, iv);
+			bc = new CBCMode(rawCipher, iv, forEncryption);
+		}
+
+		@Override
+		public int getBlockSize() {
+			return bc.getBlockSize();
+		}
+
+		@Override
+		public void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff) {
+			bc.transformBlock(src, srcoff, dst, dstoff);
+		}
 	}
 }

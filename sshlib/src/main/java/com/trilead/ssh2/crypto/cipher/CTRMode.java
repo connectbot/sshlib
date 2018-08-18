@@ -18,7 +18,7 @@ public class CTRMode implements BlockCipher
 
 	int count = 0;
 
-	public void init(boolean forEncryption, byte[] key)
+	public void init(boolean forEncryption, byte[] key, byte[] iv)
 	{
 	}
 

@@ -194,10 +194,13 @@ public class BlowFish implements BlockCipher
 	 *            whether or not we are for encryption.
 	 * @param key
 	 *            the key required to set up the cipher.
+	 * @param iv
+	 *            initial vector; not used for stream ciphers
 	 * @exception IllegalArgumentException
 	 *                if the params argument is inappropriate.
 	 */
-	public void init(boolean encrypting, byte[] key)
+	@Override
+	public void init(boolean encrypting, byte[] key, byte[] iv)
 	{
 		this.doEncrypt = encrypting;
 		this.workingKey = key;
@@ -209,6 +212,7 @@ public class BlowFish implements BlockCipher
 		return "Blowfish";
 	}
 
+	@Override
 	public final void transformBlock(byte[] in, int inOff, byte[] out, int outOff)
 	{
 		if (workingKey == null)
@@ -226,10 +230,7 @@ public class BlowFish implements BlockCipher
 		}
 	}
 
-	public void reset()
-	{
-	}
-
+	@Override
 	public int getBlockSize()
 	{
 		return BLOCK_SIZE;
@@ -400,4 +401,35 @@ public class BlowFish implements BlockCipher
 		b[offset] = (byte) (in >> 24);
 	}
 
+	private abstract static class Wrapper implements BlockCipher {
+		protected BlockCipher bc;
+
+		@Override
+		public int getBlockSize() {
+			return bc.getBlockSize();
+		}
+
+		@Override
+		public void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff) {
+			bc.transformBlock(src, srcoff, dst, dstoff);
+		}
+	}
+
+	public static class CBC extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new BlowFish();
+			rawCipher.init(forEncryption, key, iv);
+			bc = new CBCMode(rawCipher, iv, forEncryption);
+		}
+	}
+
+	public static class CTR extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new BlowFish();
+			rawCipher.init(true, key, iv);
+			bc = new CTRMode(rawCipher, iv, forEncryption);
+		}
+	}
 }

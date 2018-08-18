@@ -500,8 +500,8 @@ public class AES implements BlockCipher
 	 * @exception IllegalArgumentException
 	 *                if the params argument is inappropriate.
 	 */
-
-	public final void init(boolean forEncryption, byte[] key)
+	@Override
+	public final void init(boolean forEncryption, byte[] key, byte[] iv)
 	{
 		WorkingKey = generateWorkingKey(key, forEncryption);
 		this.doEncrypt = forEncryption;
@@ -512,6 +512,7 @@ public class AES implements BlockCipher
 		return "AES";
 	}
 
+	@Override
 	public final int getBlockSize()
 	{
 		return BLOCK_SIZE;
@@ -691,8 +692,41 @@ public class AES implements BlockCipher
 				^ (Si[(r0 >> 24) & 255] << 24) ^ KW[0][3];
 	}
 
+	@Override
 	public void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff)
 	{
 		processBlock(src, srcoff, dst, dstoff);
+	}
+
+	private abstract static class Wrapper implements BlockCipher {
+		protected BlockCipher bc;
+
+		@Override
+		public int getBlockSize() {
+			return bc.getBlockSize();
+		}
+
+		@Override
+		public void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff) {
+			bc.transformBlock(src, srcoff, dst, dstoff);
+		}
+	}
+
+	public static class CBC extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new AES();
+			rawCipher.init(forEncryption, key, iv);
+			bc = new CBCMode(rawCipher, iv, forEncryption);
+		}
+	}
+
+	public static class CTR extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new AES();
+			rawCipher.init(true, key, iv);
+			bc = new CTRMode(rawCipher, iv, forEncryption);
+		}
 	}
 }
