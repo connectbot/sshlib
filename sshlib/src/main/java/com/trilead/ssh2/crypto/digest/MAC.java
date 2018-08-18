@@ -8,4 +8,5 @@ public interface MAC {
 	void update(byte[] packetdata, int off, int len);
 	void getMac(byte[] out, int off);
 	int size();
+	boolean isEncryptThenMac();
 }

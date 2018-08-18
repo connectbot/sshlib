@@ -15,6 +15,8 @@ import java.security.NoSuchAlgorithmException;
  */
 public final class HMAC implements MAC
 {
+	private static final String ETM_SUFFIX = "-etm@openssh.com";
+
 	/**
 	 * From http://tools.ietf.org/html/rfc4253
 	 */
@@ -31,9 +33,24 @@ public final class HMAC implements MAC
 	static final String HMAC_SHA1 = "hmac-sha1";
 
 	/**
+	 * From https://cvsweb.openbsd.org/cgi-bin/cvsweb/src/usr.bin/ssh/PROTOCOL
+	 */
+	static final String HMAC_SHA1_ETM = "hmac-sha1-etm@openssh.com";
+
+	/**
 	 * From http://tools.ietf.org/html/rfc4253
 	 */
 	static final String HMAC_SHA1_96 = "hmac-sha1-96";
+
+	/**
+	 * From https://cvsweb.openbsd.org/cgi-bin/cvsweb/src/usr.bin/ssh/PROTOCOL
+	 */
+	static final String HMAC_SHA2_256_ETM = "hmac-sha2-256-etm@openssh.com";
+
+	/**
+	 * From https://cvsweb.openbsd.org/cgi-bin/cvsweb/src/usr.bin/ssh/PROTOCOL
+	 */
+	static final String HMAC_SHA2_512_ETM = "hmac-sha2-512-etm@openssh.com";
 
 	/**
 	 * From http://tools.ietf.org/html/rfc6668
@@ -45,10 +62,10 @@ public final class HMAC implements MAC
 	 */
 	static final String HMAC_SHA2_512 = "hmac-sha2-512";
 
-	Mac mac;
-	int outSize;
-	int macSize;
-	byte[] buffer;
+	private final Mac mac;
+	private final int outSize;
+	private final boolean encryptThenMac;
+	private final byte[] buffer;
 
 	public HMAC(String type, byte[] key)
 	{
@@ -56,18 +73,37 @@ public final class HMAC implements MAC
 			if (HMAC_SHA1.equals(type) || HMAC_SHA1_96.equals(type))
 			{
 				mac = Mac.getInstance("HmacSHA1");
+				encryptThenMac = false;
+			}
+			else if (HMAC_SHA1_ETM.equals(type))
+			{
+				mac = Mac.getInstance("HmacSHA1");
+				encryptThenMac = true;
 			}
 			else if (HMAC_MD5.equals(type) || HMAC_MD5_96.equals(type))
 			{
 				mac = Mac.getInstance("HmacMD5");
+				encryptThenMac = false;
 			}
 			else if (HMAC_SHA2_256.equals(type))
 			{
 				mac = Mac.getInstance("HmacSHA256");
+				encryptThenMac = false;
+			}
+			else if (HMAC_SHA2_256_ETM.equals(type))
+			{
+				mac = Mac.getInstance("HmacSHA256");
+				encryptThenMac = true;
 			}
 			else if (HMAC_SHA2_512.equals(type))
 			{
 				mac = Mac.getInstance("HmacSHA512");
+				encryptThenMac = false;
+			}
+			else if (HMAC_SHA2_512_ETM.equals(type))
+			{
+				mac = Mac.getInstance("HmacSHA512");
+				encryptThenMac = true;
 			}
 			else
 				throw new IllegalArgumentException("Unknown algorithm " + type);
@@ -75,7 +111,7 @@ public final class HMAC implements MAC
 			throw new IllegalArgumentException("Unknown algorithm " + type, e);
 		}
 
-		macSize = mac.getMacLength();
+		int macSize = mac.getMacLength();
 		if (type.endsWith("-96")) {
 			outSize = 12;
 			buffer = new byte[macSize];
@@ -122,5 +158,9 @@ public final class HMAC implements MAC
 	public final int size()
 	{
 		return outSize;
+	}
+
+	public boolean isEncryptThenMac() {
+		return encryptThenMac;
 	}
 }

@@ -523,7 +523,7 @@ public class TransportManager
 
 	public void receiveLoop() throws IOException
 	{
-		byte[] msg = new byte[35000];
+		byte[] msg = new byte[35004];
 
 		while (true)
 		{

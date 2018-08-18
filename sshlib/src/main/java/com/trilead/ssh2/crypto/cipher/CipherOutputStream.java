@@ -2,6 +2,7 @@
 package com.trilead.ssh2.crypto.cipher;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -19,6 +20,8 @@ public class CipherOutputStream
 	private byte[] enc;
 	private int blockSize;
 	private int pos;
+	private boolean recordingOutput;
+	private final ByteArrayOutputStream recordingOutputStream = new ByteArrayOutputStream();
 
 	public CipherOutputStream(BlockCipher tc, OutputStream bo)
 	{
@@ -47,6 +50,17 @@ public class CipherOutputStream
 		pos = 0;
 	}
 
+	public void startRecording() {
+		recordingOutput = true;
+	}
+
+	public byte[] getRecordedOutput() {
+		recordingOutput = false;
+		byte[] recordedOutput = recordingOutputStream.toByteArray();
+		recordingOutputStream.reset();
+		return recordedOutput;
+	}
+
 	private void writeBlock() throws IOException
 	{
 		try
@@ -60,6 +74,10 @@ public class CipherOutputStream
 
 		bo.write(enc, 0, blockSize);
 		pos = 0;
+
+		if (recordingOutput) {
+			recordingOutputStream.write(enc, 0, blockSize);
+		}
 	}
 
 	public void write(byte[] src, int off, int len) throws IOException
