@@ -1,6 +1,7 @@
 
 package com.trilead.ssh2.crypto.cipher;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -12,57 +13,21 @@ import java.io.OutputStream;
  */
 public class CipherOutputStream
 {
-	BlockCipher currentCipher;
-	OutputStream bo;
-	byte[] buffer;
-	byte[] enc;
-	int blockSize;
-	int pos;
-
-	/*
-	 * We cannot use java.io.BufferedOutputStream, since that is not available
-	 * in J2ME. Everything could be improved here alot.
-	 */
-
-	final int BUFF_SIZE = 2048;
-	byte[] out_buffer = new byte[BUFF_SIZE];
-	int out_buffer_pos = 0;
+	private BlockCipher currentCipher;
+	private final BufferedOutputStream bo;
+	private byte[] buffer;
+	private byte[] enc;
+	private int blockSize;
+	private int pos;
 
 	public CipherOutputStream(BlockCipher tc, OutputStream bo)
 	{
-		this.bo = bo;
+		if (bo instanceof BufferedOutputStream) {
+			this.bo = (BufferedOutputStream) bo;
+		} else {
+			this.bo = new BufferedOutputStream(bo);
+		}
 		changeCipher(tc);
-	}
-
-	private void internal_write(byte[] src, int off, int len) throws IOException
-	{
-		while (len > 0)
-		{
-			int space = BUFF_SIZE - out_buffer_pos;
-			int copy = (len > space) ? space : len;
-
-			System.arraycopy(src, off, out_buffer, out_buffer_pos, copy);
-
-			off += copy;
-			out_buffer_pos += copy;
-			len -= copy;
-
-			if (out_buffer_pos >= BUFF_SIZE)
-			{
-				bo.write(out_buffer, 0, BUFF_SIZE);
-				out_buffer_pos = 0;
-			}
-		}
-	}
-
-	private void internal_write(int b) throws IOException
-	{
-		out_buffer[out_buffer_pos++] = (byte) b;
-		if (out_buffer_pos >= BUFF_SIZE)
-		{
-			bo.write(out_buffer, 0, BUFF_SIZE);
-			out_buffer_pos = 0;
-		}
 	}
 
 	public void flush() throws IOException
@@ -70,11 +35,6 @@ public class CipherOutputStream
 		if (pos != 0)
 			throw new IOException("FATAL: cannot flush since crypto buffer is not aligned.");
 
-		if (out_buffer_pos > 0)
-		{
-			bo.write(out_buffer, 0, out_buffer_pos);
-			out_buffer_pos = 0;
-		}
 		bo.flush();
 	}
 
@@ -98,7 +58,7 @@ public class CipherOutputStream
 			throw new IOException("Error while decrypting block.", e);
 		}
 
-		internal_write(enc, 0, blockSize);
+		bo.write(enc, 0, blockSize);
 		pos = 0;
 	}
 
@@ -130,13 +90,13 @@ public class CipherOutputStream
 	{
 		if (pos != 0)
 			throw new IOException("Cannot write plain since crypto buffer is not aligned.");
-		internal_write(b);
+		bo.write(b);
 	}
 
 	public void writePlain(byte[] b, int off, int len) throws IOException
 	{
 		if (pos != 0)
 			throw new IOException("Cannot write plain since crypto buffer is not aligned.");
-		internal_write(b, off, len);
+		bo.write(b, off, len);
 	}
 }
