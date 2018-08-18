@@ -29,7 +29,6 @@ import java.util.Locale;
 
 import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
-import com.trilead.ssh2.crypto.cipher.CBCMode;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
 import com.trilead.ssh2.packets.TypesReader;
@@ -60,7 +59,7 @@ public class PEMDecoder
 		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1', '\0',
 	};
 
-	private static final int hexToInt(char c)
+	private static int hexToInt(char c)
 	{
 		if ((c >= 'a') && (c <= 'f'))
 		{
@@ -276,41 +275,36 @@ public class PEMDecoder
 		return ps;
 	}
 
-	private static final byte[] decryptData(byte[] data, byte[] pw, byte[] salt, int rounds, String algo) throws IOException
+	private static byte[] decryptData(byte[] data, byte[] pw, byte[] salt, int rounds, String algo) throws IOException
 	{
-		BlockCipher rawCipher;
 		BlockCipher bc;
 		int keySize;
 
 		String algoLower = algo.toLowerCase(Locale.US);
 		if (algoLower.equals("des-ede3-cbc"))
 		{
-			rawCipher = new DESede();
+			bc = new DESede.CBC();
 			keySize = 24;
-			bc = new CBCMode(rawCipher, salt, false);
 		}
 		else if (algoLower.equals("des-cbc"))
 		{
-			rawCipher = new DES();
+			bc = new DES.CBC();
 			keySize = 8;
-			bc = new CBCMode(rawCipher, salt, false);
 		}
 		else if (algoLower.equals("aes-128-cbc") || algoLower.equals("aes128-cbc"))
 		{
-			rawCipher = new AES();
+			bc = new AES.CBC();
 			keySize = 16;
-			bc = new CBCMode(rawCipher, salt, false);
 		}
 		else if (algoLower.equals("aes-192-cbc") || algoLower.equals("aes192-cbc"))
 		{
-			rawCipher = new AES();
+			bc = new AES.CBC();
 			keySize = 24;
 		}
 		else if (algoLower.equals("aes-256-cbc") || algoLower.equals("aes256-cbc"))
 		{
-			rawCipher = new AES();
+			bc = new AES.CBC();
 			keySize = 32;
-			bc = new CBCMode(rawCipher, salt, false);
 		}
 		else
 		{
@@ -319,13 +313,12 @@ public class PEMDecoder
 
 		if (rounds == -1)
 		{
-			rawCipher.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, keySize));
-			bc = new CBCMode(rawCipher, salt, false);
+			bc.init(false, generateKeyFromPasswordSaltWithMD5(pw, salt, keySize), salt);
 		}
 		else
 		{
 			byte[] key = new byte[keySize];
-			byte[] iv = new byte[rawCipher.getBlockSize()];
+			byte[] iv = new byte[bc.getBlockSize()];
 
 			byte[] keyAndIV = new byte[key.length + iv.length];
 
@@ -334,8 +327,7 @@ public class PEMDecoder
 			System.arraycopy(keyAndIV, 0, key, 0, key.length);
 			System.arraycopy(keyAndIV, key.length, iv, 0, iv.length);
 
-			rawCipher.init(false, key);
-			bc = new CBCMode(rawCipher, iv, false);
+			bc.init(false, key, iv);
 		}
 
 
@@ -360,7 +352,7 @@ public class PEMDecoder
 		}
 	}
 
-	private static final void decryptPEM(PEMStructure ps, byte[] pw) throws IOException
+	private static void decryptPEM(PEMStructure ps, byte[] pw) throws IOException
 	{
 		if (ps.dekInfo == null)
 			throw new IOException("Broken PEM, no mode and salt given, but encryption enabled");

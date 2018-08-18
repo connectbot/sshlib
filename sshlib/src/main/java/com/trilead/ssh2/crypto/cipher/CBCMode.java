@@ -15,7 +15,7 @@ public class CBCMode implements BlockCipher
 	byte[] cbc_vector;
 	byte[] tmp_vector;
 
-	public void init(boolean forEncryption, byte[] key)
+	public void init(boolean forEncryption, byte[] key, byte[] iv)
 	{
 	}
 	

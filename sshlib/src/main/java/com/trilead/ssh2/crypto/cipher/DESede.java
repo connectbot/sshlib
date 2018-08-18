@@ -59,7 +59,8 @@ public class DESede extends DES
 	 * @exception IllegalArgumentException
 	 *                if the params argument is inappropriate.
 	 */
-	public void init(boolean encrypting, byte[] key)
+	@Override
+	public void init(boolean encrypting, byte[] key, byte[] iv)
 	{
 		key1 = generateWorkingKey(encrypting, key, 0);
 		key2 = generateWorkingKey(!encrypting, key, 8);
@@ -73,11 +74,7 @@ public class DESede extends DES
 		return "DESede";
 	}
 
-	public int getBlockSize()
-	{
-		return 8;
-	}
-
+	@Override
 	public void transformBlock(byte[] in, int inOff, byte[] out, int outOff)
 	{
 		if (key1 == null)
@@ -99,7 +96,35 @@ public class DESede extends DES
 		}
 	}
 
-	public void reset()
-	{
+	private abstract static class Wrapper implements BlockCipher {
+		protected BlockCipher bc;
+
+		@Override
+		public int getBlockSize() {
+			return bc.getBlockSize();
+		}
+
+		@Override
+		public void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff) {
+			bc.transformBlock(src, srcoff, dst, dstoff);
+		}
+	}
+
+	public static class CBC extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new DESede();
+			rawCipher.init(forEncryption, key, iv);
+			bc = new CBCMode(rawCipher, iv, forEncryption);
+		}
+	}
+
+	public static class CTR extends Wrapper {
+		@Override
+		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
+			BlockCipher rawCipher = new DESede();
+			rawCipher.init(true, key, iv);
+			bc = new CTRMode(rawCipher, iv, forEncryption);
+		}
 	}
 }

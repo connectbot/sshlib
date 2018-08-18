@@ -8,7 +8,7 @@ package com.trilead.ssh2.crypto.cipher;
  */
 public interface BlockCipher
 {
-	void init(boolean forEncryption, byte[] key);
+	void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException;
 
 	int getBlockSize();
 

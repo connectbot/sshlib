@@ -19,7 +19,7 @@ public class NullCipher implements BlockCipher
 		this.blockSize = blockSize;
 	}
 	
-	public void init(boolean forEncryption, byte[] key)
+	public void init(boolean forEncryption, byte[] key, byte[] iv)
 	{
 	}
 
