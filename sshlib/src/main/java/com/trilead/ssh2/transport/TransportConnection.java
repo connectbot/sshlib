@@ -74,8 +74,6 @@ public class TransportConnection
 
 	final byte[] recv_packet_header_buffer = new byte[5];
 
-	boolean recv_packet_header_present = false;
-
 	ClientServerHello csh;
 
 	final SecureRandom rnd;
@@ -165,19 +163,21 @@ public class TransportConnection
 			message = send_comp_buffer;
 		}
 
-		int packet_len = 5 + len + padd; /* Minimum allowed padding is 4 */
+		boolean encryptThenMac = send_mac != null && send_mac.isEncryptThenMac();
 
-		int slack = packet_len % send_padd_blocksize;
+		int encryptedPacketLength = (encryptThenMac ? 1 : 5) + len + padd; /* Minimum allowed padding is 4 */
+
+		int slack = encryptedPacketLength % send_padd_blocksize;
 
 		if (slack != 0)
 		{
-			packet_len += (send_padd_blocksize - slack);
+			encryptedPacketLength += (send_padd_blocksize - slack);
 		}
 
-		if (packet_len < 16)
-			packet_len = 16;
+		if (encryptedPacketLength < 16)
+			encryptedPacketLength = 16;
 
-		int padd_len = packet_len - (5 + len);
+		int padd_len = encryptedPacketLength - ((encryptThenMac ? 1 : 5) + len);
 
 		if (useRandomPadding)
 		{
@@ -209,22 +209,36 @@ public class TransportConnection
 			 */
 		}
 
-		send_packet_header_buffer[0] = (byte) ((packet_len - 4) >> 24);
-		send_packet_header_buffer[1] = (byte) ((packet_len - 4) >> 16);
-		send_packet_header_buffer[2] = (byte) ((packet_len - 4) >> 8);
-		send_packet_header_buffer[3] = (byte) ((packet_len - 4));
+		int payloadLength = encryptThenMac ? encryptedPacketLength : encryptedPacketLength - 4;
+		send_packet_header_buffer[0] = (byte) (encryptedPacketLength >> 24);
+		send_packet_header_buffer[1] = (byte) (payloadLength >> 16);
+		send_packet_header_buffer[2] = (byte) (payloadLength >> 8);
+		send_packet_header_buffer[3] = (byte) (payloadLength);
 		send_packet_header_buffer[4] = (byte) padd_len;
 
-		cos.write(send_packet_header_buffer, 0, 5);
+		if (send_mac != null && send_mac.isEncryptThenMac()) {
+			cos.writePlain(send_packet_header_buffer, 0, 4);
+			cos.startRecording();
+			cos.write(send_packet_header_buffer, 4, 1);
+		} else {
+			cos.write(send_packet_header_buffer, 0, 5);
+		}
 		cos.write(message, off, len);
 		cos.write(send_padding_buffer, 0, padd_len);
 
 		if (send_mac != null)
 		{
 			send_mac.initMac(send_seq_number);
-			send_mac.update(send_packet_header_buffer, 0, 5);
-			send_mac.update(message, off, len);
-			send_mac.update(send_padding_buffer, 0, padd_len);
+
+			if (send_mac.isEncryptThenMac()) {
+				send_mac.update(send_packet_header_buffer, 0, 4);
+				byte[] encryptedMessage = cos.getRecordedOutput();
+				send_mac.update(encryptedMessage, 0, encryptedMessage.length);
+			} else {
+				send_mac.update(send_packet_header_buffer, 0, 5);
+				send_mac.update(message, off, len);
+				send_mac.update(send_padding_buffer, 0, padd_len);
+			}
 
 			send_mac.getMac(send_mac_buffer, 0);
 			cos.writePlain(send_mac_buffer, 0, send_mac_buffer.length);
@@ -240,87 +254,62 @@ public class TransportConnection
 		send_seq_number++;
 	}
 
-	public int peekNextMessageLength() throws IOException
-	{
-		if (!recv_packet_header_present)
-		{
-			cis.read(recv_packet_header_buffer, 0, 5);
-			recv_packet_header_present = true;
-		}
-
-		int packet_length = ((recv_packet_header_buffer[0] & 0xff) << 24)
-				| ((recv_packet_header_buffer[1] & 0xff) << 16) | ((recv_packet_header_buffer[2] & 0xff) << 8)
-				| ((recv_packet_header_buffer[3] & 0xff));
-
-		int padding_length = recv_packet_header_buffer[4] & 0xff;
-
-		if (packet_length > 35000 || packet_length < 12)
-			throw new IOException("Illegal packet size! (" + packet_length + ")");
-
-		int payload_length = packet_length - padding_length - 1;
-
-		if (payload_length < 0)
-			throw new IOException("Illegal padding_length in packet from remote (" + padding_length + ")");
-
-		return payload_length;
-	}
-
 	public int receiveMessage(byte buffer[], int off, int len) throws IOException
 	{
-		if (!recv_packet_header_present)
-		{
-			cis.read(recv_packet_header_buffer, 0, 5);
-		}
-		else
-			recv_packet_header_present = false;
+		final int packetLength;
+		final int payloadLength;
 
-		int packet_length = ((recv_packet_header_buffer[0] & 0xff) << 24)
-				| ((recv_packet_header_buffer[1] & 0xff) << 16) | ((recv_packet_header_buffer[2] & 0xff) << 8)
-				| ((recv_packet_header_buffer[3] & 0xff));
-
-		int padding_length = recv_packet_header_buffer[4] & 0xff;
-
-		if (packet_length > 35000 || packet_length < 12)
-			throw new IOException("Illegal packet size! (" + packet_length + ")");
-
-		int payload_length = packet_length - padding_length - 1;
-
-		if (payload_length < 0)
-			throw new IOException("Illegal padding_length in packet from remote (" + padding_length + ")");
-
-		if (payload_length >= len)
-			throw new IOException("Receive buffer too small (" + len + ", need " + payload_length + ")");
-
-		cis.read(buffer, off, payload_length);
-		cis.read(recv_padding_buffer, 0, padding_length);
-
-		if (recv_mac != null)
-		{
-			cis.readPlain(recv_mac_buffer, 0, recv_mac_buffer.length);
+		if (recv_mac != null && recv_mac.isEncryptThenMac()) {
+			cis.readPlain(recv_packet_header_buffer, 0, 4);
+			packetLength = getPacketLength(recv_packet_header_buffer);
 
 			recv_mac.initMac(recv_seq_number);
-			recv_mac.update(recv_packet_header_buffer, 0, 5);
-			recv_mac.update(buffer, off, payload_length);
-			recv_mac.update(recv_padding_buffer, 0, padding_length);
+			recv_mac.update(recv_packet_header_buffer, 0, 4);
+
+			cis.peekPlain(buffer, off, packetLength + recv_mac_buffer.length);
+			System.arraycopy(buffer, off + packetLength, recv_mac_buffer, 0, recv_mac_buffer.length);
+
+			recv_mac.update(buffer, off, packetLength);
 			recv_mac.getMac(recv_mac_buffer_cmp, 0);
 
-			for (int i = 0; i < recv_mac_buffer.length; i++)
-			{
-				if (recv_mac_buffer[i] != recv_mac_buffer_cmp[i])
-					throw new IOException("Remote sent corrupt MAC.");
+			checkMacMatches(recv_mac_buffer, recv_mac_buffer_cmp);
+
+			cis.read(recv_packet_header_buffer, 4, 1);
+		} else {
+			cis.read(recv_packet_header_buffer, 0, 5);
+			packetLength = getPacketLength(recv_packet_header_buffer);
+		}
+
+		int paddingLength = recv_packet_header_buffer[4] & 0xff;
+
+		payloadLength = calculatePayloadLength(len, packetLength, paddingLength);
+
+		cis.read(buffer, off, payloadLength);
+		cis.read(recv_padding_buffer, 0, paddingLength);
+
+		if (recv_mac != null) {
+			cis.readPlain(recv_mac_buffer, 0, recv_mac_buffer.length);
+
+			if (!recv_mac.isEncryptThenMac()) {
+				recv_mac.initMac(recv_seq_number);
+				recv_mac.update(recv_packet_header_buffer, 0, 5);
+				recv_mac.update(buffer, off, payloadLength);
+				recv_mac.update(recv_padding_buffer, 0, paddingLength);
+				recv_mac.getMac(recv_mac_buffer_cmp, 0);
+
+				checkMacMatches(recv_mac_buffer, recv_mac_buffer_cmp);
 			}
 		}
 
 		recv_seq_number++;
 
-		if (log.isEnabled())
-		{
-			log.log(90, "Received " + Packets.getMessageName(buffer[off] & 0xff) + " " + payload_length
+		if (log.isEnabled()) {
+			log.log(90, "Received " + Packets.getMessageName(buffer[off] & 0xff) + " " + payloadLength
 					+ " bytes payload");
 		}
 
 		if (recv_comp != null && can_recv_compress) {
-			int[] uncomp_len = new int[] { payload_length };
+			int[] uncomp_len = new int[] { payloadLength };
 			buffer = recv_comp.uncompress(buffer, off, uncomp_len);
 			
 			if (buffer == null) {
@@ -329,8 +318,40 @@ public class TransportConnection
 				return uncomp_len[0];
 			}
 		} else {
-			return payload_length;
+			return payloadLength;
 		}
+	}
+
+	private static int calculatePayloadLength(int bufferLength, int packetLength, int paddingLength) throws IOException {
+		int payloadLength = packetLength - paddingLength - 1;
+
+		if (payloadLength < 0)
+			throw new IOException("Illegal padding_length in packet from remote (" + paddingLength + ")");
+
+		if (payloadLength >= bufferLength)
+			throw new IOException("Receive buffer too small (" + bufferLength + ", need " + payloadLength + ")");
+
+		return payloadLength;
+	}
+
+	private static void checkMacMatches(byte[] buf1, byte[] buf2) throws IOException {
+		int difference = 0;
+		for (int i = 0; i < buf1.length; i++) {
+			difference |= buf1[i] ^ buf2[i];
+		}
+		if (difference != 0)
+			throw new IOException("Remote sent corrupt MAC.");
+	}
+
+	private static int getPacketLength(byte[] packetHeader) throws IOException {
+		int packetLength = ((packetHeader[0] & 0xff) << 24)
+						| ((packetHeader[1] & 0xff) << 16) | ((packetHeader[2] & 0xff) << 8)
+						| ((packetHeader[3] & 0xff));
+
+		if (packetLength > 35000 || packetLength < 12)
+			throw new IOException("Illegal packet size! (" + packetLength + ")");
+
+		return packetLength;
 	}
 
 	/**

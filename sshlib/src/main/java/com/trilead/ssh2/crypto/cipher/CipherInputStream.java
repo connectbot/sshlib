@@ -109,4 +109,25 @@ public class CipherInputStream
 		}
 		return n;
 	}
+
+	public int peekPlain(byte[] b, int off, int len) throws IOException
+	{
+		if (pos != blockSize)
+			throw new IOException("Cannot read plain since crypto buffer is not aligned.");
+		int n = 0;
+
+		bi.mark(len);
+		try {
+			while (n < len) {
+				int cnt = bi.read(b, off + n, len - n);
+				if (cnt < 0)
+					throw new IOException("Cannot fill buffer, EOF reached.");
+				n += cnt;
+			}
+		} finally {
+			bi.reset();
+		}
+
+		return n;
+	}
 }

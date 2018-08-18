@@ -17,13 +17,13 @@ import javax.crypto.spec.SecretKeySpec;
 public final class MACs
 {
 	/* Higher Priority First */
-	static final String[] MAC_LIST = {
+	private static final String[] MAC_LIST = {
+			HMAC.HMAC_SHA2_256_ETM,
+			HMAC.HMAC_SHA2_512_ETM,
+			HMAC.HMAC_SHA1_ETM,
 			HMAC.HMAC_SHA2_256,
 			HMAC.HMAC_SHA2_512,
-			HMAC.HMAC_SHA1_96,
 			HMAC.HMAC_SHA1,
-			HMAC.HMAC_MD5_96,
-			HMAC.HMAC_MD5
 	};
 
 	public final static String[] getMacList()
@@ -40,16 +40,18 @@ public final class MACs
 
 	public final static int getKeyLen(String type)
 	{
-		if (HMAC.HMAC_SHA1.equals(type) || HMAC.HMAC_SHA1_96.equals(type))
+		if (type == null)
+			throw new IllegalArgumentException("type == null");
+
+		if (type.startsWith(HMAC.HMAC_SHA1))
 			return 20;
-		if (HMAC.HMAC_MD5.equals(type) || HMAC.HMAC_MD5_96.equals(type))
+		if (type.startsWith(HMAC.HMAC_MD5))
 			return 16;
-		if (HMAC.HMAC_SHA2_256.equals(type))
+		if (type.startsWith(HMAC.HMAC_SHA2_256))
 			return 32;
-		if (HMAC.HMAC_SHA2_512.equals(type))
+		if (type.startsWith(HMAC.HMAC_SHA2_512))
 			return 64;
+
 		throw new IllegalArgumentException("Unknown algorithm " + type);
 	}
-
-
 }
