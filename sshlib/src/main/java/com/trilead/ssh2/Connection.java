@@ -45,7 +45,7 @@ import com.trilead.ssh2.util.TimeoutService.TimeoutToken;
  * @version $Id: Connection.java,v 1.3 2008/04/01 12:38:09 cplattne Exp $
  */
 
-public class Connection
+public class Connection implements AutoCloseable
 {
 	/**
 	 * The identifier presented to the SSH-2 server.

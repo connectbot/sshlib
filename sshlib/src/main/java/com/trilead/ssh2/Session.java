@@ -20,7 +20,7 @@ import com.trilead.ssh2.channel.X11ServerData;
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Session.java,v 1.2 2008/03/03 07:01:36 cplattne Exp $
  */
-public class Session
+public class Session implements AutoCloseable
 {
 	ChannelManager cm;
 	Channel cn;
