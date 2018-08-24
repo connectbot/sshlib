@@ -10,9 +10,8 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 
 /**
  * Integration tests against OpenSSH.
@@ -40,8 +39,7 @@ public class OpenSSHCompatibilityTest {
 	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
 		try (Connection c = withServer(server)) {
 			c.connect();
-			assertTrue("User should be authenticated",
-					c.authenticateWithPassword(USERNAME, PASSWORD));
+			assertThat(c.authenticateWithPassword(USERNAME, PASSWORD), is(true));
 			try (Session s = c.openSession()) {
 				s.ping();
 			}
@@ -54,7 +52,7 @@ public class OpenSSHCompatibilityTest {
 				.withEnv(OPTIONS_ENV, "-h " + keyPath)) {
 			server.start();
 			ConnectionInfo info = assertCanPasswordAuthenticate(server);
-			assertEquals(keyType, info.serverHostKeyAlgorithm);
+			assertThat(keyType, is(info.serverHostKeyAlgorithm));
 		}
 	}
 
@@ -72,8 +70,7 @@ public class OpenSSHCompatibilityTest {
 			server.start();
 			try (Connection c = withServer(server)) {
 				c.connect();
-				assertFalse("User should be authenticated",
-						c.authenticateWithPassword(USERNAME, "wrongpassword"));
+				assertThat(c.authenticateWithPassword(USERNAME, "wrongpassword"), is(false));
 			}
 		}
 	}
