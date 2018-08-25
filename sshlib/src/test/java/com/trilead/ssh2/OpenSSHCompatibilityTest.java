@@ -143,4 +143,20 @@ public class OpenSSHCompatibilityTest {
 	public void canConnectWithKexEcdhSha2Nistp521() throws Exception {
 		assertCanConnectToServerWithKex("ecdh-sha2-nistp521");
 	}
+
+	private void assertCanConnectToServerWithCipher(@NotNull String ciphers) throws IOException {
+		ConnectionInfo info = connectToServerWithOptions("-oCiphers=" + ciphers);
+		assertThat(ciphers, is(info.clientToServerCryptoAlgorithm));
+		assertThat(ciphers, is(info.serverToClientCryptoAlgorithm));
+	}
+
+	@Test
+	public void canConnectWithCipherAes128Ctr() throws Exception {
+		assertCanConnectToServerWithCipher("aes128-ctr");
+	}
+
+	@Test
+	public void canConnectWithCipherAes256Ctr() throws Exception {
+		assertCanConnectToServerWithCipher("aes256-ctr");
+	}
 }
