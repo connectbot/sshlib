@@ -47,13 +47,17 @@ public class OpenSSHCompatibilityTest {
 		}
 	}
 
-	private void assertCanConnectToServerThatHasKeyType(@NotNull String keyPath, String keyType) throws IOException {
+	private ConnectionInfo connectToServerWithOptions(@NotNull String options) throws IOException {
 		try (GenericContainer server = new GenericContainer(baseImage)
-				.withEnv(OPTIONS_ENV, "-h " + keyPath)) {
+				.withEnv(OPTIONS_ENV, options)) {
 			server.start();
-			ConnectionInfo info = assertCanPasswordAuthenticate(server);
-			assertThat(keyType, is(info.serverHostKeyAlgorithm));
+			return assertCanPasswordAuthenticate(server);
 		}
+	}
+
+	private void assertCanConnectToServerThatHasKeyType(@NotNull String keyPath, String keyType) throws IOException {
+		ConnectionInfo info = connectToServerWithOptions("-h " + keyPath);
+		assertThat(keyType, is(info.serverHostKeyAlgorithm));
 	}
 
 	@Test
@@ -88,5 +92,55 @@ public class OpenSSHCompatibilityTest {
 	@Test
 	public void connectToEd25519Host() throws Exception {
 		assertCanConnectToServerThatHasKeyType("/etc/ssh/ssh_host_ed25519_key", "ssh-ed25519");
+	}
+
+	private void assertCanConnectToServerWithKex(@NotNull String kexType) throws IOException {
+		ConnectionInfo info = connectToServerWithOptions("-oKexAlgorithms=" + kexType);
+		assertThat(kexType, is(info.keyExchangeAlgorithm));
+	}
+
+	@Test
+	public void canConnectWithKexCurve25519LibsshOrg() throws Exception {
+		assertCanConnectToServerWithKex("curve25519-sha256@libssh.org");
+	}
+
+	@Test
+	public void canConnectWithKexCurve25519() throws Exception {
+		assertCanConnectToServerWithKex("curve25519-sha256");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroup1() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group1-sha1");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroup14() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group14-sha1");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroupExchangeSha1() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group-exchange-sha1");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroupExchangeSha256() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group-exchange-sha256");
+	}
+
+	@Test
+	public void canConnectWithKexEcdhSha2Nistp256() throws Exception {
+		assertCanConnectToServerWithKex("ecdh-sha2-nistp256");
+	}
+
+	@Test
+	public void canConnectWithKexEcdhSha2Nistp384() throws Exception {
+		assertCanConnectToServerWithKex("ecdh-sha2-nistp384");
+	}
+
+	@Test
+	public void canConnectWithKexEcdhSha2Nistp521() throws Exception {
+		assertCanConnectToServerWithKex("ecdh-sha2-nistp521");
 	}
 }
