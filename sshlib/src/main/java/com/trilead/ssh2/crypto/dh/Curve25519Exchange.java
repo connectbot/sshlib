@@ -10,7 +10,8 @@ import java.security.SecureRandom;
  * Created by Kenny Root on 1/23/16.
  */
 public class Curve25519Exchange extends GenericDhExchange {
-	public static final String NAME = "curve25519-sha256@libssh.org";
+	public static final String NAME = "curve25519-sha256";
+	public static final String ALT_NAME = "curve25519-sha256@libssh.org";
 
 	private final byte[] clientPublic = new byte[Curve25519.KEY_SIZE];
 	private final byte[] clientPrivate = new byte[Curve25519.KEY_SIZE];
@@ -33,7 +34,7 @@ public class Curve25519Exchange extends GenericDhExchange {
 
 	@Override
 	public void init(String name) throws IOException {
-		if (!NAME.equals(name)) {
+		if (!NAME.equals(name) && !ALT_NAME.equals(name)) {
 			throw new IOException("Invalid name " + name);
 		}
 

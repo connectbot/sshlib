@@ -88,6 +88,7 @@ public class KexManager
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<String>();
 	static {
 		KEX_ALGS.add(Curve25519Exchange.NAME);
+		KEX_ALGS.add(Curve25519Exchange.ALT_NAME);
 		if (supportsEc) {
 			KEX_ALGS.add("ecdh-sha2-nistp256");
 			KEX_ALGS.add("ecdh-sha2-nistp384");
@@ -565,7 +566,8 @@ public class KexManager
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
-					|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)) {
+					|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
+					|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME)) {
 				kxs.dhx = GenericDhExchange.getInstance(kxs.np.kex_algo);
 
 				kxs.dhx.init(kxs.np.kex_algo);
@@ -704,7 +706,8 @@ public class KexManager
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
-				|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME))
+				|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
+				|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME))
 		{
 			if (kxs.state == 1)
 			{
