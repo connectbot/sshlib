@@ -159,4 +159,40 @@ public class OpenSSHCompatibilityTest {
 	public void canConnectWithCipherAes256Ctr() throws Exception {
 		assertCanConnectToServerWithCipher("aes256-ctr");
 	}
+
+	private void assertCanConnectToServerWithMac(@NotNull String macs) throws IOException {
+		ConnectionInfo info = connectToServerWithOptions("-oMACs=" + macs);
+		assertThat(macs, is(info.clientToServerMACAlgorithm));
+		assertThat(macs, is(info.serverToClientMACAlgorithm));
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha1() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha1");
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha2_256() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha2-256");
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha2_512() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha2-512");
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha1Etm() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha1-etm@openssh.com");
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha2_256Etm() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha2-256-etm@openssh.com");
+	}
+
+	@Test
+	public void canConnectWithMacHmacSha2_512Etm() throws Exception {
+		assertCanConnectToServerWithMac("hmac-sha2-512-etm@openssh.com");
+	}
 }
