@@ -18,6 +18,7 @@ dependencies {
     testCompile 'commons-io:commons-io:2.6'
     testCompile 'commons-codec:commons-codec:1.11'
     testCompile 'org.testcontainers:testcontainers:1.8.3'
+    testCompile 'ch.qos.logback:logback-classic:1.2.3'
 }
 
 compileJava {
