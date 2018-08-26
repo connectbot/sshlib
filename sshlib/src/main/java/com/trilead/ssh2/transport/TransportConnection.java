@@ -261,7 +261,7 @@ public class TransportConnection
 
 		if (recv_mac != null && recv_mac.isEncryptThenMac()) {
 			cis.readPlain(recv_packet_header_buffer, 0, 4);
-			packetLength = getPacketLength(recv_packet_header_buffer);
+			packetLength = getPacketLength(recv_packet_header_buffer, true);
 
 			recv_mac.initMac(recv_seq_number);
 			recv_mac.update(recv_packet_header_buffer, 0, 4);
@@ -277,7 +277,7 @@ public class TransportConnection
 			cis.read(recv_packet_header_buffer, 4, 1);
 		} else {
 			cis.read(recv_packet_header_buffer, 0, 5);
-			packetLength = getPacketLength(recv_packet_header_buffer);
+			packetLength = getPacketLength(recv_packet_header_buffer, false);
 		}
 
 		int paddingLength = recv_packet_header_buffer[4] & 0xff;
@@ -343,12 +343,12 @@ public class TransportConnection
 			throw new IOException("Remote sent corrupt MAC.");
 	}
 
-	private static int getPacketLength(byte[] packetHeader) throws IOException {
+	private static int getPacketLength(byte[] packetHeader, boolean isEtm) throws IOException {
 		int packetLength = ((packetHeader[0] & 0xff) << 24)
 						| ((packetHeader[1] & 0xff) << 16) | ((packetHeader[2] & 0xff) << 8)
 						| ((packetHeader[3] & 0xff));
 
-		if (packetLength > 35000 || packetLength < 12)
+		if (packetLength > 35000 || packetLength < (isEtm ? 8 : 12))
 			throw new IOException("Illegal packet size! (" + packetLength + ")");
 
 		return packetLength;
