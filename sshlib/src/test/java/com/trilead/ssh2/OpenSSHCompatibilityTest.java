@@ -210,4 +210,24 @@ public class OpenSSHCompatibilityTest {
 	public void canConnectWithMacHmacSha2_512Etm() throws Exception {
 		assertCanConnectToServerWithMac("hmac-sha2-512-etm@openssh.com");
 	}
+
+	@Test
+	public void canConnectWithCompression() throws Exception {
+		try (GenericContainer server = new GenericContainer(baseImage)
+				.withEnv(OPTIONS_ENV, "-oCompression=yes")) {
+			server.start();
+			try (Connection c = withServer(server)) {
+				c.setCompression(true);
+				c.connect();
+				assertThat(c.authenticateWithPassword(USERNAME, PASSWORD), is(true));
+				try (Session s = c.openSession()) {
+					s.ping();
+				}
+
+				ConnectionInfo info = c.getConnectionInfo();
+				assertThat("zlib@openssh.com", is(info.clientToServerCompressionAlgorithm));
+				assertThat("zlib@openssh.com", is(info.serverToClientCompressionAlgorithm));
+			}
+		}
+	}
 }

@@ -615,6 +615,8 @@ public class KexManager
 			sci.serverToClientMACAlgorithm = kxs.np.mac_algo_server_to_client;
 			sci.serverHostKeyAlgorithm = kxs.np.server_host_key_algo;
 			sci.serverHostKey = kxs.hostkey;
+			sci.clientToServerCompressionAlgorithm = kxs.np.comp_algo_client_to_server;
+			sci.serverToClientCompressionAlgorithm = kxs.np.comp_algo_server_to_client;
 
 			synchronized (accessLock)
 			{
