@@ -16,11 +16,11 @@ https://opensource.org/licenses/BSD-3-Clause).
 
 ##### MACs:
   * hmac-sha2-512-etm@openssh.com ([OpenSSH PROTOCOL](
-    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54)
+    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
   * hmac-sha2-256-etm@openssh.com ([OpenSSH PROTOCOL](
-    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54)
+    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
   * hmac-sha1-etm@openssh.com ([OpenSSH PROTOCOL](
-    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54)
+    https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
   * hmac-sha2-512 ([RFC 4868](https://tools.ietf.org/html/rfc4868))
   * hmac-sha2-256 ([RFC 4868](https://tools.ietf.org/html/rfc4868))
   * hmac-sha1 ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.4))
