@@ -130,6 +130,21 @@ public class OpenSSHCompatibilityTest {
 	}
 
 	@Test
+	public void canConnectWithKexDHGroup14Sha256() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group14-sha256");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroup16Sha512() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group16-sha512");
+	}
+
+	@Test
+	public void canConnectWithKexDHGroup18Sha512() throws Exception {
+		assertCanConnectToServerWithKex("diffie-hellman-group18-sha512");
+	}
+
+	@Test
 	public void canConnectWithKexEcdhSha2Nistp256() throws Exception {
 		assertCanConnectToServerWithKex("ecdh-sha2-nistp256");
 	}

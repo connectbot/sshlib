@@ -94,7 +94,10 @@ public class KexManager
 			KEX_ALGS.add("ecdh-sha2-nistp384");
 			KEX_ALGS.add("ecdh-sha2-nistp521");
 		}
+		KEX_ALGS.add("diffie-hellman-group18-sha512");
+		KEX_ALGS.add("diffie-hellman-group16-sha512");
 		KEX_ALGS.add("diffie-hellman-group-exchange-sha256");
+		KEX_ALGS.add("diffie-hellman-group14-sha256");
 		KEX_ALGS.add("diffie-hellman-group-exchange-sha1");
 		KEX_ALGS.add("diffie-hellman-group14-sha1");
 		KEX_ALGS.add("diffie-hellman-group1-sha1");
@@ -556,13 +559,16 @@ public class KexManager
 				return;
 			}
 
-			if (kxs.np.kex_algo.equals("diffie-hellman-group1-sha1")
-					|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha1")
-					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
-					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
+			if (kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
+					|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME)
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
-					|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
-					|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME)) {
+					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
+					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
+					|| kxs.np.kex_algo.equals("diffie-hellman-group18-sha512")
+					|| kxs.np.kex_algo.equals("diffie-hellman-group16-sha512")
+					|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha256")
+					|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha1")
+					|| kxs.np.kex_algo.equals("diffie-hellman-group1-sha1")) {
 				kxs.dhx = GenericDhExchange.getInstance(kxs.np.kex_algo);
 
 				kxs.dhx.init(kxs.np.kex_algo);
@@ -700,6 +706,9 @@ public class KexManager
 
 		if (kxs.np.kex_algo.equals("diffie-hellman-group1-sha1")
 				|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha1")
+				|| kxs.np.kex_algo.equals("diffie-hellman-group14-sha256")
+				|| kxs.np.kex_algo.equals("diffie-hellman-group16-sha512")
+				|| kxs.np.kex_algo.equals("diffie-hellman-group18-sha512")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp256")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
