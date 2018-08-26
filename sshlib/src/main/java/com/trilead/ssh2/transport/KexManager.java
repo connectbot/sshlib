@@ -71,7 +71,7 @@ public class KexManager
 		supportsEc = keyFact != null;
 	}
 
-	private static final Set<String> HOSTKEY_ALGS = new LinkedHashSet<String>();
+	private static final Set<String> HOSTKEY_ALGS = new LinkedHashSet<>();
 	static {
 		HOSTKEY_ALGS.add(Ed25519Verify.ED25519_ID);
 		if (supportsEc) {
@@ -85,7 +85,7 @@ public class KexManager
 		HOSTKEY_ALGS.add("rsa-sha2-512");
 	}
 
-	private static final Set<String> KEX_ALGS = new LinkedHashSet<String>();
+	private static final Set<String> KEX_ALGS = new LinkedHashSet<>();
 	static {
 		KEX_ALGS.add(Curve25519Exchange.NAME);
 		KEX_ALGS.add(Curve25519Exchange.ALT_NAME);
@@ -103,28 +103,28 @@ public class KexManager
 		KEX_ALGS.add("ext-info-c");
 	}
 
-	KexState kxs;
-	int kexCount = 0;
-	KeyMaterial km;
+	private KexState kxs;
+	private int kexCount = 0;
+	private KeyMaterial km;
 	byte[] sessionId;
-	ClientServerHello csh;
+	private ClientServerHello csh;
 
-	final Object accessLock = new Object();
-	ConnectionInfo lastConnInfo = null;
+	private final Object accessLock = new Object();
+	private ConnectionInfo lastConnInfo = null;
 
-	boolean connectionClosed = false;
+	private boolean connectionClosed = false;
 
-	boolean ignore_next_kex_packet = false;
+	private boolean ignore_next_kex_packet = false;
 
-	final TransportManager tm;
+	private final TransportManager tm;
 
-	CryptoWishList nextKEXcryptoWishList;
-	DHGexParameters nextKEXdhgexParameters;
+	private CryptoWishList nextKEXcryptoWishList;
+	private DHGexParameters nextKEXdhgexParameters;
 
-	ServerHostKeyVerifier verifier;
-	final String hostname;
-	final int port;
-	final SecureRandom rnd;
+	private ServerHostKeyVerifier verifier;
+	private final String hostname;
+	private final int port;
+	private final SecureRandom rnd;
 
 	public KexManager(TransportManager tm, ClientServerHello csh, CryptoWishList initialCwl, String hostname, int port,
 			ServerHostKeyVerifier keyVerifier, SecureRandom rnd)
@@ -155,7 +155,7 @@ public class KexManager
 				{
 					accessLock.wait();
 				}
-				catch (InterruptedException e)
+				catch (InterruptedException ignore)
 				{
 				}
 			}
@@ -170,12 +170,10 @@ public class KexManager
 		if (client.length == 0)
 			return null;
 
-		for (int i = 0; i < client.length; i++)
-		{
-			for (int j = 0; j < server.length; j++)
-			{
-				if (client[i].equals(server[j]))
-					return client[i];
+		for (String aClient : client) {
+			for (String aServer : server) {
+				if (aClient.equals(aServer))
+					return aClient;
 			}
 		}
 		throw new NegotiateException();
@@ -310,7 +308,7 @@ public class KexManager
 
 			List<String> knownAlgorithms = extendedVerifier.getKnownKeyAlgorithmsForHost(hostname, port);
 			if (knownAlgorithms != null && knownAlgorithms.size() > 0) {
-				ArrayList<String> filteredAlgorithms = new ArrayList<String>(knownAlgorithms.size());
+				ArrayList<String> filteredAlgorithms = new ArrayList<>(knownAlgorithms.size());
 
 				/*
 				 * Look at our current wish list and adjust it based on what the client already knows, but
@@ -325,13 +323,13 @@ public class KexManager
 				}
 
 				if (filteredAlgorithms.size() > 0) {
-					cwl.serverHostKeyAlgorithms = filteredAlgorithms.toArray(new String[filteredAlgorithms.size()]);
+					cwl.serverHostKeyAlgorithms = filteredAlgorithms.toArray(new String[0]);
 				}
 			}
 		}
 	}
 
-	private boolean establishKeyMaterial()
+	private void establishKeyMaterial() throws IOException
 	{
 		try
 		{
@@ -348,9 +346,8 @@ public class KexManager
 		}
 		catch (IllegalArgumentException e)
 		{
-			return false;
+			throw new IOException("Could not establish key material: " + e.getMessage());
 		}
-		return true;
 	}
 
 	private void finishKex() throws IOException
@@ -389,31 +386,29 @@ public class KexManager
 		tm.kexFinished();
 	}
 
-	public static final String[] getDefaultServerHostkeyAlgorithmList()
+	public static String[] getDefaultServerHostkeyAlgorithmList()
 	{
-		return HOSTKEY_ALGS.toArray(new String[HOSTKEY_ALGS.size()]);
+		return HOSTKEY_ALGS.toArray(new String[0]);
 	}
 
-	public static final void checkServerHostkeyAlgorithmsList(String[] algos)
+	public static void checkServerHostkeyAlgorithmsList(String[] algos)
 	{
-		for (int i = 0; i < algos.length; i++)
-		{
-			if (!HOSTKEY_ALGS.contains(algos[i]))
-				throw new IllegalArgumentException("Unknown server host key algorithm '" + algos[i] + "'");
+		for (String algo : algos) {
+			if (!HOSTKEY_ALGS.contains(algo))
+				throw new IllegalArgumentException("Unknown server host key algorithm '" + algo + "'");
 		}
 	}
 
-	public static final String[] getDefaultKexAlgorithmList()
+	public static String[] getDefaultKexAlgorithmList()
 	{
-		return KEX_ALGS.toArray(new String[KEX_ALGS.size()]);
+		return KEX_ALGS.toArray(new String[0]);
 	}
 
-	public static final void checkKexAlgorithmList(String[] algos)
+	public static void checkKexAlgorithmList(String[] algos)
 	{
-		for (int i = 0; i < algos.length; i++)
-		{
-			if (!KEX_ALGS.contains(algos[i]))
-				throw new IllegalArgumentException("Unknown kex algorithm '" + algos[i] + "'");
+		for (String algo : algos) {
+			if (!KEX_ALGS.contains(algo))
+				throw new IllegalArgumentException("Unknown kex algorithm '" + algo + "'");
 		}
 	}
 
@@ -602,7 +597,7 @@ public class KexManager
 			}
 			catch (IllegalArgumentException e1)
 			{
-				throw new IOException("Fatal error during MAC startup!");
+				throw new IOException("Fatal error during MAC startup: " + e1.getMessage());
 			}
 
 			tm.changeRecvCipher(cbc, mac);
