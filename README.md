@@ -13,6 +13,7 @@ https://opensource.org/licenses/BSD-3-Clause).
   * aes128-ctr ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
   * aes256-cbc ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
   * aes128-cbc ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
+  * 3des-ctr ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
   * 3des-cbc ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
 
 ##### MACs:
