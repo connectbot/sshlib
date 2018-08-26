@@ -160,6 +160,21 @@ public class OpenSSHCompatibilityTest {
 		assertCanConnectToServerWithCipher("aes256-ctr");
 	}
 
+	@Test
+	public void canConnectWithCipherAes128Cbc() throws Exception {
+		assertCanConnectToServerWithCipher("aes128-cbc");
+	}
+
+	@Test
+	public void canConnectWithCipherAes256Cbc() throws Exception {
+		assertCanConnectToServerWithCipher("aes256-cbc");
+	}
+
+	@Test
+	public void canConnectWithCipher3desCbc() throws Exception {
+		assertCanConnectToServerWithCipher("3des-cbc");
+	}
+
 	private void assertCanConnectToServerWithMac(@NotNull String macs) throws IOException {
 		ConnectionInfo info = connectToServerWithOptions("-oMACs=" + macs);
 		assertThat(macs, is(info.clientToServerMACAlgorithm));
