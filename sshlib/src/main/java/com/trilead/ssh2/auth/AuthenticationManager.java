@@ -236,8 +236,8 @@ public class AuthenticationManager implements MessageHandler
 			else if (publicKey instanceof RSAPublicKey)
 			{
 				byte[] pk_enc = RSASHA1Verify.encodeSSHRSAPublicKey((RSAPublicKey) publicKey);
+				String pk_algorithm;
 
-				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, "ssh-rsa", pk_enc);
 
 				// Servers support different hash algorithms for RSA keys
 				// https://tools.ietf.org/html/draft-ietf-curdle-rsa-sha2-12
@@ -246,6 +246,8 @@ public class AuthenticationManager implements MessageHandler
 
 				if (algsAccepted.contains("rsa-sha2-512"))
 				{
+					pk_algorithm = "rsa-sha2-512";
+					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
 					if (signatureProxy != null)
 					{
 						rsa_sig_enc = signatureProxy.sign(msg, SignatureProxy.SHA512);
@@ -259,6 +261,9 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else if (algsAccepted.contains("rsa-sha2-256"))
 				{
+					pk_algorithm = "rsa-sha2-256";
+					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
+
 					if (signatureProxy != null)
 					{
 						rsa_sig_enc = signatureProxy.sign(msg, SignatureProxy.SHA256);
@@ -272,6 +277,8 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
+					pk_algorithm = "ssh-rsa";
+					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
 					if (signatureProxy != null)
 					{
 						rsa_sig_enc = signatureProxy.sign(msg, SignatureProxy.SHA1);
@@ -286,7 +293,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
-						"ssh-rsa", pk_enc, rsa_sig_enc);
+						pk_algorithm, pk_enc, rsa_sig_enc);
 
 				tm.sendMessage(ua.getPayload());
 			}
