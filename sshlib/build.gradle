@@ -5,6 +5,7 @@ plugins {
 
 apply plugin: 'java'
 apply from: "${rootDir}/publish.gradle"
+apply from: "${rootDir}/config/quality.gradle"
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
