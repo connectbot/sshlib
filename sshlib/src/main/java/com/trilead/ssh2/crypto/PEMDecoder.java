@@ -4,8 +4,8 @@ package com.trilead.ssh2.crypto;
 import java.io.BufferedReader;
 import java.io.CharArrayReader;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.DigestException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -376,7 +376,7 @@ public class PEMDecoder
 			TypesReader tr = new TypesReader(ps.data);
 			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
 			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, StandardCharsets.US_ASCII));
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic));
 			}
 
 			tr.readString();
@@ -410,7 +410,11 @@ public class PEMDecoder
 			if (password == null)
 				throw new IOException("PEM is encrypted, but no password was specified");
 
-			decryptPEM(ps, password.getBytes(StandardCharsets.ISO_8859_1));
+			try {
+				decryptPEM(ps, password.getBytes("ISO-8859-1"));
+			} catch (UnsupportedEncodingException e) {
+				decryptPEM(ps, password.getBytes("ISO-8859-1"));
+			}
 		}
 
 		if (ps.pemType == PEM_DSA_PRIVATE_KEY)
@@ -527,7 +531,7 @@ public class PEMDecoder
 			TypesReader tr = new TypesReader(ps.data);
 			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
 			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic, StandardCharsets.US_ASCII));
+				throw new IOException("Could not find OPENSSH key magic: " + new String(magic));
 			}
 
 			String ciphername = tr.readString();
@@ -553,7 +557,13 @@ public class PEMDecoder
 				TypesReader optionsReader = new TypesReader(kdfoptions);
 				byte[] salt = optionsReader.readByteString();
 				int rounds = optionsReader.readUINT32();
-				dataBytes = decryptData(dataBytes, password.getBytes(StandardCharsets.UTF_8), salt, rounds, ciphername);
+				byte[] passwordBytes;
+				try {
+					passwordBytes = password.getBytes("UTF-8");
+				} catch (UnsupportedEncodingException e) {
+					passwordBytes = password.getBytes();
+				}
+				dataBytes = decryptData(dataBytes, passwordBytes, salt, rounds, ciphername);
 			} else if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
 				throw new IOException("encryption not supported");
 			}

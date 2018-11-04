@@ -4,10 +4,10 @@ package com.trilead.ssh2;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.transport.ClientServerHello;
@@ -113,7 +113,12 @@ public class HTTPProxyData implements ProxyData
 		if ((proxyUser != null) && (proxyPass != null))
 		{
 			String credentials = proxyUser + ":" + proxyPass;
-			char[] encoded = Base64.encode(credentials.getBytes(StandardCharsets.ISO_8859_1));
+			char[] encoded;
+			try {
+				encoded = Base64.encode(credentials.getBytes("ISO-8859-1"));
+			} catch (UnsupportedEncodingException e) {
+				encoded = Base64.encode(credentials.getBytes());
+			}
 			sb.append("Proxy-Authorization: Basic ");
 			sb.append(encoded);
 			sb.append("\r\n");
@@ -135,7 +140,11 @@ public class HTTPProxyData implements ProxyData
 
 		OutputStream out = sock.getOutputStream();
 
-		out.write(sb.toString().getBytes(StandardCharsets.ISO_8859_1));
+		try {
+			out.write(sb.toString().getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			out.write(sb.toString().getBytes());
+		}
 		out.flush();
 
 			/* Now parse the HTTP response */
@@ -145,7 +154,12 @@ public class HTTPProxyData implements ProxyData
 
 		int len = ClientServerHello.readLineRN(in, buffer);
 
-		String httpReponse = new String(buffer, 0, len, StandardCharsets.ISO_8859_1);
+		String httpReponse;
+		try {
+			httpReponse = new String(buffer, 0, len, "ISO-8859-1");
+		} catch (UnsupportedEncodingException e) {
+			httpReponse = new String(buffer, 0, len);
+		}
 
 		if (!httpReponse.startsWith("HTTP/"))
 			throw new IOException("The proxy did not send back a valid HTTP response.");
