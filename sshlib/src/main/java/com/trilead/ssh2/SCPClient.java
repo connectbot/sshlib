@@ -9,7 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.UnsupportedEncodingException;
 
 /**
  * A very basic <code>SCPClient</code> that can be used to copy files from/to
@@ -142,7 +142,12 @@ public class SCPClient
 
 		String cline = "C" + mode + " " + data.length + " " + fileName + "\n";
 
-		os.write(cline.getBytes(StandardCharsets.ISO_8859_1));
+		try {
+			os.write(cline.getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			os.write(cline.getBytes());
+		}
+
 		os.flush();
 
 		readResponse(is);
@@ -153,7 +158,11 @@ public class SCPClient
 
 		readResponse(is);
 
-		os.write("E\n".getBytes(StandardCharsets.ISO_8859_1));
+		try {
+			os.write("E\n".getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			os.write("E\n".getBytes());
+		}
 		os.flush();
 	}
 
@@ -180,7 +189,11 @@ public class SCPClient
 
 			String cline = "C" + mode + " " + remain + " " + remoteName + "\n";
 
-			os.write(cline.getBytes(StandardCharsets.ISO_8859_1));
+			try {
+				os.write(cline.getBytes("ISO-8859-1"));
+			} catch (UnsupportedEncodingException e) {
+				os.write(cline.getBytes());
+			}
 			os.flush();
 
 			readResponse(is);
@@ -219,7 +232,11 @@ public class SCPClient
 			readResponse(is);
 		}
 
-		os.write("E\n".getBytes(StandardCharsets.ISO_8859_1));
+		try {
+			os.write("E\n".getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			os.write("E\n".getBytes("ISO-8859-1"));
+		}
 		os.flush();
 	}
 

@@ -4,8 +4,8 @@ package com.trilead.ssh2.channel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.log.Logger;
 
@@ -124,7 +124,13 @@ public class RemoteX11AcceptThread extends Thread
 			if (remote_is.read(paddingBuffer, 0, authProtocolDataPadding) != authProtocolDataPadding)
 				throw new IOException("Unexpected EOF on X11 startup! (authProtocolDataPadding)");
 
-			if (!"MIT-MAGIC-COOKIE-1".equals(new String(authProtocolName, StandardCharsets.ISO_8859_1)))
+			String authProtocolNameStr;
+			try {
+				authProtocolNameStr = new String(authProtocolName, "ISO-8859-1");
+			} catch (UnsupportedEncodingException e) {
+				authProtocolNameStr = new String(authProtocolName);
+			}
+			if (!"MIT-MAGIC-COOKIE-1".equals(authProtocolNameStr))
 				throw new IOException("Unknown X11 authorization protocol!");
 
 			if (authProtocolDataLength != 16)

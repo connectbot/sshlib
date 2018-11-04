@@ -2,8 +2,8 @@
 package com.trilead.ssh2.packets;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 
 import com.trilead.ssh2.util.Tokenizer;
 
@@ -158,7 +158,12 @@ public class TypesReader
 		if ((len + pos) > max)
 			throw new IOException("Malformed SSH string.");
 
-		String res = new String(arr, pos, len, StandardCharsets.ISO_8859_1);
+		String res;
+		try {
+			res = new String(arr, pos, len, "ISO-8859-1");
+		} catch (UnsupportedEncodingException e) {
+			res = new String(arr, pos, len);
+		}
 		
 		pos += len;
 

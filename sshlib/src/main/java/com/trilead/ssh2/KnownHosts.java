@@ -11,7 +11,6 @@ import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -206,7 +205,11 @@ public class KnownHosts
 			throw new RuntimeException("Unable to create SecretKey", e);
 		}
 
-		hmac.update(hostname.getBytes(StandardCharsets.ISO_8859_1));
+		try {
+			hmac.update(hostname.getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			hmac.update(hostname.getBytes());
+		}
 
 		return hmac.doFinal();
 	}
@@ -694,8 +697,12 @@ public class KnownHosts
 			if (last != '\n')
 				raf.write('\n');
 		}
-		
-		raf.write(new String(entry).getBytes(StandardCharsets.ISO_8859_1));
+
+		try {
+			raf.write(new String(entry).getBytes("ISO-8859-1"));
+		} catch (UnsupportedEncodingException e) {
+			raf.write(new String(entry).getBytes());
+		}
 		raf.close();
 	}
 
