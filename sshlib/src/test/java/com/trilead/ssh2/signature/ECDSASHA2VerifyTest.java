@@ -1,10 +1,9 @@
 package com.trilead.ssh2.signature;
 
 import com.trilead.ssh2.crypto.PEMDecoder;
-
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
 
 /**
  * Created by kenny on 12/25/15.

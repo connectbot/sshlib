@@ -251,7 +251,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 	private void sendIdentities() throws IOException
 	{
-		Map<String,byte[]> keys = null;
+		Map<String, byte[]> keys = null;
 
 		TypesWriter tw = new TypesWriter();
 		tw.writeByte(SSH2_AGENT_IDENTITIES_ANSWER);
@@ -266,7 +266,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 		tw.writeUINT32(numKeys);
 
 		if (keys != null) {
-			for (Entry<String,byte[]> entry : keys.entrySet()) {
+			for (Entry<String, byte[]> entry : keys.entrySet()) {
 				byte[] keyBytes = entry.getValue();
 				tw.writeString(keyBytes, 0, keyBytes.length);
 				tw.writeString(entry.getKey());
