@@ -320,8 +320,8 @@ public class SFTPv3Client
 		{
 			if (debug != null)
 				debug.println("SSH_FILEXFER_ATTR_V3_ACMODTIME");
-			fa.atime = new Long(((long)tr.readUINT32()) & 0xffffffffl);
-			fa.mtime = new Long(((long)tr.readUINT32()) & 0xffffffffl);
+			fa.atime = new Long(((long) tr.readUINT32()) & 0xffffffffl);
+			fa.mtime = new Long(((long) tr.readUINT32()) & 0xffffffffl);
 
 		}
 

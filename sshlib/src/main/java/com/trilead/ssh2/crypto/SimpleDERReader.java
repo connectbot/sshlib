@@ -189,7 +189,7 @@ public class SimpleDERReader
 		long value = 0;
 
 		StringBuilder sb = new StringBuilder(64);
-		switch(b[0] / 40) {
+		switch (b[0] / 40) {
 		case 0:
 			sb.append('0');
 			break;

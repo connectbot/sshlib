@@ -3,10 +3,10 @@ package com.trilead.ssh2.crypto;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.math.BigInteger;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 
 /**
  * Created by kenny on 12/25/15.

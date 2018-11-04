@@ -16,7 +16,9 @@ import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.spec.PKCS8EncodedKeySpec;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by kenny on 1/24/16.

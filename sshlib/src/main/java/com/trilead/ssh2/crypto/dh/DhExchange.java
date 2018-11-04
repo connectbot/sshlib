@@ -10,7 +10,12 @@ import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.DHPublicKeySpec;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 
 /**
@@ -22,12 +27,12 @@ public class DhExchange extends GenericDhExchange {
 	/* Given by the standard */
 
 	private static final BigInteger P1 = new BigInteger(
-			"FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"+
-			"29024E088A67CC74020BBEA63B139B22514A08798E3404DD"+
-			"EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"+
-			"E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"+
-			"EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381"+
-			"FFFFFFFFFFFFFFFF",16);
+			"FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
+			"29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
+			"EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245" +
+			"E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
+			"EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381" +
+			"FFFFFFFFFFFFFFFF", 16);
 
 	private static final BigInteger P14 = new BigInteger(
 			"FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +

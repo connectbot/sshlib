@@ -14,7 +14,7 @@ public interface AuthAgentCallback {
 	/**
 	 * @return array of blobs containing the OpenSSH-format encoded public keys
 	 */
-	Map<String,byte[]> retrieveIdentities();
+	Map<String, byte[]> retrieveIdentities();
 
 	/**
 	 * @param pair A <code>RSAPrivateKey</code>, <code>ECPrivateKey</code>, or

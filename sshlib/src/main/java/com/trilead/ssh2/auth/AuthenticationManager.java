@@ -324,7 +324,7 @@ public class AuthenticationManager implements MessageHandler
 
 				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((EdDSAPublicKey) publicKey);
 
-				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user,algo,pk_enc);
+				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
 
 				byte[] ed_sig_enc;
 				if (signatureProxy != null)
@@ -501,7 +501,7 @@ public class AuthenticationManager implements MessageHandler
 		throw new IOException("Unexpected SSH message (type " + ar[0] + ")");
 	}
 
-	private byte[] generatePublicKeyUserAuthenticationRequest(String user, String algorithm, byte[] publicKeyEncoded){
+	private byte[] generatePublicKeyUserAuthenticationRequest(String user, String algorithm, byte[] publicKeyEncoded) {
 		TypesWriter tw = new TypesWriter();
 		{
 			byte[] H = tm.getSessionIdentifier();

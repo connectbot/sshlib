@@ -16,7 +16,6 @@ import com.trilead.ssh2.auth.SignatureProxy;
 import com.trilead.ssh2.channel.ChannelManager;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
-import com.trilead.ssh2.crypto.digest.MAC;
 import com.trilead.ssh2.crypto.digest.MACs;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketIgnore;
