@@ -1,10 +1,11 @@
 package com.trilead.ssh2;
 
+import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Rule;
+import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -23,17 +24,31 @@ import static org.junit.Assert.assertThat;
  * @author Kenny Root
  */
 public class AsyncSSHCompatibilityTest {
-	private final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class);
+	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class);
 
 	private static final String USERNAME = "user123";
 	private static final String PASSWORD = "secretpw";
 
-	@Rule
-	public TemporaryFolder hostKeyFolder = new TemporaryFolder();
+	private static ImageFromDockerfile baseImage;
 
-	private ImageFromDockerfile baseImage = new ImageFromDockerfile()
-			.withFileFromClasspath("server.py", "asyncssh-server/server.py")
-			.withFileFromClasspath("Dockerfile", "asyncssh-server/Dockerfile");
+	@ClassRule
+	public static GenericContainer server;
+
+	static {
+		baseImage = new ImageFromDockerfile()
+				.withFileFromClasspath("server.py", "asyncssh-server/server.py")
+				.withFileFromClasspath("Dockerfile", "asyncssh-server/Dockerfile");
+		for (String key : PubkeyConstants.KEY_NAMES) {
+			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
+		}
+
+		Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
+
+		server = new GenericContainer(baseImage);
+		server.withLogConsumer(logConsumer)
+				.waitingFor(new LogMessageWaitStrategy()
+						.withRegEx(".*Creating SSH server on port.*\\s"));
+	}
 
 	@NotNull
 	@Contract("_ -> new")
@@ -54,13 +69,48 @@ public class AsyncSSHCompatibilityTest {
 
 	@Test
 	public void canConnectWithPassword() throws Exception {
-		Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
+		assertCanPasswordAuthenticate(server);
+	}
 
-		try (GenericContainer server = new GenericContainer(baseImage)) {
-			server.withLogConsumer(logConsumer)
-					.waitingFor(new LogMessageWaitStrategy()
-							.withRegEx("READY\\s")).start();
-			assertCanPasswordAuthenticate(server);
+	private ConnectionInfo assertCanPubkeyAuthenticate(GenericContainer server, char[] key) throws IOException {
+		try (Connection c = withServer(server)) {
+			c.connect();
+			assertThat(c.authenticateWithPublicKey(USERNAME, key, ""), is(true));
+			try (Session s = c.openSession()) {
+				s.ping();
+			}
+			return c.getConnectionInfo();
 		}
+	}
+
+	private void canConnectWithPubkey(String keyFilename) throws Exception {
+		char[] keyChars = IOUtils.toCharArray(getClass().getResourceAsStream("crypto/" + keyFilename), "UTF-8");
+		assertCanPubkeyAuthenticate(server, keyChars);
+	}
+
+	@Ignore
+	@Test
+	public void canConnectWithEd25519() throws Exception {
+		canConnectWithPubkey("ed25519-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa256() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp256-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa384() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp384-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa521() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp521-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithRsa() throws Exception {
+		canConnectWithPubkey("rsa-openssh2-private-key.txt");
 	}
 }
