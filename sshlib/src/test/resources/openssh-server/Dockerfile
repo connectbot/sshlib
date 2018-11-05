@@ -1,4 +1,4 @@
-FROM alpine:3.8
+FROM alpine:edge
 ENV USERNAME testuser
 ENV PASSWORD testtest123
 ENV OPTIONS ""

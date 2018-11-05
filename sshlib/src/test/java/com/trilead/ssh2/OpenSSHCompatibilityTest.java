@@ -3,6 +3,8 @@ package com.trilead.ssh2;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +23,7 @@ import static org.junit.Assert.assertThat;
  * @author Kenny Root
  */
 public class OpenSSHCompatibilityTest {
-	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class);
+	private static final Logger logger = LoggerFactory.getLogger(OpenSSHCompatibilityTest.class);
 	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
 
 	private static final String OPTIONS_ENV = "OPTIONS";
@@ -37,7 +39,24 @@ public class OpenSSHCompatibilityTest {
 		for (String key : PubkeyConstants.KEY_NAMES) {
 			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
 		}
+
 	}
+
+        @Before
+        public void setupLogging() {
+		com.trilead.ssh2.log.Logger.enabled = true;
+		com.trilead.ssh2.log.Logger.logger = new DebugLogger() {
+			public void log(int level, String className, String message) {
+				logger.info(message);
+			}
+		};
+        }
+
+        @After
+        public void stopLogging() {
+		com.trilead.ssh2.log.Logger.enabled = false;
+		com.trilead.ssh2.log.Logger.logger = null;
+        }
 
 	@NotNull
 	@Contract("_ -> new")
@@ -136,7 +155,7 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void connectToRsaHost() throws Exception {
-		assertCanConnectToServerThatHasKeyType("/etc/ssh/ssh_host_rsa_key", "ssh-rsa");
+		assertCanConnectToServerThatHasKeyType("/etc/ssh/ssh_host_rsa_key", "rsa-sha2-512");
 	}
 
 	@Test
@@ -299,5 +318,25 @@ public class OpenSSHCompatibilityTest {
 				assertThat("zlib@openssh.com", is(info.serverToClientCompressionAlgorithm));
 			}
 		}
+	}
+
+	private void canConnectWithHostKeyAlgorithm(String keyPath, String hostKeyAlgorithm) throws Exception {
+		ConnectionInfo info = connectToServerWithOptions("-h " + keyPath + " -oHostKeyAlgorithms=" + hostKeyAlgorithm);
+		assertThat(hostKeyAlgorithm, is(info.serverHostKeyAlgorithm));
+	}
+
+	@Test
+	public void canConnectToHostWithHostKeyRsaSha512() throws Exception {
+		canConnectWithHostKeyAlgorithm("/etc/ssh/ssh_host_rsa_key", "rsa-sha2-512");
+	}
+
+	@Test
+	public void canConnectToHostWithHostKeyRsaSha256() throws Exception {
+		canConnectWithHostKeyAlgorithm("/etc/ssh/ssh_host_rsa_key", "rsa-sha2-256");
+	}
+
+	@Test
+	public void canConnectToHostWithHostKeySshRsa() throws Exception {
+		canConnectWithHostKeyAlgorithm("/etc/ssh/ssh_host_rsa_key", "ssh-rsa");
 	}
 }
