@@ -32,8 +32,8 @@ publishing {
         url = gitHubUrl
         licenses {
           license {
-            name = 'Apache License, Version 2.0'
-            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            name = 'BSD 3-Clause License'
+            url = 'https://opensource.org/licenses/BSD-3-Clause'
           }
         }
         developers {
@@ -81,7 +81,7 @@ bintray {
     repo = 'maven'
     name = project.name
 
-    licenses = ['Apache-2.0']
+    licenses = ['BSD 3-Clause']
     configurations = ['archives']
 
     websiteUrl = gitHubUrl
