@@ -79,10 +79,10 @@ public class KexManager
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp384");
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp521");
 		}
+		HOSTKEY_ALGS.add("rsa-sha2-512");
+		HOSTKEY_ALGS.add("rsa-sha2-256");
 		HOSTKEY_ALGS.add("ssh-rsa");
 		HOSTKEY_ALGS.add("ssh-dss");
-		HOSTKEY_ALGS.add("rsa-sha2-256");
-		HOSTKEY_ALGS.add("rsa-sha2-512");
 	}
 
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<>();
@@ -426,6 +426,7 @@ public class KexManager
 			return Ed25519Verify.verifySignature(kxs.H, eds, edpk);
 
 		}
+
 		if (kxs.np.server_host_key_algo.startsWith("ecdsa-sha2-"))
 		{
 			byte[] rs = ECDSASHA2Verify.decodeSSHECDSASignature(sig);
@@ -436,14 +437,14 @@ public class KexManager
 			return ECDSASHA2Verify.verifySignature(kxs.H, rs, epk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("ssh-rsa"))
+		if (kxs.np.server_host_key_algo.equals("rsa-sha2-512"))
 		{
-			byte[] rs = RSASHA1Verify.decodeSSHRSASignature(sig);
+			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
 
-			log.log(50, "Verifying ssh-rsa signature");
+			log.log(50, "Verifying rsa-sha2-512 signature");
 
-			return RSASHA1Verify.verifySignature(kxs.H, rs, rpk);
+			return RSASHA512Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals("rsa-sha2-256"))
@@ -456,14 +457,14 @@ public class KexManager
 			return RSASHA256Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("rsa-sha2-512"))
+		if (kxs.np.server_host_key_algo.equals("ssh-rsa"))
 		{
-			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
+			byte[] rs = RSASHA1Verify.decodeSSHRSASignature(sig);
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
 
-			log.log(50, "Verifying rsa-sha2-512 signature");
+			log.log(50, "Verifying ssh-rsa signature");
 
-			return RSASHA512Verify.verifySignature(kxs.H, rs, rpk);
+			return RSASHA1Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals("ssh-dss"))
