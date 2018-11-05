@@ -1,11 +1,13 @@
 package com.trilead.ssh2;
 
+import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
@@ -19,21 +21,34 @@ import static org.junit.Assert.assertThat;
  * @author Kenny Root
  */
 public class OpenSSHCompatibilityTest {
+	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class);
+	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
+
 	private static final String OPTIONS_ENV = "OPTIONS";
 	private static final String USERNAME = "testuser";
 	private static final String PASSWORD = "testtest123";
 
-	@Rule
-	public TemporaryFolder hostKeyFolder = new TemporaryFolder();
+	private static ImageFromDockerfile baseImage;
 
-	private ImageFromDockerfile baseImage = new ImageFromDockerfile()
-			.withFileFromClasspath("run.sh", "openssh-server/run.sh")
-			.withFileFromClasspath("Dockerfile", "openssh-server/Dockerfile");
+	static {
+		baseImage = new ImageFromDockerfile()
+				.withFileFromClasspath("run.sh", "openssh-server/run.sh")
+				.withFileFromClasspath("Dockerfile", "openssh-server/Dockerfile");
+		for (String key : PubkeyConstants.KEY_NAMES) {
+			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
+		}
+	}
 
 	@NotNull
 	@Contract("_ -> new")
 	private Connection withServer(@NotNull GenericContainer container) {
 		return new Connection(container.getContainerIpAddress(), container.getMappedPort(22));
+	}
+
+	private GenericContainer getBaseContainer() {
+		GenericContainer container = new GenericContainer(baseImage);
+		container.withLogConsumer(logConsumer);
+		return container;
 	}
 
 	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
@@ -60,9 +75,49 @@ public class OpenSSHCompatibilityTest {
 		assertThat(keyType, is(info.serverHostKeyAlgorithm));
 	}
 
+	private void canConnectWithPubkey(String keyFilename) throws Exception {
+		char[] keyChars = IOUtils.toCharArray(getClass().getResourceAsStream("crypto/" + keyFilename), "UTF-8");
+
+		try (GenericContainer server = getBaseContainer()) {
+			server.start();
+			try (Connection connection = withServer(server)) {
+				connection.connect();
+				assertThat(connection.authenticateWithPublicKey(USERNAME, keyChars, ""), is(true));
+				try (Session session = connection.openSession()) {
+					session.ping();
+				}
+			}
+		}
+	}
+
+	@Test
+	public void canConnectWithEd25519() throws Exception {
+		canConnectWithPubkey("ed25519-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa256() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp256-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa384() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp384-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithEcdsa521() throws Exception {
+		canConnectWithPubkey("ecdsa-nistp521-openssh2-private-key.txt");
+	}
+
+	@Test
+	public void canConnectWithRsa() throws Exception {
+		canConnectWithPubkey("rsa-openssh2-private-key.txt");
+	}
+
 	@Test
 	public void canConnectWithPassword() throws Exception {
-		try (GenericContainer server = new GenericContainer(baseImage)) {
+		try (GenericContainer server = getBaseContainer()) {
 			server.start();
 			assertCanPasswordAuthenticate(server);
 		}
@@ -70,7 +125,7 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void wrongPasswordFails() throws Exception {
-		try (GenericContainer server = new GenericContainer(baseImage)) {
+		try (GenericContainer server = getBaseContainer()) {
 			server.start();
 			try (Connection c = withServer(server)) {
 				c.connect();
@@ -228,7 +283,7 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void canConnectWithCompression() throws Exception {
-		try (GenericContainer server = new GenericContainer(baseImage)
+		try (GenericContainer server = getBaseContainer()
 				.withEnv(OPTIONS_ENV, "-oCompression=yes")) {
 			server.start();
 			try (Connection c = withServer(server)) {
