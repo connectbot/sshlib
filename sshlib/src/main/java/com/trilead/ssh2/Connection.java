@@ -1347,6 +1347,25 @@ public class Connection implements AutoCloseable
 	}
 
 	/**
+	 * Define the set of allowed Key Exchange algorithms to be  used for the
+	 * following key exchange operations.
+	 * <p>
+	 * Unless you know what you are doing, you will never need this.
+	 *
+	 * @param algos
+	 *            An array of allowed key exchange algorithms.
+	 */
+	public synchronized void setKeyExchangeAlgorithms(String[] algos)
+	{
+		if (algos == null || algos.length == 0)
+			throw new IllegalArgumentException();
+
+		algos = removeDuplicates(algos);
+		KexManager.checkKexAlgorithmList(algos);
+		cryptoWishList.kexAlgorithms = algos;
+	}
+
+	/**
 	 * Used to tell the library that the connection shall be established through
 	 * a proxy server. It only makes sense to call this method before calling
 	 * the {@link #connect() connect()} method.
