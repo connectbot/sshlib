@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.junit.ClassRule;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,28 +25,27 @@ import static org.junit.Assert.assertThat;
  * @author Kenny Root
  */
 public class AsyncSSHCompatibilityTest {
-	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class);
+	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class.getSimpleName());
+
+	@Rule
+	public SshLogger sshLogger = new SshLogger(logger);
 
 	private static final String USERNAME = "user123";
 	private static final String PASSWORD = "secretpw";
-
-	private static ImageFromDockerfile baseImage;
 
 	@ClassRule
 	public static GenericContainer server;
 
 	static {
-		baseImage = new ImageFromDockerfile()
+		ImageFromDockerfile baseImage = new ImageFromDockerfile()
 				.withFileFromClasspath("server.py", "asyncssh-server/server.py")
 				.withFileFromClasspath("Dockerfile", "asyncssh-server/Dockerfile");
 		for (String key : PubkeyConstants.KEY_NAMES) {
 			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
 		}
 
-		Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
-
-		server = new GenericContainer(baseImage);
-		server.withLogConsumer(logConsumer)
+		server = new GenericContainer(baseImage)
+				.withLogConsumer(new Slf4jLogConsumer(logger).withPrefix("DOCKER"))
 				.waitingFor(new LogMessageWaitStrategy()
 						.withRegEx(".*Creating SSH server on port.*\\s"));
 	}

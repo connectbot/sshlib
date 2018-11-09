@@ -3,8 +3,7 @@ package com.trilead.ssh2;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,40 +22,25 @@ import static org.junit.Assert.assertThat;
  * @author Kenny Root
  */
 public class OpenSSHCompatibilityTest {
-	private static final Logger logger = LoggerFactory.getLogger(OpenSSHCompatibilityTest.class);
-	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger);
+	private static final Logger logger = LoggerFactory.getLogger(OpenSSHCompatibilityTest.class.getSimpleName());
+	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger).withPrefix("DOCKER");
+
+	@Rule
+	public SshLogger sshLogger = new SshLogger(logger);
 
 	private static final String OPTIONS_ENV = "OPTIONS";
 	private static final String USERNAME = "testuser";
 	private static final String PASSWORD = "testtest123";
 
-	private static ImageFromDockerfile baseImage;
-
-	static {
-		baseImage = new ImageFromDockerfile()
+	private static ImageFromDockerfile baseImage = new ImageFromDockerfile()
 				.withFileFromClasspath("run.sh", "openssh-server/run.sh")
 				.withFileFromClasspath("Dockerfile", "openssh-server/Dockerfile");
+
+	static {
 		for (String key : PubkeyConstants.KEY_NAMES) {
 			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
 		}
-
 	}
-
-        @Before
-        public void setupLogging() {
-		com.trilead.ssh2.log.Logger.enabled = true;
-		com.trilead.ssh2.log.Logger.logger = new DebugLogger() {
-			public void log(int level, String className, String message) {
-				logger.info(message);
-			}
-		};
-        }
-
-        @After
-        public void stopLogging() {
-		com.trilead.ssh2.log.Logger.enabled = false;
-		com.trilead.ssh2.log.Logger.logger = null;
-        }
 
 	@NotNull
 	@Contract("_ -> new")
@@ -64,10 +48,8 @@ public class OpenSSHCompatibilityTest {
 		return new Connection(container.getContainerIpAddress(), container.getMappedPort(22));
 	}
 
-	private GenericContainer getBaseContainer() {
-		GenericContainer container = new GenericContainer(baseImage);
-		container.withLogConsumer(logConsumer);
-		return container;
+	private static GenericContainer getBaseContainer() {
+		return new GenericContainer(baseImage).withLogConsumer(logConsumer);
 	}
 
 	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
@@ -82,8 +64,7 @@ public class OpenSSHCompatibilityTest {
 	}
 
 	private ConnectionInfo connectToServerWithOptions(@NotNull String options) throws IOException {
-		try (GenericContainer server = new GenericContainer(baseImage)
-				.withEnv(OPTIONS_ENV, options)) {
+		try (GenericContainer server = getBaseContainer().withEnv(OPTIONS_ENV, options)) {
 			server.start();
 			return assertCanPasswordAuthenticate(server);
 		}
