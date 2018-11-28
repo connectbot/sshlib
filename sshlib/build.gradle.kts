@@ -14,12 +14,6 @@ dependencies {
     compile("net.i2p.crypto:eddsa:0.2.0")
     compile("net.vrallev.ecc:ecc-25519-java:1.0.3")
     compile("org.connectbot.jbcrypt:jbcrypt:1.0.0")
-
-    testCompile("junit:junit:4.12")
-    testCompile("commons-io:commons-io:2.6")
-    testCompile("commons-codec:commons-codec:1.11")
-    testCompile("org.testcontainers:testcontainers:1.9.1")
-    testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 
 java {
