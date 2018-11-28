@@ -38,6 +38,7 @@ public class AsyncSSHCompatibilityTest {
 
 	static {
 		ImageFromDockerfile baseImage = new ImageFromDockerfile()
+				.withFileFromClasspath("requirements.txt", "asyncssh-server/requirements.txt")
 				.withFileFromClasspath("server.py", "asyncssh-server/server.py")
 				.withFileFromClasspath("Dockerfile", "asyncssh-server/Dockerfile");
 		for (String key : PubkeyConstants.KEY_NAMES) {
