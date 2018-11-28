@@ -10,10 +10,6 @@ buildscript {
     }
 }
 
-plugins {
-  id 'net.researchgate.release' version '2.1.2'
-}
-
 allprojects {
     repositories {
         jcenter()
