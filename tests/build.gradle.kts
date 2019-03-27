@@ -8,8 +8,8 @@ dependencies {
     testCompile(project(":sshlib"))
     testCompile("junit:junit:4.12")
     testCompile("commons-io:commons-io:2.6")
-    testCompile("commons-codec:commons-codec:1.11")
-    testCompile("org.testcontainers:testcontainers:1.10.2")
+    testCompile("commons-codec:commons-codec:1.12")
+    testCompile("org.testcontainers:testcontainers:1.11.1")
     testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 

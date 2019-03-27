@@ -1,8 +1,8 @@
 plugins {
     `java-library`
-    id("com.jfrog.artifactory") version "4.8.1"
+    id("com.jfrog.artifactory") version "4.9.4"
     id("com.jfrog.bintray") version "1.8.4"
-    id("net.researchgate.release") version "2.7.0"
+    id("net.researchgate.release") version "2.8.0"
 }
 
 apply(from = "${rootDir}/publish.gradle")
