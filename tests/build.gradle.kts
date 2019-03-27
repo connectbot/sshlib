@@ -1,6 +1,5 @@
 plugins {
     java
-    id("com.github.ben-manes.versions") version "0.20.0"
 }
 
 apply(from = "${rootDir}/config/quality.gradle.kts")
