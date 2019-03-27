@@ -3,7 +3,6 @@ plugins {
     id("com.jfrog.artifactory") version "4.8.1"
     id("com.jfrog.bintray") version "1.8.4"
     id("net.researchgate.release") version "2.7.0"
-    id("com.github.ben-manes.versions") version "0.20.0"
 }
 
 apply(from = "${rootDir}/publish.gradle")
