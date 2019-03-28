@@ -1,4 +1,4 @@
-FROM python:3-alpine
+FROM python:3-alpine3.9
 
 EXPOSE 8022
 ENV PYTHONUNBUFFERED=0
