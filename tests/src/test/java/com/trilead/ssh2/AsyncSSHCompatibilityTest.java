@@ -4,7 +4,6 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -89,7 +88,6 @@ public class AsyncSSHCompatibilityTest {
 		assertCanPubkeyAuthenticate(server, keyChars);
 	}
 
-	@Ignore
 	@Test
 	public void canConnectWithEd25519() throws Exception {
 		canConnectWithPubkey("ed25519-openssh2-private-key.txt");
