@@ -1,24 +1,35 @@
 language: java
 jdk:
-- oraclejdk9
-- oraclejdk8
+  - oraclejdk9
+  - oraclejdk8
 addons:
   apt:
     packages:
       - docker-ce
       - oracle-java8-installer
 services:
-- docker
+  - docker
 cache:
   directories:
   - "$HOME/.gradle/caches"
   - "$HOME/.gradle/wrapper"
+before_script:
+  - mkdir -p /tmp/cc
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > /tmp/cc/cc-test-reporter
+  - chmod +x /tmp/cc/cc-test-reporter
+  - /tmp/cc/cc-test-reporter before-build
 before_cache:
-- find $HOME/.gradle -name "*.lock" -exec rm {} \;
-- rm -rf $HOME/.gradle/caches/[1-9]*
+  - find $HOME/.gradle -name "*.lock" -exec rm {} \;
+  - rm -rf $HOME/.gradle/caches/[1-9]*
+script:
+  - ./gradlew check jacocoTestReport
+after_script:
+  - JACOCO_SOURCE_PATH=sshlib/src/main/java /tmp/cc/cc-test-reporter format-coverage sshlib/build/reports/jacoco/test/jacocoTestReport.xml --input-type jacoco
+  - /tmp/cc/cc-test-reporter upload-coverage
 after_success:
-- "./gradlew bintrayUpload artifactoryPublish"
+  - "./gradlew bintrayUpload artifactoryPublish"
 env:
   global:
   - bintrayUser=kruton
+  - CC_TEST_REPORTER_ID=9c22853d2ecf28aec51c1b578072031a3a655790cffb9fecfed6101920e5446c
   - secure: p478tZRQdGGiSklfWiMPqLrhTnApfSxqwfCqt3gYExH1fZcRtQL5sR2gopTpFzhD3qbTrGmFA6+BQnOV5O+h1yhZQC3Kup3D2xHnBlSWLLJ/inlsYwHPZX33b86rh45OUuIwASFw57wynWL1I2CDAkAU7z3n0aTmqPqeVc4NoJj71S2dqSF09CEwuxOb7OdiHlzVnWt9rZnWnHhyO8U40paRtOlvt9Xz/poo2i4f5Z/97yVevqiYmPZqr4imvGcH8eGjGbN4oFZV3DFI9KIuhNtX+HFl46c8BjADDNbtx9b/iOUkLnsFhv/nnim1e2RPJDwePiBHXcCR5ONU6L1VW7qG0HxTQPJQfPQZzyCsVBOzoM5UgrAViU6WgMU0K5aiGjYK1fItlzdoJxSa20YzxxLGnoWtYYxLzOLPtEq+KKXghMA8fs6B99rbTSCR3wB9J++IzZMrwN7MPpj39deluRzJfjZrAyiJC7qleKX8PgTNFFbirFCz76W22ZO4YM0McxQqajPzsBFA4AaQaOp1IIKy2rb1kyJ2WprhwO1ruDtZ0KotfgJ9E2UWvGbSe1bUYotkU1AdgS2srx+WCSs8i6mDB0l6BCF1CZ42sDOc1KC6egmEfK7Iqzh+opADhDgDLlBtl1BEipkW+6Tb4gJzn5Vp2f8f+f50oaQXp2TDFf8=
