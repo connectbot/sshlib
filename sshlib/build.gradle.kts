@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    jacoco
     id("com.jfrog.artifactory") version "4.9.4"
     id("com.jfrog.bintray") version "1.8.4"
     id("net.researchgate.release") version "2.8.0"
@@ -14,9 +15,21 @@ dependencies {
     compile("net.i2p.crypto:eddsa:0.3.0")
     compile("net.vrallev.ecc:ecc-25519-java:1.0.3")
     compile("org.connectbot.jbcrypt:jbcrypt:1.0.0")
+
+    testCompile("junit:junit:4.12")
+    testCompile("commons-io:commons-io:2.6")
+    testCompile("commons-codec:commons-codec:1.12")
+    testCompile("org.testcontainers:testcontainers:1.11.1")
+    testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_7
-    targetCompatibility = JavaVersion.VERSION_1_7
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType<JacocoReport> {
+    reports {
+        xml.isEnabled = true
+    }
 }
