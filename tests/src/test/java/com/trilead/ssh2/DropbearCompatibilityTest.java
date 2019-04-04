@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
@@ -55,7 +56,10 @@ public class DropbearCompatibilityTest {
 	}
 
 	private static GenericContainer getBaseContainer() {
-		return new GenericContainer(baseImage).withLogConsumer(logConsumer);
+		return new GenericContainer(baseImage)
+				.withLogConsumer(logConsumer)
+				.waitingFor(new LogMessageWaitStrategy()
+						.withRegEx(".*Not backgrounding.*\\s"));
 	}
 
 	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
