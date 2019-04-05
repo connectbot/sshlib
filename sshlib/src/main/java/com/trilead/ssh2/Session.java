@@ -134,18 +134,18 @@ public class Session implements AutoCloseable
 	 * Inform other side of connection that our PTY has resized.
 	 * <p>
 	 * Zero dimension parameters are ignored. The character/row dimensions
-     * override the pixel dimensions (when nonzero). Pixel dimensions refer to
-     * the drawable area of the window. The dimension parameters are only
-     * informational.
-     *
-     * @param term_width_characters
-     *            terminal width, characters (e.g., 80)
-     * @param term_height_characters
-     *            terminal height, rows (e.g., 24)
-     * @param term_width_pixels
-     *            terminal width, pixels (e.g., 640)
-     * @param term_height_pixels
-     *            terminal height, pixels (e.g., 480)
+	 * override the pixel dimensions (when nonzero). Pixel dimensions refer to
+	 * the drawable area of the window. The dimension parameters are only
+	 * informational.
+	 *
+	 * @param term_width_characters
+	 *            terminal width, characters (e.g., 80)
+	 * @param term_height_characters
+	 *            terminal height, rows (e.g., 24)
+	 * @param term_width_pixels
+	 *            terminal width, pixels (e.g., 640)
+	 * @param term_height_pixels
+	 *            terminal height, pixels (e.g., 480)
 	 * @throws IOException
 	 */
 	public void resizePTY(int term_width_characters, int term_height_characters, int term_width_pixels,

@@ -41,8 +41,8 @@ public class Ed25519VerifyTest {
 		"-----END OPENSSH PRIVATE KEY-----").toCharArray();
 	private static final byte[] SSH_KAT_ED25519_PK = toByteArray("5386ea463b45fe14b4216f3f02a0a3f073b57724db10b86b65b2037e17b48c19");
 	private static final byte[] SSH_KAT_ED25519_SK = toByteArray("f72a0a036e3479e15edb74da5f2a5418e66db450ad50687cad90247eeab6440c");
-        // There is actually another 32 bytes in the key, but it's not used.
-        // 5386ea463b45fe14b4216f3f02a0a3f073b57724db10b86b65b2037e17b48c19
+		// There is actually another 32 bytes in the key, but it's not used.
+		// 5386ea463b45fe14b4216f3f02a0a3f073b57724db10b86b65b2037e17b48c19
 
 	private EdDSANamedCurveSpec spec;
 

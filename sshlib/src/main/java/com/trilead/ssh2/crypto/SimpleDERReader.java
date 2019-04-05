@@ -177,7 +177,7 @@ public class SimpleDERReader
 		int type = readByte() & 0xff;
 
 		if (type != 0x06)
-		   throw new IOException("Expected DER OID, but found type " + type);
+			throw new IOException("Expected DER OID, but found type " + type);
 
 		int len = readLength();
 

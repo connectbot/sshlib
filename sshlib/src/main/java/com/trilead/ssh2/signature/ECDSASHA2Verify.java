@@ -429,7 +429,7 @@ public class ECDSASHA2Verify {
 		{
 			byte[] affineY = removeLeadingZeroes(group.getAffineY().toByteArray());
 			System.arraycopy(affineY, 0, M, 1 + elementSize + elementSize - affineY.length,
-							 affineY.length);
+							affineY.length);
 		}
 
 		return M;
