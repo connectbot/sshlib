@@ -8,7 +8,7 @@ package com.trilead.ssh2;
  * Depending on which constructor is used, either the use of a
  * <code>SSH_MSG_KEX_DH_GEX_REQUEST</code> or <code>SSH_MSG_KEX_DH_GEX_REQUEST_OLD</code>
  * can be forced.
- * 
+ *
  * @see Connection#setDHGexParameters(DHGexParameters)
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: DHGexParameters.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
@@ -26,7 +26,7 @@ public class DHGexParameters
 	/**
 	 * Same as calling {@link #DHGexParameters(int, int, int) DHGexParameters(1024, 1024, 4096)}.
 	 * This is also the default used by the Connection class.
-	 * 
+	 *
 	 */
 	public DHGexParameters()
 	{
@@ -38,7 +38,7 @@ public class DHGexParameters
 	 * <code>SSH_MSG_KEX_DH_GEX_REQUEST_OLD</code> request.
 	 * Internally, the minimum and maximum group lengths will
 	 * be set to zero.
-	 * 
+	 *
 	 * @param pref_group_len has to be &gt;= 1024 and &lt;= 8192
 	 */
 	public DHGexParameters(int pref_group_len)
@@ -60,7 +60,7 @@ public class DHGexParameters
 	 * <p>
 	 * All values have to be &gt;= 1024 and &lt;= 8192. Furthermore,
 	 * min_group_len &lt;= pref_group_len &lt;= max_group_len.
-	 * 
+	 *
 	 * @param min_group_len
 	 * @param pref_group_len
 	 * @param max_group_len
@@ -89,7 +89,7 @@ public class DHGexParameters
 
 	/**
 	 * Get the maximum group length.
-	 * 
+	 *
 	 * @return the maximum group length, may be <code>zero</code> if
 	 *         SSH_MSG_KEX_DH_GEX_REQUEST_OLD should be requested
 	 */
@@ -100,7 +100,7 @@ public class DHGexParameters
 
 	/**
 	 * Get the minimum group length.
-	 * 
+	 *
 	 * @return minimum group length, may be <code>zero</code> if
 	 *         SSH_MSG_KEX_DH_GEX_REQUEST_OLD should be requested
 	 */
@@ -111,7 +111,7 @@ public class DHGexParameters
 
 	/**
 	 * Get the preferred group length.
-	 * 
+	 *
 	 * @return the preferred group length
 	 */
 	public int getPref_group_len()

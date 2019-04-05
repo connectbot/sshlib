@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketChannelOpenFailure.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketChannelOpenFailure.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -44,7 +44,7 @@ public class PacketChannelOpenFailure
 		reasonCode = tr.readUINT32();
 		description = tr.readString();
 		languageTag = tr.readString();
-		
+
 		if (tr.remain() != 0)
 			throw new IOException("Padding in SSH_MSG_CHANNEL_OPEN_FAILURE packet!");
 	}

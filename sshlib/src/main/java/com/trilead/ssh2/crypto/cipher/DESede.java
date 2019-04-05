@@ -24,15 +24,15 @@ package com.trilead.ssh2.crypto.cipher;
  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE. 
+ THE SOFTWARE.
  */
 
 /**
  * DESede.
- * 
+ *
  * @author See comments in the source file
  * @version $Id: DESede.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
- * 
+ *
  */
 public class DESede extends DES
 {
@@ -51,7 +51,7 @@ public class DESede extends DES
 
 	/**
 	 * initialise a DES cipher.
-	 * 
+	 *
 	 * @param encrypting
 	 *            whether or not we are for encryption.
 	 * @param key

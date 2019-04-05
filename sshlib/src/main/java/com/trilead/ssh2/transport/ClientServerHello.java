@@ -10,7 +10,7 @@ import com.trilead.ssh2.Connection;
 
 /**
  * ClientServerHello.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ClientServerHello.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */

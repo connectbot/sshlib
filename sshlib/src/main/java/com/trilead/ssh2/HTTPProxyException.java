@@ -5,10 +5,10 @@ import java.io.IOException;
 
 /**
  * May be thrown upon connect() if a HTTP proxy is being used.
- * 
+ *
  * @see Connection#connect()
  * @see Connection#setProxyData(ProxyData)
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: HTTPProxyException.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */

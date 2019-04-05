@@ -6,20 +6,20 @@ import java.io.IOException;
 
 /**
  * Basic Base64 Support.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Base64.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
 public class Base64
 {
 	static final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
-	
+
 	public static char[] encode(byte[] content)
 	{
 		CharArrayWriter cw = new CharArrayWriter((4 * content.length) / 3);
 
 		int idx = 0;
-					
+
 		int x = 0;
 
 		for (int i = 0; i < content.length; i++)

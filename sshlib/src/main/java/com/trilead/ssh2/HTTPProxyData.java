@@ -14,10 +14,10 @@ import com.trilead.ssh2.transport.ClientServerHello;
 
 /**
  * A <code>HTTPProxyData</code> object is used to specify the needed connection data
- * to connect through a HTTP proxy. 
- * 
+ * to connect through a HTTP proxy.
+ *
  * @see Connection#setProxyData(ProxyData)
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: HTTPProxyData.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -32,7 +32,7 @@ public class HTTPProxyData implements ProxyData
 
 	/**
 	 * Same as calling {@link #HTTPProxyData(String, int, String, String) HTTPProxyData(proxyHost, proxyPort, <code>null</code>, <code>null</code>)}
-	 * 
+	 *
 	 * @param proxyHost Proxy hostname.
 	 * @param proxyPort Proxy port.
 	 */
@@ -67,7 +67,7 @@ public class HTTPProxyData implements ProxyData
 	 * <code>
 	 * new HTTPProxyData("192.168.1.1", "3128", "proxyuser", "secret", new String[] {"User-Agent: TrileadBasedClient/1.0", "X-My-Proxy-Option: something"});
 	 * </code>
-	 * 
+	 *
 	 * @param proxyHost Proxy hostname.
 	 * @param proxyPort Proxy port.
 	 * @param proxyUser Username for basic authentication (<code>null</code> if no authentication is needed).

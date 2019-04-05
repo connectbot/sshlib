@@ -5,7 +5,7 @@ import java.io.UnsupportedEncodingException;
 
 /**
  * PacketUserauthRequestPassword.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketUserauthRequestPassword.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -45,7 +45,7 @@ public class PacketUserauthRequestPassword
 			throw new IOException("This is not a SSH_MSG_USERAUTH_REQUEST with type password!");
 
 		/* ... */
-		
+
 		if (tr.remain() != 0)
 			throw new IOException("Padding in SSH_MSG_USERAUTH_REQUEST packet!");
 	}

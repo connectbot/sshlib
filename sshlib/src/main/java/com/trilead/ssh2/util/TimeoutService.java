@@ -16,7 +16,7 @@ import com.trilead.ssh2.log.Logger;
  * that rely on timeouts, then there will be only one timeout thread. Once all timeouts
  * have expired/are cancelled, the thread will (sooner or later) exit.
  * Only after new timeouts arrive a new thread (singleton) will be instantiated.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TimeoutService.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */
@@ -108,7 +108,7 @@ public class TimeoutService
 
 	/**
 	 * It is assumed that the passed handler will not execute for a long time.
-	 * 
+	 *
 	 * @param runTime
 	 * @param handler
 	 * @return a TimeoutToken that can be used to cancel the timeout.

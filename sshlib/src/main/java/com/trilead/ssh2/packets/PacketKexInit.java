@@ -10,7 +10,7 @@ import com.trilead.ssh2.transport.KexParameters;
 
 /**
  * PacketKexInit.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketKexInit.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

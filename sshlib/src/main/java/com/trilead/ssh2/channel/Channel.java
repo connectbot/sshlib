@@ -3,7 +3,7 @@ package com.trilead.ssh2.channel;
 
 /**
  * Channel.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Channel.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -12,28 +12,28 @@ public class Channel
 	/*
 	 * OK. Here is an important part of the JVM Specification:
 	 * (http://java.sun.com/docs/books/vmspec/2nd-edition/html/Threads.doc.html#22214)
-	 * 
+	 *
 	 * Any association between locks and variables is purely conventional.
 	 * Locking any lock conceptually flushes all variables from a thread's
 	 * working memory, and unlocking any lock forces the writing out to main
 	 * memory of all variables that the thread has assigned. That a lock may be
 	 * associated with a particular object or a class is purely a convention.
 	 * (...)
-	 * 
+	 *
 	 * If a thread uses a particular shared variable only after locking a
 	 * particular lock and before the corresponding unlocking of that same lock,
 	 * then the thread will read the shared value of that variable from main
 	 * memory after the lock operation, if necessary, and will copy back to main
 	 * memory the value most recently assigned to that variable before the
 	 * unlock operation.
-	 * 
+	 *
 	 * This, in conjunction with the mutual exclusion rules for locks, suffices
 	 * to guarantee that values are correctly transmitted from one thread to
 	 * another through shared variables.
-	 * 
+	 *
 	 * ====> Always keep that in mind when modifying the Channel/ChannelManger
 	 * code.
-	 * 
+	 *
 	 */
 
 	static final int STATE_OPENING = 1;
@@ -68,7 +68,7 @@ public class Channel
 	/*
 	 * Make sure that we never send a data/EOF/WindowChange msg after a CLOSE
 	 * msg.
-	 * 
+	 *
 	 * This is a little bit complicated, but we have to do it in that way, since
 	 * we cannot keep a lock on the Channel during the send operation (this
 	 * would block sometimes the receiver thread, and, in extreme cases, can
@@ -83,7 +83,7 @@ public class Channel
 	 * If you send a message on a channel, then you have to aquire the
 	 * "channelSendLock" and check the "closeMessageSent" flag (this variable
 	 * may only be accessed while holding the "channelSendLock" !!!
-	 * 
+	 *
 	 * BTW: NEVER EVER SEND MESSAGES FROM THE RECEIVE THREAD - see explanation
 	 * above.
 	 */

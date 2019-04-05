@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketChannelWindowAdjust.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketChannelWindowAdjust.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -37,7 +37,7 @@ public class PacketChannelWindowAdjust
 
 		recipientChannelID = tr.readUINT32();
 		windowChange = tr.readUINT32();
-		
+
 		if (tr.remain() != 0)
 			throw new IOException("Padding in SSH_MSG_CHANNEL_WINDOW_ADJUST packet!");
 	}

@@ -6,7 +6,7 @@ import java.math.BigInteger;
 
 /**
  * TypesWriter.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TypesWriter.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */

@@ -2,7 +2,7 @@
 package com.trilead.ssh2.sftp;
 
 /**
- * 
+ *
  * Types for the 'type' field in the SFTP ATTRS data type.
  * <p>
  * "<i>On a POSIX system, these values would be derived from the mode field

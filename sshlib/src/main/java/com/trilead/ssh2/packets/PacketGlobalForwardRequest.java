@@ -3,7 +3,7 @@ package com.trilead.ssh2.packets;
 
 /**
  * PacketGlobalForwardRequest.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketGlobalForwardRequest.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -28,7 +28,7 @@ public class PacketGlobalForwardRequest
 		{
 			TypesWriter tw = new TypesWriter();
 			tw.writeByte(Packets.SSH_MSG_GLOBAL_REQUEST);
-			
+
 			tw.writeString("tcpip-forward");
 			tw.writeBoolean(wantReply);
 			tw.writeString(bindAddress);

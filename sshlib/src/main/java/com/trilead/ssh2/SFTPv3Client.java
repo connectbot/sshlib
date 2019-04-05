@@ -31,7 +31,7 @@ import com.trilead.ssh2.sftp.Packet;
  * there is catastrophic failure, exceptions of the type {@link SFTPv3Client} will
  * be thrown (a subclass of IOException). Therefore, you can implement more verbose
  * behavior by checking if a thrown exception if of this type. If yes, then you
- * can cast the exception and access detailed information about the failure. 
+ * can cast the exception and access detailed information about the failure.
  * <p>
  * Notes about file names, directory names and paths, copy-pasted
  * from the specs:
@@ -54,7 +54,7 @@ import com.trilead.ssh2.sftp.Packet;
  * <p>
  * If you are still not tired then please go on and read the comment for
  * {@link #setCharset(String)}.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SFTPv3Client.java,v 1.3 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -78,11 +78,11 @@ public class SFTPv3Client
 
 	/**
 	 * Create a SFTP v3 client.
-	 * 
+	 *
 	 * @param conn The underlying SSH-2 connection to be used.
 	 * @param debug
 	 * @throws IOException
-	 * 
+	 *
 	 * @deprecated this constructor (debug version) will disappear in the future,
 	 *             use {@link #SFTPv3Client(Connection)} instead.
 	 */
@@ -112,7 +112,7 @@ public class SFTPv3Client
 
 	/**
 	 * Create a SFTP v3 client.
-	 * 
+	 *
 	 * @param conn The underlying SSH-2 connection to be used.
 	 * @throws IOException
 	 */
@@ -133,9 +133,9 @@ public class SFTPv3Client
 	 * <p>
 	 * If you don't set anything, then the platform default will be used (this is the default
 	 * behavior).
-	 * 
+	 *
 	 * @see #getCharset()
-	 * 
+	 *
 	 * @param charset the name of the charset to be used or <code>null</code> to use the platform's
 	 *        default encoding.
 	 * @throws IOException
@@ -161,9 +161,9 @@ public class SFTPv3Client
 
 	/**
 	 * The currently used charset for filename encoding/decoding.
-	 * 
+	 *
 	 * @see #setCharset(String)
-	 * 
+	 *
 	 * @return The name of the charset (<code>null</code> if the platform's default charset is being used)
 	 */
 	public String getCharset()
@@ -230,7 +230,7 @@ public class SFTPv3Client
 	 * <p>
 	 * Note: receiveMessage(34000) actually means that the message may be up to 34004
 	 * bytes (the length attribute preceeding the contents is 4 bytes).
-	 * 
+	 *
 	 * @param maxlen
 	 * @return the message contents
 	 * @throws IOException
@@ -347,7 +347,7 @@ public class SFTPv3Client
 
 	/**
 	 * Retrieve the file attributes of an open file.
-	 * 
+	 *
 	 * @param handle a SFTPv3FileHandle handle.
 	 * @return a SFTPv3FileAttributes object.
 	 * @throws IOException
@@ -445,9 +445,9 @@ public class SFTPv3Client
 	/**
 	 * Retrieve the file attributes of a file. This method
 	 * follows symbolic links on the server.
-	 * 
+	 *
 	 * @see #lstat(String)
-	 * 
+	 *
 	 * @param path See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileAttributes object.
 	 * @throws IOException
@@ -460,9 +460,9 @@ public class SFTPv3Client
 	/**
 	 * Retrieve the file attributes of a file. This method
 	 * does NOT follow symbolic links on the server.
-	 * 
+	 *
 	 * @see #stat(String)
-	 * 
+	 *
 	 * @param path See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileAttributes object.
 	 * @throws IOException
@@ -474,7 +474,7 @@ public class SFTPv3Client
 
 	/**
 	 * Read the target of a symbolic link.
-	 * 
+	 *
 	 * @param path See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return The target of the link.
 	 * @throws IOException
@@ -560,7 +560,7 @@ public class SFTPv3Client
 	/**
 	 *  Modify the attributes of a file. Used for operations such as changing
 	 *  the ownership, permissions or access times, as well as for truncating a file.
-	 * 
+	 *
 	 * @param path See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param attr A SFTPv3FileAttributes object. Specifies the modifications to be
 	 *             made to the attributes of the file. Empty fields will be ignored.
@@ -588,7 +588,7 @@ public class SFTPv3Client
 	/**
 	 * 	Modify the attributes of a file. Used for operations such as changing
 	 *  the ownership, permissions or access times, as well as for truncating a file.
-	 * 
+	 *
 	 * @param handle a SFTPv3FileHandle handle
 	 * @param attr A SFTPv3FileAttributes object. Specifies the modifications to be
 	 *             made to the attributes of the file. Empty fields will be ignored.
@@ -618,7 +618,7 @@ public class SFTPv3Client
 	/**
 	 * Create a symbolic link on the server. Creates a link "src" that points
 	 * to "target".
-	 * 
+	 *
 	 * @param src See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param target See the {@link SFTPv3Client comment} for the class for more details.
 	 * @throws IOException
@@ -650,7 +650,7 @@ public class SFTPv3Client
 	 * Have the server canonicalize any given path name to an absolute path.
 	 * This is useful for converting path names containing ".." components or
 	 * relative pathnames without a leading slash into absolute paths.
-	 * 
+	 *
 	 * @param path See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return An absolute path.
 	 * @throws IOException
@@ -722,10 +722,10 @@ public class SFTPv3Client
 			}
 
 			sendMessage(Packet.SSH_FXP_READDIR, req_id, tw.getBytes());
-		
+
 			/* Some servers send here a packet with size > 34000 */
 			/* To whom it may concern: please learn to read the specs. */
-			
+
 			byte[] resp = receiveMessage(65536);
 
 			if (debug != null)
@@ -896,9 +896,9 @@ public class SFTPv3Client
 
 	/**
 	 * Returns the negotiated SFTP protocol version between the client and the server.
-	 * 
+	 *
 	 * @return SFTP protocol version, i.e., "3".
-	 * 
+	 *
 	 */
 	public int getProtocolVersion()
 	{
@@ -912,7 +912,7 @@ public class SFTPv3Client
 	 * underlying channel is closed (this can happen, e.g., if the other server
 	 * sent a close message.) However, as long as you have not called the
 	 * <code>close()</code> method, you are likely wasting resources.
-	 * 
+	 *
 	 */
 	public void close()
 	{
@@ -921,7 +921,7 @@ public class SFTPv3Client
 
 	/**
 	 * List the contents of a directory.
-	 * 
+	 *
 	 * @param dirName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return A Vector containing {@link SFTPv3DirectoryEntry} objects.
 	 * @throws IOException
@@ -936,11 +936,11 @@ public class SFTPv3Client
 
 	/**
 	 * Create a new directory.
-	 * 
+	 *
 	 * @param dirName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param posixPermissions the permissions for this directory, e.g., "0700" (remember that
 	 *                         this is octal noation). The server will likely apply a umask.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void mkdir(String dirName, int posixPermissions) throws IOException
@@ -959,7 +959,7 @@ public class SFTPv3Client
 
 	/**
 	 * Remove a file.
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @throws IOException
 	 */
@@ -976,8 +976,8 @@ public class SFTPv3Client
 	}
 
 	/**
-	 * Remove an empty directory. 
-	 * 
+	 * Remove an empty directory.
+	 *
 	 * @param dirName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @throws IOException
 	 */
@@ -995,7 +995,7 @@ public class SFTPv3Client
 
 	/**
 	 * Move a file or directory.
-	 * 
+	 *
 	 * @param oldPath See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param newPath See the {@link SFTPv3Client comment} for the class for more details.
 	 * @throws IOException
@@ -1015,19 +1015,19 @@ public class SFTPv3Client
 
 	/**
 	 * Open a file for reading.
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileHandle handle
 	 * @throws IOException
 	 */
 	public SFTPv3FileHandle openFileRO(String fileName) throws IOException
 	{
-		return openFile(fileName, 0x00000001, null); // SSH_FXF_READ	
+		return openFile(fileName, 0x00000001, null); // SSH_FXF_READ
 	}
 
 	/**
 	 * Open a file for reading and writing.
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileHandle handle
 	 * @throws IOException
@@ -1047,7 +1047,7 @@ public class SFTPv3Client
 	/**
 	 * Create a file and open it for reading and writing.
 	 * Same as {@link #createFile(String, SFTPv3FileAttributes) createFile(fileName, null)}.
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileHandle handle
 	 * @throws IOException
@@ -1061,7 +1061,7 @@ public class SFTPv3Client
 	 * Create a file and open it for reading and writing.
 	 * You can specify the default attributes of the file (the server may or may
 	 * not respect your wishes).
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param attr may be <code>null</code> to use server defaults. Probably only
 	 *             the <code>uid</code>, <code>gid</code> and <code>permissions</code>
@@ -1079,7 +1079,7 @@ public class SFTPv3Client
 	/**
 	 * Create a file (truncate it if it already exists) and open it for reading and writing.
 	 * Same as {@link #createFileTruncate(String, SFTPv3FileAttributes) createFileTruncate(fileName, null)}.
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @return a SFTPv3FileHandle handle
 	 * @throws IOException
@@ -1093,7 +1093,7 @@ public class SFTPv3Client
 	 * reate a file (truncate it if it already exists) and open it for reading and writing.
 	 * You can specify the default attributes of the file (the server may or may
 	 * not respect your wishes).
-	 * 
+	 *
 	 * @param fileName See the {@link SFTPv3Client comment} for the class for more details.
 	 * @param attr may be <code>null</code> to use server defaults. Probably only
 	 *             the <code>uid</code>, <code>gid</code> and <code>permissions</code>
@@ -1216,7 +1216,7 @@ public class SFTPv3Client
 	 * number of bytes, or up to end of file. For, e.g., device files this may return
 	 * fewer bytes than requested.</li>
 	 * </ul>
-	 * 
+	 *
 	 * @param handle a SFTPv3FileHandle handle
 	 * @param fileOffset offset (in bytes) in the file
 	 * @param dst the destination byte array
@@ -1300,7 +1300,7 @@ public class SFTPv3Client
 	/**
 	 * Write bytes to a file. If <code>len</code> &gt; 32768, then the write operation will
 	 * be split into multiple writes.
-	 * 
+	 *
 	 * @param handle a SFTPv3FileHandle handle.
 	 * @param fileOffset offset (in bytes) in the file.
 	 * @param src the source byte array.
@@ -1365,7 +1365,7 @@ public class SFTPv3Client
 
 	/**
 	 * Close a file.
-	 * 
+	 *
 	 * @param handle a SFTPv3FileHandle handle
 	 * @throws IOException
 	 */

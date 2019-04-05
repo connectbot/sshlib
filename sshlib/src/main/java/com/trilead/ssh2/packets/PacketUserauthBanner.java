@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketUserauthBanner.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketUserauthBanner.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -25,7 +25,7 @@ public class PacketUserauthBanner
 	{
 		return message;
 	}
-	
+
 	public PacketUserauthBanner(byte payload[], int off, int len) throws IOException
 	{
 		this.payload = new byte[len];

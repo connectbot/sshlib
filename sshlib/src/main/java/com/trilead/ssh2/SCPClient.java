@@ -18,7 +18,7 @@ import java.io.UnsupportedEncodingException;
  * This scp client is thread safe - you can download (and upload) different sets
  * of files concurrently without any troubles. The <code>SCPClient</code> is
  * actually mapping every request to a distinct {@link Session}.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SCPClient.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -402,13 +402,13 @@ public class SCPClient
 	/**
 	 * Copy a local file to a remote directory, uses mode 0600 when creating the
 	 * file on the remote side.
-	 * 
+	 *
 	 * @param localFile
 	 *            Path and name of local file.
 	 * @param remoteTargetDirectory
 	 *            Remote target directory. Use an empty string to specify the
 	 *            default directory.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void put(String localFile, String remoteTargetDirectory) throws IOException
@@ -419,13 +419,13 @@ public class SCPClient
 	/**
 	 * Copy a set of local files to a remote directory, uses mode 0600 when
 	 * creating files on the remote side.
-	 * 
+	 *
 	 * @param localFiles
 	 *            Paths and names of local file names.
 	 * @param remoteTargetDirectory
 	 *            Remote target directory. Use an empty string to specify the
 	 *            default directory.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 
@@ -437,7 +437,7 @@ public class SCPClient
 	/**
 	 * Copy a local file to a remote directory, uses the specified mode when
 	 * creating the file on the remote side.
-	 * 
+	 *
 	 * @param localFile
 	 *            Path and name of local file.
 	 * @param remoteTargetDirectory
@@ -455,7 +455,7 @@ public class SCPClient
 	/**
 	 * Copy a local file to a remote directory, uses the specified mode and
 	 * remote filename when creating the file on the remote side.
-	 * 
+	 *
 	 * @param localFile
 	 *            Path and name of local file.
 	 * @param remoteFileName
@@ -477,7 +477,7 @@ public class SCPClient
 	/**
 	 * Create a remote file and copy the contents of the passed byte array into
 	 * it. Uses mode 0600 for creating the remote file.
-	 * 
+	 *
 	 * @param data
 	 *            the data to be copied into the remote file.
 	 * @param remoteFileName
@@ -498,7 +498,7 @@ public class SCPClient
 	 * Create a remote file and copy the contents of the passed byte array into
 	 * it. The method use the specified mode when creating the file on the
 	 * remote side.
-	 * 
+	 *
 	 * @param data
 	 *            the data to be copied into the remote file.
 	 * @param remoteFileName
@@ -550,7 +550,7 @@ public class SCPClient
 	/**
 	 * Copy a set of local files to a remote directory, uses the specified mode
 	 * when creating the files on the remote side.
-	 * 
+	 *
 	 * @param localFiles
 	 *            Paths and names of the local files.
 	 * @param remoteTargetDirectory
@@ -618,12 +618,12 @@ public class SCPClient
 
 	/**
 	 * Download a file from the remote server to a local directory.
-	 * 
+	 *
 	 * @param remoteFile
 	 *            Path and name of the remote file.
 	 * @param localTargetDirectory
 	 *            Local directory to put the downloaded file.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void get(String remoteFile, String localTargetDirectory) throws IOException
@@ -636,7 +636,7 @@ public class SCPClient
 	 * <code>OutputStream</code>. Please note that, to enable flexible usage
 	 * of this method, the <code>OutputStream</code> will not be closed nor
 	 * flushed.
-	 * 
+	 *
 	 * @param remoteFile
 	 *            Path and name of the remote file.
 	 * @param target
@@ -695,12 +695,12 @@ public class SCPClient
 
 	/**
 	 * Download a set of files from the remote server to a local directory.
-	 * 
+	 *
 	 * @param remoteFiles
 	 *            Paths and names of the remote files.
 	 * @param localTargetDirectory
 	 *            Local directory to put the downloaded files.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void get(String remoteFiles[], String localTargetDirectory) throws IOException

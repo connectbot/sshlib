@@ -2,7 +2,7 @@
 package com.trilead.ssh2.sftp;
 
 /**
- * 
+ *
  * Permissions for the 'permissions' field in the SFTP ATTRS data type.
  * <p>
  * "<i>The 'permissions' field contains a bit mask specifying file permissions.

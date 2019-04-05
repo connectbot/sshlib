@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketNewKeys.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketNewKeys.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -15,7 +15,7 @@ public class PacketNewKeys
 	public PacketNewKeys()
 	{
 	}
-	
+
 	public PacketNewKeys(byte payload[], int off, int len) throws IOException
 	{
 		this.payload = new byte[len];

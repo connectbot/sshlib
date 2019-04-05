@@ -12,7 +12,7 @@ import com.trilead.ssh2.DebugLogger;
  * For speed reasons, the static variables are not protected
  * with semaphores. In other words, if you dynamicaly change the
  * logging settings, then some threads may still use the old setting.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Logger.java,v 1.2 2008/03/03 07:01:36 cplattne Exp $
  */
@@ -21,7 +21,7 @@ public class Logger
 {
 	public static boolean enabled = false;
 	public static DebugLogger logger = null;
-	
+
 	private String className;
 
 	public final static Logger getLogger(Class x)
@@ -43,12 +43,12 @@ public class Logger
 	{
 		if (!enabled)
 			return;
-		
+
 		DebugLogger target = logger;
-		
+
 		if (target == null)
 			return;
-		
+
 		target.log(level, className, message);
 	}
 }

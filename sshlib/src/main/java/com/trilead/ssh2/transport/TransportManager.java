@@ -36,14 +36,14 @@ import com.trilead.ssh2.packets.TypesReader;
  * other than KEX, they become horribly irritated and kill the connection. Since
  * we are very likely going to communicate with OpenSSH servers, we have to play
  * the same game - even though we could do better.
- * 
+ *
  * btw: having stdout and stderr on the same channel, with a shared window, is
  * also a VERY good idea... =(
  */
 
 /**
  * TransportManager.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TransportManager.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -441,7 +441,7 @@ public class TransportManager
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public void startCompression() {
 		tc.startCompression();
@@ -625,7 +625,7 @@ public class TransportManager
 						new PacketExtInfo(msg, 0, msglen));
 				continue;
 			}
-			
+
 			MessageHandler mh = null;
 
 			for (int i = 0; i < messageHandlers.size(); i++)

@@ -21,7 +21,7 @@ import com.trilead.ssh2.packets.TypesWriter;
 
 /**
  * RSASHA1Verify.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: RSASHA1Verify.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */

@@ -13,7 +13,7 @@ import com.trilead.ssh2.channel.LocalAcceptThread;
  * port via the secure tunnel to another host (which may or may not be identical
  * to the remote SSH-2 server). Checkout {@link Connection#createLocalPortForwarder(int, String, int)}
  * on how to create one.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: LocalPortForwarder.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */

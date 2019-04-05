@@ -3,7 +3,7 @@ package com.trilead.ssh2.packets;
 
 /**
  * PacketSessionX11Request.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketSessionX11Request.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

@@ -18,7 +18,7 @@ import com.trilead.ssh2.packets.Packets;
 
 /**
  * TransportConnection.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TransportConnection.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -51,17 +51,17 @@ public class TransportConnection
 	byte[] recv_mac_buffer_cmp;
 
 	int recv_padd_blocksize = 8;
-	
+
 	ICompressor recv_comp = null;
-	
+
 	ICompressor send_comp = null;
-	
+
 	boolean can_recv_compress = false;
 
 	boolean can_send_compress = false;
 
 	byte[] recv_comp_buffer;
-	
+
 	byte[] send_comp_buffer;
 
 	/* won't change */
@@ -112,11 +112,11 @@ public class TransportConnection
 		if (send_padd_blocksize < 8)
 			send_padd_blocksize = 8;
 	}
-	
+
 	public void changeRecvCompression(ICompressor comp)
 	{
 		recv_comp = comp;
-		
+
 		if (comp != null) {
 			recv_comp_buffer = new byte[comp.getBufferSize()];
 			can_recv_compress |= recv_comp.canCompressPreauth();
@@ -126,13 +126,13 @@ public class TransportConnection
 	public void changeSendCompression(ICompressor comp)
 	{
 		send_comp = comp;
-		
+
 		if (comp != null) {
 			send_comp_buffer = new byte[comp.getBufferSize()];
 			can_send_compress |= send_comp.canCompressPreauth();
 		}
 	}
-	
+
 	public void sendMessage(byte[] message) throws IOException
 	{
 		sendMessage(message, 0, message.length, 0);
@@ -155,7 +155,7 @@ public class TransportConnection
 			padd = 4;
 		else if (padd > 64)
 			padd = 64;
-		
+
 		if (send_comp != null && can_send_compress) {
 			if (send_comp_buffer.length < message.length + 1024)
 				send_comp_buffer = new byte[message.length + 1024];
@@ -311,7 +311,7 @@ public class TransportConnection
 		if (recv_comp != null && can_recv_compress) {
 			int[] uncomp_len = new int[] { payloadLength };
 			buffer = recv_comp.uncompress(buffer, off, uncomp_len);
-			
+
 			if (buffer == null) {
 				throw new IOException("Error while inflating remote data");
 			} else {
@@ -355,7 +355,7 @@ public class TransportConnection
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public void startCompression() {
 		can_recv_compress = true;

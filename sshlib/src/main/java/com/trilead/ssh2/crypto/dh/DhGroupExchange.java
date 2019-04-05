@@ -10,7 +10,7 @@ import com.trilead.ssh2.crypto.digest.HashForSSH2Types;
 
 /**
  * DhGroupExchange.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: DhGroupExchange.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */

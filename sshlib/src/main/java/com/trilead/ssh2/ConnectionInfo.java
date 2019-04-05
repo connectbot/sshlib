@@ -3,7 +3,7 @@ package com.trilead.ssh2;
 
 /**
  * In most cases you probably do not need the information contained in here.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ConnectionInfo.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */

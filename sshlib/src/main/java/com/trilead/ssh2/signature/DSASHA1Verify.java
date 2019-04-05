@@ -23,7 +23,7 @@ import com.trilead.ssh2.packets.TypesWriter;
 
 /**
  * DSASHA1Verify.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: DSASHA1Verify.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -120,7 +120,7 @@ public class DSASHA1Verify
 	public static byte[] decodeSSHDSASignature(byte[] sig) throws IOException
 	{
 		byte[] rsArray = null;
-		
+
 		if (sig.length == 40)
 		{
 			/* OK, another broken SSH server. */

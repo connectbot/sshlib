@@ -44,7 +44,7 @@ import org.mindrot.jbcrypt.BCrypt;
 
 /**
  * PEM Support.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PEMDecoder.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */

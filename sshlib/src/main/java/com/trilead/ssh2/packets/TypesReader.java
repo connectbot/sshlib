@@ -10,7 +10,7 @@ import com.trilead.ssh2.util.Tokenizer;
 
 /**
  * TypesReader.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TypesReader.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -164,7 +164,7 @@ public class TypesReader
 		} catch (UnsupportedEncodingException e) {
 			res = new String(arr, pos, len);
 		}
-		
+
 		pos += len;
 
 		return res;
