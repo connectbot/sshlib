@@ -1,7 +1,7 @@
 plugins {
     `java-library`
     jacoco
-    id("com.jfrog.artifactory") version "4.9.4"
+    id("com.jfrog.artifactory") version "4.9.5"
     id("com.jfrog.bintray") version "1.8.4"
     id("net.researchgate.release") version "2.8.0"
 }
