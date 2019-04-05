@@ -371,11 +371,11 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 				privKey = kf.generatePrivate(privSpec);
 			} catch (NoSuchAlgorithmException ex) {
 				// TODO: log error
-				 os.write(SSH_AGENT_FAILURE);
+				os.write(SSH_AGENT_FAILURE);
 				return;
 			} catch (InvalidKeySpecException ex) {
 				// TODO: log error
-				 os.write(SSH_AGENT_FAILURE);
+				os.write(SSH_AGENT_FAILURE);
 				return;
 			}
 
