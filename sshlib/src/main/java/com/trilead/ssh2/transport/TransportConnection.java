@@ -254,7 +254,7 @@ public class TransportConnection
 		send_seq_number++;
 	}
 
-	public int receiveMessage(byte buffer[], int off, int len) throws IOException
+	public int receiveMessage(byte[] buffer, int off, int len) throws IOException
 	{
 		final int packetLength;
 		final int payloadLength;
