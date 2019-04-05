@@ -47,7 +47,7 @@ public class AsyncSSHCompatibilityTest {
 		server = new GenericContainer(baseImage)
 				.withLogConsumer(new Slf4jLogConsumer(logger).withPrefix("DOCKER"))
 				.waitingFor(new LogMessageWaitStrategy()
-						.withRegEx(".*Creating SSH server on port.*\\s"));
+						.withRegEx(".*LISTENER READY.*\\s"));
 	}
 
 	@NotNull
