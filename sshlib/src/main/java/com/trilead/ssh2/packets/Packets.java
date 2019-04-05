@@ -77,7 +77,7 @@ public class Packets
 
 	private static final String[] reverseNames = new String[101];
 
-	private Packets() {}
+	private Packets() { }
 
 	static
 	{

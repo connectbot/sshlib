@@ -2,7 +2,7 @@ package com.trilead.ssh2.packets;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class PacketsTest {
 	@Test
