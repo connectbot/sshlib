@@ -72,6 +72,8 @@ try:
 except (OSError, asyncssh.Error) as exc:
     sys.exit('Error starting server: ' + str(exc))
 
+print("LISTENER READY")
+
 # Only run the loop once for testing
 #loop.call_soon(loop.stop)
 loop.run_forever()
