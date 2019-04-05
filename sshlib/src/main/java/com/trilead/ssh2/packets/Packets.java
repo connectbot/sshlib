@@ -77,6 +77,8 @@ public class Packets
 
 	private static final String[] reverseNames = new String[101];
 
+	private Packets() {}
+
 	static
 	{
 		reverseNames[1] = "SSH_MSG_DISCONNECT";
