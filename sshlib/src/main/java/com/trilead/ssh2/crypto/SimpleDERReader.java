@@ -6,7 +6,7 @@ import java.math.BigInteger;
 
 /**
  * SimpleDERReader.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SimpleDERReader.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -22,7 +22,7 @@ public class SimpleDERReader
 	{
 		resetInput(b);
 	}
-	
+
 	public SimpleDERReader(byte[] b, int off, int len)
 	{
 		resetInput(b, off, len);
@@ -32,7 +32,7 @@ public class SimpleDERReader
 	{
 		resetInput(b, 0, b.length);
 	}
-	
+
 	public void resetInput(byte[] b, int off, int len)
 	{
 		buffer = b;
@@ -84,7 +84,7 @@ public class SimpleDERReader
 			return -1;
 
 		len = 0;
-		
+
 		while (remain > 0)
 		{
 			len = len << 8;
@@ -108,26 +108,26 @@ public class SimpleDERReader
 			throw new IOException("Illegal len in DER object (" + len  + ")");
 
 		readBytes(len);
-		
+
 		return type;
 	}
-	
+
 	public BigInteger readInt() throws IOException
 	{
 		int type = readByte() & 0xff;
-		
+
 		if (type != 0x02)
 			throw new IOException("Expected DER Integer, but found type " + type);
-		
+
 		int len = readLength();
 
 		if ((len < 0) || len > available())
 			throw new IOException("Illegal len in DER object (" + len  + ")");
 
 		byte[] b = readBytes(len);
-		
+
 		BigInteger bi = new BigInteger(1, b);
-		
+
 		return bi;
 	}
 
@@ -158,10 +158,10 @@ public class SimpleDERReader
 	public byte[] readSequenceAsByteArray() throws IOException
 	{
 		int type = readByte() & 0xff;
-		
+
 		if (type != 0x30)
 			throw new IOException("Expected DER Sequence, but found type " + type);
-		
+
 		int len = readLength();
 
 		if ((len < 0) || len > available())
@@ -221,7 +221,7 @@ public class SimpleDERReader
 
 		if (type != 0x04 && type != 0x03)
 			throw new IOException("Expected DER Octetstring, but found type " + type);
-		
+
 		int len = readLength();
 
 		if ((len < 0) || len > available())

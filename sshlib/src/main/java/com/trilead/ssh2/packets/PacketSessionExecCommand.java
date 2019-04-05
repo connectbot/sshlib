@@ -3,7 +3,7 @@ package com.trilead.ssh2.packets;
 
 /**
  * PacketSessionExecCommand.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketSessionExecCommand.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -21,7 +21,7 @@ public class PacketSessionExecCommand
 		this.wantReply = wantReply;
 		this.command = command;
 	}
-	
+
 	public byte[] getPayload()
 	{
 		if (payload == null)

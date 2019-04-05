@@ -2,7 +2,7 @@
 package com.trilead.ssh2.sftp;
 
 /**
- * 
+ *
  * Values for the 'text-hint' field in the SFTP ATTRS data type.
  *
  * @author Christian Plattner, plattner@trilead.com

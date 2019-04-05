@@ -3,7 +3,7 @@ package com.trilead.ssh2;
 
 /**
  * A <code>SFTPv3FileHandle</code>.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SFTPv3FileHandle.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -23,8 +23,8 @@ public class SFTPv3FileHandle
 	}
 
 	/**
-	 * Get the SFTPv3Client instance which created this handle. 
-	 * 
+	 * Get the SFTPv3Client instance which created this handle.
+	 *
 	 * @return A SFTPv3Client instance.
 	 */
 	public SFTPv3Client getClient()
@@ -35,7 +35,7 @@ public class SFTPv3FileHandle
 	/**
 	 * Check if this handle was closed with the {@link SFTPv3Client#closeFile(SFTPv3FileHandle)} method
 	 * of the <code>SFTPv3Client</code> instance which created the handle.
-	 * 
+	 *
 	 * @return if the handle is closed.
 	 */
 	public boolean isClosed()

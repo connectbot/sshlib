@@ -2,7 +2,7 @@
 package com.trilead.ssh2.sftp;
 
 /**
- * 
+ *
  * SFTP Attribute Bits for the "attrib-bits" and "attrib-bits-valid" fields
  * of the SFTP ATTR data type.
  * <p>

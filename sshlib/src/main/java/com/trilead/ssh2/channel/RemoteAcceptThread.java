@@ -9,7 +9,7 @@ import com.trilead.ssh2.log.Logger;
 
 /**
  * RemoteAcceptThread.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: RemoteAcceptThread.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -58,7 +58,7 @@ public class RemoteAcceptThread extends Thread
 					"LocalToRemote");
 
 			/* No need to start two threads, one can be executed in the current thread */
-			
+
 			r2l.setDaemon(true);
 			r2l.start();
 			l2r.run();

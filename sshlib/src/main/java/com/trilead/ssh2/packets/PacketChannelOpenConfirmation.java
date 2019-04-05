@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketChannelOpenConfirmation.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketChannelOpenConfirmation.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -44,7 +44,7 @@ public class PacketChannelOpenConfirmation
 		senderChannelID = tr.readUINT32();
 		initialWindowSize = tr.readUINT32();
 		maxPacketSize = tr.readUINT32();
-		
+
 		if (tr.remain() != 0)
 			throw new IOException("Padding in SSH_MSG_CHANNEL_OPEN_CONFIRMATION packet!");
 	}

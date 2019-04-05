@@ -2,7 +2,7 @@
 package com.trilead.ssh2.sftp;
 
 /**
- * 
+ *
  * Attribute Flags. The 'valid-attribute-flags' field in
  * the SFTP ATTRS data type specifies which of the fields are actually present.
  *
@@ -63,7 +63,7 @@ public class AttribFlags
 	/**
 	 * Indicates that additionally to the 'atime', 'createtime',
 	 * 'mtime' and 'ctime' fields (if present), there is also
-	 * 'atime-nseconds', 'createtime-nseconds',  'mtime-nseconds' 
+	 * 'atime-nseconds', 'createtime-nseconds',  'mtime-nseconds'
 	 * and 'ctime-nseconds'.
 	 */
 	public static final int SSH_FILEXFER_ATTR_SUBSECOND_TIMES = 0x00000100;

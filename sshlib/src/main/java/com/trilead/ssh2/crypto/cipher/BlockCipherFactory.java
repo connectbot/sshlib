@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 /**
  * BlockCipherFactory.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: BlockCipherFactory.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -41,7 +41,7 @@ public class BlockCipherFactory
 		ciphers.add(new CipherEntry("aes256-cbc", 16, 32, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
 		ciphers.add(new CipherEntry("aes128-cbc", 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
 		ciphers.add(new CipherEntry("blowfish-cbc", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish$CBC"));
-		
+
 		ciphers.add(new CipherEntry("3des-ctr", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede$CTR"));
 		ciphers.add(new CipherEntry("3des-cbc", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede$CBC"));
 	}

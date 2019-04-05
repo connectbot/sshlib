@@ -2,7 +2,7 @@ package com.trilead.ssh2.crypto.cipher;
 
 /**
  * CBCMode.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: CBCMode.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -18,7 +18,7 @@ public class CBCMode implements BlockCipher
 	public void init(boolean forEncryption, byte[] key, byte[] iv)
 	{
 	}
-	
+
 	public CBCMode(BlockCipher tc, byte[] iv, boolean doEncrypt)
 			throws IllegalArgumentException
 	{
@@ -53,16 +53,16 @@ public class CBCMode implements BlockCipher
 	private void decryptBlock(byte[] src, int srcoff, byte[] dst, int dstoff)
 	{
 		/* Assume the worst, src and dst are overlapping... */
-		
+
 		System.arraycopy(src, srcoff, tmp_vector, 0, blockSize);
-		
+
 		tc.transformBlock(src, srcoff, dst, dstoff);
-		
+
 		for (int i = 0; i < blockSize; i++)
 			dst[dstoff + i] ^= cbc_vector[i];
 
 		/* ...that is why we need a tmp buffer. */
-		
+
 		byte[] swap = cbc_vector;
 		cbc_vector = tmp_vector;
 		tmp_vector = swap;

@@ -14,7 +14,7 @@ import com.trilead.ssh2.channel.LocalAcceptThread;
  * A <code>LocalStreamForwarder</code> forwards an Input- and Outputstream
  * pair via the secure tunnel to another host (which may or may not be identical
  * to the remote SSH-2 server).
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: LocalStreamForwarder.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -50,7 +50,7 @@ public class LocalStreamForwarder
 	 * tunnel, you have to call the <code>flush</code> method of the
 	 * <code>OutputStream</code>. To signal EOF, please use the
 	 * <code>close</code> method of the <code>OutputStream</code>.
-	 * 
+	 *
 	 * @return An <code>OutputStream</code> object.
 	 */
 	public OutputStream getOutputStream() {
@@ -64,7 +64,7 @@ public class LocalStreamForwarder
 	 * be sent. Pending input (InputStream) can still be read. If the shutdown
 	 * operation is already in progress (initiated from either side), then this
 	 * call is a no-op.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void close() throws IOException

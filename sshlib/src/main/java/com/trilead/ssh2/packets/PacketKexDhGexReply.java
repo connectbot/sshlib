@@ -7,7 +7,7 @@ import java.math.BigInteger;
 
 /**
  * PacketKexDhGexReply.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketKexDhGexReply.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

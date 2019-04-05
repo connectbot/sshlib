@@ -4,7 +4,7 @@ package com.trilead.ssh2.sftp;
 /**
  *
  * SFTP Open Flags.
- * 
+ *
  * The following table is provided to assist in mapping POSIX semantics
  * to equivalent SFTP file open parameters:
  * <p>
@@ -54,7 +54,7 @@ package com.trilead.ssh2.sftp;
  * </ul>
  * </li>
  * </ul>
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: OpenFlags.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

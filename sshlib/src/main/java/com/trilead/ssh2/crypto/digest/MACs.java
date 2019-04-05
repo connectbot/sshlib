@@ -3,7 +3,7 @@ package com.trilead.ssh2.crypto.digest;
 
 /**
  * MAC.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: MAC.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */

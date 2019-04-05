@@ -5,7 +5,7 @@ import java.io.UnsupportedEncodingException;
 
 /**
  * PacketUserauthRequestInteractive.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketUserauthRequestInteractive.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

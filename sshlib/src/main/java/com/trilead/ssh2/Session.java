@@ -16,7 +16,7 @@ import com.trilead.ssh2.channel.X11ServerData;
  * in this context either a shell, an application or a system command. The
  * program may or may not have a tty. Only one single program can be started on
  * a session. However, multiple sessions can be active simultaneously.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Session.java,v 1.2 2008/03/03 07:01:36 cplattne Exp $
  */
@@ -33,7 +33,7 @@ public class Session implements AutoCloseable
 	String x11FakeCookie = null;
 
 	final SecureRandom rnd;
-	
+
 	Session(ChannelManager cm, SecureRandom rnd) throws IOException
 	{
 		this.cm = cm;
@@ -44,7 +44,7 @@ public class Session implements AutoCloseable
 	/**
 	 * Basically just a wrapper for lazy people - identical to calling
 	 * <code>requestPTY("dumb", 0, 0, 0, 0, null)</code>.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void requestDumbPTY() throws IOException
@@ -55,7 +55,7 @@ public class Session implements AutoCloseable
 	/**
 	 * Basically just another wrapper for lazy people - identical to calling
 	 * <code>requestPTY(term, 0, 0, 0, 0, null)</code>.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void requestPTY(String term) throws IOException
@@ -81,7 +81,7 @@ public class Session implements AutoCloseable
 	 * the drawable area of the window. The dimension parameters are only
 	 * informational. The encoding of terminal modes (parameter
 	 * <code>terminal_modes</code>) is described in RFC4254.
-	 * 
+	 *
 	 * @param term
 	 *            The TERM environment variable value (e.g., vt100)
 	 * @param term_width_characters
@@ -129,7 +129,7 @@ public class Session implements AutoCloseable
 		cm.requestPTY(cn, term, term_width_characters, term_height_characters, term_width_pixels, term_height_pixels,
 				terminal_modes);
 	}
-	
+
 	/**
 	 * Inform other side of connection that our PTY has resized.
 	 * <p>
@@ -137,7 +137,7 @@ public class Session implements AutoCloseable
      * override the pixel dimensions (when nonzero). Pixel dimensions refer to
      * the drawable area of the window. The dimension parameters are only
      * informational.
-     * 
+     *
      * @param term_width_characters
      *            terminal width, characters (e.g., 80)
      * @param term_height_characters
@@ -156,7 +156,7 @@ public class Session implements AutoCloseable
 			if (flag_closed)
 				throw new IOException("This session is closed.");
 		}
-		
+
 		cm.resizePTY(cn, term_width_characters, term_height_characters, term_width_pixels, term_height_pixels);
 	}
 
@@ -167,7 +167,7 @@ public class Session implements AutoCloseable
 	 * <p>
 	 * This method may only be called before a program or shell is started in
 	 * this session.
-	 * 
+	 *
 	 * @param hostname the hostname of the real (target) X11 server (e.g., 127.0.0.1)
 	 * @param port the port of the real (target) X11 server (e.g., 6010)
 	 * @param cookie if non-null, then present this cookie to the real X11 server
@@ -254,7 +254,7 @@ public class Session implements AutoCloseable
 
 	/**
 	 * Execute a command on the remote machine.
-	 * 
+	 *
 	 * @param cmd
 	 *            The command to execute on the remote host.
 	 * @throws IOException
@@ -281,7 +281,7 @@ public class Session implements AutoCloseable
 
 	/**
 	 * Start a shell on the remote machine.
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	public void startShell() throws IOException
@@ -304,7 +304,7 @@ public class Session implements AutoCloseable
 	/**
 	 * Start a subsystem on the remote machine.
 	 * Unless you know what you are doing, you will never need this.
-	 * 
+	 *
 	 * @param name the name of the subsystem.
 	 * @throws IOException
 	 */
@@ -336,7 +336,7 @@ public class Session implements AutoCloseable
 	 * Implementation details: this method sends a SSH_MSG_CHANNEL_REQUEST request
 	 * ('trilead-ping') to the server and waits for the SSH_MSG_CHANNEL_FAILURE reply
 	 * packet.
-	 * 
+	 *
 	 * @throws IOException in case of any problem or when the session is closed
 	 */
 	public void ping() throws IOException
@@ -398,7 +398,7 @@ public class Session implements AutoCloseable
 	 * method if you use concurrent threads that operate on either of the two
 	 * InputStreams of this <code>Session</code> (otherwise this method may
 	 * block, even though more data is available).
-	 * 
+	 *
 	 * @param timeout
 	 *            The (non-negative) timeout in <code>ms</code>. <code>0</code> means no
 	 *            timeout, the call may block forever.
@@ -408,10 +408,10 @@ public class Session implements AutoCloseable
 	 *            <li><code>1</code> if more data is available.</li>
 	 *            <li><code>-1</code> if a timeout occurred.</li>
 	 *            </ul>
-	 *            
+	 *
 	 * @deprecated This method has been replaced with a much more powerful wait-for-condition
 	 *             interface and therefore acts only as a wrapper.
-	 * 
+	 *
 	 */
 	@Deprecated
 	public int waitUntilDataAvailable(long timeout) {
@@ -441,19 +441,19 @@ public class Session implements AutoCloseable
 	 * This method returns as soon as one of the following happens:
 	 * <ul>
 	 * <li>at least of the specified conditions (see {@link ChannelCondition}) holds true</li>
-	 * <li>timeout &gt; 0 and a timeout occured (TIMEOUT will be set in result conditions)</li> 
+	 * <li>timeout &gt; 0 and a timeout occured (TIMEOUT will be set in result conditions)</li>
 	 * <li>the underlying channel was closed (CLOSED will be set in result conditions)</li>
 	 * </ul>
 	 * <p>
 	 * In any case, the result value contains ALL current conditions, which may be more
 	 * than the specified condition set (i.e., never use the "==" operator to test for conditions
-	 * in the bitmask, see also comments in {@link ChannelCondition}). 
+	 * in the bitmask, see also comments in {@link ChannelCondition}).
 	 * <p>
 	 * Note: do NOT call this method if you want to wait for STDOUT_DATA or STDERR_DATA and
 	 * there are concurrent threads (e.g., StreamGobblers) that operate on either of the two
 	 * InputStreams of this <code>Session</code> (otherwise this method may
 	 * block, even though more data is available in the StreamGobblers).
-	 * 
+	 *
 	 * @param condition_set a bitmask based on {@link ChannelCondition} values
 	 * @param timeout non-negative timeout in ms, <code>0</code> means no timeout
 	 * @return all bitmask specifying all current conditions that are true
@@ -472,7 +472,7 @@ public class Session implements AutoCloseable
 	 * careful - not all server implementations return this value. It is
 	 * generally a good idea to call this method only when all data from the
 	 * remote side has been consumed (see also the <code>WaitForCondition</code> method).
-	 * 
+	 *
 	 * @return An <code>Integer</code> holding the exit code, or
 	 *         <code>null</code> if no exit code is (yet) available.
 	 */
@@ -485,7 +485,7 @@ public class Session implements AutoCloseable
 	 * Get the name of the signal by which the process on the remote side was
 	 * stopped - if available and applicable. Be careful - not all server
 	 * implementations return this value.
-	 * 
+	 *
 	 * @return An <code>String</code> holding the name of the signal, or
 	 *         <code>null</code> if the process exited normally or is still
 	 *         running (or if the server forgot to send this information).
@@ -503,7 +503,7 @@ public class Session implements AutoCloseable
 	 * closed (this can happen, e.g., if the other server sent a close message.)
 	 * However, as long as you have not called the <code>close()</code>
 	 * method, you may be wasting (local) resources.
-	 * 
+	 *
 	 */
 	public void close()
 	{

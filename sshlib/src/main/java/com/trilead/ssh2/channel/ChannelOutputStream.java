@@ -5,7 +5,7 @@ import java.io.OutputStream;
 
 /**
  * ChannelOutputStream.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ChannelOutputStream.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -16,7 +16,7 @@ public final class ChannelOutputStream extends OutputStream
 	private byte[] writeBuffer;
 
 	boolean isClosed = false;
-	
+
 	ChannelOutputStream(Channel c)
 	{
 		this.c = c;
@@ -24,9 +24,9 @@ public final class ChannelOutputStream extends OutputStream
 	}
 
 	public void write(int b) throws IOException
-	{	
+	{
 		writeBuffer[0] = (byte) b;
-		
+
 		write(writeBuffer, 0, 1);
 	}
 
@@ -51,7 +51,7 @@ public final class ChannelOutputStream extends OutputStream
 	{
 		if (isClosed)
 			throw new IOException("This OutputStream is closed.");
-		
+
 		if (b == null)
 			throw new NullPointerException();
 
@@ -60,7 +60,7 @@ public final class ChannelOutputStream extends OutputStream
 
 		if (len == 0)
 			return;
-		
+
 		c.cm.sendData(c, b, off, len);
 	}
 

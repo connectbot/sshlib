@@ -3,7 +3,7 @@ package com.trilead.ssh2.packets;
 
 /**
  * PacketChannelTrileadPing.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketChannelTrileadPing.java,v 1.1 2008/03/03 07:01:36
  *          cplattne Exp $

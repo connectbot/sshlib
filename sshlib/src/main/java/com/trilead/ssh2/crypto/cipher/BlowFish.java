@@ -24,14 +24,14 @@ package com.trilead.ssh2.crypto.cipher;
  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE. 
+ THE SOFTWARE.
  */
 
 /**
  * A class that provides Blowfish key encryption operations, such as encoding
  * data and generating keys. All the algorithms herein are from Applied
  * Cryptography and implement a simplified cryptography interface.
- * 
+ *
  * @author See comments in the source file
  * @version $Id: BlowFish.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
@@ -189,7 +189,7 @@ public class BlowFish implements BlockCipher
 
 	/**
 	 * initialise a Blowfish cipher.
-	 * 
+	 *
 	 * @param encrypting
 	 *            whether or not we are for encryption.
 	 * @param key
@@ -278,7 +278,7 @@ public class BlowFish implements BlockCipher
 		 * - comments are from _Applied Crypto_, Schneier, p338 please be
 		 * careful comparing the two, AC numbers the arrays from 1, the enclosed
 		 * code from 0.
-		 * 
+		 *
 		 * (1) Initialise the S-boxes and the P-array, with a fixed string This
 		 * string contains the hexadecimal digits of pi (3.141...)
 		 */
@@ -320,14 +320,14 @@ public class BlowFish implements BlockCipher
 		/*
 		 * (3) Encrypt the all-zero string with the Blowfish algorithm, using
 		 * the subkeys described in (1) and (2)
-		 * 
+		 *
 		 * (4) Replace P1 and P2 with the output of step (3)
-		 * 
+		 *
 		 * (5) Encrypt the output of step(3) using the Blowfish algorithm, with
 		 * the modified subkeys.
-		 * 
+		 *
 		 * (6) Replace P3 and P4 with the output of step (5)
-		 * 
+		 *
 		 * (7) Continue the process, replacing all elements of the P-array and
 		 * then all four S-boxes in order, with the output of the continuously
 		 * changing Blowfish algorithm

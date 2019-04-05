@@ -27,7 +27,7 @@ import java.io.InputStream;
  * <p>
  * The term "StreamGobbler" was taken from an article called "When Runtime.exec() won't",
  * see http://www.javaworld.com/javaworld/jw-12-2000/jw-1229-traps.html.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: StreamGobbler.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -54,9 +54,9 @@ public class StreamGobbler extends InputStream
 							synchronizer.notifyAll();
 							break;
 						}
-						
+
 						int space_available = buffer.length - write_pos;
-						
+
 						if (space_available < avail)
 						{
 							/* compact/resize buffer */
@@ -73,21 +73,21 @@ public class StreamGobbler extends InputStream
 								inc = (inc > 8192) ? 8192 : inc;
 								new_buffer = new byte[need_space + inc];
 							}
-							
+
 							if (unread_size > 0)
 								System.arraycopy(buffer, read_pos, new_buffer, 0, unread_size);
 
 							buffer = new_buffer;
-							
+
 							read_pos = 0;
 							write_pos = unread_size;
 						}
-						
+
 						System.arraycopy(buff, 0, buffer, write_pos, avail);
 						write_pos += avail;
 
 						synchronizer.notifyAll();
-					}	
+					}
 				}
 				catch (IOException e)
 				{

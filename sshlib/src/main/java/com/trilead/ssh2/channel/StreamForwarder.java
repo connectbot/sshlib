@@ -7,11 +7,11 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 /**
- * A StreamForwarder forwards data between two given streams. 
+ * A StreamForwarder forwards data between two given streams.
  * If two StreamForwarder threads are used (one for each direction)
  * then one can be configured to shutdown the underlying channel/socket
  * if both threads have finished forwarding (EOF).
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: StreamForwarder.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */

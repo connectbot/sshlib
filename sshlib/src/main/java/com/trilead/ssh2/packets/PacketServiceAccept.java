@@ -5,7 +5,7 @@ import java.io.IOException;
 
 /**
  * PacketServiceAccept.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketServiceAccept.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */

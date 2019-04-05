@@ -46,7 +46,7 @@ import net.i2p.crypto.eddsa.EdDSAPublicKey;
  * <p>
  * It is a thread safe implementation, therefore, you need only to instantiate one
  * <code>KnownHosts</code> for your whole application.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: KnownHosts.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -89,7 +89,7 @@ public class KnownHosts
 	 * Adds a single public key entry to the database. Note: this will NOT add the public key
 	 * to any physical file (e.g., "~/.ssh/known_hosts") - use <code>addHostkeyToFile()</code> for that purpose.
 	 * This method is designed to be used in a {@link ServerHostKeyVerifier}.
-	 * 
+	 *
 	 * @param hostnames a list of hostname patterns - at least one most be specified. Check out the
 	 *        OpenSSH sshd man page for a description of the pattern matching algorithm.
 	 * @param serverHostKeyAlgorithm as passed to the {@link ServerHostKeyVerifier}.
@@ -143,7 +143,7 @@ public class KnownHosts
 
 	/**
 	 * Parses the given known_hosts data and adds entries to the database.
-	 * 
+	 *
 	 * @param knownHostsData
 	 * @throws IOException
 	 */
@@ -154,7 +154,7 @@ public class KnownHosts
 
 	/**
 	 * Parses the given known_hosts file and adds entries to the database.
-	 * 
+	 *
 	 * @param knownHosts
 	 * @throws IOException
 	 */
@@ -310,8 +310,8 @@ public class KnownHosts
 	 * Based on the type of hostkey that is present in the internal database
 	 * (i.e., either <code>ssh-rsa</code> or <code>ssh-dss</code>)
 	 * an ordered list of hostkey algorithms is returned which can be passed
-	 * to <code>Connection.setServerHostKeyAlgorithms</code>. 
-	 * 
+	 * to <code>Connection.setServerHostKeyAlgorithms</code>.
+	 *
 	 * @param hostname
 	 * @return <code>null</code> if no key for the given hostname is present or
 	 * there are keys of multiple types present for the given hostname. Otherwise,
@@ -584,7 +584,7 @@ public class KnownHosts
 	 * Checks the internal hostkey database for the given hostkey.
 	 * If no matching key can be found, then the hostname is resolved to an IP address
 	 * and the search is repeated using that IP address.
-	 * 
+	 *
 	 * @param hostname the server's hostname, will be matched with all hostname patterns
 	 * @param serverHostKeyAlgorithm type of hostkey, either <code>ssh-rsa</code> or <code>ssh-dss</code>
 	 * @param serverHostKey the key blob
@@ -652,7 +652,7 @@ public class KnownHosts
 	/**
 	 * Adds a single public key entry to the a known_hosts file.
 	 * This method is designed to be used in a {@link ServerHostKeyVerifier}.
-	 * 
+	 *
 	 * @param knownHosts the file where the publickey entry will be appended.
 	 * @param hostnames a list of hostname patterns - at least one most be specified. Check out the
 	 *        OpenSSH sshd man page for a description of the pattern matching algorithm.
@@ -670,7 +670,7 @@ public class KnownHosts
 			throw new IllegalArgumentException();
 
 		CharArrayWriter writer = new CharArrayWriter();
-		
+
 		for (int i = 0; i < hostnames.length; i++)
 		{
 			if (i != 0)
@@ -685,11 +685,11 @@ public class KnownHosts
 		writer.write("\n");
 
 		char[] entry = writer.toCharArray();
-		
+
 		RandomAccessFile raf = new RandomAccessFile(knownHosts, "rw");
 
 		long len = raf.length();
-		
+
 		if (len > 0)
 		{
 			raf.seek(len - 1);
@@ -708,7 +708,7 @@ public class KnownHosts
 
 	/**
 	 * Generates a "raw" fingerprint of a hostkey.
-	 * 
+	 *
 	 * @param type either "md5" or "sha1"
 	 * @param keyType either "ssh-rsa" or "ssh-dss"
 	 * @param hostkey the hostkey
@@ -850,7 +850,7 @@ public class KnownHosts
 	 * that are easier to remember for humans.
 	 * <p>
 	 * Example fingerprint: xofoc-bubuz-cazin-zufyl-pivuk-biduk-tacib-pybur-gonar-hotat-lyxux.
-	 * 
+	 *
 	 * @param keytype either "ssh-rsa" or "ssh-dss"
 	 * @param publickey key data
 	 * @return Bubblebabble fingerprint

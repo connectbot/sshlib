@@ -43,7 +43,7 @@ import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 /**
  * AuthenticationManager.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: AuthenticationManager.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */

@@ -3,7 +3,7 @@ package com.trilead.ssh2.util;
 
 /**
  * Tokenizer. Why? Because StringTokenizer is not available in J2ME.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Tokenizer.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */
@@ -12,7 +12,7 @@ public class Tokenizer
 	/**
 	 * Exists because StringTokenizer is not available in J2ME.
 	 * Returns an array with at least 1 entry.
-	 * 
+	 *
 	 * @param source must be non-null
 	 * @param delimiter
 	 * @return an array of Strings

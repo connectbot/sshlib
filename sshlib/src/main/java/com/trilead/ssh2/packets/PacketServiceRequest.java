@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * PacketServiceRequest.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketServiceRequest.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

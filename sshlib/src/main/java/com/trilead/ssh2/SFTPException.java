@@ -9,7 +9,7 @@ import com.trilead.ssh2.sftp.ErrorCodes;
 /**
  * Used in combination with the SFTPv3Client. This exception wraps
  * error messages sent by the SFTP server.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SFTPException.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -41,7 +41,7 @@ public class SFTPException extends IOException
 	/**
 	 * Get the error message sent by the server. Often, this
 	 * message does not help a lot (e.g., "failure").
-	 * 
+	 *
 	 * @return the plain string as sent by the server.
 	 */
 	public String getServerErrorMessage()
@@ -51,7 +51,7 @@ public class SFTPException extends IOException
 
 	/**
 	 * Get the error code sent by the server.
-	 * 
+	 *
 	 * @return an error code as defined in the SFTP specs.
 	 */
 	public int getServerErrorCode()
@@ -61,7 +61,7 @@ public class SFTPException extends IOException
 
 	/**
 	 * Get the symbolic name of the error code as given in the SFTP specs.
-	 * 
+	 *
 	 * @return e.g., "SSH_FX_INVALID_FILENAME".
 	 */
 	public String getServerErrorCodeSymbol()
@@ -76,7 +76,7 @@ public class SFTPException extends IOException
 
 	/**
 	 * Get the description of the error code as given in the SFTP specs.
-	 * 
+	 *
 	 * @return e.g., "The filename is not valid."
 	 */
 	public String getServerErrorCodeVerbose()

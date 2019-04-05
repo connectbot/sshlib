@@ -3,7 +3,7 @@ package com.trilead.ssh2.packets;
 
 /**
  * PacketSessionPtyRequest.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: PacketSessionPtyRequest.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */

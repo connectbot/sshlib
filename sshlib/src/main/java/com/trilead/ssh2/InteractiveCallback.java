@@ -4,10 +4,10 @@ package com.trilead.ssh2;
 /**
  * An <code>InteractiveCallback</code> is used to respond to challenges sent
  * by the server if authentication mode "keyboard-interactive" is selected.
- * 
+ *
  * @see Connection#authenticateWithKeyboardInteractive(String,
  *      String[], InteractiveCallback)
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: InteractiveCallback.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -33,7 +33,7 @@ public interface InteractiveCallback
 	 * Note: clients SHOULD use control character filtering as discussed in
 	 * RFC4251 to avoid attacks by including
 	 * terminal control characters in the fields to be displayed.
-	 * 
+	 *
 	 * @param name
 	 *            the name String sent by the server.
 	 * @param instruction

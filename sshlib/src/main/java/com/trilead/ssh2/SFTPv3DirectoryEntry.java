@@ -3,7 +3,7 @@ package com.trilead.ssh2;
 
 /**
  * A <code>SFTPv3DirectoryEntry</code> as returned by {@link SFTPv3Client#ls(String)}.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SFTPv3DirectoryEntry.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */

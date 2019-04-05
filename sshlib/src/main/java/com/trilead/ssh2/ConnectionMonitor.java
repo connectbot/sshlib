@@ -3,8 +3,8 @@ package com.trilead.ssh2;
 
 /**
  * A <code>ConnectionMonitor</code> is used to get notified when the
- * underlying socket of a connection is closed. 
- * 
+ * underlying socket of a connection is closed.
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ConnectionMonitor.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -25,9 +25,9 @@ public interface ConnectionMonitor
 	 * <b>Please note: if the connection is not connected (e.g., there was no successful
 	 * connect() call), then the invocation of {@link Connection#close()} will NOT trigger
 	 * this method.</b>
-	 * 
+	 *
 	 * @see Connection#addConnectionMonitor(ConnectionMonitor)
-	 * 
+	 *
 	 * @param reason Includes an indication why the socket was closed.
 	 */
 	void connectionLost(Throwable reason);

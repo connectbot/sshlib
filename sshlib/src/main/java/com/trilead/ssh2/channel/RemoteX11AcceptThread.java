@@ -12,7 +12,7 @@ import com.trilead.ssh2.log.Logger;
 
 /**
  * RemoteX11AcceptThread.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: RemoteX11AcceptThread.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
@@ -55,7 +55,7 @@ public class RemoteX11AcceptThread extends Thread
 
 			/*
 			 * Client startup:
-			 * 
+			 *
 			 * 1 0X42 MSB first/0x6c lSB first - byteorder
 			 * 1 - unused
 			 * 2 card16 - protocol-major-version
@@ -67,14 +67,14 @@ public class RemoteX11AcceptThread extends Thread
 			 * p - unused, p=pad(n)
 			 * string8 - authorization-protocol-data
 			 * q - unused, q=pad(d)
-			 * 
+			 *
 			 * pad(X) = (4 - (X mod 4)) mod 4
-			 * 
+			 *
 			 * Server response:
-			 * 
+			 *
 			 * 1 (0 failed, 2 authenticate, 1 success)
 			 * ...
-			 * 
+			 *
 			 */
 
 			/* Later on we will simply forward the first 6 header bytes to the "real" X11 server */
@@ -88,7 +88,7 @@ public class RemoteX11AcceptThread extends Thread
 				throw new IOException("Unknown endian format in X11 message!");
 
 			/* Yes, I came up with this myself - shall I file an application for a patent? =) */
-			
+
 			int idxMSB = (header[0] == 0x42) ? 0 : 1;
 
 			/* Read authorization data header */

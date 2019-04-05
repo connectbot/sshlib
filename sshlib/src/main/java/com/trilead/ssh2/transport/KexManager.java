@@ -51,7 +51,7 @@ import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 /**
  * KexManager.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: KexManager.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
@@ -375,7 +375,7 @@ public class KexManager
 					km.initial_iv_client_to_server);
 
 			mac = new HMAC(kxs.np.mac_algo_client_to_server, km.integrity_key_client_to_server);
-			
+
 			comp = CompressionFactory.createCompressor(kxs.np.comp_algo_client_to_server);
 
 		}
@@ -599,7 +599,7 @@ public class KexManager
 						km.enc_key_server_to_client, km.initial_iv_server_to_client);
 
 				mac = new HMAC(kxs.np.mac_algo_server_to_client, km.integrity_key_server_to_client);
-				
+
 				comp = CompressionFactory.createCompressor(kxs.np.comp_algo_server_to_client);
 			}
 			catch (IllegalArgumentException e1)

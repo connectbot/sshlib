@@ -6,7 +6,7 @@ import java.io.InputStream;
 
 /**
  * ChannelInputStream.
- * 
+ *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ChannelInputStream.java,v 1.1 2007/10/15 12:49:56 cplattne Exp $
  */
