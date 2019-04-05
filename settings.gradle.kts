@@ -1,2 +1,1 @@
 include(":sshlib")
-include(":tests")
