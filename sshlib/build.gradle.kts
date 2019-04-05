@@ -6,8 +6,8 @@ plugins {
     id("net.researchgate.release") version "2.8.0"
 }
 
-apply(from = "${rootDir}/publish.gradle")
-apply(from = "${rootDir}/config/quality.gradle.kts")
+apply(from = "$rootDir/publish.gradle")
+apply(from = "$rootDir/config/quality.gradle.kts")
 
 dependencies {
     compile("com.jcraft:jzlib:1.1.3")
