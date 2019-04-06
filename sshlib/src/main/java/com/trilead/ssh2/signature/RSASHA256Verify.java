@@ -42,18 +42,6 @@ public class RSASHA256Verify
 		if (tr.remain() != 0)
 			throw new IOException("Padding in RSA signature!");
 
-		if (s[0] == 0 && s[1] == 0 && s[2] == 0) {
-			int i = 0;
-			int j = ((s[i++] << 24) & 0xff000000) | ((s[i++] << 16) & 0x00ff0000)
-					| ((s[i++] << 8) & 0x0000ff00) | ((s[i++]) & 0x000000ff);
-			i += j;
-			j = ((s[i++] << 24) & 0xff000000) | ((s[i++] << 16) & 0x00ff0000)
-					| ((s[i++] << 8) & 0x0000ff00) | ((s[i++]) & 0x000000ff);
-			byte[] tmp = new byte[j];
-			System.arraycopy(s, i, tmp, 0, j);
-			sig = tmp;
-		}
-
 		return s;
 	}
 
