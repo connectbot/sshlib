@@ -1,12 +1,11 @@
 language: java
 jdk:
-  - oraclejdk9
-  - oraclejdk8
+  - openjdk9
+  - openjdk11
 addons:
   apt:
     packages:
       - docker-ce
-      - oracle-java8-installer
 services:
   - docker
 cache:
