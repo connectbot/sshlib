@@ -747,6 +747,12 @@ public class KnownHosts
 		else if ("ssh-dss".equals(keyType))
 		{
 		}
+		else if ("rsa-sha2-256".equals(keyType))
+		{
+		}
+		else if ("rsa-sha2-512".equals(keyType))
+		{
+		}
 		else
 			throw new IllegalArgumentException("Unknown key type " + keyType);
 
