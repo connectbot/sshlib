@@ -57,7 +57,7 @@ public class KnownHosts
 	public static final int HOSTKEY_IS_NEW = 1;
 	public static final int HOSTKEY_HAS_CHANGED = 2;
 
-	private class KnownHostsEntry
+	protected class KnownHostsEntry
 	{
 		String[] patterns;
 		PublicKey key;
@@ -69,7 +69,7 @@ public class KnownHosts
 		}
 	}
 
-	private LinkedList<KnownHostsEntry> publicKeys = new LinkedList<KnownHostsEntry>();
+	protected LinkedList<KnownHostsEntry> publicKeys = new LinkedList<KnownHostsEntry>();
 
 	public KnownHosts()
 	{
@@ -436,14 +436,11 @@ public class KnownHosts
 
 			if (arr.length >= 3)
 			{
-				if ((arr[1].compareTo("ssh-rsa") == 0) || (arr[1].compareTo("ssh-dss") == 0))
-				{
-					String[] hostnames = arr[0].split(",");
+				String[] hostnames = arr[0].split(",");
 
-					byte[] msg = Base64.decode(arr[2].toCharArray());
+				byte[] msg = Base64.decode(arr[2].toCharArray());
 
-					addHostkey(hostnames, arr[1], msg);
-				}
+				addHostkey(hostnames, arr[1], msg);
 			}
 		}
 	}
