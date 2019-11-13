@@ -1,9 +1,10 @@
 package com.trilead.ssh2;
 
 import com.trilead.ssh2.signature.Ed25519Verify;
-
+import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -12,6 +13,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 public class KnownHostsTest {
+
+	private char[] getKnownHosts(String s) throws IOException {
+		return IOUtils.toCharArray(getClass().getResourceAsStream(s), "UTF-8");
+	}
 
 	@Test
 	public void supportsExpectedHashAndKeys()
@@ -62,5 +67,38 @@ public class KnownHostsTest {
 			assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
 			assertEquals(e.getCause().getMessage(), "hostkey is null");
 		}
+	}
+
+	@Test
+	public void initializeKnownHostsFile()
+		throws IOException {
+
+		KnownHosts obj = new KnownHosts();
+		obj.addHostkeys(getKnownHosts("known_hosts"));
+		assertEquals(4, obj.publicKeys.size());
+		assertEquals("RSA", obj.publicKeys.get(0).key.getAlgorithm());
+		assertEquals("EC", obj.publicKeys.get(1).key.getAlgorithm());
+		assertEquals("EdDSA", obj.publicKeys.get(2).key.getAlgorithm());
+		assertEquals("DSA", obj.publicKeys.get(3).key.getAlgorithm());
+	}
+
+	@Test
+	public void initializeInvalidHostKeyAlgo() {
+		KnownHosts obj = new KnownHosts();
+		try {
+			obj.addHostkeys("host invalid-algo abc123".toCharArray());
+			throw new Error("Did not throw Exception");
+		} catch (IOException e) {
+			assertEquals(e.getMessage(), "Unknown host key type (invalid-algo)");
+		}
+		assertEquals(true, obj.publicKeys.isEmpty());
+	}
+
+	@Test
+	public void initializeInvalidHostKey() throws IOException {
+		KnownHosts obj = new KnownHosts();
+		obj.addHostkeys("not-a-host-key".toCharArray());
+		obj.addHostkeys("also not-a-host-key".toCharArray());
+		assertEquals(true, obj.publicKeys.isEmpty());
 	}
 }
