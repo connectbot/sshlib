@@ -9,7 +9,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class KnownHostsTest {
@@ -53,19 +53,19 @@ public class KnownHostsTest {
 			privateMethod.invoke(obj, "UNSUPPORTED_HASH", "ssh-rsa", new byte[0]);
 		} catch (InvocationTargetException e) {
 			assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
-			assertEquals(e.getCause().getMessage(), "Unknown hash type UNSUPPORTED_HASH");
+			assertThat(e.getCause().getMessage(), is("Unknown hash type UNSUPPORTED_HASH"));
 		}
 		try {
 			privateMethod.invoke(obj, "sha1", "UNSUPPORTED_KEY", new byte[0]);
 		} catch (InvocationTargetException e) {
 			assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
-			assertEquals(e.getCause().getMessage(), "Unknown key type UNSUPPORTED_KEY");
+			assertThat(e.getCause().getMessage(), is("Unknown key type UNSUPPORTED_KEY"));
 		}
 		try {
 			privateMethod.invoke(obj, "sha1", "ssh-rsa", null);
 		} catch (InvocationTargetException e) {
 			assertThat(e.getCause(), instanceOf(IllegalArgumentException.class));
-			assertEquals(e.getCause().getMessage(), "hostkey is null");
+			assertThat(e.getCause().getMessage(), is("hostkey is null"));
 		}
 	}
 
@@ -75,11 +75,11 @@ public class KnownHostsTest {
 
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys(getKnownHosts("known_hosts"));
-		assertEquals(4, obj.publicKeys.size());
-		assertEquals("RSA", obj.publicKeys.get(0).key.getAlgorithm());
-		assertEquals("EC", obj.publicKeys.get(1).key.getAlgorithm());
-		assertEquals("EdDSA", obj.publicKeys.get(2).key.getAlgorithm());
-		assertEquals("DSA", obj.publicKeys.get(3).key.getAlgorithm());
+		assertThat(obj.publicKeys.size(), is(4));
+		assertThat(obj.publicKeys.get(0).key.getAlgorithm(), is("RSA"));
+		assertThat(obj.publicKeys.get(1).key.getAlgorithm(), is("EC"));
+		assertThat(obj.publicKeys.get(2).key.getAlgorithm(), is("EdDSA"));
+		assertThat(obj.publicKeys.get(3).key.getAlgorithm(), is("DSA"));
 	}
 
 	@Test
@@ -89,9 +89,9 @@ public class KnownHostsTest {
 			obj.addHostkeys("host invalid-algo abc123".toCharArray());
 			throw new Error("Did not throw Exception");
 		} catch (IOException e) {
-			assertEquals(e.getMessage(), "Unknown host key type (invalid-algo)");
+			assertThat(e.getMessage(), is("Unknown host key type (invalid-algo)"));
 		}
-		assertEquals(true, obj.publicKeys.isEmpty());
+		assertThat(obj.publicKeys.isEmpty(), is(true));
 	}
 
 	@Test
@@ -99,6 +99,6 @@ public class KnownHostsTest {
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys("not-a-host-key".toCharArray());
 		obj.addHostkeys("also not-a-host-key".toCharArray());
-		assertEquals(true, obj.publicKeys.isEmpty());
+		assertThat(obj.publicKeys.isEmpty(), is(true));
 	}
 }
