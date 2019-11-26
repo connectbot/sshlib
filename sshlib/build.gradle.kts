@@ -1,9 +1,9 @@
 plugins {
     `java-library`
     jacoco
-    id("com.jfrog.artifactory") version "4.9.5"
+    id("com.jfrog.artifactory") version "4.11.0"
     id("com.jfrog.bintray") version "1.8.4"
-    id("net.researchgate.release") version "2.8.0"
+    id("net.researchgate.release") version "2.8.1"
 }
 
 apply(from = "$rootDir/publish.gradle")
@@ -18,8 +18,8 @@ dependencies {
 
     testCompile("junit:junit:4.12")
     testCompile("commons-io:commons-io:2.6")
-    testCompile("commons-codec:commons-codec:1.12")
-    testCompile("org.testcontainers:testcontainers:1.11.1")
+    testCompile("commons-codec:commons-codec:1.13")
+    testCompile("org.testcontainers:testcontainers:1.12.3")
     testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 
