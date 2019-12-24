@@ -1,7 +1,7 @@
 plugins {
     `java-library`
     jacoco
-    id("com.jfrog.artifactory") version "4.11.0"
+    id("com.jfrog.artifactory") version "4.12.0"
     id("com.jfrog.bintray") version "1.8.4"
     id("net.researchgate.release") version "2.8.1"
 }
@@ -19,7 +19,7 @@ dependencies {
     testCompile("junit:junit:4.12")
     testCompile("commons-io:commons-io:2.6")
     testCompile("commons-codec:commons-codec:1.13")
-    testCompile("org.testcontainers:testcontainers:1.12.3")
+    testCompile("org.testcontainers:testcontainers:1.12.4")
     testCompile("ch.qos.logback:logback-classic:1.2.3")
 }
 
