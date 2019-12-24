@@ -33,9 +33,8 @@ public class OpenSSHCompatibilityTest {
 	private static final String USERNAME = "testuser";
 	private static final String PASSWORD = "testtest123";
 
-	private static ImageFromDockerfile baseImage = new ImageFromDockerfile()
-				.withFileFromClasspath("run.sh", "openssh-server/run.sh")
-				.withFileFromClasspath("Dockerfile", "openssh-server/Dockerfile");
+	private static ImageFromDockerfile baseImage = new ImageFromDockerfile("openssh-server", false)
+				.withFileFromClasspath(".", "openssh-server");
 
 	static {
 		for (String key : PubkeyConstants.KEY_NAMES) {

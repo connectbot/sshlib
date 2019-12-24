@@ -36,9 +36,8 @@ public class DropbearCompatibilityTest {
 	private static final String USERNAME = "testuser";
 	private static final String PASSWORD = "testtest123";
 
-	private static ImageFromDockerfile baseImage = new ImageFromDockerfile()
-			.withFileFromClasspath("run.sh", "dropbear-server/run.sh")
-			.withFileFromClasspath("Dockerfile", "dropbear-server/Dockerfile");
+	private static ImageFromDockerfile baseImage = new ImageFromDockerfile("dropbear-server", false)
+			.withFileFromClasspath(".", "dropbear-server");
 
 	static {
 		for (String key : PubkeyConstants.KEY_NAMES) {

@@ -36,10 +36,8 @@ public class AsyncSSHCompatibilityTest {
 	public static GenericContainer server;
 
 	static {
-		ImageFromDockerfile baseImage = new ImageFromDockerfile()
-				.withFileFromClasspath("requirements.txt", "asyncssh-server/requirements.txt")
-				.withFileFromClasspath("server.py", "asyncssh-server/server.py")
-				.withFileFromClasspath("Dockerfile", "asyncssh-server/Dockerfile");
+		ImageFromDockerfile baseImage = new ImageFromDockerfile("asyncssh-server", false)
+				.withFileFromClasspath(".", "asyncssh-server");
 		for (String key : PubkeyConstants.KEY_NAMES) {
 			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
 		}
