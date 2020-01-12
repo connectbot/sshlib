@@ -306,6 +306,21 @@ public class PEMDecoder
 			bc = new AES.CBC();
 			keySize = 32;
 		}
+		else if (algoLower.equals("aes-128-ctr") || algoLower.equals("aes128-ctr"))
+		{
+			bc = new AES.CTR();
+			keySize = 16;
+		}
+		else if (algoLower.equals("aes-192-ctr") || algoLower.equals("aes192-ctr"))
+		{
+			bc = new AES.CTR();
+			keySize = 24;
+		}
+		else if (algoLower.equals("aes-256-ctr") || algoLower.equals("aes256-ctr"))
+		{
+			bc = new AES.CTR();
+			keySize = 32;
+		}
 		else
 		{
 			throw new IOException("Cannot decrypt PEM structure, unknown cipher " + algo);
