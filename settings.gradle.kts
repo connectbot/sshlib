@@ -1,1 +1,1 @@
-include(":sshlib")
+rootProject.name = "sshlib"
