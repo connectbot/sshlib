@@ -23,7 +23,7 @@ before_cache:
 script:
   - ./gradlew check jacocoTestReport
 after_script:
-  - JACOCO_SOURCE_PATH=sshlib/src/main/java /tmp/cc/cc-test-reporter format-coverage sshlib/build/reports/jacoco/test/jacocoTestReport.xml --input-type jacoco
+  - JACOCO_SOURCE_PATH=src/main/java /tmp/cc/cc-test-reporter format-coverage build/reports/jacoco/test/jacocoTestReport.xml --input-type jacoco
   - /tmp/cc/cc-test-reporter upload-coverage
 after_success:
   - "./gradlew bintrayUpload artifactoryPublish"
