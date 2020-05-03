@@ -65,6 +65,13 @@ public class Curve25519Exchange extends GenericDhExchange {
 		serverPublic = f.clone();
 		try {
 			byte[] sharedSecretBytes = X25519.computeSharedSecret(clientPrivate, serverPublic);
+			int allBytes = 0;
+			for (int i = 0; i < sharedSecretBytes.length; i++) {
+				allBytes |= sharedSecretBytes[i];
+			}
+			if (allBytes == 0) {
+				throw new IOException("Invalid key computed; all zeroes");
+			}
 			sharedSecret = new BigInteger(1, sharedSecretBytes);
 		} catch (InvalidKeyException e) {
 			throw new IOException(e);

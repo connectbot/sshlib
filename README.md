@@ -30,8 +30,7 @@ https://opensource.org/licenses/BSD-3-Clause).
   * hmac-sha1 ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.4))
   
 ##### Key support:
-  * Ed25519 ([draft-ietf-curdle-ssh-ed25519-ed448-03](
-    https://tools.ietf.org/html/draft-ietf-curdle-ssh-ed25519-ed448-03))
+  * Ed25519 ([RFC 8709](https://tools.ietf.org/html/rfc8709))
   * ECDSA ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
   * RSA  ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.6))
 
@@ -39,7 +38,7 @@ https://opensource.org/licenses/BSD-3-Clause).
   * ecdh-sha2-nistp521 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
   * ecdh-sha2-nistp384 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
   * ecdh-sha2-nistp256 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
-  * curve25519-sha256 ([curve25519-sha256](https://tools.ietf.org/id/draft-ietf-curdle-ssh-curves-07.html))
+  * curve25519-sha256 ([RFC 8731](https://tools.ietf.org/html/rfc8731))
   * diffie-hellman-group18-sha512 ([RFC 8268](https://tools.ietf.org/html/rfc8268))
   * diffie-hellman-group16-sha512 ([RFC 8268](https://tools.ietf.org/html/rfc8268))
   * diffie-hellman-group14-sha256 ([RFC 8268](https://tools.ietf.org/html/rfc8268))
