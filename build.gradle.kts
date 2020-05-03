@@ -31,17 +31,17 @@ apply(from = "$rootDir/publish.gradle")
 apply(from = "$rootDir/config/quality.gradle.kts")
 
 dependencies {
-    compile("com.jcraft:jzlib:1.1.3")
-    compile("org.connectbot:simplesocks:1.0.1")
-    compile("net.i2p.crypto:eddsa:0.3.0")
-    compile("net.vrallev.ecc:ecc-25519-java:1.0.3")
-    compile("org.connectbot.jbcrypt:jbcrypt:1.0.0")
+    implementation("com.jcraft:jzlib:1.1.3")
+    implementation("org.connectbot:simplesocks:1.0.1")
+    implementation("net.i2p.crypto:eddsa:0.3.0")
+    implementation("net.vrallev.ecc:ecc-25519-java:1.0.3")
+    implementation("org.connectbot.jbcrypt:jbcrypt:1.0.0")
 
-    testCompile("junit:junit:4.12")
-    testCompile("commons-io:commons-io:2.6")
-    testCompile("commons-codec:commons-codec:1.13")
-    testCompile("org.testcontainers:testcontainers:1.12.4")
-    testCompile("ch.qos.logback:logback-classic:1.2.3")
+    testImplementation("junit:junit:4.12")
+    testImplementation("commons-io:commons-io:2.6")
+    testImplementation("commons-codec:commons-codec:1.13")
+    testImplementation("org.testcontainers:testcontainers:1.12.4")
+    testImplementation("ch.qos.logback:logback-classic:1.2.3")
 }
 
 java {
