@@ -29,21 +29,15 @@
 
 package com.trilead.ssh2.signature;
 
+import com.google.crypto.tink.subtle.Ed25519Sign;
+import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
+import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
-import net.i2p.crypto.eddsa.EdDSAEngine;
-import net.i2p.crypto.eddsa.EdDSAPrivateKey;
-import net.i2p.crypto.eddsa.EdDSAPublicKey;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
-import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
+import java.security.GeneralSecurityException;
 
 /**
  * @author Kenny Root
@@ -63,7 +57,7 @@ public class Ed25519Verify {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		byte[] encoded = key.getAbyte();
+		byte[] encoded = key.getEncoded();
 		tw.writeString(encoded, 0, encoded.length);
 
 		return tw.getBytes();
@@ -87,42 +81,23 @@ public class Ed25519Verify {
 			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
 		}
 
-		return new EdDSAPublicKey(new EdDSAPublicKeySpec(keyBytes, EdDSANamedCurveTable.getByName(ED25519_CURVE_NAME)));
+		return new EdDSAPublicKey(keyBytes);
 	}
 
 	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
 		try {
-			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
-			engine.setParameter(EdDSAEngine.ONE_SHOT_MODE);
-			engine.initSign(privateKey);
-			engine.update(msg);
-			return engine.sign();
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException(e);
-		} catch (SignatureException e) {
-			throw new IOException(e);
-		} catch (InvalidAlgorithmParameterException e) {
-			throw new IOException(e);
-		} catch (InvalidKeyException e) {
+			return new Ed25519Sign(privateKey.getEncoded()).sign(msg);
+		} catch (GeneralSecurityException e) {
 			throw new IOException(e);
 		}
 	}
 
 	public static boolean verifySignature(byte[] msg, byte[] sig, EdDSAPublicKey publicKey) throws IOException {
 		try {
-			EdDSAEngine engine = new EdDSAEngine(MessageDigest.getInstance("SHA-512"));
-			engine.initVerify(publicKey);
-			engine.setParameter(EdDSAEngine.ONE_SHOT_MODE);
-			engine.update(msg);
-			return engine.verify(sig);
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException(e);
-		} catch (InvalidAlgorithmParameterException e) {
-			throw new IOException(e);
-		} catch (InvalidKeyException e) {
-			throw new IOException(e);
-		} catch (SignatureException e) {
-			throw new IOException(e);
+			new com.google.crypto.tink.subtle.Ed25519Verify(publicKey.getEncoded()).verify(sig, msg);
+			return true;
+		} catch (GeneralSecurityException e) {
+			return false;
 		}
 	}
 

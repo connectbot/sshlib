@@ -1,10 +1,10 @@
 package com.trilead.ssh2.crypto.dh;
 
-import djb.Curve25519;
+import com.google.crypto.tink.subtle.X25519;
+
 import org.junit.Test;
 
 import java.math.BigInteger;
-import java.security.SecureRandom;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -35,17 +35,11 @@ public class Curve25519ExchangeTest {
 
 	@Test
 	public void selfAgreement() throws Exception {
-		SecureRandom sr = new SecureRandom();
+		byte[] alicePrivKey = X25519.generatePrivateKey();
+		byte[] alicePubKey = X25519.publicFromPrivate(alicePrivKey);
 
-		byte[] alicePrivKey = new byte[Curve25519.KEY_SIZE];
-		sr.nextBytes(alicePrivKey);
-		byte[] alicePubKey = new byte[Curve25519.KEY_SIZE];
-		Curve25519.keygen(alicePubKey, null, alicePrivKey);
-
-		byte[] bobPrivKey = new byte[Curve25519.KEY_SIZE];
-		sr.nextBytes(bobPrivKey);
-		byte[] bobPubKey = new byte[Curve25519.KEY_SIZE];
-		Curve25519.keygen(bobPubKey, null, bobPrivKey);
+		byte[] bobPrivKey = X25519.generatePrivateKey();
+		byte[] bobPubKey = X25519.publicFromPrivate(bobPrivKey);
 
 		Curve25519Exchange alice = new Curve25519Exchange(alicePrivKey);
 		alice.setF(bobPubKey);
@@ -58,16 +52,14 @@ public class Curve25519ExchangeTest {
 	}
 
 	@Test
-	public void deriveAlicePublicKey() {
-		byte[] pubKey = new byte[Curve25519.KEY_SIZE];
-		Curve25519.keygen(pubKey, null, ALICE_PRIVATE);
+	public void deriveAlicePublicKey() throws Exception {
+		byte[] pubKey = X25519.publicFromPrivate(ALICE_PRIVATE);
 		assertArrayEquals(ALICE_PUBLIC, pubKey);
 	}
 
 	@Test
-	public void deriveBobPublicKey() {
-		byte[] pubKey = new byte[Curve25519.KEY_SIZE];
-		Curve25519.keygen(pubKey, null, BOB_PRIVATE);
+	public void deriveBobPublicKey() throws Exception {
+		byte[] pubKey = X25519.publicFromPrivate(BOB_PRIVATE);
 		assertArrayEquals(BOB_PUBLIC, pubKey);
 	}
 
