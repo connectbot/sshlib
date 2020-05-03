@@ -33,8 +33,7 @@ apply(from = "$rootDir/config/quality.gradle.kts")
 dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("net.i2p.crypto:eddsa:0.3.0")
-    implementation("net.vrallev.ecc:ecc-25519-java:1.0.3")
+    implementation("com.google.crypto.tink:tink:1.4.0-rc1")
     implementation("org.connectbot.jbcrypt:jbcrypt:1.0.0")
 
     testImplementation("junit:junit:4.12")

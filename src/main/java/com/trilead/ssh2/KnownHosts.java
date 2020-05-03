@@ -28,11 +28,11 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.trilead.ssh2.crypto.Base64;
+import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
-import net.i2p.crypto.eddsa.EdDSAPublicKey;
 
 
 /**

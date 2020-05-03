@@ -1,6 +1,7 @@
 
 package com.trilead.ssh2.transport;
 
+import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
 import com.trilead.ssh2.signature.RSASHA256Verify;
 import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
@@ -46,8 +47,6 @@ import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
-import net.i2p.crypto.eddsa.EdDSAPublicKey;
-
 
 /**
  * KexManager.

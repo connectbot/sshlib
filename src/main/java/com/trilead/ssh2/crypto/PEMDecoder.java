@@ -31,15 +31,11 @@ import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
+import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
+import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
-import net.i2p.crypto.eddsa.EdDSAPrivateKey;
-import net.i2p.crypto.eddsa.EdDSAPublicKey;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
-import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
-import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
-import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 import org.mindrot.jbcrypt.BCrypt;
 
 /**
@@ -598,10 +594,9 @@ public class PEMDecoder
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
 				byte[] publicBytes = trEnc.readByteString();
 				byte[] privateBytes = trEnc.readByteString();
-				EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(Ed25519Verify.ED25519_CURVE_NAME);
-				PrivateKey privKey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(
-						Arrays.copyOfRange(privateBytes, 0, 32), spec));
-				PublicKey pubKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(publicBytes, spec));
+				PrivateKey privKey = new EdDSAPrivateKey(
+						Arrays.copyOfRange(privateBytes, 0, 32));
+				PublicKey pubKey = new EdDSAPublicKey(publicBytes);
 				keyPair = new KeyPair(pubKey, privKey);
 			} else if (keyType.startsWith("ecdsa-sha2-")) {
 				String curveName = trEnc.readString();

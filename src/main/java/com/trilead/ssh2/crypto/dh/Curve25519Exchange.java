@@ -1,10 +1,10 @@
 package com.trilead.ssh2.crypto.dh;
 
-import djb.Curve25519;
+import com.google.crypto.tink.subtle.X25519;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.SecureRandom;
+import java.security.InvalidKeyException;
 
 /**
  * Created by Kenny Root on 1/23/16.
@@ -12,10 +12,11 @@ import java.security.SecureRandom;
 public class Curve25519Exchange extends GenericDhExchange {
 	public static final String NAME = "curve25519-sha256";
 	public static final String ALT_NAME = "curve25519-sha256@libssh.org";
+	public static final int KEY_SIZE = 32;
 
-	private final byte[] clientPublic = new byte[Curve25519.KEY_SIZE];
-	private final byte[] clientPrivate = new byte[Curve25519.KEY_SIZE];
-	private final byte[] serverPublic = new byte[Curve25519.KEY_SIZE];
+	private byte[] clientPublic;
+	private byte[] clientPrivate;
+	private byte[] serverPublic;
 
 	public Curve25519Exchange() {
 		super();
@@ -24,12 +25,11 @@ public class Curve25519Exchange extends GenericDhExchange {
 	/*
 	 * Used to test known vectors.
 	 */
-	public Curve25519Exchange(byte[] secret) {
-		if (secret.length != Curve25519.KEY_SIZE) {
+	public Curve25519Exchange(byte[] secret) throws InvalidKeyException {
+		if (secret.length != KEY_SIZE) {
 			throw new AssertionError("secret must be key size");
 		}
-		System.arraycopy(secret, 0, clientPrivate, 0, secret.length);
-		Curve25519.keygen(clientPublic, null, clientPrivate);
+		clientPrivate = secret.clone();
 	}
 
 	@Override
@@ -38,9 +38,12 @@ public class Curve25519Exchange extends GenericDhExchange {
 			throw new IOException("Invalid name " + name);
 		}
 
-		SecureRandom sr = new SecureRandom();
-		sr.nextBytes(clientPrivate);
-		Curve25519.keygen(clientPublic, null, clientPrivate);
+		clientPrivate = X25519.generatePrivateKey();
+		try {
+			clientPublic = X25519.publicFromPrivate(clientPrivate);
+		} catch (InvalidKeyException e) {
+			throw new IOException(e);
+		}
 	}
 
 	@Override
@@ -55,14 +58,17 @@ public class Curve25519Exchange extends GenericDhExchange {
 
 	@Override
 	public void setF(byte[] f) throws IOException {
-		if (f.length != serverPublic.length) {
+		if (f.length != KEY_SIZE) {
 			throw new IOException("Server sent invalid key length " + f.length + " (expected " +
-					serverPublic.length + ")");
+					KEY_SIZE + ")");
 		}
-		System.arraycopy(f, 0, serverPublic, 0, f.length);
-		byte[] sharedSecretBytes = new byte[Curve25519.KEY_SIZE];
-		Curve25519.curve(sharedSecretBytes, clientPrivate, serverPublic);
-		sharedSecret = new BigInteger(1, sharedSecretBytes);
+		serverPublic = f.clone();
+		try {
+			byte[] sharedSecretBytes = X25519.computeSharedSecret(clientPrivate, serverPublic);
+			sharedSecret = new BigInteger(1, sharedSecretBytes);
+		} catch (InvalidKeyException e) {
+			throw new IOException(e);
+		}
 	}
 
 	@Override
