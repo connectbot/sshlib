@@ -16,15 +16,15 @@ public class EdDSAPrivateKey implements PrivateKey {
 	private static final int KEY_BYTES_LENGTH = 32;
 	private static final int ENCODED_SIZE = 48;
 
-	private final byte[] keyBytes;
+	private final byte[] seed;
 	private boolean destroyed;
 
-	public EdDSAPrivateKey(byte[] seed) {
-		this.keyBytes = seed;
+	public EdDSAPrivateKey(byte[] hash) {
+		this.seed = hash;
 	}
 
 	public EdDSAPrivateKey(PKCS8EncodedKeySpec keySpec) throws InvalidKeySpecException {
-		this.keyBytes = decode(keySpec);
+		this.seed = decode(keySpec);
 	}
 
 	@Override
@@ -38,7 +38,7 @@ public class EdDSAPrivateKey implements PrivateKey {
 	}
 
 	public byte[] getSeed() {
-		return keyBytes;
+		return seed;
 	}
 
 	@Override
@@ -47,7 +47,7 @@ public class EdDSAPrivateKey implements PrivateKey {
 		TypesWriter tw = new TypesWriter();
 		// ASN.1 Sequence
 		tw.writeByte(0x30);
-		tw.writeByte(11 + ED25519_OID.length + keyBytes.length); // Length
+		tw.writeByte(11 + ED25519_OID.length + seed.length); // Length
 		// Key version type
 		tw.writeByte(0x02); // ASN.1 Integer
 		tw.writeByte(1); // Length
@@ -60,10 +60,10 @@ public class EdDSAPrivateKey implements PrivateKey {
 		tw.writeBytes(ED25519_OID);
 		// Private key sequence
 		tw.writeByte(0x04); // ASN.1 Octet string
-		tw.writeByte(2 + keyBytes.length);
+		tw.writeByte(2 + seed.length);
 		tw.writeByte(0x04); // ASN.1 Octet string
-		tw.writeByte(keyBytes.length);
-		tw.writeBytes(keyBytes);
+		tw.writeByte(seed.length);
+		tw.writeBytes(seed);
 
 		return tw.getBytes();
 	}
@@ -102,7 +102,7 @@ public class EdDSAPrivateKey implements PrivateKey {
 
 	@Override
 	public void destroy() throws DestroyFailedException {
-		Arrays.fill(keyBytes, (byte) 0);
+		Arrays.fill(seed, (byte) 0);
 		destroyed = true;
 	}
 
