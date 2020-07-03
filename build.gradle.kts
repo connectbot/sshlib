@@ -1,5 +1,7 @@
 import com.diffplug.spotless.extra.wtp.EclipseWtpFormatterStep
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+import net.researchgate.release.GitAdapter.GitConfig
+import net.researchgate.release.ReleaseExtension
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
@@ -51,6 +53,13 @@ java {
 tasks.withType<JacocoReport> {
     reports {
         xml.isEnabled = true
+    }
+}
+
+fun ReleaseExtension.git(configure: GitConfig.() -> Unit) = (getProperty("git") as GitConfig).configure()
+release {
+    git {
+        requireBranch = "main"
     }
 }
 
