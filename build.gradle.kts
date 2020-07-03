@@ -8,10 +8,10 @@ import net.researchgate.release.ReleaseExtension
 plugins {
     `java-library`
     jacoco
-    id("com.diffplug.gradle.spotless") version "3.26.1"
-    id("com.github.ben-manes.versions") version "0.27.0"
-    id("com.jfrog.artifactory") version "4.12.0"
-    id("com.jfrog.bintray") version "1.8.4"
+    id("com.diffplug.gradle.spotless") version "4.5.0"
+    id("com.github.ben-manes.versions") version "0.28.0"
+    id("com.jfrog.artifactory") version "4.16.0"
+    id("com.jfrog.bintray") version "1.8.5"
     id("net.researchgate.release") version "2.8.1"
 }
 
@@ -35,12 +35,12 @@ apply(from = "$rootDir/config/quality.gradle.kts")
 dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("com.google.crypto.tink:tink:1.4.0-rc1")
+    implementation("com.google.crypto.tink:tink:1.4.0-rc2")
     implementation("org.connectbot.jbcrypt:jbcrypt:1.0.0")
 
-    testImplementation("junit:junit:4.12")
-    testImplementation("commons-io:commons-io:2.6")
-    testImplementation("commons-codec:commons-codec:1.13")
+    testImplementation("junit:junit:4.13")
+    testImplementation("commons-io:commons-io:2.7")
+    testImplementation("commons-codec:commons-codec:1.14")
     testImplementation("org.testcontainers:testcontainers:1.12.4")
     testImplementation("ch.qos.logback:logback-classic:1.2.3")
 }
