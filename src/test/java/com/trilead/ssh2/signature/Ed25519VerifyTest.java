@@ -4,16 +4,19 @@ import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.crypto.PEMDecoder;
 import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
 import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
-
 import org.junit.Test;
 
 import java.io.IOException;
 import java.security.KeyPair;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -79,7 +82,7 @@ public class Ed25519VerifyTest {
 	@Test
 	public void decodeEncodedSuccess() throws Exception {
 		EdDSAPrivateKey privKey1 = new EdDSAPrivateKey(SECRET_KEY);
-		EdDSAPrivateKey privKey2 = new EdDSAPrivateKey(privKey1.getEncoded());
+		EdDSAPrivateKey privKey2 = new EdDSAPrivateKey(privKey1.getSeed());
 
 		EdDSAPublicKey pubKey = new EdDSAPublicKey(PUBLIC_KEY);
 
@@ -155,15 +158,33 @@ public class Ed25519VerifyTest {
 	@Test
 	public void opensshPrivateDecodesCorrectly() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
-		assertArrayEquals(SSH_KAT_ED25519_SK, pair.getPrivate().getEncoded());
-		assertArrayEquals(SSH_KAT_ED25519_PK, pair.getPublic().getEncoded());
+		assertArrayEquals(SSH_KAT_ED25519_SK, ((EdDSAPrivateKey) pair.getPrivate()).getSeed());
+		assertArrayEquals(SSH_KAT_ED25519_PK, ((EdDSAPublicKey) pair.getPublic()).getAbyte());
 	}
 
 	@Test
 	public void opensshVectorSigns() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
 		byte[] sig = Ed25519Verify.generateSignature(SSH_KAT_MESSAGE, (EdDSAPrivateKey) pair.getPrivate());
-		byte[] encoded = Ed25519Verify.encodeSSHEd25519Signature(sig);
 		assertArrayEquals(SSH_KAT_SIGNATURE, Ed25519Verify.encodeSSHEd25519Signature(sig));
+	}
+
+	@Test
+	public void encodesAndDecodesJavaFormat() throws Exception {
+		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
+
+		// Private
+		assertThat(pair.getPrivate().getFormat(), is("PKCS#8"));
+		EdDSAPrivateKey privKey = (EdDSAPrivateKey) pair.getPrivate();
+		byte[] privKeyEncoded = privKey.getEncoded();
+		EdDSAPrivateKey privKey2 = new EdDSAPrivateKey(new PKCS8EncodedKeySpec(privKeyEncoded));
+		assertThat(privKey.getSeed(), is(privKey2.getSeed()));
+
+		// Public
+		assertThat(pair.getPublic().getFormat(), is("X.509"));
+		EdDSAPublicKey pubKey = (EdDSAPublicKey) pair.getPublic();
+		byte[] pubKeyEncoded = pubKey.getEncoded();
+		EdDSAPublicKey pubKey2 = new EdDSAPublicKey(new X509EncodedKeySpec(pubKeyEncoded));
+		assertThat(pubKey.getAbyte(), is(pubKey2.getAbyte()));
 	}
 }

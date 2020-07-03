@@ -57,7 +57,7 @@ public class Ed25519Verify {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		byte[] encoded = key.getEncoded();
+		byte[] encoded = key.getAbyte();
 		tw.writeString(encoded, 0, encoded.length);
 
 		return tw.getBytes();
@@ -86,7 +86,7 @@ public class Ed25519Verify {
 
 	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
 		try {
-			return new Ed25519Sign(privateKey.getEncoded()).sign(msg);
+			return new Ed25519Sign(privateKey.getSeed()).sign(msg);
 		} catch (GeneralSecurityException e) {
 			throw new IOException(e);
 		}
@@ -94,7 +94,7 @@ public class Ed25519Verify {
 
 	public static boolean verifySignature(byte[] msg, byte[] sig, EdDSAPublicKey publicKey) throws IOException {
 		try {
-			new com.google.crypto.tink.subtle.Ed25519Verify(publicKey.getEncoded()).verify(sig, msg);
+			new com.google.crypto.tink.subtle.Ed25519Verify(publicKey.getAbyte()).verify(sig, msg);
 			return true;
 		} catch (GeneralSecurityException e) {
 			return false;
