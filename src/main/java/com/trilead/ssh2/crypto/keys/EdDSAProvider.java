@@ -3,9 +3,12 @@ package com.trilead.ssh2.crypto.keys;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.Provider;
+import java.security.Security;
 
 public class EdDSAProvider extends Provider {
 	public static final String KEY_ALGORITHM = "EdDSA";
+	private static final Object sInitLock = new Object();
+	private static boolean sInitialized = false;
 
 	public EdDSAProvider() {
 		super("ConnectBot EdDSA Provider", 1.0, "Not for use elsewhere");
@@ -24,5 +27,14 @@ public class EdDSAProvider extends Provider {
 		put("Alg.Alias.KeyFactory.OID.1.3.101.112", KEY_ALGORITHM);
 		put("Alg.Alias.KeyPairGenerator.1.3.101.112", KEY_ALGORITHM);
 		put("Alg.Alias.KeyPairGenerator.OID.1.3.101.112", KEY_ALGORITHM);
+	}
+
+	public static void insertIfNeeded() {
+		synchronized (sInitLock) {
+			if (!sInitialized) {
+				Security.addProvider(new EdDSAProvider());
+				sInitialized = true;
+			}
+		}
 	}
 }
