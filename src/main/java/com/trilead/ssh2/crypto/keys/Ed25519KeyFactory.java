@@ -10,11 +10,11 @@ import java.security.spec.KeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
-public class EdDSAKeyFactory extends KeyFactorySpi {
+public class Ed25519KeyFactory extends KeyFactorySpi {
 	@Override
 	protected PublicKey engineGeneratePublic(KeySpec keySpec) throws InvalidKeySpecException {
 		if (keySpec instanceof X509EncodedKeySpec) {
-			return new EdDSAPublicKey((X509EncodedKeySpec) keySpec);
+			return new Ed25519PublicKey((X509EncodedKeySpec) keySpec);
 		}
 		throw new InvalidKeySpecException("Unrecognized key spec: " + keySpec.getClass());
 	}
@@ -22,7 +22,7 @@ public class EdDSAKeyFactory extends KeyFactorySpi {
 	@Override
 	protected PrivateKey engineGeneratePrivate(KeySpec keySpec) throws InvalidKeySpecException {
 		if (keySpec instanceof PKCS8EncodedKeySpec) {
-			return new EdDSAPrivateKey((PKCS8EncodedKeySpec) keySpec);
+			return new Ed25519PrivateKey((PKCS8EncodedKeySpec) keySpec);
 		}
 		throw new InvalidKeySpecException("Unrecognized key spec: " + keySpec.getClass());
 	}

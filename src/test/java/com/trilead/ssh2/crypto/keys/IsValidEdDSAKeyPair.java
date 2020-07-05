@@ -15,12 +15,12 @@ public class IsValidEdDSAKeyPair extends TypeSafeMatcher<KeyPair> {
 	protected boolean matchesSafely(KeyPair item) {
 		PrivateKey privKey = item.getPrivate();
 		PublicKey pubKey = item.getPublic();
-		if (!(privKey instanceof EdDSAPrivateKey) || !(pubKey instanceof EdDSAPublicKey)) {
+		if (!(privKey instanceof Ed25519PrivateKey) || !(pubKey instanceof Ed25519PublicKey)) {
 			return false;
 		}
 
-		EdDSAPrivateKey edPriv = (EdDSAPrivateKey) privKey;
-		EdDSAPublicKey edPub = (EdDSAPublicKey) pubKey;
+		Ed25519PrivateKey edPriv = (Ed25519PrivateKey) privKey;
+		Ed25519PublicKey edPub = (Ed25519PublicKey) pubKey;
 
 		try {
 			byte[] signature = new Ed25519Sign(edPriv.getSeed()).sign(new byte[128]);

@@ -2,8 +2,8 @@ package com.trilead.ssh2.signature;
 
 import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.crypto.PEMDecoder;
-import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
-import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -63,28 +63,28 @@ public class Ed25519VerifyTest {
 
 	@Test
 	public void verifies() throws Exception {
-		EdDSAPublicKey pubKey = new EdDSAPublicKey(PUBLIC_KEY);
+		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
 		assertTrue(Ed25519Verify.verifySignature(MESSAGE, SIGNATURE, pubKey));
 	}
 
 	@Test
 	public void noVerificationForInvalidData() throws Exception {
-		EdDSAPublicKey pubKey = new EdDSAPublicKey(PUBLIC_KEY);
+		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
 		assertFalse(Ed25519Verify.verifySignature(new byte[1], SIGNATURE, pubKey));
 	}
 
 	@Test
 	public void signs() throws Exception {
-		EdDSAPrivateKey privKey = new EdDSAPrivateKey(SECRET_KEY);
+		Ed25519PrivateKey privKey = new Ed25519PrivateKey(SECRET_KEY);
 		assertEquals(Arrays.toString(SIGNATURE), Arrays.toString(Ed25519Verify.generateSignature(MESSAGE, privKey)));
 	}
 
 	@Test
 	public void decodeEncodedSuccess() throws Exception {
-		EdDSAPrivateKey privKey1 = new EdDSAPrivateKey(SECRET_KEY);
-		EdDSAPrivateKey privKey2 = new EdDSAPrivateKey(privKey1.getSeed());
+		Ed25519PrivateKey privKey1 = new Ed25519PrivateKey(SECRET_KEY);
+		Ed25519PrivateKey privKey2 = new Ed25519PrivateKey(privKey1.getSeed());
 
-		EdDSAPublicKey pubKey = new EdDSAPublicKey(PUBLIC_KEY);
+		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
 
 		byte[] message = new byte[] { (byte) 0xA5, (byte) 0x5A };
 
@@ -97,8 +97,8 @@ public class Ed25519VerifyTest {
 
 	@Test
 	public void loopbackSuccess() throws Exception {
-		EdDSAPrivateKey privKey = new EdDSAPrivateKey(SECRET_KEY);
-		EdDSAPublicKey pubKey = new EdDSAPublicKey(PUBLIC_KEY);
+		Ed25519PrivateKey privKey = new Ed25519PrivateKey(SECRET_KEY);
+		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
 
 		byte[] message = new byte[] { (byte) 0xA5, (byte) 0x5A };
 
@@ -121,8 +121,8 @@ public class Ed25519VerifyTest {
 		KeyPair pair = PEMDecoder.decode(SSH_PRIVATE_KEY, null);
 	}
 
-	private EdDSAPublicKey getTestPubKey() throws IOException {
-		return (EdDSAPublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
+	private Ed25519PublicKey getTestPubKey() throws IOException {
+		return (Ed25519PublicKey) PEMDecoder.decode(SSH_PRIVATE_KEY, null).getPublic();
 	}
 
 	private byte[] getTestPubKeyBytes() throws Exception {
@@ -152,20 +152,20 @@ public class Ed25519VerifyTest {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
 		assertTrue(Ed25519Verify.verifySignature(SSH_KAT_MESSAGE,
 				Ed25519Verify.decodeSSHEd25519Signature(SSH_KAT_SIGNATURE),
-				(EdDSAPublicKey) pair.getPublic()));
+				(Ed25519PublicKey) pair.getPublic()));
 	}
 
 	@Test
 	public void opensshPrivateDecodesCorrectly() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
-		assertArrayEquals(SSH_KAT_ED25519_SK, ((EdDSAPrivateKey) pair.getPrivate()).getSeed());
-		assertArrayEquals(SSH_KAT_ED25519_PK, ((EdDSAPublicKey) pair.getPublic()).getAbyte());
+		assertArrayEquals(SSH_KAT_ED25519_SK, ((Ed25519PrivateKey) pair.getPrivate()).getSeed());
+		assertArrayEquals(SSH_KAT_ED25519_PK, ((Ed25519PublicKey) pair.getPublic()).getAbyte());
 	}
 
 	@Test
 	public void opensshVectorSigns() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
-		byte[] sig = Ed25519Verify.generateSignature(SSH_KAT_MESSAGE, (EdDSAPrivateKey) pair.getPrivate());
+		byte[] sig = Ed25519Verify.generateSignature(SSH_KAT_MESSAGE, (Ed25519PrivateKey) pair.getPrivate());
 		assertArrayEquals(SSH_KAT_SIGNATURE, Ed25519Verify.encodeSSHEd25519Signature(sig));
 	}
 
@@ -175,16 +175,16 @@ public class Ed25519VerifyTest {
 
 		// Private
 		assertThat(pair.getPrivate().getFormat(), is("PKCS#8"));
-		EdDSAPrivateKey privKey = (EdDSAPrivateKey) pair.getPrivate();
+		Ed25519PrivateKey privKey = (Ed25519PrivateKey) pair.getPrivate();
 		byte[] privKeyEncoded = privKey.getEncoded();
-		EdDSAPrivateKey privKey2 = new EdDSAPrivateKey(new PKCS8EncodedKeySpec(privKeyEncoded));
+		Ed25519PrivateKey privKey2 = new Ed25519PrivateKey(new PKCS8EncodedKeySpec(privKeyEncoded));
 		assertThat(privKey.getSeed(), is(privKey2.getSeed()));
 
 		// Public
 		assertThat(pair.getPublic().getFormat(), is("X.509"));
-		EdDSAPublicKey pubKey = (EdDSAPublicKey) pair.getPublic();
+		Ed25519PublicKey pubKey = (Ed25519PublicKey) pair.getPublic();
 		byte[] pubKeyEncoded = pubKey.getEncoded();
-		EdDSAPublicKey pubKey2 = new EdDSAPublicKey(new X509EncodedKeySpec(pubKeyEncoded));
+		Ed25519PublicKey pubKey2 = new Ed25519PublicKey(new X509EncodedKeySpec(pubKeyEncoded));
 		assertThat(pubKey.getAbyte(), is(pubKey2.getAbyte()));
 	}
 }

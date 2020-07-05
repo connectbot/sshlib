@@ -31,8 +31,8 @@ import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
-import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
-import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
@@ -594,9 +594,9 @@ public class PEMDecoder
 			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
 				byte[] publicBytes = trEnc.readByteString();
 				byte[] privateBytes = trEnc.readByteString();
-				PrivateKey privKey = new EdDSAPrivateKey(
+				PrivateKey privKey = new Ed25519PrivateKey(
 						Arrays.copyOfRange(privateBytes, 0, 32));
-				PublicKey pubKey = new EdDSAPublicKey(publicBytes);
+				PublicKey pubKey = new Ed25519PublicKey(publicBytes);
 				keyPair = new KeyPair(pubKey, privKey);
 			} else if (keyType.startsWith("ecdsa-sha2-")) {
 				String curveName = trEnc.readString();

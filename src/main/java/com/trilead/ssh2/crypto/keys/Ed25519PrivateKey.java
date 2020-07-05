@@ -11,7 +11,7 @@ import java.util.Arrays;
 
 import javax.security.auth.DestroyFailedException;
 
-public class EdDSAPrivateKey implements PrivateKey {
+public class Ed25519PrivateKey implements PrivateKey {
 	private static final byte[] ED25519_OID = new byte[] {43, 101, 112};
 	private static final int KEY_BYTES_LENGTH = 32;
 	private static final int ENCODED_SIZE = 48;
@@ -19,12 +19,36 @@ public class EdDSAPrivateKey implements PrivateKey {
 	private final byte[] seed;
 	private boolean destroyed;
 
-	public EdDSAPrivateKey(byte[] hash) {
+	public Ed25519PrivateKey(byte[] hash) {
 		this.seed = hash;
 	}
 
-	public EdDSAPrivateKey(PKCS8EncodedKeySpec keySpec) throws InvalidKeySpecException {
+	public Ed25519PrivateKey(PKCS8EncodedKeySpec keySpec) throws InvalidKeySpecException {
 		this.seed = decode(keySpec);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(seed);
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (!(o instanceof Ed25519PrivateKey)) {
+			return false;
+		}
+
+		Ed25519PrivateKey other = (Ed25519PrivateKey) o;
+
+		if (seed == null || other.seed == null || seed.length != other.seed.length) {
+			return false;
+		}
+
+		int difference = 0;
+		for (int i = 0; i < seed.length; i++) {
+			difference |= seed[i] ^ other.seed[i];
+		}
+		return difference == 0;
 	}
 
 	@Override

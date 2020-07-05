@@ -1,8 +1,8 @@
 
 package com.trilead.ssh2.auth;
 
-import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
-import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.signature.RSASHA256Verify;
 import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
@@ -325,11 +325,11 @@ public class AuthenticationManager implements MessageHandler
 
 				tm.sendMessage(ua.getPayload());
 			}
-			else if (publicKey instanceof EdDSAPublicKey)
+			else if (publicKey instanceof Ed25519PublicKey)
 			{
 				final String algo = Ed25519Verify.ED25519_ID;
 
-				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((EdDSAPublicKey) publicKey);
+				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((Ed25519PublicKey) publicKey);
 
 				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
 
@@ -340,7 +340,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
-					EdDSAPrivateKey pk = (EdDSAPrivateKey) privateKey;
+					Ed25519PrivateKey pk = (Ed25519PrivateKey) privateKey;
 					byte[] ds = Ed25519Verify.generateSignature(msg, pk);
 					ed_sig_enc = Ed25519Verify.encodeSSHEd25519Signature(ds);
 				}

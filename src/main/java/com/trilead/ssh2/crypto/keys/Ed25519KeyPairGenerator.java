@@ -7,7 +7,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGeneratorSpi;
 import java.security.SecureRandom;
 
-public class EdDSAKeyPairGenerator extends KeyPairGeneratorSpi {
+public class Ed25519KeyPairGenerator extends KeyPairGeneratorSpi {
 	@Override
 	public void initialize(int keySize, SecureRandom secureRandom) {
 		// ignored.
@@ -17,7 +17,7 @@ public class EdDSAKeyPairGenerator extends KeyPairGeneratorSpi {
 	public KeyPair generateKeyPair() {
 		try {
 			Ed25519Sign.KeyPair kp = Ed25519Sign.KeyPair.newKeyPair();
-			return new KeyPair(new EdDSAPublicKey(kp.getPublicKey()), new EdDSAPrivateKey(kp.getPrivateKey()));
+			return new KeyPair(new Ed25519PublicKey(kp.getPublicKey()), new Ed25519PrivateKey(kp.getPrivateKey()));
 		} catch (GeneralSecurityException e) {
 			throw new IllegalStateException(e);
 		}
