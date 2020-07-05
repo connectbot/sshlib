@@ -30,8 +30,8 @@
 package com.trilead.ssh2.signature;
 
 import com.google.crypto.tink.subtle.Ed25519Sign;
-import com.trilead.ssh2.crypto.keys.EdDSAPrivateKey;
-import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
@@ -53,7 +53,7 @@ public class Ed25519Verify {
 	private static final int ED25519_PK_SIZE_BYTES = 32;
 	private static final int ED25519_SIG_SIZE_BYTES = 64;
 
-	public static byte[] encodeSSHEd25519PublicKey(EdDSAPublicKey key) {
+	public static byte[] encodeSSHEd25519PublicKey(Ed25519PublicKey key) {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
@@ -63,7 +63,7 @@ public class Ed25519Verify {
 		return tw.getBytes();
 	}
 
-	public static EdDSAPublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {
+	public static Ed25519PublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {
 		TypesReader tr = new TypesReader(key);
 
 		String key_format = tr.readString();
@@ -81,10 +81,10 @@ public class Ed25519Verify {
 			throw new IOException("Ed25519 was not of correct length: " + keyBytes.length + " vs " + ED25519_PK_SIZE_BYTES);
 		}
 
-		return new EdDSAPublicKey(keyBytes);
+		return new Ed25519PublicKey(keyBytes);
 	}
 
-	public static byte[] generateSignature(byte[] msg, EdDSAPrivateKey privateKey) throws IOException {
+	public static byte[] generateSignature(byte[] msg, Ed25519PrivateKey privateKey) throws IOException {
 		try {
 			return new Ed25519Sign(privateKey.getSeed()).sign(msg);
 		} catch (GeneralSecurityException e) {
@@ -92,7 +92,7 @@ public class Ed25519Verify {
 		}
 	}
 
-	public static boolean verifySignature(byte[] msg, byte[] sig, EdDSAPublicKey publicKey) throws IOException {
+	public static boolean verifySignature(byte[] msg, byte[] sig, Ed25519PublicKey publicKey) throws IOException {
 		try {
 			new com.google.crypto.tink.subtle.Ed25519Verify(publicKey.getAbyte()).verify(sig, msg);
 			return true;

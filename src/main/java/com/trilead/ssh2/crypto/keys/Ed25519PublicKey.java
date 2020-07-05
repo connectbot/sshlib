@@ -9,18 +9,18 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
-public class EdDSAPublicKey implements PublicKey {
+public class Ed25519PublicKey implements PublicKey {
 	private static final byte[] ED25519_OID = new byte[]{43, 101, 112};
 	private static final int KEY_BYTES_LENGTH = 32;
 	private static final int ENCODED_SIZE = 44;
 
 	private final byte[] keyBytes;
 
-	public EdDSAPublicKey(byte[] keyBytes) {
+	public Ed25519PublicKey(byte[] keyBytes) {
 		this.keyBytes = keyBytes;
 	}
 
-	public EdDSAPublicKey(X509EncodedKeySpec keySpec) throws InvalidKeySpecException {
+	public Ed25519PublicKey(X509EncodedKeySpec keySpec) throws InvalidKeySpecException {
 		keyBytes = decode(keySpec.getEncoded());
 	}
 
@@ -51,6 +51,25 @@ public class EdDSAPublicKey implements PublicKey {
 		tw.writeByte(0);
 		tw.writeBytes(keyBytes);
 		return tw.getBytes();
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(keyBytes);
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (!(o instanceof Ed25519PublicKey)) {
+			return false;
+		}
+
+		Ed25519PublicKey other = (Ed25519PublicKey) o;
+		if (keyBytes == null || other.keyBytes == null) {
+			return false;
+		}
+
+		return Arrays.equals(keyBytes, other.keyBytes);
 	}
 
 	private static byte[] decode(byte[] input) throws InvalidKeySpecException {

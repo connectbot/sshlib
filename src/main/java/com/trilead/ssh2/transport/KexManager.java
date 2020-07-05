@@ -1,7 +1,7 @@
 
 package com.trilead.ssh2.transport;
 
-import com.trilead.ssh2.crypto.keys.EdDSAPublicKey;
+import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.signature.RSASHA256Verify;
 import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
@@ -418,7 +418,7 @@ public class KexManager
 	{
 		if (kxs.np.server_host_key_algo.equals(Ed25519Verify.ED25519_ID)) {
 			byte[] eds = Ed25519Verify.decodeSSHEd25519Signature(sig);
-			EdDSAPublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(hostkey);
+			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(hostkey);
 
 			log.log(50, "Verifying ed25519 signature");
 
