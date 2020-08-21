@@ -96,7 +96,7 @@ public class DropbearCompatibilityTest {
 
 	private void assertCanConnectToServerThatHasKeyType(@NotNull String keyPath, String keyType) throws IOException {
 		ConnectionInfo info = connectToServerWithOptions("-r " + keyPath);
-		assertThat(keyType, is(info.serverHostKeyAlgorithm));
+		assertThat(info.serverHostKeyAlgorithm, is(keyType));
 	}
 
 	private void canConnectWithPubkey(String keyFilename) throws Exception {
@@ -166,7 +166,7 @@ public class DropbearCompatibilityTest {
 	private void assertCanConnectToServerWithKex(@NotNull String kexType) throws IOException {
 		ConnectionInfo info = connectToServer(
 				c -> c.setKeyExchangeAlgorithms(new String[]{kexType}));
-		assertThat(kexType, is(info.keyExchangeAlgorithm));
+		assertThat(info.keyExchangeAlgorithm, is(kexType));
 	}
 
 	@Test
@@ -211,8 +211,8 @@ public class DropbearCompatibilityTest {
 
 	private void assertCanConnectToServerWithCipher(@NotNull String cipher) throws IOException {
 		ConnectionInfo info = connectToServer(c -> setCiphers(c, cipher));
-		assertThat(cipher, is(info.clientToServerCryptoAlgorithm));
-		assertThat(cipher, is(info.serverToClientCryptoAlgorithm));
+		assertThat(info.clientToServerCryptoAlgorithm, is(cipher));
+		assertThat(info.serverToClientCryptoAlgorithm, is(cipher));
 	}
 
 	@Test
@@ -232,8 +232,8 @@ public class DropbearCompatibilityTest {
 
 	private void assertCanConnectToServerWithMac(@NotNull String mac) throws IOException {
 		ConnectionInfo info = connectToServer(c -> setMac(c, mac));
-		assertThat(mac, is(info.clientToServerMACAlgorithm));
-		assertThat(mac, is(info.serverToClientMACAlgorithm));
+		assertThat(info.clientToServerMACAlgorithm, is(mac));
+		assertThat(info.serverToClientMACAlgorithm, is(mac));
 	}
 
 	@Test
@@ -259,15 +259,15 @@ public class DropbearCompatibilityTest {
 				}
 
 				ConnectionInfo info = c.getConnectionInfo();
-				assertThat("zlib@openssh.com", is(info.clientToServerCompressionAlgorithm));
-				assertThat("zlib@openssh.com", is(info.serverToClientCompressionAlgorithm));
+				assertThat(info.clientToServerCompressionAlgorithm, is("zlib@openssh.com"));
+				assertThat(info.serverToClientCompressionAlgorithm, is("zlib@openssh.com"));
 			}
 		}
 	}
 
 	private void canConnectWithHostKeyAlgorithm(String keyPath, String hostKeyAlgorithm) throws Exception {
 		ConnectionInfo info = connectToServerWithOptions("-r " + keyPath, c -> c.setServerHostKeyAlgorithms(new String[]{hostKeyAlgorithm}));
-		assertThat(hostKeyAlgorithm, is(info.serverHostKeyAlgorithm));
+		assertThat(info.serverHostKeyAlgorithm, is(hostKeyAlgorithm));
 	}
 
 	@Test
