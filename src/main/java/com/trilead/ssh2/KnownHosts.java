@@ -101,7 +101,7 @@ public class KnownHosts
 		if (hostnames == null)
 			throw new IllegalArgumentException("hostnames may not be null");
 
-		if ("ssh-rsa".equals(serverHostKeyAlgorithm))
+		if ("ssh-rsa".equals(serverHostKeyAlgorithm) || serverHostKeyAlgorithm.startsWith("rsa-sha2-"))
 		{
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
 
@@ -597,7 +597,7 @@ public class KnownHosts
 	{
 		PublicKey remoteKey = null;
 
-		if ("ssh-rsa".equals(serverHostKeyAlgorithm))
+		if ("ssh-rsa".equals(serverHostKeyAlgorithm) || serverHostKeyAlgorithm.startsWith("rsa-sha2-"))
 		{
 			remoteKey = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
 		}
