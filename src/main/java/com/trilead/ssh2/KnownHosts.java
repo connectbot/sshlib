@@ -20,8 +20,10 @@ import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Locale;
+import java.util.Set;
 import java.util.Vector;
 
 import javax.crypto.Mac;
@@ -57,19 +59,21 @@ public class KnownHosts
 	public static final int HOSTKEY_IS_NEW = 1;
 	public static final int HOSTKEY_HAS_CHANGED = 2;
 
-	protected class KnownHostsEntry
+	protected static class KnownHostsEntry
 	{
 		String[] patterns;
 		PublicKey key;
+		String algorithm;
 
-		KnownHostsEntry(String[] patterns, PublicKey key)
+		KnownHostsEntry(String[] patterns, PublicKey key, String algorithm)
 		{
 			this.patterns = patterns;
 			this.key = key;
+			this.algorithm = algorithm;
 		}
 	}
 
-	protected LinkedList<KnownHostsEntry> publicKeys = new LinkedList<KnownHostsEntry>();
+	final protected LinkedList<KnownHostsEntry> publicKeys = new LinkedList<KnownHostsEntry>();
 
 	public KnownHosts()
 	{
@@ -107,7 +111,7 @@ public class KnownHosts
 
 			synchronized (publicKeys)
 			{
-				publicKeys.add(new KnownHostsEntry(hostnames, rpk));
+				publicKeys.add(new KnownHostsEntry(hostnames, rpk, serverHostKeyAlgorithm));
 			}
 		}
 		else if ("ssh-dss".equals(serverHostKeyAlgorithm))
@@ -116,7 +120,7 @@ public class KnownHosts
 
 			synchronized (publicKeys)
 			{
-				publicKeys.add(new KnownHostsEntry(hostnames, dpk));
+				publicKeys.add(new KnownHostsEntry(hostnames, dpk, serverHostKeyAlgorithm));
 			}
 		}
 		else if (serverHostKeyAlgorithm.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX))
@@ -125,7 +129,7 @@ public class KnownHosts
 
 			synchronized (publicKeys)
 			{
-				publicKeys.add(new KnownHostsEntry(hostnames, epk));
+				publicKeys.add(new KnownHostsEntry(hostnames, epk, serverHostKeyAlgorithm));
 			}
 		}
 		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
@@ -134,7 +138,7 @@ public class KnownHosts
 
 			synchronized (publicKeys)
 			{
-				publicKeys.add(new KnownHostsEntry(hostnames, edpk));
+				publicKeys.add(new KnownHostsEntry(hostnames, edpk, serverHostKeyAlgorithm));
 			}
 		}
 		else
@@ -303,6 +307,22 @@ public class KnownHosts
 		}
 
 		return keys;
+	}
+
+	private Vector<KnownHostsEntry> getAllKnownHostEntries(String hostname)
+	{
+		Vector<KnownHostsEntry> knownHostsEntries = new Vector<>();
+
+		synchronized (publicKeys)
+		{
+			for (KnownHostsEntry ke : publicKeys) {
+				if (hostnameMatches(ke.patterns, hostname)) {
+					knownHostsEntries.addElement(ke);
+				}
+			}
+		}
+
+		return knownHostsEntries;
 	}
 
 	/**
@@ -526,55 +546,13 @@ public class KnownHosts
 
 	private String[] recommendHostkeyAlgorithms(String hostname)
 	{
-		String preferredAlgo = null;
+		Set<String> algorithms = new LinkedHashSet<>();
 
-		Vector<PublicKey> keys = getAllKeys(hostname);
-
-		for (int i = 0; i < keys.size(); i++)
-		{
-			String thisAlgo = null;
-
-			if (keys.elementAt(i) instanceof RSAPublicKey)
-				thisAlgo = "ssh-rsa";
-			else if (keys.elementAt(i) instanceof DSAPublicKey)
-				thisAlgo = "ssh-dss";
-			else
-				continue;
-
-			if (preferredAlgo != null)
-			{
-				/* If we find different key types, then return null */
-
-				if (preferredAlgo.compareTo(thisAlgo) != 0)
-					return null;
-
-				/* OK, we found the same algo again, optimize */
-
-				continue;
-			}
+		for (KnownHostsEntry key : getAllKnownHostEntries(hostname)) {
+			algorithms.add(key.algorithm);
 		}
 
-		/* If we did not find anything that we know of, return null */
-
-		if (preferredAlgo == null)
-			return null;
-
-		/* Now put the preferred algo to the start of the array.
-		 * You may ask yourself why we do it that way - basically, we could just
-		 * return only the preferred algorithm: since we have a saved key of that
-		 * type (sent earlier from the remote host), then that should work out.
-		 * However, imagine that the server is (for whatever reasons) not offering
-		 * that type of hostkey anymore (e.g., "ssh-rsa" was disabled and
-		 * now "ssh-dss" is being used). If we then do not let the server send us
-		 * a fresh key of the new type, then we shoot ourself into the foot:
-		 * the connection cannot be established and hence the user cannot decide
-		 * if he/she wants to accept the new key.
-		 */
-
-		if (preferredAlgo.equals("ssh-rsa"))
-			return new String[] { "ssh-rsa", "ssh-dss" };
-
-		return new String[] { "ssh-dss", "ssh-rsa" };
+		return algorithms.toArray(new String[0]);
 	}
 
 	/**
