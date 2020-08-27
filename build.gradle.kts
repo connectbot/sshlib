@@ -43,6 +43,7 @@ dependencies {
     testImplementation("commons-codec:commons-codec:1.14")
     testImplementation("org.testcontainers:testcontainers:1.12.4")
     testImplementation("ch.qos.logback:logback-classic:1.2.3")
+    testImplementation("org.hamcrest:hamcrest:2.2")
 }
 
 java {
