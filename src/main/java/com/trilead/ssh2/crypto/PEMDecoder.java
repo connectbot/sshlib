@@ -34,6 +34,7 @@ import com.trilead.ssh2.crypto.cipher.DESede;
 import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.packets.TypesReader;
+import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import org.mindrot.jbcrypt.BCrypt;
@@ -639,7 +640,7 @@ public class PEMDecoder
 				RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
 
 				keyPair = generateKeyPair("RSA", privateKeySpec, publicKeySpec);
-			} else if ("ssh-dss".equals(keyType)) {
+			} else if (DSASHA1Verify.ID_SSH_DSS.equals(keyType)) {
 				BigInteger p = trEnc.readMPINT();
 				BigInteger q = trEnc.readMPINT();
 				BigInteger g = trEnc.readMPINT();

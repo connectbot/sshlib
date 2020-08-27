@@ -215,7 +215,7 @@ public class AuthenticationManager implements MessageHandler
 			{
 				byte[] pk_enc = DSASHA1Verify.encodeSSHDSAPublicKey((DSAPublicKey) publicKey);
 
-				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, "ssh-dss", pk_enc);
+				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, DSASHA1Verify.ID_SSH_DSS, pk_enc);
 
 				byte[] ds_enc;
 				if (signatureProxy != null)
@@ -230,7 +230,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
-						"ssh-dss", pk_enc, ds_enc);
+						DSASHA1Verify.ID_SSH_DSS, pk_enc, ds_enc);
 				tm.sendMessage(ua.getPayload());
 			}
 			else if (publicKey instanceof RSAPublicKey)
