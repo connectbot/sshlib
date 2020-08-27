@@ -6,9 +6,9 @@ import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
@@ -117,7 +117,7 @@ public class RSASHA1Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, RSAPrivateKey pk) throws IOException
+	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA1withRSA");

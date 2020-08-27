@@ -10,11 +10,8 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.interfaces.DSAPrivateKey;
 import java.security.interfaces.DSAPublicKey;
-import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Set;
 import java.util.Vector;
@@ -224,8 +221,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
-					DSAPrivateKey pk = (DSAPrivateKey) privateKey;
-					byte[] ds = DSASHA1Verify.generateSignature(msg, pk, rnd);
+					byte[] ds = DSASHA1Verify.generateSignature(msg, privateKey, rnd);
 					ds_enc = DSASHA1Verify.encodeSSHDSASignature(ds);
 				}
 
@@ -254,8 +250,7 @@ public class AuthenticationManager implements MessageHandler
 					}
 					else
 					{
-						RSAPrivateKey pk = (RSAPrivateKey) privateKey;
-						byte[] ds = RSASHA512Verify.generateSignature(msg, pk);
+						byte[] ds = RSASHA512Verify.generateSignature(msg, privateKey);
 						rsa_sig_enc = RSASHA512Verify.encodeRSASHA512Signature(ds);
 					}
 				}
@@ -270,8 +265,7 @@ public class AuthenticationManager implements MessageHandler
 					}
 					else
 					{
-						RSAPrivateKey pk = (RSAPrivateKey) privateKey;
-						byte[] ds = RSASHA256Verify.generateSignature(msg, pk);
+						byte[] ds = RSASHA256Verify.generateSignature(msg, privateKey);
 						rsa_sig_enc = RSASHA256Verify.encodeRSASHA256Signature(ds);
 					}
 				}
@@ -285,9 +279,8 @@ public class AuthenticationManager implements MessageHandler
 					}
 					else
 					{
-						RSAPrivateKey pk = (RSAPrivateKey) privateKey;
 						// Server always accepts RSA with SHA1
-						byte[] ds = RSASHA1Verify.generateSignature(msg, pk);
+						byte[] ds = RSASHA1Verify.generateSignature(msg, privateKey);
 						rsa_sig_enc = RSASHA1Verify.encodeSSHRSASignature(ds);
 					}
 				}
@@ -314,8 +307,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
-					ECPrivateKey pk = (ECPrivateKey) privateKey;
-					byte[] ds = ECDSASHA2Verify.generateSignature(msg, pk);
+					byte[] ds = ECDSASHA2Verify.generateSignature(msg, privateKey);
 					ec_sig_enc = ECDSASHA2Verify.encodeSSHECDSASignature(ds, ecPublicKey.getParams());
 				}
 
