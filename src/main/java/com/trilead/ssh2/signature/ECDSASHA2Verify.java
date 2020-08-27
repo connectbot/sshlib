@@ -170,6 +170,10 @@ public class ECDSASHA2Verify {
 		return tw.getBytes();
 	}
 
+	public static String getSshKeyType(ECParameterSpec params) throws IOException {
+		return ECDSA_SHA2_PREFIX + getCurveName(params);
+	}
+
 	public static String getCurveName(ECParameterSpec params) throws IOException {
 		int fieldSize = getCurveSize(params);
 		final String curveName = getCurveName(fieldSize);
@@ -296,8 +300,7 @@ public class ECDSASHA2Verify {
 	{
 		TypesWriter tw = new TypesWriter();
 
-		String curveName = getCurveName(params);
-		tw.writeString(ECDSA_SHA2_PREFIX + curveName);
+		tw.writeString(getSshKeyType(params));
 
 		/*
 		 * This is a signature in ASN.1 DER format. It should look like:

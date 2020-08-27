@@ -110,7 +110,7 @@ public class KnownHostsTest {
 				hasKeyType("EdDSA"),
 				hasKeyType("DSA"),
 				hasKeyType("EC"),
-				hasKeyType("EdDSA")));
+				hasKeyType("RSA")));
 	}
 
 	@Test
@@ -139,8 +139,14 @@ public class KnownHostsTest {
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("rsa"),
 			arrayContaining(
-				"ssh-rsa",
-				"ssh-dss"
+				equalTo("rsa-sha2-512"),
+				equalTo("rsa-sha2-256"),
+				equalTo("ssh-rsa"),
+				equalTo("ssh-ed25519"),
+				equalTo("ecdsa-sha2-nistp256"),
+				equalTo("ecdsa-sha2-nistp384"),
+				equalTo("ecdsa-sha2-nistp521"),
+				equalTo("ssh-dss")
 			));
 	}
 
@@ -150,8 +156,14 @@ public class KnownHostsTest {
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("dss"),
 			arrayContaining(
-				"ssh-dss",
-				"ssh-rsa"
+				equalTo("ssh-dss"),
+				equalTo("ssh-ed25519"),
+				equalTo("ecdsa-sha2-nistp256"),
+				equalTo("ecdsa-sha2-nistp384"),
+				equalTo("ecdsa-sha2-nistp521"),
+				equalTo("rsa-sha2-512"),
+				equalTo("rsa-sha2-256"),
+				equalTo("ssh-rsa")
 			));
 	}
 
@@ -160,7 +172,16 @@ public class KnownHostsTest {
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("ecdsap256"),
-			nullValue());
+			arrayContaining(
+				equalTo("ecdsa-sha2-nistp256"),
+				equalTo("ssh-ed25519"),
+				equalTo("ecdsa-sha2-nistp384"),
+				equalTo("ecdsa-sha2-nistp521"),
+				equalTo("rsa-sha2-512"),
+				equalTo("rsa-sha2-256"),
+				equalTo("ssh-rsa"),
+				equalTo("ssh-dss")
+			));
 	}
 
 	@Test
@@ -168,8 +189,16 @@ public class KnownHostsTest {
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("multiple"),
-			nullValue());
-	}
+			arrayContaining(
+				equalTo("ecdsa-sha2-nistp256"),
+				equalTo("rsa-sha2-512"),
+				equalTo("rsa-sha2-256"),
+				equalTo("ssh-rsa"),
+				equalTo("ssh-ed25519"),
+				equalTo("ecdsa-sha2-nistp384"),
+				equalTo("ecdsa-sha2-nistp521"),
+				equalTo("ssh-dss")
+			));	}
 
 	@Test
 	public void getPreferredServerHostkeyAlgorithmOrder_Unknown() throws Exception {

@@ -28,6 +28,7 @@ import com.trilead.ssh2.packets.TypesWriter;
 public class RSASHA1Verify
 {
 	private static final Logger log = Logger.getLogger(RSASHA1Verify.class);
+	public static final String ID_SSH_RSA = "ssh-rsa";
 
 	public static RSAPublicKey decodeSSHRSAPublicKey(byte[] key) throws IOException
 	{
@@ -35,7 +36,7 @@ public class RSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (!key_format.equals("ssh-rsa"))
+		if (!key_format.equals(ID_SSH_RSA))
 			throw new IllegalArgumentException("This is not a ssh-rsa public key");
 
 		BigInteger e = tr.readMPINT();
@@ -58,7 +59,7 @@ public class RSASHA1Verify
 	{
 		TypesWriter tw = new TypesWriter();
 
-		tw.writeString("ssh-rsa");
+		tw.writeString(ID_SSH_RSA);
 		tw.writeMPInt(pk.getPublicExponent());
 		tw.writeMPInt(pk.getModulus());
 
@@ -71,7 +72,7 @@ public class RSASHA1Verify
 
 		String sig_format = tr.readString();
 
-		if (!sig_format.equals("ssh-rsa"))
+		if (!sig_format.equals(ID_SSH_RSA))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
@@ -99,7 +100,7 @@ public class RSASHA1Verify
 	{
 		TypesWriter tw = new TypesWriter();
 
-		tw.writeString("ssh-rsa");
+		tw.writeString(ID_SSH_RSA);
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
 		 * containing s (which is an integer, without lengths or padding, unsigned and in
