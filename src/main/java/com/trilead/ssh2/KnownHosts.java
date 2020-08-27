@@ -623,20 +623,19 @@ public class KnownHosts
 		if (result == HOSTKEY_IS_OK)
 			return result;
 
-		InetAddress[] ipAdresses = null;
+		InetAddress[] ipAddresses = null;
 
 		try
 		{
-			ipAdresses = InetAddress.getAllByName(hostname);
+			ipAddresses = InetAddress.getAllByName(hostname);
 		}
 		catch (UnknownHostException e)
 		{
 			return result;
 		}
 
-		for (int i = 0; i < ipAdresses.length; i++)
-		{
-			int newresult = checkKey(ipAdresses[i].getHostAddress(), remoteKey);
+		for (InetAddress ipAddress : ipAddresses) {
+			int newresult = checkKey(ipAddress.getHostAddress(), remoteKey);
 
 			if (newresult == HOSTKEY_IS_OK)
 				return newresult;
