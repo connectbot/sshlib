@@ -6,11 +6,11 @@ import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.DSAParams;
-import java.security.interfaces.DSAPrivateKey;
 import java.security.interfaces.DSAPublicKey;
 import java.security.spec.DSAPublicKeySpec;
 import java.security.spec.InvalidKeySpecException;
@@ -217,7 +217,7 @@ public class DSASHA1Verify
 		}
 	}
 
-	public static byte[] generateSignature(byte[] message, DSAPrivateKey pk, SecureRandom rnd) throws IOException
+	public static byte[] generateSignature(byte[] message, PrivateKey pk, SecureRandom rnd) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA1withDSA");

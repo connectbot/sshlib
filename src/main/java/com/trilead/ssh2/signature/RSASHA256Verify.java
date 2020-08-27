@@ -6,9 +6,9 @@ import com.trilead.ssh2.packets.TypesWriter;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 public class RSASHA256Verify
@@ -66,7 +66,7 @@ public class RSASHA256Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, RSAPrivateKey pk) throws IOException
+	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA256withRSA");

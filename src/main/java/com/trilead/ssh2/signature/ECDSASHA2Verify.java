@@ -36,9 +36,10 @@ import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECFieldFp;
 import java.security.spec.ECParameterSpec;
@@ -322,9 +323,9 @@ public class ECDSASHA2Verify {
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, ECPrivateKey pk) throws IOException
+	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
 	{
-		final String algo = getSignatureAlgorithmForParams(pk.getParams());
+		final String algo = getSignatureAlgorithmForParams(((ECKey) pk).getParams());
 
 		try {
 			Signature s = Signature.getInstance(algo);
