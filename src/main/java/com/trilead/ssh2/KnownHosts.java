@@ -120,7 +120,7 @@ public class KnownHosts
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, rpk));
 			}
-		} else if ("ssh-dss".equals(serverHostKeyAlgorithm)) {
+		} else if (serverHostKeyAlgorithm.equals(DSASHA1Verify.ID_SSH_DSS)) {
 			DSAPublicKey dpk = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
 
 			synchronized (publicKeys)
@@ -532,7 +532,7 @@ public class KnownHosts
 		RSASHA1Verify.ID_SSH_RSA,
 	};
 
-	private final String ALGO_FOR_DSS = "ssh-dss";
+	private final String ALGO_FOR_DSS = DSASHA1Verify.ID_SSH_DSS;
 
 	private final String ALGO_FOR_EDDSA = Ed25519Verify.ED25519_ID;
 
@@ -613,7 +613,7 @@ public class KnownHosts
 		{
 			remoteKey = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
 		}
-		else if ("ssh-dss".equals(serverHostKeyAlgorithm))
+		else if (DSASHA1Verify.ID_SSH_DSS.equals(serverHostKeyAlgorithm))
 		{
 			remoteKey = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
 		}
@@ -752,7 +752,7 @@ public class KnownHosts
 		else if (RSASHA1Verify.ID_SSH_RSA.equals(keyType))
 		{
 		}
-		else if ("ssh-dss".equals(keyType))
+		else if (DSASHA1Verify.ID_SSH_DSS.equals(keyType))
 		{
 		}
 		else if (RSASHA256Verify.ID_RSA_SHA_2_256.equals(keyType))

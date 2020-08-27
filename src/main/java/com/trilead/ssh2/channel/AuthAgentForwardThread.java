@@ -321,7 +321,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 				pubSpec = new RSAPublicKeySpec(n, e);
 				privSpec = new RSAPrivateCrtKeySpec(n, e, d, p, q, dmp1, dmq1, iqmp);
-			} else if (type.equals("ssh-dss")) {
+			} else if (type.equals(DSASHA1Verify.ID_SSH_DSS)) {
 				keyType = "DSA";
 
 				BigInteger p = tr.readMPINT();

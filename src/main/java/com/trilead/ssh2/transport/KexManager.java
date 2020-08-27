@@ -81,7 +81,7 @@ public class KexManager
 		HOSTKEY_ALGS.add(RSASHA512Verify.ID_RSA_SHA_2_512);
 		HOSTKEY_ALGS.add(RSASHA256Verify.ID_RSA_SHA_2_256);
 		HOSTKEY_ALGS.add(RSASHA1Verify.ID_SSH_RSA);
-		HOSTKEY_ALGS.add("ssh-dss");
+		HOSTKEY_ALGS.add(DSASHA1Verify.ID_SSH_DSS);
 	}
 
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<>();
@@ -466,7 +466,7 @@ public class KexManager
 			return RSASHA1Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("ssh-dss"))
+		if (kxs.np.server_host_key_algo.equals(DSASHA1Verify.ID_SSH_DSS))
 		{
 			byte[] ds = DSASHA1Verify.decodeSSHDSASignature(sig);
 			DSAPublicKey dpk = DSASHA1Verify.decodeSSHDSAPublicKey(hostkey);

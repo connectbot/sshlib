@@ -30,6 +30,7 @@ import com.trilead.ssh2.packets.TypesWriter;
 public class DSASHA1Verify
 {
 	private static final Logger log = Logger.getLogger(DSASHA1Verify.class);
+	public static final String ID_SSH_DSS = "ssh-dss";
 
 	public static DSAPublicKey decodeSSHDSAPublicKey(byte[] key) throws IOException
 	{
@@ -37,7 +38,7 @@ public class DSASHA1Verify
 
 		String key_format = tr.readString();
 
-		if (!key_format.equals("ssh-dss"))
+		if (!key_format.equals(DSASHA1Verify.ID_SSH_DSS))
 			throw new IllegalArgumentException("This is not a ssh-dss public key!");
 
 		BigInteger p = tr.readMPINT();
@@ -62,7 +63,7 @@ public class DSASHA1Verify
 	{
 		TypesWriter tw = new TypesWriter();
 
-		tw.writeString("ssh-dss");
+		tw.writeString(DSASHA1Verify.ID_SSH_DSS);
 
 		DSAParams params = pk.getParams();
 		tw.writeMPInt(params.getP());
@@ -88,7 +89,7 @@ public class DSASHA1Verify
 	{
 		TypesWriter tw = new TypesWriter();
 
-		tw.writeString("ssh-dss");
+		tw.writeString(ID_SSH_DSS);
 
 		int len, index;
 
@@ -132,7 +133,7 @@ public class DSASHA1Verify
 			TypesReader tr = new TypesReader(sig);
 
 			String sig_format = tr.readString();
-			if (!sig_format.equals("ssh-dss"))
+			if (!sig_format.equals(DSASHA1Verify.ID_SSH_DSS))
 				throw new IOException("Peer sent wrong signature format");
 
 			rsArray = tr.readByteString();
