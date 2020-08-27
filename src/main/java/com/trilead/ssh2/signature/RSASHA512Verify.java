@@ -14,6 +14,7 @@ import java.security.interfaces.RSAPublicKey;
 public class RSASHA512Verify
 {
 	private static final Logger log = Logger.getLogger(RSASHA512Verify.class);
+	public static final String ID_RSA_SHA_2_512 = "rsa-sha2-512";
 
 	public static byte[] decodeRSASHA512Signature(byte[] sig) throws IOException
 	{
@@ -21,7 +22,7 @@ public class RSASHA512Verify
 
 		String sig_format = tr.readString();
 
-		if (!sig_format.equals("rsa-sha2-512"))
+		if (!sig_format.equals(ID_RSA_SHA_2_512))
 			throw new IOException("Peer sent wrong signature format");
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
@@ -49,7 +50,7 @@ public class RSASHA512Verify
 	{
 		TypesWriter tw = new TypesWriter();
 
-		tw.writeString("rsa-sha2-512");
+		tw.writeString(ID_RSA_SHA_2_512);
 
 		/* S is NOT an MPINT. "The value for 'rsa_signature_blob' is encoded as a string
 		 * containing s (which is an integer, without lengths or padding, unsigned and in

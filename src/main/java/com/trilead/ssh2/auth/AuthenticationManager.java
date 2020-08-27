@@ -244,9 +244,9 @@ public class AuthenticationManager implements MessageHandler
 				Set<String> algsAccepted = tm.getExtensionInfo().getSignatureAlgorithmsAccepted();
 				final byte[] rsa_sig_enc;
 
-				if (algsAccepted.contains("rsa-sha2-512"))
+				if (algsAccepted.contains(RSASHA512Verify.ID_RSA_SHA_2_512))
 				{
-					pk_algorithm = "rsa-sha2-512";
+					pk_algorithm = RSASHA512Verify.ID_RSA_SHA_2_512;
 					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
 					if (signatureProxy != null)
 					{
@@ -259,9 +259,9 @@ public class AuthenticationManager implements MessageHandler
 						rsa_sig_enc = RSASHA512Verify.encodeRSASHA512Signature(ds);
 					}
 				}
-				else if (algsAccepted.contains("rsa-sha2-256"))
+				else if (algsAccepted.contains(RSASHA256Verify.ID_RSA_SHA_2_256))
 				{
-					pk_algorithm = "rsa-sha2-256";
+					pk_algorithm = RSASHA256Verify.ID_RSA_SHA_2_256;
 					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
 
 					if (signatureProxy != null)
@@ -301,8 +301,7 @@ public class AuthenticationManager implements MessageHandler
 			{
 				ECPublicKey ecPublicKey = (ECPublicKey) publicKey;
 
-				final String algo = ECDSASHA2Verify.ECDSA_SHA2_PREFIX
-						+ ECDSASHA2Verify.getCurveName(ecPublicKey.getParams());
+				final String algo = ECDSASHA2Verify.getSshKeyType(ecPublicKey.getParams());
 
 				byte[] pk_enc = ECDSASHA2Verify.encodeSSHECDSAPublicKey(ecPublicKey);
 

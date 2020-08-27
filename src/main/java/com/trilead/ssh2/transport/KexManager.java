@@ -78,9 +78,9 @@ public class KexManager
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp384");
 			HOSTKEY_ALGS.add("ecdsa-sha2-nistp521");
 		}
-		HOSTKEY_ALGS.add("rsa-sha2-512");
-		HOSTKEY_ALGS.add("rsa-sha2-256");
-		HOSTKEY_ALGS.add("ssh-rsa");
+		HOSTKEY_ALGS.add(RSASHA512Verify.ID_RSA_SHA_2_512);
+		HOSTKEY_ALGS.add(RSASHA256Verify.ID_RSA_SHA_2_256);
+		HOSTKEY_ALGS.add(RSASHA1Verify.ID_SSH_RSA);
 		HOSTKEY_ALGS.add("ssh-dss");
 	}
 
@@ -426,7 +426,7 @@ public class KexManager
 
 		}
 
-		if (kxs.np.server_host_key_algo.startsWith("ecdsa-sha2-"))
+		if (kxs.np.server_host_key_algo.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX))
 		{
 			byte[] rs = ECDSASHA2Verify.decodeSSHECDSASignature(sig);
 			ECPublicKey epk = ECDSASHA2Verify.decodeSSHECDSAPublicKey(hostkey);
@@ -436,7 +436,7 @@ public class KexManager
 			return ECDSASHA2Verify.verifySignature(kxs.H, rs, epk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("rsa-sha2-512"))
+		if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.ID_RSA_SHA_2_512))
 		{
 			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
@@ -446,7 +446,7 @@ public class KexManager
 			return RSASHA512Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("rsa-sha2-256"))
+		if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.ID_RSA_SHA_2_256))
 		{
 			byte[] rs = RSASHA256Verify.decodeRSASHA256Signature(sig);
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
@@ -456,7 +456,7 @@ public class KexManager
 			return RSASHA256Verify.verifySignature(kxs.H, rs, rpk);
 		}
 
-		if (kxs.np.server_host_key_algo.equals("ssh-rsa"))
+		if (kxs.np.server_host_key_algo.equals(RSASHA1Verify.ID_SSH_RSA))
 		{
 			byte[] rs = RSASHA1Verify.decodeSSHRSASignature(sig);
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
