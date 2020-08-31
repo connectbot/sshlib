@@ -138,7 +138,10 @@ public class KnownHostsTest {
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("rsa"),
-			nullValue());
+			arrayContaining(
+				"ssh-rsa",
+				"ssh-dss"
+			));
 	}
 
 	@Test
@@ -146,7 +149,10 @@ public class KnownHostsTest {
 		KnownHosts obj = new KnownHosts();
 		obj.addHostkeys(getKnownHosts("known_hosts"));
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("dss"),
-			nullValue());
+			arrayContaining(
+				"ssh-dss",
+				"ssh-rsa"
+			));
 	}
 
 	@Test

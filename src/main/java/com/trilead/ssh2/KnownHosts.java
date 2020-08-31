@@ -554,6 +554,8 @@ public class KnownHosts
 
 				continue;
 			}
+
+			preferredAlgo = thisAlgo;
 		}
 
 		/* If we did not find anything that we know of, return null */
