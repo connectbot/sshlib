@@ -35,7 +35,7 @@ apply(from = "$rootDir/config/quality.gradle.kts")
 dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("com.google.crypto.tink:tink:1.4.0-rc2")
+    implementation("com.google.crypto.tink:tink:1.4.0")
     implementation("org.connectbot.jbcrypt:jbcrypt:1.0.0")
 
     testImplementation("junit:junit:4.13")
@@ -43,6 +43,8 @@ dependencies {
     testImplementation("commons-codec:commons-codec:1.14")
     testImplementation("org.testcontainers:testcontainers:1.12.4")
     testImplementation("ch.qos.logback:logback-classic:1.2.3")
+    testImplementation("org.hamcrest:hamcrest:2.2")
+    testImplementation("org.mockito:mockito-core:3.5.7")
 }
 
 java {

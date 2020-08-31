@@ -19,10 +19,12 @@ import java.security.SecureRandom;
 import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
-import java.util.Vector;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -33,7 +35,9 @@ import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
-
+import com.trilead.ssh2.signature.RSASHA256Verify;
+import com.trilead.ssh2.signature.RSASHA512Verify;
+import com.trilead.ssh2.transport.KexManager;
 
 /**
  * The <code>KnownHosts</code> class is a handy tool to verify received server hostkeys
@@ -67,9 +71,14 @@ public class KnownHosts
 			this.patterns = patterns;
 			this.key = key;
 		}
+
+		@Override
+		public String toString() {
+			return "KnownHostsEntry{keyType=" + key.getAlgorithm() + "}";
+		}
 	}
 
-	protected LinkedList<KnownHostsEntry> publicKeys = new LinkedList<KnownHostsEntry>();
+	protected final LinkedList<KnownHostsEntry> publicKeys = new LinkedList<>();
 
 	public KnownHosts()
 	{
@@ -96,12 +105,14 @@ public class KnownHosts
 	 * @param serverHostKey as passed to the {@link ServerHostKeyVerifier}.
 	 * @throws IOException
 	 */
-	public void addHostkey(String hostnames[], String serverHostKeyAlgorithm, byte[] serverHostKey) throws IOException
+	public void addHostkey(String[] hostnames, String serverHostKeyAlgorithm, byte[] serverHostKey) throws IOException
 	{
 		if (hostnames == null)
 			throw new IllegalArgumentException("hostnames may not be null");
 
-		if ("ssh-rsa".equals(serverHostKeyAlgorithm) || serverHostKeyAlgorithm.startsWith("rsa-sha2-"))
+		if (RSASHA1Verify.ID_SSH_RSA.equals(serverHostKeyAlgorithm) ||
+			RSASHA512Verify.ID_RSA_SHA_2_512.equals(serverHostKeyAlgorithm) ||
+			RSASHA256Verify.ID_RSA_SHA_2_256.equals(serverHostKeyAlgorithm))
 		{
 			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
 
@@ -109,36 +120,30 @@ public class KnownHosts
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, rpk));
 			}
-		}
-		else if ("ssh-dss".equals(serverHostKeyAlgorithm))
-		{
+		} else if (serverHostKeyAlgorithm.equals(DSASHA1Verify.ID_SSH_DSS)) {
 			DSAPublicKey dpk = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, dpk));
 			}
-		}
-		else if (serverHostKeyAlgorithm.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX))
-		{
+		} else if (serverHostKeyAlgorithm.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX)) {
 			ECPublicKey epk = ECDSASHA2Verify.decodeSSHECDSAPublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, epk));
 			}
-		}
-		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
-		{
+		} else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm)) {
 			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, edpk));
 			}
-		}
-		else
+		} else {
 			throw new IOException("Unknown host key type (" + serverHostKeyAlgorithm + ")");
+		}
 	}
 
 	/**
@@ -283,9 +288,9 @@ public class KnownHosts
 		return result;
 	}
 
-	private Vector<PublicKey> getAllKeys(String hostname)
+	private List<PublicKey> getAllKeys(String hostname)
 	{
-		Vector<PublicKey> keys = new Vector<PublicKey>();
+		List<PublicKey> keys = new ArrayList<>();
 
 		synchronized (publicKeys)
 		{
@@ -298,7 +303,7 @@ public class KnownHosts
 				if (!hostnameMatches(ke.patterns, hostname))
 					continue;
 
-				keys.addElement(ke.key);
+				keys.add(ke.key);
 			}
 		}
 
@@ -324,20 +329,17 @@ public class KnownHosts
 		if (algos != null)
 			return algos;
 
-		InetAddress[] ipAdresses = null;
+		InetAddress[] ipAddresses;
 
 		try
 		{
-			ipAdresses = InetAddress.getAllByName(hostname);
-		}
-		catch (UnknownHostException e)
-		{
+			ipAddresses = InetAddress.getAllByName(hostname);
+		} catch (UnknownHostException e) {
 			return null;
 		}
 
-		for (int i = 0; i < ipAdresses.length; i++)
-		{
-			algos = recommendHostkeyAlgorithms(ipAdresses[i].getHostAddress());
+		for (InetAddress ipAddress : ipAddresses) {
+			algos = recommendHostkeyAlgorithms(ipAddress.getHostAddress());
 
 			if (algos != null)
 				return algos;
@@ -524,39 +526,40 @@ public class KnownHosts
 		}
 	}
 
-	private String[] recommendHostkeyAlgorithms(String hostname)
-	{
-		String preferredAlgo = null;
+	private final String[] ALGOS_FOR_RSA = new String[] {
+		RSASHA512Verify.ID_RSA_SHA_2_512,
+		RSASHA256Verify.ID_RSA_SHA_2_256,
+		RSASHA1Verify.ID_SSH_RSA,
+	};
 
-		Vector<PublicKey> keys = getAllKeys(hostname);
+	private final String ALGO_FOR_DSS = DSASHA1Verify.ID_SSH_DSS;
 
-		for (int i = 0; i < keys.size(); i++)
-		{
-			String thisAlgo = null;
+	private final String ALGO_FOR_EDDSA = Ed25519Verify.ED25519_ID;
 
-			if (keys.elementAt(i) instanceof RSAPublicKey)
-				thisAlgo = "ssh-rsa";
-			else if (keys.elementAt(i) instanceof DSAPublicKey)
-				thisAlgo = "ssh-dss";
-			else
-				continue;
+	private String[] recommendHostkeyAlgorithms(String hostname) {
+		List<String> preferredAlgos = new ArrayList<>();
 
-			if (preferredAlgo != null)
-			{
-				/* If we find different key types, then return null */
+		List<PublicKey> keys = getAllKeys(hostname);
 
-				if (preferredAlgo.compareTo(thisAlgo) != 0)
-					return null;
-
-				/* OK, we found the same algo again, optimize */
-
-				continue;
+		for (PublicKey key : keys) {
+			if (key instanceof RSAPublicKey) {
+				preferredAlgos.addAll(Arrays.asList(ALGOS_FOR_RSA));
+			} else if (key instanceof DSAPublicKey) {
+				preferredAlgos.add(ALGO_FOR_DSS);
+			} else if (key instanceof Ed25519PublicKey) {
+				preferredAlgos.add(ALGO_FOR_EDDSA);
+			} else if (key instanceof ECPublicKey) {
+				ECPublicKey ecPublicKey = (ECPublicKey) key;
+				try {
+					preferredAlgos.add(
+						ECDSASHA2Verify.getSshKeyType(ecPublicKey.getParams()));
+				} catch (IOException ignored) {
+				}
 			}
 		}
 
 		/* If we did not find anything that we know of, return null */
-
-		if (preferredAlgo == null)
+		if (preferredAlgos.isEmpty())
 			return null;
 
 		/* Now put the preferred algo to the start of the array.
@@ -571,10 +574,17 @@ public class KnownHosts
 		 * if he/she wants to accept the new key.
 		 */
 
-		if (preferredAlgo.equals("ssh-rsa"))
-			return new String[] { "ssh-rsa", "ssh-dss" };
-
-		return new String[] { "ssh-dss", "ssh-rsa" };
+		List<String> preferredAndOthers = new ArrayList<>();
+		List<String> notPreferred = new ArrayList<>();
+		for (String algo : KexManager.getDefaultServerHostkeyAlgorithmList()) {
+			if (preferredAlgos.contains(algo)) {
+				preferredAndOthers.add(algo);
+			} else {
+				notPreferred.add(algo);
+			}
+		}
+		preferredAndOthers.addAll(notPreferred);
+		return preferredAndOthers.toArray(new String[0]);
 	}
 
 	/**
@@ -597,11 +607,13 @@ public class KnownHosts
 	{
 		PublicKey remoteKey = null;
 
-		if ("ssh-rsa".equals(serverHostKeyAlgorithm) || serverHostKeyAlgorithm.startsWith("rsa-sha2-"))
+		if (RSASHA1Verify.ID_SSH_RSA.equals(serverHostKeyAlgorithm) ||
+			RSASHA256Verify.ID_RSA_SHA_2_256.equals(serverHostKeyAlgorithm) ||
+			RSASHA512Verify.ID_RSA_SHA_2_512.equals(serverHostKeyAlgorithm))
 		{
 			remoteKey = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
 		}
-		else if ("ssh-dss".equals(serverHostKeyAlgorithm))
+		else if (DSASHA1Verify.ID_SSH_DSS.equals(serverHostKeyAlgorithm))
 		{
 			remoteKey = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
 		}
@@ -621,20 +633,19 @@ public class KnownHosts
 		if (result == HOSTKEY_IS_OK)
 			return result;
 
-		InetAddress[] ipAdresses = null;
+		InetAddress[] ipAddresses = null;
 
 		try
 		{
-			ipAdresses = InetAddress.getAllByName(hostname);
+			ipAddresses = InetAddress.getAllByName(hostname);
 		}
 		catch (UnknownHostException e)
 		{
 			return result;
 		}
 
-		for (int i = 0; i < ipAdresses.length; i++)
-		{
-			int newresult = checkKey(ipAdresses[i].getHostAddress(), remoteKey);
+		for (InetAddress ipAddress : ipAddresses) {
+			int newresult = checkKey(ipAddress.getHostAddress(), remoteKey);
 
 			if (newresult == HOSTKEY_IS_OK)
 				return newresult;
@@ -711,7 +722,7 @@ public class KnownHosts
 	 * @param hostkey the hostkey
 	 * @return the raw fingerprint
 	 */
-	static final private byte[] rawFingerPrint(String type, String keyType, byte[] hostkey)
+	private static byte[] rawFingerPrint(String type, String keyType, byte[] hostkey)
 	{
 		MessageDigest dig = null;
 
@@ -735,19 +746,19 @@ public class KnownHosts
 		if (Ed25519Verify.ED25519_ID.equals(keyType))
 		{
 		}
-		else if (keyType.startsWith("ecdsa-sha2-"))
+		else if (keyType.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX))
 		{
 		}
-		else if ("ssh-rsa".equals(keyType))
+		else if (RSASHA1Verify.ID_SSH_RSA.equals(keyType))
 		{
 		}
-		else if ("ssh-dss".equals(keyType))
+		else if (DSASHA1Verify.ID_SSH_DSS.equals(keyType))
 		{
 		}
-		else if ("rsa-sha2-256".equals(keyType))
+		else if (RSASHA256Verify.ID_RSA_SHA_2_256.equals(keyType))
 		{
 		}
-		else if ("rsa-sha2-512".equals(keyType))
+		else if (RSASHA512Verify.ID_RSA_SHA_2_512.equals(keyType))
 		{
 		}
 		else
@@ -765,11 +776,11 @@ public class KnownHosts
 	 * @param fingerprint raw fingerprint
 	 * @return the hex representation
 	 */
-	static final private String rawToHexFingerprint(byte[] fingerprint)
+	private static String rawToHexFingerprint(byte[] fingerprint)
 	{
 		final char[] alpha = "0123456789abcdef".toCharArray();
 
-		StringBuffer sb = new StringBuffer();
+		StringBuilder sb = new StringBuilder();
 
 		for (int i = 0; i < fingerprint.length; i++)
 		{
@@ -793,7 +804,7 @@ public class KnownHosts
 		final char[] v = "aeiouy".toCharArray();
 		final char[] c = "bcdfghklmnprstvzx".toCharArray();
 
-		StringBuffer sb = new StringBuffer();
+		StringBuilder sb = new StringBuilder();
 
 		int seed = 1;
 
