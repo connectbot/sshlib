@@ -43,7 +43,7 @@ public class TypesReader
 		this.pos = off;
 		this.max = off + len;
 
-		if ((pos < 0) || (pos > arr.length))
+		if ((pos < 0) || (pos >= arr.length))
 			throw new IllegalArgumentException("Illegal offset.");
 
 		if ((max < 0) || (max > arr.length))
@@ -60,6 +60,9 @@ public class TypesReader
 
 	public byte[] readBytes(int len) throws IOException
 	{
+		if (len < 0)
+			throw new IOException("Negative length requested");
+
 		if ((pos + len) > max)
 			throw new IOException("Packet too short.");
 
@@ -73,6 +76,12 @@ public class TypesReader
 
 	public void readBytes(byte[] dst, int off, int len) throws IOException
 	{
+		if (off < 0 || len < 0)
+			throw new IOException("Negative offset or length specified");
+
+		if (len > dst.length - off)
+			throw new IOException("Length too long for output buffer");
+
 		if ((pos + len) > max)
 			throw new IOException("Packet too short.");
 
@@ -115,12 +124,12 @@ public class TypesReader
 	{
 		BigInteger b;
 
-		byte raw[] = readByteString();
+		byte[] raw = readByteString();
 
 		if (raw.length == 0)
 			b = BigInteger.ZERO;
 		else
-			b = new BigInteger(1, raw);
+			b = new BigInteger(raw);
 
 		return b;
 	}

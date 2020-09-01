@@ -19,6 +19,10 @@ public class Tokenizer
 	 */
 	public static String[] parseTokens(String source, char delimiter)
 	{
+		if (source.length() == 0) {
+			return new String[0];
+		}
+
 		int numtoken = 1;
 
 		for (int i = 0; i < source.length(); i++)
@@ -27,7 +31,7 @@ public class Tokenizer
 				numtoken++;
 		}
 
-		String list[] = new String[numtoken];
+		String[] list = new String[numtoken];
 		int nextfield = 0;
 
 		for (int i = 0; i < numtoken; i++)
