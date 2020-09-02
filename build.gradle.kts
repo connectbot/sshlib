@@ -8,9 +8,9 @@ import net.researchgate.release.ReleaseExtension
 plugins {
     `java-library`
     jacoco
-    id("com.diffplug.gradle.spotless") version "4.5.0"
-    id("com.github.ben-manes.versions") version "0.28.0"
-    id("com.jfrog.artifactory") version "4.16.0"
+    id("com.diffplug.spotless") version "5.3.0"
+    id("com.github.ben-manes.versions") version "0.29.0"
+    id("com.jfrog.artifactory") version "4.17.2"
     id("com.jfrog.bintray") version "1.8.5"
     id("net.researchgate.release") version "2.8.1"
 }
@@ -40,11 +40,11 @@ dependencies {
 
     testImplementation("junit:junit:4.13")
     testImplementation("commons-io:commons-io:2.7")
-    testImplementation("commons-codec:commons-codec:1.14")
-    testImplementation("org.testcontainers:testcontainers:1.12.4")
+    testImplementation("commons-codec:commons-codec:1.15")
+    testImplementation("org.testcontainers:testcontainers:1.14.3")
     testImplementation("ch.qos.logback:logback-classic:1.2.3")
     testImplementation("org.hamcrest:hamcrest:2.2")
-    testImplementation("org.mockito:mockito-core:3.5.7")
+    testImplementation("org.mockito:mockito-core:3.5.9")
 }
 
 java {
