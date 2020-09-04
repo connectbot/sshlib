@@ -15,7 +15,7 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
 import java.io.IOException;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * Integration tests against OpenSSH.
@@ -33,7 +33,8 @@ public class OpenSSHCompatibilityTest {
 	private static final String USERNAME = "testuser";
 	private static final String PASSWORD = "testtest123";
 
-	private static ImageFromDockerfile baseImage = new ImageFromDockerfile("openssh-server", false)
+	private static final ImageFromDockerfile baseImage = new ImageFromDockerfile(
+		"openssh-server", false)
 				.withFileFromClasspath(".", "openssh-server");
 
 	static {
@@ -42,23 +43,25 @@ public class OpenSSHCompatibilityTest {
 		}
 	}
 
+	private ExtendedServerHostKeyVerifier verifier = new TestExtendedHostKeyVerifier();
+
 	@NotNull
 	@Contract("_ -> new")
-	private Connection withServer(@NotNull GenericContainer container) {
+	private Connection withServer(@NotNull GenericContainer<?> container) {
 		return new Connection(container.getContainerIpAddress(), container.getMappedPort(22));
 	}
 
-	private static GenericContainer getBaseContainer() {
-		return new GenericContainer(baseImage)
+	private static GenericContainer<?> getBaseContainer() {
+		return new GenericContainer<>(baseImage)
 				.withExposedPorts(22)
 				.withLogConsumer(logConsumer)
 				.waitingFor(new LogMessageWaitStrategy()
 						.withRegEx(".*Server listening on .*\\s"));
 	}
 
-	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
+	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer<?> server) throws IOException {
 		try (Connection c = withServer(server)) {
-			c.connect();
+			c.connect(verifier);
 			assertThat(c.authenticateWithPassword(USERNAME, PASSWORD), is(true));
 			try (Session s = c.openSession()) {
 				s.ping();
@@ -68,7 +71,7 @@ public class OpenSSHCompatibilityTest {
 	}
 
 	private ConnectionInfo connectToServerWithOptions(@NotNull String options) throws IOException {
-		try (GenericContainer server = getBaseContainer().withEnv(OPTIONS_ENV, options)) {
+		try (GenericContainer<?> server = getBaseContainer().withEnv(OPTIONS_ENV, options)) {
 			server.start();
 			return assertCanPasswordAuthenticate(server);
 		}
@@ -82,10 +85,10 @@ public class OpenSSHCompatibilityTest {
 	private void canConnectWithPubkey(String keyFilename) throws Exception {
 		char[] keyChars = IOUtils.toCharArray(getClass().getResourceAsStream("crypto/" + keyFilename), "UTF-8");
 
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			try (Connection connection = withServer(server)) {
-				connection.connect();
+				connection.connect(verifier);
 				assertThat(connection.authenticateWithPublicKey(USERNAME, keyChars, ""), is(true));
 				try (Session session = connection.openSession()) {
 					session.ping();
@@ -121,7 +124,7 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void canConnectWithPassword() throws Exception {
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			assertCanPasswordAuthenticate(server);
 		}
@@ -129,10 +132,10 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void wrongPasswordFails() throws Exception {
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			try (Connection c = withServer(server)) {
-				c.connect();
+				c.connect(verifier);
 				assertThat(c.authenticateWithPassword(USERNAME, "wrongpassword"), is(false));
 			}
 		}
@@ -287,12 +290,12 @@ public class OpenSSHCompatibilityTest {
 
 	@Test
 	public void canConnectWithCompression() throws Exception {
-		try (GenericContainer server = getBaseContainer()
+		try (GenericContainer<?> server = getBaseContainer()
 				.withEnv(OPTIONS_ENV, "-oCompression=yes")) {
 			server.start();
 			try (Connection c = withServer(server)) {
 				c.setCompression(true);
-				c.connect();
+				c.connect(verifier);
 				assertThat(c.authenticateWithPassword(USERNAME, PASSWORD), is(true));
 				try (Session s = c.openSession()) {
 					s.ping();
