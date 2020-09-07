@@ -511,9 +511,8 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 					response = RSASHA1Verify.encodeSSHRSASignature(signature);
 				}
 			} else if (privKey instanceof DSAPrivateKey) {
-				byte[] signature = DSASHA1Verify.generateSignature(challenge,
-						(DSAPrivateKey) privKey, new SecureRandom());
-				response = DSASHA1Verify.encodeSSHDSASignature(signature);
+				response = DSASHA1Verify.get().generateSignature(challenge,
+						privKey, new SecureRandom());
 			} else {
 				os.write(SSH_AGENT_FAILURE);
 				return;
@@ -592,7 +591,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 	}
 
 	/**
-	 * @param tw
+	 * @param message
 	 * @throws IOException
 	 */
 	private void sendPacket(byte[] message) throws IOException

@@ -34,6 +34,7 @@ import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
+import com.trilead.ssh2.signature.SSHSignature;
 import com.trilead.ssh2.transport.MessageHandler;
 import com.trilead.ssh2.transport.TransportManager;
 
@@ -210,7 +211,8 @@ public class AuthenticationManager implements MessageHandler
 
 			if (publicKey instanceof DSAPublicKey)
 			{
-				byte[] pk_enc = DSASHA1Verify.encodeSSHDSAPublicKey((DSAPublicKey) publicKey);
+				SSHSignature s = DSASHA1Verify.get();
+				byte[] pk_enc = s.encodePublicKey(publicKey);
 
 				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, DSASHA1Verify.ID_SSH_DSS, pk_enc);
 
@@ -221,8 +223,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
-					byte[] ds = DSASHA1Verify.generateSignature(msg, privateKey, rnd);
-					ds_enc = DSASHA1Verify.encodeSSHDSASignature(ds);
+					ds_enc = s.generateSignature(msg, privateKey, rnd);
 				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,

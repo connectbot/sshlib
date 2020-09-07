@@ -7,6 +7,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
@@ -27,12 +28,28 @@ import com.trilead.ssh2.packets.TypesWriter;
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: DSASHA1Verify.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
-public class DSASHA1Verify
+public class DSASHA1Verify implements SSHSignature
 {
+
 	private static final Logger log = Logger.getLogger(DSASHA1Verify.class);
 	public static final String ID_SSH_DSS = "ssh-dss";
 
-	public static DSAPublicKey decodeSSHDSAPublicKey(byte[] key) throws IOException
+	private static class InstanceHolder {
+		private static DSASHA1Verify sInstance = new DSASHA1Verify();
+	}
+
+	private DSASHA1Verify() {}
+
+	public static DSASHA1Verify get() {
+		return InstanceHolder.sInstance;
+	}
+
+	@Override
+	public String getKeyFormat() {
+		return ID_SSH_DSS;
+	}
+
+	public PublicKey decodePublicKey(byte[] key) throws IOException
 	{
 		TypesReader tr = new TypesReader(key);
 
@@ -59,17 +76,19 @@ public class DSASHA1Verify
 		}
 	}
 
-	public static byte[] encodeSSHDSAPublicKey(DSAPublicKey pk) throws IOException
+	public byte[] encodePublicKey(PublicKey pk) throws IOException
 	{
+		DSAPublicKey dsaPublicKey = (DSAPublicKey) pk;
+
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(DSASHA1Verify.ID_SSH_DSS);
 
-		DSAParams params = pk.getParams();
+		DSAParams params = dsaPublicKey.getParams();
 		tw.writeMPInt(params.getP());
 		tw.writeMPInt(params.getQ());
 		tw.writeMPInt(params.getG());
-		tw.writeMPInt(pk.getY());
+		tw.writeMPInt(dsaPublicKey.getY());
 
 		return tw.getBytes();
 	}
@@ -85,7 +104,7 @@ public class DSASHA1Verify
 	 * }
 	 * </pre>
 	 */
-	public static byte[] encodeSSHDSASignature(byte[] ds)
+	private static byte[] encodeSignature(byte[] ds)
 	{
 		TypesWriter tw = new TypesWriter();
 
@@ -118,7 +137,7 @@ public class DSASHA1Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] decodeSSHDSASignature(byte[] sig) throws IOException
+	private byte[] decodeSignature(byte[] sig) throws IOException
 	{
 		byte[] rsArray = null;
 
@@ -204,13 +223,14 @@ public class DSASHA1Verify
 		return rsArray;
 	}
 
-	public static boolean verifySignature(byte[] message, byte[] ds, DSAPublicKey dpk) throws IOException
+	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey dpk) throws IOException
 	{
+		byte[] javaSig = decodeSignature(sshSig);
 		try {
 			Signature s = Signature.getInstance("SHA1withDSA");
 			s.initVerify(dpk);
 			s.update(message);
-			return s.verify(ds);
+			return s.verify(javaSig);
 		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
 			throw new IOException("No such algorithm", e);
 		} catch (SignatureException e) {
@@ -218,13 +238,13 @@ public class DSASHA1Verify
 		}
 	}
 
-	public static byte[] generateSignature(byte[] message, PrivateKey pk, SecureRandom rnd) throws IOException
+	public byte[] generateSignature(byte[] message, PrivateKey pk, SecureRandom rnd) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA1withDSA");
 			s.initSign(pk);
 			s.update(message);
-			return s.sign();
+			return encodeSignature(s.sign());
 		} catch (NoSuchAlgorithmException | SignatureException | InvalidKeyException e) {
 			throw new IOException(e);
 		}
