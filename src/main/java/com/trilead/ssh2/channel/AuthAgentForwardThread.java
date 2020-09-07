@@ -507,8 +507,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 					byte[] signature = RSASHA256Verify.generateSignature(challenge, rsaPrivKey);
 					response = RSASHA256Verify.encodeRSASHA256Signature(signature);
 				} else {
-					byte[] signature = RSASHA1Verify.generateSignature(challenge, rsaPrivKey);
-					response = RSASHA1Verify.encodeSSHRSASignature(signature);
+					response = RSASHA1Verify.get().generateSignature(challenge, rsaPrivKey, new SecureRandom());
 				}
 			} else if (privKey instanceof DSAPrivateKey) {
 				response = DSASHA1Verify.get().generateSignature(challenge,

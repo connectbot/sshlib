@@ -37,6 +37,7 @@ import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
+import com.trilead.ssh2.signature.RSASHA1Verify;
 import org.mindrot.jbcrypt.BCrypt;
 
 /**
@@ -618,7 +619,7 @@ public class PEMDecoder
 				ECPublicKeySpec publicKeySpec = new ECPublicKeySpec(group, spec);
 				ECPrivateKeySpec privateKeySpec = new ECPrivateKeySpec(privateKey, spec);
 				keyPair = generateKeyPair("EC", privateKeySpec, publicKeySpec);
-			} else if ("ssh-rsa".equals(keyType)) {
+			} else if (RSASHA1Verify.get().getKeyFormat().equals(keyType)) {
 				BigInteger n = trEnc.readMPINT();
 				BigInteger e = trEnc.readMPINT();
 				BigInteger d = trEnc.readMPINT();

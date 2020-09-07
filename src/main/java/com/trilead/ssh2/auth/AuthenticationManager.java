@@ -232,7 +232,7 @@ public class AuthenticationManager implements MessageHandler
 			}
 			else if (publicKey instanceof RSAPublicKey)
 			{
-				byte[] pk_enc = RSASHA1Verify.encodeSSHRSAPublicKey((RSAPublicKey) publicKey);
+				byte[] pk_enc = RSASHA1Verify.get().encodePublicKey(publicKey);
 				String pk_algorithm;
 
 
@@ -281,8 +281,7 @@ public class AuthenticationManager implements MessageHandler
 					else
 					{
 						// Server always accepts RSA with SHA1
-						byte[] ds = RSASHA1Verify.generateSignature(msg, privateKey);
-						rsa_sig_enc = RSASHA1Verify.encodeSSHRSASignature(ds);
+						rsa_sig_enc = RSASHA1Verify.get().generateSignature(msg, privateKey, rnd);
 					}
 				}
 

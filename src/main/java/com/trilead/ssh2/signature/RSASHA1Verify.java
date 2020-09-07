@@ -7,6 +7,8 @@ import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.RSAPublicKey;
@@ -25,12 +27,27 @@ import com.trilead.ssh2.packets.TypesWriter;
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: RSASHA1Verify.java,v 1.1 2007/10/15 12:49:57 cplattne Exp $
  */
-public class RSASHA1Verify
+public class RSASHA1Verify implements SSHSignature
 {
 	private static final Logger log = Logger.getLogger(RSASHA1Verify.class);
 	public static final String ID_SSH_RSA = "ssh-rsa";
 
-	public static RSAPublicKey decodeSSHRSAPublicKey(byte[] key) throws IOException
+	private static class InstanceHolder {
+		private static RSASHA1Verify sInstance = new RSASHA1Verify();
+	}
+
+	private RSASHA1Verify() {}
+
+	public static RSASHA1Verify get() {
+		return RSASHA1Verify.InstanceHolder.sInstance;
+	}
+
+	@Override
+	public String getKeyFormat() {
+		return ID_SSH_RSA;
+	}
+
+	public PublicKey decodePublicKey(byte[] key) throws IOException
 	{
 		TypesReader tr = new TypesReader(key);
 
@@ -49,24 +66,26 @@ public class RSASHA1Verify
 
 		try {
 			KeyFactory kf = KeyFactory.getInstance("RSA");
-			return (RSAPublicKey) kf.generatePublic(keySpec);
+			return kf.generatePublic(keySpec);
 		} catch (NoSuchAlgorithmException | InvalidKeySpecException nsae) {
 			throw new IOException("No RSA KeyFactory available", nsae);
 		}
 	}
 
-	public static byte[] encodeSSHRSAPublicKey(RSAPublicKey pk) throws IOException
+	public byte[] encodePublicKey(PublicKey pk) throws IOException
 	{
+		RSAPublicKey rsaPublicKey = (RSAPublicKey) pk;
+
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ID_SSH_RSA);
-		tw.writeMPInt(pk.getPublicExponent());
-		tw.writeMPInt(pk.getModulus());
+		tw.writeMPInt(rsaPublicKey.getPublicExponent());
+		tw.writeMPInt(rsaPublicKey.getModulus());
 
 		return tw.getBytes();
 	}
 
-	public static byte[] decodeSSHRSASignature(byte[] sig) throws IOException
+	private static byte[] decodeSignature(byte[] sig) throws IOException
 	{
 		TypesReader tr = new TypesReader(sig);
 
@@ -96,7 +115,7 @@ public class RSASHA1Verify
 		return s;
 	}
 
-	public static byte[] encodeSSHRSASignature(byte[] s) throws IOException
+	private static byte[] encodeSignature(byte[] s) throws IOException
 	{
 		TypesWriter tw = new TypesWriter();
 
@@ -117,25 +136,26 @@ public class RSASHA1Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
+	public byte[] generateSignature(byte[] message, PrivateKey pk, SecureRandom secureRandom) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA1withRSA");
-			s.initSign(pk);
+			s.initSign(pk, secureRandom);
 			s.update(message);
-			return s.sign();
+			return encodeSignature(s.sign());
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
 	}
 
-	public static boolean verifySignature(byte[] message, byte[] ds, RSAPublicKey dpk) throws IOException
+	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey dpk) throws IOException
 	{
+		byte[] javaSig = decodeSignature(sshSig);
 		try {
 			Signature s = Signature.getInstance("SHA1withRSA");
 			s.initVerify(dpk);
 			s.update(message);
-			return s.verify(ds);
+			return s.verify(javaSig);
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
