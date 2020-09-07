@@ -7,8 +7,8 @@ import com.trilead.ssh2.signature.RSASHA512Verify;
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
@@ -47,6 +47,7 @@ import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
+import com.trilead.ssh2.signature.SSHSignature;
 
 /**
  * KexManager.
@@ -468,12 +469,12 @@ public class KexManager
 
 		if (kxs.np.server_host_key_algo.equals(DSASHA1Verify.ID_SSH_DSS))
 		{
-			byte[] ds = DSASHA1Verify.decodeSSHDSASignature(sig);
-			DSAPublicKey dpk = DSASHA1Verify.decodeSSHDSAPublicKey(hostkey);
+			SSHSignature s = DSASHA1Verify.get();
+			PublicKey dpk = s.decodePublicKey(hostkey);
 
 			log.log(50, "Verifying ssh-dss signature");
 
-			return DSASHA1Verify.verifySignature(kxs.H, ds, dpk);
+			return s.verifySignature(kxs.H, sig, dpk);
 		}
 
 		throw new IOException("Unknown server host key algorithm '" + kxs.np.server_host_key_algo + "'");

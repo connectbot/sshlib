@@ -640,7 +640,7 @@ public class PEMDecoder
 				RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
 
 				keyPair = generateKeyPair("RSA", privateKeySpec, publicKeySpec);
-			} else if (DSASHA1Verify.ID_SSH_DSS.equals(keyType)) {
+			} else if (DSASHA1Verify.get().getKeyFormat().equals(keyType)) {
 				BigInteger p = trEnc.readMPINT();
 				BigInteger q = trEnc.readMPINT();
 				BigInteger g = trEnc.readMPINT();

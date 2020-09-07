@@ -121,7 +121,7 @@ public class KnownHosts
 				publicKeys.add(new KnownHostsEntry(hostnames, rpk));
 			}
 		} else if (serverHostKeyAlgorithm.equals(DSASHA1Verify.ID_SSH_DSS)) {
-			DSAPublicKey dpk = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
+			PublicKey dpk = DSASHA1Verify.get().decodePublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
@@ -615,7 +615,7 @@ public class KnownHosts
 		}
 		else if (DSASHA1Verify.ID_SSH_DSS.equals(serverHostKeyAlgorithm))
 		{
-			remoteKey = DSASHA1Verify.decodeSSHDSAPublicKey(serverHostKey);
+			remoteKey = DSASHA1Verify.get().decodePublicKey(serverHostKey);
 		}
 		else if (serverHostKeyAlgorithm.startsWith("ecdsa-sha2-"))
 		{
