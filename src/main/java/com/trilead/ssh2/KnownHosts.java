@@ -114,7 +114,7 @@ public class KnownHosts
 			RSASHA512Verify.ID_RSA_SHA_2_512.equals(serverHostKeyAlgorithm) ||
 			RSASHA256Verify.ID_RSA_SHA_2_256.equals(serverHostKeyAlgorithm))
 		{
-			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
+			PublicKey rpk = RSASHA1Verify.get().decodePublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
@@ -611,7 +611,7 @@ public class KnownHosts
 			RSASHA256Verify.ID_RSA_SHA_2_256.equals(serverHostKeyAlgorithm) ||
 			RSASHA512Verify.ID_RSA_SHA_2_512.equals(serverHostKeyAlgorithm))
 		{
-			remoteKey = RSASHA1Verify.decodeSSHRSAPublicKey(serverHostKey);
+			remoteKey = RSASHA1Verify.get().decodePublicKey(serverHostKey);
 		}
 		else if (DSASHA1Verify.ID_SSH_DSS.equals(serverHostKeyAlgorithm))
 		{

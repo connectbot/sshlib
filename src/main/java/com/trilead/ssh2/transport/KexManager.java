@@ -10,7 +10,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -440,7 +439,7 @@ public class KexManager
 		if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.ID_RSA_SHA_2_512))
 		{
 			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
-			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
+			PublicKey rpk = RSASHA1Verify.get().decodePublicKey(hostkey);
 
 			log.log(50, "Verifying rsa-sha2-512 signature");
 
@@ -450,7 +449,7 @@ public class KexManager
 		if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.ID_RSA_SHA_2_256))
 		{
 			byte[] rs = RSASHA256Verify.decodeRSASHA256Signature(sig);
-			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
+			PublicKey rpk = RSASHA1Verify.get().decodePublicKey(hostkey);
 
 			log.log(50, "Verifying rsa-sha2-256 signature");
 
@@ -459,12 +458,12 @@ public class KexManager
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA1Verify.ID_SSH_RSA))
 		{
-			byte[] rs = RSASHA1Verify.decodeSSHRSASignature(sig);
-			RSAPublicKey rpk = RSASHA1Verify.decodeSSHRSAPublicKey(hostkey);
+			SSHSignature s = RSASHA1Verify.get();
+			PublicKey rpk = s.decodePublicKey(hostkey);
 
 			log.log(50, "Verifying ssh-rsa signature");
 
-			return RSASHA1Verify.verifySignature(kxs.H, rs, rpk);
+			return s.verifySignature(kxs.H, sig, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals(DSASHA1Verify.ID_SSH_DSS))

@@ -7,9 +7,9 @@ import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.interfaces.RSAPublicKey;
 
 public class RSASHA512Verify
 {
@@ -80,7 +80,7 @@ public class RSASHA512Verify
 		}
 	}
 
-	public static boolean verifySignature(byte[] message, byte[] ds, RSAPublicKey dpk) throws IOException
+	public static boolean verifySignature(byte[] message, byte[] ds, PublicKey dpk) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA512withRSA");
