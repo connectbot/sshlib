@@ -149,7 +149,7 @@ public class KnownHosts
 				publicKeys.add(new KnownHostsEntry(hostnames, epk));
 			}
 		} else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm)) {
-			Ed25519PublicKey edpk = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
+			PublicKey edpk = Ed25519Verify.get().decodePublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
@@ -640,7 +640,7 @@ public class KnownHosts
 		}
 		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
 		{
-			remoteKey = Ed25519Verify.decodeSSHEd25519PublicKey(serverHostKey);
+			remoteKey = Ed25519Verify.get().decodePublicKey(serverHostKey);
 		}
 		else
 			throw new IllegalArgumentException("Unknown hostkey type " + serverHostKeyAlgorithm);

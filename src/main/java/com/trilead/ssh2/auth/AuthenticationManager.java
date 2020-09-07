@@ -320,7 +320,7 @@ public class AuthenticationManager implements MessageHandler
 			{
 				final String algo = Ed25519Verify.ED25519_ID;
 
-				byte[] pk_enc = Ed25519Verify.encodeSSHEd25519PublicKey((Ed25519PublicKey) publicKey);
+				byte[] pk_enc = Ed25519Verify.get().encodePublicKey(publicKey);
 
 				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
 
@@ -332,8 +332,7 @@ public class AuthenticationManager implements MessageHandler
 				else
 				{
 					Ed25519PrivateKey pk = (Ed25519PrivateKey) privateKey;
-					byte[] ds = Ed25519Verify.generateSignature(msg, pk);
-					ed_sig_enc = Ed25519Verify.encodeSSHEd25519Signature(ds);
+					ed_sig_enc = Ed25519Verify.get().generateSignature(msg, pk, rnd);
 				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
