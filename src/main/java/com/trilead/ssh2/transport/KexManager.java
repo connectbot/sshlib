@@ -412,88 +412,31 @@ public class KexManager
 		}
 	}
 
-	private boolean verifySignature(byte[] sig, byte[] hostkey) throws IOException
-	{
+	private boolean verifySignature(byte[] sig, byte[] hostkey) throws IOException {
+		SSHSignature sshSignature;
 		if (kxs.np.server_host_key_algo.equals(Ed25519Verify.get().getKeyFormat())) {
-			SSHSignature s = Ed25519Verify.get();
-			PublicKey edpk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying " + s.getKeyFormat() + " signature");
-
-			return s.verifySignature(kxs.H, sig, edpk);
+			sshSignature = Ed25519Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat())) {
+			sshSignature = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat())) {
+			sshSignature = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat())) {
+			sshSignature = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.get().getKeyFormat())) {
+			sshSignature = RSASHA512Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.get().getKeyFormat())) {
+			sshSignature = RSASHA256Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(RSASHA1Verify.get().getKeyFormat())) {
+			sshSignature = RSASHA1Verify.get();
+		} else if (kxs.np.server_host_key_algo.equals(DSASHA1Verify.get().getKeyFormat())) {
+			sshSignature = DSASHA1Verify.get();
+		} else {
+			throw new IOException("Unknown server host key algorithm '" + kxs.np.server_host_key_algo + "'");
 		}
 
-		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat()))
-		{
-			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
-			PublicKey epk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying ecdsa-nistp256 signature");
-
-			return s.verifySignature(kxs.H, sig, epk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat()))
-		{
-			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
-			PublicKey epk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying ecdsa-nistp384 signature");
-
-			return s.verifySignature(kxs.H, sig, epk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat()))
-		{
-			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
-			PublicKey epk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying ecdsa-nistp521 signature");
-
-			return s.verifySignature(kxs.H, sig, epk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.ID_RSA_SHA_2_512))
-		{
-			SSHSignature s = RSASHA512Verify.get();
-			PublicKey rpk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying rsa-sha2-512 signature");
-
-			return s.verifySignature(kxs.H, sig, rpk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.ID_RSA_SHA_2_256))
-		{
-			SSHSignature s = RSASHA256Verify.get();
-			PublicKey rpk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying rsa-sha2-256 signature");
-
-			return s.verifySignature(kxs.H, sig, rpk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(RSASHA1Verify.ID_SSH_RSA))
-		{
-			SSHSignature s = RSASHA1Verify.get();
-			PublicKey rpk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying ssh-rsa signature");
-
-			return s.verifySignature(kxs.H, sig, rpk);
-		}
-
-		if (kxs.np.server_host_key_algo.equals(DSASHA1Verify.ID_SSH_DSS))
-		{
-			SSHSignature s = DSASHA1Verify.get();
-			PublicKey dpk = s.decodePublicKey(hostkey);
-
-			log.log(50, "Verifying ssh-dss signature");
-
-			return s.verifySignature(kxs.H, sig, dpk);
-		}
-
-		throw new IOException("Unknown server host key algorithm '" + kxs.np.server_host_key_algo + "'");
+		PublicKey publicKey = sshSignature.decodePublicKey(hostkey);
+		log.log(50, "Verifying " + sshSignature.getKeyFormat() + " signature");
+		return sshSignature.verifySignature(kxs.H, sig, publicKey);
 	}
 
 	public synchronized void handleMessage(byte[] msg, int msglen) throws IOException
