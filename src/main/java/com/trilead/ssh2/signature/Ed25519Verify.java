@@ -38,33 +38,48 @@ import com.trilead.ssh2.packets.TypesWriter;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 
 /**
  * @author Kenny Root
  */
-public class Ed25519Verify {
+public class Ed25519Verify implements SSHSignature {
 	private static final Logger log = Logger.getLogger(Ed25519Verify.class);
 
 	/** Identifies this as an Ed25519 key in the protocol. */
 	public static final String ED25519_ID = "ssh-ed25519";
 
-	public static final String ED25519_CURVE_NAME = "Ed25519";
-
 	private static final int ED25519_PK_SIZE_BYTES = 32;
 	private static final int ED25519_SIG_SIZE_BYTES = 64;
 
-	public static byte[] encodeSSHEd25519PublicKey(Ed25519PublicKey key) {
+	private static class InstanceHolder {
+		private static final Ed25519Verify sInstance = new Ed25519Verify();
+	}
+
+	private Ed25519Verify() {}
+
+	public static Ed25519Verify get() {
+		return Ed25519Verify.InstanceHolder.sInstance;
+	}
+
+	@Override
+	public byte[] encodePublicKey(PublicKey publicKey) {
+		Ed25519PublicKey ed25519PublicKey = (Ed25519PublicKey) publicKey;
+
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
-		byte[] encoded = key.getAbyte();
+		byte[] encoded = ed25519PublicKey.getAbyte();
 		tw.writeString(encoded, 0, encoded.length);
 
 		return tw.getBytes();
 	}
 
-	public static Ed25519PublicKey decodeSSHEd25519PublicKey(byte[] key) throws IOException {
-		TypesReader tr = new TypesReader(key);
+	@Override
+	public PublicKey decodePublicKey(byte[] encoded) throws IOException {
+		TypesReader tr = new TypesReader(encoded);
 
 		String key_format = tr.readString();
 		if (!key_format.equals(ED25519_ID)) {
@@ -84,24 +99,29 @@ public class Ed25519Verify {
 		return new Ed25519PublicKey(keyBytes);
 	}
 
-	public static byte[] generateSignature(byte[] msg, Ed25519PrivateKey privateKey) throws IOException {
+	@Override
+	public byte[] generateSignature(byte[] msg, PrivateKey privateKey, SecureRandom secureRandom) throws IOException {
+		Ed25519PrivateKey ed25519PrivateKey = (Ed25519PrivateKey) privateKey;
 		try {
-			return new Ed25519Sign(privateKey.getSeed()).sign(msg);
+			return encodeSSHEd25519Signature(new Ed25519Sign(ed25519PrivateKey.getSeed()).sign(msg));
 		} catch (GeneralSecurityException e) {
 			throw new IOException(e);
 		}
 	}
 
-	public static boolean verifySignature(byte[] msg, byte[] sig, Ed25519PublicKey publicKey) throws IOException {
+	@Override
+	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey publicKey) throws IOException {
+		Ed25519PublicKey ed25519PublicKey = (Ed25519PublicKey) publicKey;
+		byte[] javaSig = decodeSSHEd25519Signature(sshSig);
 		try {
-			new com.google.crypto.tink.subtle.Ed25519Verify(publicKey.getAbyte()).verify(sig, msg);
+			new com.google.crypto.tink.subtle.Ed25519Verify(ed25519PublicKey.getAbyte()).verify(javaSig, message);
 			return true;
 		} catch (GeneralSecurityException e) {
 			return false;
 		}
 	}
 
-	public static byte[] encodeSSHEd25519Signature(byte[] sig) {
+	private static byte[] encodeSSHEd25519Signature(byte[] sig) {
 		TypesWriter tw = new TypesWriter();
 
 		tw.writeString(ED25519_ID);
@@ -110,7 +130,7 @@ public class Ed25519Verify {
 		return tw.getBytes();
 	}
 
-	public static byte[] decodeSSHEd25519Signature(byte[] sig) throws IOException {
+	private static byte[] decodeSSHEd25519Signature(byte[] sig) throws IOException {
 		byte[] rsArray;
 
 		TypesReader tr = new TypesReader(sig);
@@ -131,5 +151,10 @@ public class Ed25519Verify {
 		}
 
 		return rsArray;
+	}
+
+	@Override
+	public String getKeyFormat() {
+		return ED25519_ID;
 	}
 }

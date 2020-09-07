@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.security.KeyPair;
+import java.security.SecureRandom;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
@@ -32,6 +33,7 @@ public class Ed25519VerifyTest {
 		"0816ed13ba3303ac5deb911548908025");
 	private static final byte[] MESSAGE = toByteArray("af82");
 	private static final byte[] SIGNATURE = toByteArray(
+		"0000000b7373682d6564323535313900000040" +
 		"6291d657deec24024827e69c3abe01a3" +
 		"0ce548a284743a445e3680d7db5ac3ac" +
 		"18ff9b538d16f290ae67f760984dc659" +
@@ -64,19 +66,20 @@ public class Ed25519VerifyTest {
 	@Test
 	public void verifies() throws Exception {
 		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
-		assertTrue(Ed25519Verify.verifySignature(MESSAGE, SIGNATURE, pubKey));
+		assertTrue(Ed25519Verify.get().verifySignature(MESSAGE, SIGNATURE, pubKey));
 	}
 
 	@Test
 	public void noVerificationForInvalidData() throws Exception {
 		Ed25519PublicKey pubKey = new Ed25519PublicKey(PUBLIC_KEY);
-		assertFalse(Ed25519Verify.verifySignature(new byte[1], SIGNATURE, pubKey));
+		assertFalse(Ed25519Verify.get().verifySignature(new byte[1], SIGNATURE, pubKey));
 	}
 
 	@Test
 	public void signs() throws Exception {
 		Ed25519PrivateKey privKey = new Ed25519PrivateKey(SECRET_KEY);
-		assertEquals(Arrays.toString(SIGNATURE), Arrays.toString(Ed25519Verify.generateSignature(MESSAGE, privKey)));
+		assertEquals(Arrays.toString(SIGNATURE), Arrays.toString(
+			Ed25519Verify.get().generateSignature(MESSAGE, privKey, new SecureRandom())));
 	}
 
 	@Test
@@ -88,11 +91,11 @@ public class Ed25519VerifyTest {
 
 		byte[] message = new byte[] { (byte) 0xA5, (byte) 0x5A };
 
-		byte[] sig1 = Ed25519Verify.generateSignature(message, privKey1);
-		assertTrue(Ed25519Verify.verifySignature(message, sig1, pubKey));
+		byte[] sig1 = Ed25519Verify.get().generateSignature(message, privKey1, new SecureRandom());
+		assertTrue(Ed25519Verify.get().verifySignature(message, sig1, pubKey));
 
-		byte[] sig2 = Ed25519Verify.generateSignature(message, privKey2);
-		assertTrue(Ed25519Verify.verifySignature(message, sig2, pubKey));
+		byte[] sig2 = Ed25519Verify.get().generateSignature(message, privKey2, new SecureRandom());
+		assertTrue(Ed25519Verify.get().verifySignature(message, sig2, pubKey));
 	}
 
 	@Test
@@ -102,8 +105,8 @@ public class Ed25519VerifyTest {
 
 		byte[] message = new byte[] { (byte) 0xA5, (byte) 0x5A };
 
-		byte[] sig = Ed25519Verify.generateSignature(message, privKey);
-		assertTrue(Ed25519Verify.verifySignature(message, sig, pubKey));
+		byte[] sig = Ed25519Verify.get().generateSignature(message, privKey, new SecureRandom());
+		assertTrue(Ed25519Verify.get().verifySignature(message, sig, pubKey));
 	}
 
 	private static final char[] SSH_PRIVATE_KEY = ("-----BEGIN OPENSSH PRIVATE KEY-----\n" +
@@ -131,12 +134,12 @@ public class Ed25519VerifyTest {
 
 	@Test
 	public void publicKeyEncodeDecodeSuccess() throws Exception {
-		assertArrayEquals(getTestPubKeyBytes(), Ed25519Verify.encodeSSHEd25519PublicKey(getTestPubKey()));
+		assertArrayEquals(getTestPubKeyBytes(), Ed25519Verify.get().encodePublicKey(getTestPubKey()));
 	}
 
 	@Test
 	public void publicKeyDecodeSuccess() throws Exception {
-		assertArrayEquals(getTestPubKey().getEncoded(), Ed25519Verify.decodeSSHEd25519PublicKey(getTestPubKeyBytes()).getEncoded());
+		assertArrayEquals(getTestPubKey().getEncoded(), Ed25519Verify.get().decodePublicKey(getTestPubKeyBytes()).getEncoded());
 	}
 
 	@Test(expected = IOException.class)
@@ -144,15 +147,15 @@ public class Ed25519VerifyTest {
 		byte[] validKey = getTestPubKeyBytes();
 		byte[] invalidKey = new byte[validKey.length + 1];
 		System.arraycopy(validKey, 0, invalidKey, 0, validKey.length);
-		Ed25519Verify.decodeSSHEd25519PublicKey(invalidKey);
+		Ed25519Verify.get().decodePublicKey(invalidKey);
 	}
 
 	@Test
 	public void opensshVectorVerifies() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
-		assertTrue(Ed25519Verify.verifySignature(SSH_KAT_MESSAGE,
-				Ed25519Verify.decodeSSHEd25519Signature(SSH_KAT_SIGNATURE),
-				(Ed25519PublicKey) pair.getPublic()));
+		assertTrue(Ed25519Verify.get().verifySignature(SSH_KAT_MESSAGE,
+				SSH_KAT_SIGNATURE,
+				pair.getPublic()));
 	}
 
 	@Test
@@ -165,8 +168,8 @@ public class Ed25519VerifyTest {
 	@Test
 	public void opensshVectorSigns() throws Exception {
 		KeyPair pair = PEMDecoder.decode(SSH_KAT_PRIVATE, null);
-		byte[] sig = Ed25519Verify.generateSignature(SSH_KAT_MESSAGE, (Ed25519PrivateKey) pair.getPrivate());
-		assertArrayEquals(SSH_KAT_SIGNATURE, Ed25519Verify.encodeSSHEd25519Signature(sig));
+		byte[] sig = Ed25519Verify.get().generateSignature(SSH_KAT_MESSAGE, pair.getPrivate(), new SecureRandom());
+		assertArrayEquals(SSH_KAT_SIGNATURE, sig);
 	}
 
 	@Test
