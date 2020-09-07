@@ -241,9 +241,10 @@ public class AuthenticationManager implements MessageHandler
 				Set<String> algsAccepted = tm.getExtensionInfo().getSignatureAlgorithmsAccepted();
 				final byte[] rsa_sig_enc;
 
-				if (algsAccepted.contains(RSASHA512Verify.ID_RSA_SHA_2_512))
+				if (algsAccepted.contains(RSASHA512Verify.get().getKeyFormat()))
 				{
-					pk_algorithm = RSASHA512Verify.ID_RSA_SHA_2_512;
+					SSHSignature s = RSASHA512Verify.get();
+					pk_algorithm = s.getKeyFormat();
 					byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, pk_algorithm, pk_enc);
 					if (signatureProxy != null)
 					{
@@ -251,8 +252,7 @@ public class AuthenticationManager implements MessageHandler
 					}
 					else
 					{
-						byte[] ds = RSASHA512Verify.generateSignature(msg, privateKey);
-						rsa_sig_enc = RSASHA512Verify.encodeRSASHA512Signature(ds);
+						rsa_sig_enc = s.generateSignature(msg, privateKey, rnd);
 					}
 				}
 				else if (algsAccepted.contains(RSASHA256Verify.ID_RSA_SHA_2_256))

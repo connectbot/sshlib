@@ -501,8 +501,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 			if (privKey instanceof RSAPrivateKey) {
 				RSAPrivateKey rsaPrivKey = (RSAPrivateKey) privKey;
 				if ((flags & SSH_AGENT_RSA_SHA2_512) != 0) {
-					byte[] signature = RSASHA512Verify.generateSignature(challenge, rsaPrivKey);
-					response = RSASHA512Verify.encodeRSASHA512Signature(signature);
+					response = RSASHA512Verify.get().generateSignature(challenge, rsaPrivKey, new SecureRandom());
 				} else if ((flags & SSH_AGENT_RSA_SHA2_256) != 0) {
 					response = RSASHA256Verify.get().generateSignature(challenge, rsaPrivKey, new SecureRandom());
 				} else {
