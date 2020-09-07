@@ -8,15 +8,26 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 
-public class RSASHA256Verify
+public class RSASHA256Verify implements SSHSignature
 {
 	private static final Logger log = Logger.getLogger(RSASHA256Verify.class);
 	public static final String ID_RSA_SHA_2_256 = "rsa-sha2-256";
 
-	public static byte[] decodeRSASHA256Signature(byte[] sig) throws IOException
+	private static class InstanceHolder {
+		private static RSASHA256Verify sInstance = new RSASHA256Verify();
+	}
+
+	private RSASHA256Verify() {}
+
+	public static RSASHA256Verify get() {
+		return RSASHA256Verify.InstanceHolder.sInstance;
+	}
+
+	private static byte[] decodeRSASHA256Signature(byte[] sig) throws IOException
 	{
 		TypesReader tr = new TypesReader(sig);
 
@@ -46,7 +57,7 @@ public class RSASHA256Verify
 		return s;
 	}
 
-	public static byte[] encodeRSASHA256Signature(byte[] s) throws IOException
+	private static byte[] encodeRSASHA256Signature(byte[] s) throws IOException
 	{
 		TypesWriter tw = new TypesWriter();
 
@@ -67,25 +78,44 @@ public class RSASHA256Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
+	@Override
+	public byte[] generateSignature(byte[] message, PrivateKey privateKey, SecureRandom secureRandom) throws IOException
 	{
 		try {
 			Signature s = Signature.getInstance("SHA256withRSA");
-			s.initSign(pk);
+			s.initSign(privateKey, secureRandom);
 			s.update(message);
-			return s.sign();
+			return encodeRSASHA256Signature(s.sign());
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
 	}
 
-	public static boolean verifySignature(byte[] message, byte[] ds, PublicKey dpk) throws IOException
+	@Override
+	public String getKeyFormat() {
+		return ID_RSA_SHA_2_256;
+	}
+
+	@Override
+	public PublicKey decodePublicKey(byte[] encoded) throws IOException {
+		return RSASHA1Verify.get().decodePublicKey(encoded);
+	}
+
+	@Override
+	public byte[] encodePublicKey(PublicKey publicKey) throws IOException {
+		return RSASHA1Verify.get().encodePublicKey(publicKey);
+	}
+
+	@Override
+	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey dpk) throws IOException
 	{
+		byte[] javaSig = decodeRSASHA256Signature(sshSig);
+
 		try {
 			Signature s = Signature.getInstance("SHA256withRSA");
 			s.initVerify(dpk);
 			s.update(message);
-			return s.verify(ds);
+			return s.verify(javaSig);
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
