@@ -448,12 +448,12 @@ public class KexManager
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.ID_RSA_SHA_2_256))
 		{
-			byte[] rs = RSASHA256Verify.decodeRSASHA256Signature(sig);
-			PublicKey rpk = RSASHA1Verify.get().decodePublicKey(hostkey);
+			SSHSignature s = RSASHA256Verify.get();
+			PublicKey rpk = s.decodePublicKey(hostkey);
 
 			log.log(50, "Verifying rsa-sha2-256 signature");
 
-			return RSASHA256Verify.verifySignature(kxs.H, rs, rpk);
+			return s.verifySignature(kxs.H, sig, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA1Verify.ID_SSH_RSA))

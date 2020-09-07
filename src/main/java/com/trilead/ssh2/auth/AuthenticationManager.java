@@ -266,8 +266,7 @@ public class AuthenticationManager implements MessageHandler
 					}
 					else
 					{
-						byte[] ds = RSASHA256Verify.generateSignature(msg, privateKey);
-						rsa_sig_enc = RSASHA256Verify.encodeRSASHA256Signature(ds);
+						rsa_sig_enc = RSASHA256Verify.get().generateSignature(msg, privateKey, rnd);
 					}
 				}
 				else
