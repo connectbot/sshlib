@@ -438,12 +438,12 @@ public class KexManager
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.ID_RSA_SHA_2_512))
 		{
-			byte[] rs = RSASHA512Verify.decodeRSASHA512Signature(sig);
-			PublicKey rpk = RSASHA1Verify.get().decodePublicKey(hostkey);
+			SSHSignature s = RSASHA512Verify.get();
+			PublicKey rpk = s.decodePublicKey(hostkey);
 
 			log.log(50, "Verifying rsa-sha2-512 signature");
 
-			return RSASHA512Verify.verifySignature(kxs.H, rs, rpk);
+			return s.verifySignature(kxs.H, sig, rpk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA256Verify.ID_RSA_SHA_2_256))

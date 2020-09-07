@@ -8,15 +8,26 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 
-public class RSASHA512Verify
+public class RSASHA512Verify implements SSHSignature
 {
 	private static final Logger log = Logger.getLogger(RSASHA512Verify.class);
 	public static final String ID_RSA_SHA_2_512 = "rsa-sha2-512";
 
-	public static byte[] decodeRSASHA512Signature(byte[] sig) throws IOException
+	private static class InstanceHolder {
+		private static final RSASHA512Verify sInstance = new RSASHA512Verify();
+	}
+
+	private RSASHA512Verify() {}
+
+	public static RSASHA512Verify get() {
+		return RSASHA512Verify.InstanceHolder.sInstance;
+	}
+
+	private static byte[] decodeRSASHA512Signature(byte[] sig) throws IOException
 	{
 		TypesReader tr = new TypesReader(sig);
 
@@ -46,7 +57,7 @@ public class RSASHA512Verify
 		return s;
 	}
 
-	public static byte[] encodeRSASHA512Signature(byte[] s) throws IOException
+	private static byte[] encodeRSASHA512Signature(byte[] s)
 	{
 		TypesWriter tw = new TypesWriter();
 
@@ -67,26 +78,44 @@ public class RSASHA512Verify
 		return tw.getBytes();
 	}
 
-	public static byte[] generateSignature(byte[] message, PrivateKey pk) throws IOException
+	@Override
+	public byte[] generateSignature(byte[] message, PrivateKey privateKey, SecureRandom secureRandom) throws IOException
 	{
 		try {
 			// Android's Signature is guaranteed to support this instance
 			Signature s = Signature.getInstance("SHA512withRSA");
-			s.initSign(pk);
+			s.initSign(privateKey, secureRandom);
 			s.update(message);
-			return s.sign();
+			return encodeRSASHA512Signature(s.sign());
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
 	}
 
-	public static boolean verifySignature(byte[] message, byte[] ds, PublicKey dpk) throws IOException
+	@Override
+	public String getKeyFormat() {
+		return ID_RSA_SHA_2_512;
+	}
+
+	@Override
+	public PublicKey decodePublicKey(byte[] encoded) throws IOException {
+		return RSASHA1Verify.get().decodePublicKey(encoded);
+	}
+
+	@Override
+	public byte[] encodePublicKey(PublicKey publicKey) throws IOException {
+		return RSASHA1Verify.get().encodePublicKey(publicKey);
+	}
+
+	@Override
+	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey publicKey) throws IOException
 	{
+		byte[] javaSig = decodeRSASHA512Signature(sshSig);
 		try {
 			Signature s = Signature.getInstance("SHA512withRSA");
-			s.initVerify(dpk);
+			s.initVerify(publicKey);
 			s.update(message);
-			return s.verify(ds);
+			return s.verify(javaSig);
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
 			throw new IOException(e);
 		}
