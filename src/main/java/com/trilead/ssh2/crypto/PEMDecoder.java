@@ -525,14 +525,15 @@ public class PEMDecoder
 				}
 			}
 
-			ECParameterSpec params = ECDSASHA2Verify.getCurveForOID(curveOid);
-			if (params == null)
+			ECDSASHA2Verify verifier = ECDSASHA2Verify.getVerifierForOID(curveOid);
+			if (verifier == null)
 				throw new IOException("invalid OID");
 
 			BigInteger s = new BigInteger(1, privateBytes);
 			byte[] publicBytesSlice = new byte[publicBytes.length - 1];
 			System.arraycopy(publicBytes, 1, publicBytesSlice, 0, publicBytesSlice.length);
-			ECPoint w = ECDSASHA2Verify.decodeECPoint(publicBytesSlice, params.getCurve());
+			ECParameterSpec params = verifier.getParameterSpec();
+			ECPoint w = verifier.decodeECPoint(publicBytesSlice);
 
 			ECPrivateKeySpec privSpec = new ECPrivateKeySpec(s, params);
 			ECPublicKeySpec pubSpec = new ECPublicKeySpec(w, params);
@@ -603,18 +604,22 @@ public class PEMDecoder
 			} else if (keyType.startsWith("ecdsa-sha2-")) {
 				String curveName = trEnc.readString();
 
-				ECParameterSpec spec = ECDSASHA2Verify.getCurveForName(curveName);
-				if (null == spec) {
-					throw new IOException("Invalid curve name");
-				}
-
 				byte[] groupBytes = trEnc.readByteString();
 				BigInteger privateKey = trEnc.readMPINT();
 
-				ECPoint group = ECDSASHA2Verify.decodeECPoint(groupBytes, spec.getCurve());
-				if (null == group) {
+				final ECDSASHA2Verify verifier;
+				if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getCurveName())) {
+					verifier = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
+				} else if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getCurveName())) {
+					verifier = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
+				} else if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getCurveName())) {
+					verifier = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
+				} else {
 					throw new IOException("Invalid ECDSA group");
 				}
+
+				ECParameterSpec spec = verifier.getParameterSpec();
+				ECPoint group = verifier.decodeECPoint(groupBytes);
 
 				ECPublicKeySpec publicKeySpec = new ECPublicKeySpec(group, spec);
 				ECPrivateKeySpec privateKeySpec = new ECPrivateKeySpec(privateKey, spec);

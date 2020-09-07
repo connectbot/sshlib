@@ -127,8 +127,22 @@ public class KnownHosts
 			{
 				publicKeys.add(new KnownHostsEntry(hostnames, dpk));
 			}
-		} else if (serverHostKeyAlgorithm.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX)) {
-			ECPublicKey epk = ECDSASHA2Verify.decodeSSHECDSAPublicKey(serverHostKey);
+		} else if (serverHostKeyAlgorithm.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat())) {
+			PublicKey epk = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().decodePublicKey(serverHostKey);
+
+			synchronized (publicKeys)
+			{
+				publicKeys.add(new KnownHostsEntry(hostnames, epk));
+			}
+		} else if (serverHostKeyAlgorithm.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat())) {
+			PublicKey epk = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().decodePublicKey(serverHostKey);
+
+			synchronized (publicKeys)
+			{
+				publicKeys.add(new KnownHostsEntry(hostnames, epk));
+			}
+		} else if (serverHostKeyAlgorithm.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat())) {
+			PublicKey epk = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().decodePublicKey(serverHostKey);
 
 			synchronized (publicKeys)
 			{
@@ -549,12 +563,7 @@ public class KnownHosts
 			} else if (key instanceof Ed25519PublicKey) {
 				preferredAlgos.add(ALGO_FOR_EDDSA);
 			} else if (key instanceof ECPublicKey) {
-				ECPublicKey ecPublicKey = (ECPublicKey) key;
-				try {
-					preferredAlgos.add(
-						ECDSASHA2Verify.getSshKeyType(ecPublicKey.getParams()));
-				} catch (IOException ignored) {
-				}
+				preferredAlgos.add(ECDSASHA2Verify.getSshKeyType((ECPublicKey) key));
 			}
 		}
 
@@ -617,9 +626,17 @@ public class KnownHosts
 		{
 			remoteKey = DSASHA1Verify.get().decodePublicKey(serverHostKey);
 		}
-		else if (serverHostKeyAlgorithm.startsWith("ecdsa-sha2-"))
+		else if (ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat().equals(serverHostKeyAlgorithm))
 		{
-			remoteKey = ECDSASHA2Verify.decodeSSHECDSAPublicKey(serverHostKey);
+			remoteKey = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().decodePublicKey(serverHostKey);
+		}
+		else if (ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat().equals(serverHostKeyAlgorithm))
+		{
+			remoteKey = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().decodePublicKey(serverHostKey);
+		}
+		else if (ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat().equals(serverHostKeyAlgorithm))
+		{
+			remoteKey = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().decodePublicKey(serverHostKey);
 		}
 		else if (Ed25519Verify.ED25519_ID.equals(serverHostKeyAlgorithm))
 		{

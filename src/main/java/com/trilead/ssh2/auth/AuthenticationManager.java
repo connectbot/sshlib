@@ -293,21 +293,22 @@ public class AuthenticationManager implements MessageHandler
 			{
 				ECPublicKey ecPublicKey = (ECPublicKey) publicKey;
 
-				final String algo = ECDSASHA2Verify.getSshKeyType(ecPublicKey.getParams());
+				ECDSASHA2Verify verifier = ECDSASHA2Verify.getVerifierForKey(ecPublicKey);
 
-				byte[] pk_enc = ECDSASHA2Verify.encodeSSHECDSAPublicKey(ecPublicKey);
+				final String algo = verifier.getKeyFormat();
+
+				byte[] pk_enc = verifier.encodePublicKey(ecPublicKey);
 
 				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
 
 				byte[] ec_sig_enc;
 				if (signatureProxy != null)
 				{
-					ec_sig_enc = signatureProxy.sign(msg, ECDSASHA2Verify.getDigestAlgorithmForParams(ecPublicKey.getParams()));
+					ec_sig_enc = signatureProxy.sign(msg, ECDSASHA2Verify.getDigestAlgorithmForParams(ecPublicKey));
 				}
 				else
 				{
-					byte[] ds = ECDSASHA2Verify.generateSignature(msg, privateKey);
-					ec_sig_enc = ECDSASHA2Verify.encodeSSHECDSASignature(ds, ecPublicKey.getParams());
+					ec_sig_enc = verifier.generateSignature(msg, privateKey, rnd);
 				}
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,

@@ -333,7 +333,8 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 				pubSpec = new DSAPublicKeySpec(y, p, q, g);
 				privSpec = new DSAPrivateKeySpec(x, p, q, g);
-			} else if (type.equals("ecdsa-sha2-nistp256")) {
+			} else if (type.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat())) {
+				ECDSASHA2Verify verifier = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
 				keyType = "EC";
 
 				String curveName = tr.readString();
@@ -347,16 +348,16 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 					return;
 				}
 
-				ECParameterSpec nistp256 = ECDSASHA2Verify.EllipticCurves.nistp256;
-				ECPoint group = ECDSASHA2Verify.decodeECPoint(groupBytes, nistp256.getCurve());
+				ECParameterSpec params = verifier.getParameterSpec();
+				ECPoint group = verifier.decodeECPoint(groupBytes);
 				if (group == null) {
 					// TODO log error
 					os.write(SSH_AGENT_FAILURE);
 					return;
 				}
 
-				pubSpec = new ECPublicKeySpec(group, nistp256);
-				privSpec = new ECPrivateKeySpec(exponent, nistp256);
+				pubSpec = new ECPublicKeySpec(group, params);
+				privSpec = new ECPrivateKeySpec(exponent, params);
 			} else {
 				log.log(2, "Unknown key type: " + type);
 				os.write(SSH_AGENT_FAILURE);

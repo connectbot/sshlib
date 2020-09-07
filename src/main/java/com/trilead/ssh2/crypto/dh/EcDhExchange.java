@@ -1,6 +1,3 @@
-/**
- *
- */
 package com.trilead.ssh2.crypto.dh;
 
 import java.io.IOException;
@@ -36,11 +33,11 @@ public class EcDhExchange extends GenericDhExchange {
 		final ECParameterSpec spec;
 
 		if ("ecdh-sha2-nistp256".equals(name)) {
-			spec = ECDSASHA2Verify.EllipticCurves.nistp256;
+			spec = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getParameterSpec();
 		} else if ("ecdh-sha2-nistp384".equals(name)) {
-			spec = ECDSASHA2Verify.EllipticCurves.nistp384;
+			spec = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getParameterSpec();
 		} else if ("ecdh-sha2-nistp521".equals(name)) {
-			spec = ECDSASHA2Verify.EllipticCurves.nistp521;
+			spec = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getParameterSpec();
 		} else {
 			throw new IllegalArgumentException("Unknown EC curve " + name);
 		}
@@ -80,8 +77,13 @@ public class EcDhExchange extends GenericDhExchange {
 		final KeyAgreement ka;
 		try {
 			KeyFactory kf = KeyFactory.getInstance("EC");
-			ECParameterSpec params = clientPublic.getParams();
-			ECPoint serverPoint = ECDSASHA2Verify.decodeECPoint(f, params.getCurve());
+			ECDSASHA2Verify verifier = ECDSASHA2Verify.getVerifierForKey(clientPublic);
+			if (verifier == null) {
+				throw new IOException("No such EC group");
+			}
+
+			ECPoint serverPoint = verifier.decodeECPoint(f);
+			ECParameterSpec params = verifier.getParameterSpec();
 			this.serverPublic = (ECPublicKey) kf.generatePublic(new ECPublicKeySpec(serverPoint,
 																					params));
 
@@ -90,9 +92,7 @@ public class EcDhExchange extends GenericDhExchange {
 			ka.doPhase(serverPublic, true);
 		} catch (NoSuchAlgorithmException e) {
 			throw new IOException("No ECDH key agreement method", e);
-		} catch (InvalidKeyException e) {
-			throw new IOException("Invalid ECDH key", e);
-		} catch (InvalidKeySpecException e) {
+		} catch (InvalidKeyException | InvalidKeySpecException e) {
 			throw new IOException("Invalid ECDH key", e);
 		}
 
@@ -101,6 +101,6 @@ public class EcDhExchange extends GenericDhExchange {
 
 	@Override
 	public String getHashAlgo() {
-		return ECDSASHA2Verify.getDigestAlgorithmForParams(clientPublic.getParams());
+		return ECDSASHA2Verify.getDigestAlgorithmForParams(clientPublic);
 	}
 }
