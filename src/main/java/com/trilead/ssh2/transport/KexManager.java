@@ -9,7 +9,6 @@ import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.interfaces.ECPublicKey;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -426,14 +425,34 @@ public class KexManager
 
 		}
 
-		if (kxs.np.server_host_key_algo.startsWith(ECDSASHA2Verify.ECDSA_SHA2_PREFIX))
+		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getKeyFormat()))
 		{
-			byte[] rs = ECDSASHA2Verify.decodeSSHECDSASignature(sig);
-			ECPublicKey epk = ECDSASHA2Verify.decodeSSHECDSAPublicKey(hostkey);
+			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
+			PublicKey epk = s.decodePublicKey(hostkey);
 
-			log.log(50, "Verifying ecdsa signature");
+			log.log(50, "Verifying ecdsa-nistp256 signature");
 
-			return ECDSASHA2Verify.verifySignature(kxs.H, rs, epk);
+			return s.verifySignature(kxs.H, sig, epk);
+		}
+
+		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getKeyFormat()))
+		{
+			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
+			PublicKey epk = s.decodePublicKey(hostkey);
+
+			log.log(50, "Verifying ecdsa-nistp384 signature");
+
+			return s.verifySignature(kxs.H, sig, epk);
+		}
+
+		if (kxs.np.server_host_key_algo.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getKeyFormat()))
+		{
+			SSHSignature s = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
+			PublicKey epk = s.decodePublicKey(hostkey);
+
+			log.log(50, "Verifying ecdsa-nistp521 signature");
+
+			return s.verifySignature(kxs.H, sig, epk);
 		}
 
 		if (kxs.np.server_host_key_algo.equals(RSASHA512Verify.ID_RSA_SHA_2_512))
