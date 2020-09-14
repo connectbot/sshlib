@@ -21,7 +21,8 @@ public class RSASHA512Verify implements SSHSignature
 		private static final RSASHA512Verify sInstance = new RSASHA512Verify();
 	}
 
-	private RSASHA512Verify() {}
+	private RSASHA512Verify() {
+	}
 
 	public static RSASHA512Verify get() {
 		return RSASHA512Verify.InstanceHolder.sInstance;

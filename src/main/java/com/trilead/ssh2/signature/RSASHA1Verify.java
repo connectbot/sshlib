@@ -36,7 +36,8 @@ public class RSASHA1Verify implements SSHSignature
 		private static RSASHA1Verify sInstance = new RSASHA1Verify();
 	}
 
-	private RSASHA1Verify() {}
+	private RSASHA1Verify() {
+	}
 
 	public static RSASHA1Verify get() {
 		return RSASHA1Verify.InstanceHolder.sInstance;

@@ -38,7 +38,8 @@ public class DSASHA1Verify implements SSHSignature
 		private static DSASHA1Verify sInstance = new DSASHA1Verify();
 	}
 
-	private DSASHA1Verify() {}
+	private DSASHA1Verify() {
+	}
 
 	public static DSASHA1Verify get() {
 		return InstanceHolder.sInstance;

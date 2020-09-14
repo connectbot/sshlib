@@ -21,7 +21,8 @@ public class RSASHA256Verify implements SSHSignature
 		private static RSASHA256Verify sInstance = new RSASHA256Verify();
 	}
 
-	private RSASHA256Verify() {}
+	private RSASHA256Verify() {
+	}
 
 	public static RSASHA256Verify get() {
 		return RSASHA256Verify.InstanceHolder.sInstance;

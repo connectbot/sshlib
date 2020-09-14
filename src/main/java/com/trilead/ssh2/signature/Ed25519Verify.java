@@ -58,7 +58,8 @@ public class Ed25519Verify implements SSHSignature {
 		private static final Ed25519Verify sInstance = new Ed25519Verify();
 	}
 
-	private Ed25519Verify() {}
+	private Ed25519Verify() {
+	}
 
 	public static Ed25519Verify get() {
 		return Ed25519Verify.InstanceHolder.sInstance;
