@@ -448,7 +448,8 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 			private static final ECDSASHA2NISTP256Verify sInstance = new ECDSASHA2NISTP256Verify();
 		}
 
-		private ECDSASHA2NISTP256Verify() {}
+		private ECDSASHA2NISTP256Verify() {
+		}
 
 		public static ECDSASHA2NISTP256Verify get() {
 			return ECDSASHA2NISTP256Verify.InstanceHolder.sInstance;
@@ -479,7 +480,8 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 			private static final ECDSASHA2NISTP384Verify sInstance = new ECDSASHA2NISTP384Verify();
 		}
 
-		private ECDSASHA2NISTP384Verify() {}
+		private ECDSASHA2NISTP384Verify() {
+		}
 
 		public static ECDSASHA2NISTP384Verify get() {
 			return ECDSASHA2NISTP384Verify.InstanceHolder.sInstance;
@@ -560,7 +562,8 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 			private static final ECDSASHA2NISTP521Verify sInstance = new ECDSASHA2NISTP521Verify();
 		}
 
-		private ECDSASHA2NISTP521Verify() {}
+		private ECDSASHA2NISTP521Verify() {
+		}
 
 		public static ECDSASHA2NISTP521Verify get() {
 			return ECDSASHA2NISTP521Verify.InstanceHolder.sInstance;
