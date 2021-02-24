@@ -7,9 +7,12 @@ import net.researchgate.release.ReleaseExtension
 
 plugins {
     `java-library`
+    `maven-publish`
+    signing
     jacoco
     id("com.diffplug.spotless") version "5.3.0"
     id("com.github.ben-manes.versions") version "0.29.0"
+    id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
     id("net.researchgate.release") version "2.8.1"
 }
 
@@ -26,6 +29,10 @@ buildscript {
 repositories {
     mavenCentral()
 }
+
+group = "org.connectbot"
+
+val gitHubUrl = "https://github.com/connectbot/sshlib"
 
 apply(from = "$rootDir/config/quality.gradle.kts")
 
@@ -120,4 +127,47 @@ tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
     outputFormatter = "json"
     outputDir = "build/dependencyUpdates"
     reportfileName = "report"
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+
+            pom {
+                name.set("sshlib")
+                url.set(gitHubUrl)
+                licenses {
+                    license {
+                        name.set("BSD 3-Clause License")
+                        url.set("https://opensource.org/licenses/BSD-3-Clause")
+                    }
+                }
+                developers {
+                    developer {
+                        name.set("Kenny Root")
+                        email.set("kenny@the-b.org")
+                    }
+                }
+                scm {
+                    connection.set("$gitHubUrl.git")
+                    developerConnection.set("$gitHubUrl.git")
+                    url.set(gitHubUrl)
+                }
+            }
+        }
+    }
+}
+
+signing {
+    setRequired({
+        gradle.taskGraph.hasTask("publish")
+    })
+    sign(publishing.publications["mavenJava"])
+}
+
+nexusPublishing {
+    repositories {
+        sonatype()
+    }
 }
