@@ -10,8 +10,6 @@ plugins {
     jacoco
     id("com.diffplug.spotless") version "5.3.0"
     id("com.github.ben-manes.versions") version "0.29.0"
-    id("com.jfrog.artifactory") version "4.17.2"
-    id("com.jfrog.bintray") version "1.8.5"
     id("net.researchgate.release") version "2.8.1"
 }
 
@@ -29,7 +27,6 @@ repositories {
     mavenCentral()
 }
 
-apply(from = "$rootDir/publish.gradle")
 apply(from = "$rootDir/config/quality.gradle.kts")
 
 dependencies {
