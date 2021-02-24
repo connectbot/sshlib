@@ -17,7 +17,7 @@ plugins {
 
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         // NOTE: Do not place your application dependencies here; they belong
@@ -26,7 +26,7 @@ buildscript {
 }
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 apply(from = "$rootDir/publish.gradle")
@@ -36,7 +36,7 @@ dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
     implementation("com.google.crypto.tink:tink:1.4.0")
-    implementation("org.connectbot.jbcrypt:jbcrypt:1.0.0")
+    implementation("org.connectbot:jbcrypt:1.0.2")
 
     testImplementation("junit:junit:4.13")
     testImplementation("commons-io:commons-io:2.7")
