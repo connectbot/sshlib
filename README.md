@@ -1,6 +1,6 @@
 # ConnectBot's SSH library
-[![Build Status](https://travis-ci.com/connectbot/sshlib.svg?branch=main)](https://travis-ci.com/connectbot/sshlib)
-[![Download](https://api.bintray.com/packages/connectbot/maven/sshlib/images/download.svg)](https://bintray.com/connectbot/maven/sshlib/_latestVersion)
+[![Build Status](https://github.com/connectbot/sshlib/actions/workflows/ci.yml/badge.svg)](https://travis-ci.com/connectbot/sshlib)
+[![Download](https://img.shields.io/maven-central/v/org.connectbot/sshlib)](https://search.maven.org/artifact/org.connectbot/sshlib)
 
 This is ConnectBot's SSH library. It started as a continuation of the Trilead SSH2 library,
 but has had several features added to it since then.
