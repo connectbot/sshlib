@@ -139,6 +139,7 @@ publishing {
 
             pom {
                 name.set("sshlib")
+                description.set("The SSH library used by the ConnectBot app")
                 url.set(gitHubUrl)
                 licenses {
                     license {
