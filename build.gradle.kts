@@ -1,11 +1,13 @@
 import com.diffplug.spotless.extra.wtp.EclipseWtpFormatterStep
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.researchgate.release.GitAdapter.GitConfig
 import net.researchgate.release.ReleaseExtension
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 plugins {
+    id("com.github.johnrengelman.shadow") version "6.1.0"
     `java-library`
     `maven-publish`
     signing
@@ -58,6 +60,11 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
     }
+}
+
+tasks.withType<ShadowJar> {
+    classifier = null
+    minimize()
 }
 
 tasks.withType<JacocoReport> {
@@ -135,7 +142,9 @@ tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            from(components["java"])
+            artifact(tasks["shadowJar"])
+            artifact(tasks["javadocJar"])
+            artifact(tasks["sourcesJar"])
 
             pom {
                 name.set("sshlib")
