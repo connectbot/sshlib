@@ -1,0 +1,17 @@
+version: 2
+updates:
+- package-ecosystem: docker
+  directory: "/src/test/resources/asyncssh-server"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+- package-ecosystem: docker
+  directory: "/src/test/resources/dropbear-server"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+- package-ecosystem: docker
+  directory: "/src/test/resources/openssh-server"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
