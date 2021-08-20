@@ -44,7 +44,7 @@ dependencies {
     implementation("com.google.crypto.tink:tink:1.6.1")
     implementation("org.connectbot:jbcrypt:1.0.2")
 
-    testImplementation("junit:junit:4.13")
+    testImplementation("junit:junit:4.13.2")
     testImplementation("commons-io:commons-io:2.11.0")
     testImplementation("commons-codec:commons-codec:1.15")
     testImplementation("org.testcontainers:testcontainers:1.15.2")
