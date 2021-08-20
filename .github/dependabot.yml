@@ -5,22 +5,26 @@ updates:
   schedule:
     interval: daily
   open-pull-requests-limit: 10
-  assignees: kruton
+  assignees:
+    - kruton
 - package-ecosystem: docker
   directory: "/src/test/resources/asyncssh-server"
   schedule:
     interval: daily
   open-pull-requests-limit: 10
-  assignees: kruton
+  assignees:
+    - kruton
 - package-ecosystem: docker
   directory: "/src/test/resources/dropbear-server"
   schedule:
     interval: daily
   open-pull-requests-limit: 10
-  assignees: kruton
+  assignees:
+    - kruton
 - package-ecosystem: docker
   directory: "/src/test/resources/openssh-server"
   schedule:
     interval: daily
   open-pull-requests-limit: 10
-  assignees: kruton
+  assignees:
+    - kruton
