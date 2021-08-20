@@ -43,6 +43,7 @@ public class AsyncSSHCompatibilityTest {
 		}
 
 		server = new GenericContainer(baseImage)
+				.withExposedPorts(8022)
 				.withLogConsumer(new Slf4jLogConsumer(logger).withPrefix("DOCKER"))
 				.waitingFor(new LogMessageWaitStrategy()
 						.withRegEx(".*LISTENER READY.*\\s"));
