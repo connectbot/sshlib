@@ -2,7 +2,6 @@ apply(plugin = "checkstyle")
 
 configure<CheckstyleExtension> {
     toolVersion = "8.14"
-    configDir = rootProject.file("config/quality/checkstyle")
 }
 
 tasks.named<Task>("check") {
