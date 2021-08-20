@@ -56,6 +56,7 @@ public class DropbearCompatibilityTest {
 
 	private static GenericContainer getBaseContainer() {
 		return new GenericContainer(baseImage)
+				.withExposedPorts(22)
 				.withLogConsumer(logConsumer)
 				.waitingFor(new LogMessageWaitStrategy()
 						.withRegEx(".*Not backgrounding.*\\s"));
