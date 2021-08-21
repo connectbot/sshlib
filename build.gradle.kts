@@ -82,10 +82,12 @@ release {
 
 spotless {
     java {
-        target(fileTree(".") {
-            include("**/*.java")
-            exclude("**/build", "**/out")
-        })
+        target(
+            fileTree(".") {
+                include("**/*.java")
+                exclude("**/build", "**/out")
+            }
+        )
         removeUnusedImports()
         trimTrailingWhitespace()
 
@@ -95,18 +97,22 @@ spotless {
     }
 
     kotlinGradle {
-        target(fileTree(".") {
-            include("**/*.gradle.kts")
-            exclude("**/build", "**/out")
-        })
+        target(
+            fileTree(".") {
+                include("**/*.gradle.kts")
+                exclude("**/build", "**/out")
+            }
+        )
         ktlint()
     }
 
     format("xml") {
-        target(fileTree(".") {
-            include("config/**/*.xml", "sshlib/**/*.xml")
-            exclude("**/build", "**/out")
-        })
+        target(
+            fileTree(".") {
+                include("config/**/*.xml", "sshlib/**/*.xml")
+                exclude("**/build", "**/out")
+            }
+        )
 
         eclipseWtp(EclipseWtpFormatterStep.XML).configFile("spotless.xml.prefs")
     }
