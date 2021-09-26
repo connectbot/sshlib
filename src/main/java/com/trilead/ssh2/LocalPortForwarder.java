@@ -51,6 +51,10 @@ public class LocalPortForwarder
 		lat.start();
 	}
 
+	public int getLocalPort() {
+		return lat.getLocalPort();
+	}
+
 	/**
 	 * Stop TCP/IP forwarding of newly arriving connections.
 	 *

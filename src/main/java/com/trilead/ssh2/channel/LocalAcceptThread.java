@@ -41,6 +41,10 @@ public class LocalAcceptThread extends Thread implements IChannelWorkerThread
 		ss.bind(localAddress);
 	}
 
+	public int getLocalPort() {
+		return ss.getLocalPort();
+	}
+
 	public void run()
 	{
 		try
