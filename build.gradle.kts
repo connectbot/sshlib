@@ -49,7 +49,7 @@ dependencies {
     testImplementation("commons-codec:commons-codec:1.15")
     testImplementation("org.testcontainers:testcontainers:1.16.2")
     testImplementation("org.jetbrains:annotations:23.0.0")
-    testImplementation("ch.qos.logback:logback-classic:1.2.8")
+    testImplementation("ch.qos.logback:logback-classic:1.2.9")
     testImplementation("org.hamcrest:hamcrest:2.2")
     testImplementation("org.mockito:mockito-core:4.2.0")
 }
