@@ -7,7 +7,7 @@ import net.researchgate.release.ReleaseExtension
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 plugins {
-    id("com.github.johnrengelman.shadow") version "7.1.1"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
     `java-library`
     `maven-publish`
     signing
