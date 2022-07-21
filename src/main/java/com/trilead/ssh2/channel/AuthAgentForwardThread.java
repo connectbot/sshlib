@@ -57,11 +57,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.trilead.ssh2.AuthAgentCallback;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
 import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
+import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 
 /**
@@ -509,8 +511,9 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 					response = RSASHA1Verify.get().generateSignature(challenge, rsaPrivKey, new SecureRandom());
 				}
 			} else if (privKey instanceof DSAPrivateKey) {
-				response = DSASHA1Verify.get().generateSignature(challenge,
-						privKey, new SecureRandom());
+				response = DSASHA1Verify.get().generateSignature(challenge, privKey, new SecureRandom());
+			} else if (privKey instanceof Ed25519PrivateKey) {
+				response = Ed25519Verify.get().generateSignature(challenge, privKey, new SecureRandom());
 			} else {
 				os.write(SSH_AGENT_FAILURE);
 				return;
