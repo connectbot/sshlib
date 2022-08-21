@@ -75,9 +75,6 @@ tasks.withType<JacocoReport> {
 
 fun ReleaseExtension.git(configure: GitConfig.() -> Unit) = (getProperty("git") as GitConfig).configure()
 release {
-    git {
-        requireBranch = "main"
-    }
 }
 
 spotless {
