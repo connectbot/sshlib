@@ -64,13 +64,13 @@ java {
 }
 
 tasks.withType<ShadowJar> {
-    classifier = null
+    archiveClassifier.set("")
     minimize()
 }
 
-tasks.withType<JacocoReport> {
+tasks.jacocoTestReport {
     reports {
-        xml.isEnabled = true
+        xml.required.set(true)
     }
 }
 
