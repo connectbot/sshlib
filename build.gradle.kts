@@ -30,6 +30,7 @@ buildscript {
 
 repositories {
     mavenCentral()
+    google()
 }
 
 group = "org.connectbot"
