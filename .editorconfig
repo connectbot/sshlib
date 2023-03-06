@@ -1,3 +1,5 @@
+root=true
+
 [*]
 charset=utf-8
 end_of_line=lf
@@ -20,3 +22,7 @@ indent_size=2
 [*.md]
 indent_style=space
 indent_size=2
+
+[gradlew]
+indent_style = unset
+indent_size = unset
