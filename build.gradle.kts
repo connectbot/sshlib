@@ -48,7 +48,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("commons-io:commons-io:2.11.0")
     testImplementation("commons-codec:commons-codec:1.15")
-    testImplementation("org.testcontainers:testcontainers:1.17.6")
+    testImplementation("org.testcontainers:testcontainers:1.18.0")
     testImplementation("org.jetbrains:annotations:24.0.1")
     testImplementation("ch.qos.logback:logback-classic:1.2.11")
     testImplementation("org.hamcrest:hamcrest:2.2")
