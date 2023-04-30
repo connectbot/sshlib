@@ -84,7 +84,7 @@ spotless {
             fileTree(".") {
                 include("**/*.java")
                 exclude("**/build", "**/out")
-            }
+            },
         )
         removeUnusedImports()
         trimTrailingWhitespace()
@@ -99,7 +99,7 @@ spotless {
             fileTree(".") {
                 include("**/*.gradle.kts")
                 exclude("**/build", "**/out")
-            }
+            },
         )
         ktlint()
     }
@@ -109,7 +109,7 @@ spotless {
             fileTree(".") {
                 include("config/**/*.xml", "sshlib/**/*.xml")
                 exclude("**/build", "**/out")
-            }
+            },
         )
 
         eclipseWtp(EclipseWtpFormatterStep.XML).configFile("spotless.xml.prefs")
