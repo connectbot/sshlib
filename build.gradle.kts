@@ -46,7 +46,7 @@ dependencies {
     implementation("org.connectbot:jbcrypt:1.0.2")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("commons-io:commons-io:2.14.0")
+    testImplementation("commons-io:commons-io:2.15.0")
     testImplementation("commons-codec:commons-codec:1.16.0")
     testImplementation("org.testcontainers:testcontainers:1.19.1")
     testImplementation("org.jetbrains:annotations:24.0.1")
