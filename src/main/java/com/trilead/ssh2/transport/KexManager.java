@@ -98,10 +98,10 @@ public class KexManager
 		KEX_ALGS.add("diffie-hellman-group-exchange-sha1");
 		KEX_ALGS.add("diffie-hellman-group14-sha1");
 		KEX_ALGS.add("diffie-hellman-group1-sha1");
-
-		// Indicate client support for ext-info
-		KEX_ALGS.add("ext-info-c");
 	}
+
+	/** RFC 8308 Section 2 */
+	private static final String EXT_INFO_C = "ext-info-c";
 
 	private KexState kxs;
 	private int kexCount = 0;
@@ -279,8 +279,9 @@ public class KexManager
 
 	public synchronized void initiateKEX(CryptoWishList cwl, DHGexParameters dhgex) throws IOException
 	{
-		nextKEXcryptoWishList = cwl;
+		nextKEXcryptoWishList = cwl.clone();
 		filterHostKeyTypes(nextKEXcryptoWishList);
+		addExtraKexAlgorithms(nextKEXcryptoWishList);
 
 		nextKEXdhgexParameters = dhgex;
 
@@ -293,6 +294,24 @@ public class KexManager
 			kxs.localKEX = kp;
 			tm.sendKexMessage(kp.getPayload());
 		}
+	}
+
+	/**
+	 * Adds the pseudo-key-exchange algorithms to the crypto wishlist.
+	 *
+	 * @param cwl the crypto wishlist to which the key exchange algo
+	 *            should be added.
+	 */
+	private static void addExtraKexAlgorithms(CryptoWishList cwl) {
+		String[] oldKexAlgorithms = cwl.kexAlgorithms;
+		List<String> kexAlgorithms = new ArrayList<>(oldKexAlgorithms.length + 1);
+		for (String algo : oldKexAlgorithms)
+		{
+			if (!algo.equals(EXT_INFO_C))
+				kexAlgorithms.add(algo);
+		}
+		kexAlgorithms.add(EXT_INFO_C);
+		cwl.kexAlgorithms = kexAlgorithms.toArray(new String[0]);
 	}
 
 	/**
