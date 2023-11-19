@@ -13,7 +13,7 @@ plugins {
     signing
     jacoco
     id("com.diffplug.spotless") version "6.22.0"
-    id("com.github.ben-manes.versions") version "0.49.0"
+    id("com.github.ben-manes.versions") version "0.50.0"
     id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
     id("net.researchgate.release") version "3.0.2"
 }
@@ -48,11 +48,11 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("commons-io:commons-io:2.15.0")
     testImplementation("commons-codec:commons-codec:1.16.0")
-    testImplementation("org.testcontainers:testcontainers:1.19.1")
-    testImplementation("org.jetbrains:annotations:24.0.1")
+    testImplementation("org.testcontainers:testcontainers:1.19.2")
+    testImplementation("org.jetbrains:annotations:24.1.0")
     testImplementation("ch.qos.logback:logback-classic:1.4.11")
     testImplementation("org.hamcrest:hamcrest:2.2")
-    testImplementation("org.mockito:mockito-core:5.6.0")
+    testImplementation("org.mockito:mockito-core:5.7.0")
 }
 
 java {
