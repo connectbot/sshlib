@@ -54,6 +54,10 @@ public class PacketExtInfo
 		// Type has dynamic number of fields
 		// First int tells us how many pairs to expect
 		int numExtensions = tr.readUINT32();
+		if (numExtensions >= 1024) {
+			throw new IOException("Too many entries in ext info packet");
+		}
+
 		Map<String, String> extNameToValue_ = new HashMap<>(numExtensions);
 		for (int i = 0; i < numExtensions; i++)
 		{
