@@ -12,7 +12,7 @@ plugins {
     `maven-publish`
     signing
     jacoco
-    id("com.diffplug.spotless") version "6.21.0"
+    id("com.diffplug.spotless") version "6.22.0"
     id("com.github.ben-manes.versions") version "0.50.0"
     id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
     id("net.researchgate.release") version "3.0.2"
@@ -127,9 +127,10 @@ tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
     resolutionStrategy {
         componentSelection {
             all {
-                val rejected = listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea")
-                    .map { qualifier -> Regex("(?i).*[.-]$qualifier[.\\d-+]*") }
-                    .any { it.matches(candidate.version) }
+                val rejected =
+                    listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea")
+                        .map { qualifier -> Regex("(?i).*[.-]$qualifier[.\\d-+]*") }
+                        .any { it.matches(candidate.version) }
                 if (rejected) {
                     reject("Release candidate")
                 }
