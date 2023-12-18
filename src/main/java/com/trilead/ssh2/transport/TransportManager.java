@@ -122,10 +122,11 @@ public class TransportManager
 	int port;
 	Socket sock;
 
-	Object connectionSemaphore = new Object();
+	private final Object connectionSemaphore = new Object();
 
 	boolean flagKexOngoing = false;
 	boolean connectionClosed = false;
+	boolean firstKexFinished = false;
 
 	Throwable reasonClosedCause = null;
 
@@ -404,6 +405,8 @@ public class TransportManager
 	}
 
 	public void kexFinished() {
+		firstKexFinished = true;
+
 		synchronized (connectionSemaphore)
 		{
 			flagKexOngoing = false;
@@ -419,11 +422,15 @@ public class TransportManager
 	public void changeRecvCipher(BlockCipher bc, MAC mac)
 	{
 		tc.changeRecvCipher(bc, mac);
+		if (km.isStrictKex())
+			tc.resetReceiveSequenceNumber();
 	}
 
 	public void changeSendCipher(BlockCipher bc, MAC mac)
 	{
 		tc.changeSendCipher(bc, mac);
+		if (km.isStrictKex())
+			tc.resetSendSequenceNumber();
 	}
 
 	/**
@@ -531,38 +538,6 @@ public class TransportManager
 
 			int type = msg[0] & 0xff;
 
-			if (type == Packets.SSH_MSG_IGNORE)
-				continue;
-
-			if (type == Packets.SSH_MSG_DEBUG)
-			{
-				if (log.isEnabled())
-				{
-					TypesReader tr = new TypesReader(msg, 0, msglen);
-					tr.readByte();
-					tr.readBoolean();
-					StringBuffer debugMessageBuffer = new StringBuffer();
-					debugMessageBuffer.append(tr.readString("UTF-8"));
-
-					for (int i = 0; i < debugMessageBuffer.length(); i++)
-					{
-						char c = debugMessageBuffer.charAt(i);
-
-						if ((c >= 32) && (c <= 126))
-							continue;
-						debugMessageBuffer.setCharAt(i, '\uFFFD');
-					}
-
-					log.log(50, "DEBUG Message from remote: '" + debugMessageBuffer.toString() + "'");
-				}
-				continue;
-			}
-
-			if (type == Packets.SSH_MSG_UNIMPLEMENTED)
-			{
-				throw new IOException("Peer sent UNIMPLEMENTED message, that should not happen.");
-			}
-
 			if (type == Packets.SSH_MSG_DISCONNECT)
 			{
 				TypesReader tr = new TypesReader(msg, 0, msglen);
@@ -613,6 +588,46 @@ public class TransportManager
 			{
 				km.handleMessage(msg, msglen);
 				continue;
+			}
+
+			/*
+			 * Any other packet should not be used when kex-strict is enabled.
+			 */
+			if (!firstKexFinished && km.isStrictKex())
+			{
+				throw new IOException("Unexpected packet received when kex-strict enabled");
+			}
+
+			if (type == Packets.SSH_MSG_IGNORE)
+				continue;
+
+			if (type == Packets.SSH_MSG_DEBUG)
+			{
+				if (log.isEnabled())
+				{
+					TypesReader tr = new TypesReader(msg, 0, msglen);
+					tr.readByte();
+					tr.readBoolean();
+					StringBuffer debugMessageBuffer = new StringBuffer();
+					debugMessageBuffer.append(tr.readString("UTF-8"));
+
+					for (int i = 0; i < debugMessageBuffer.length(); i++)
+					{
+						char c = debugMessageBuffer.charAt(i);
+
+						if ((c >= 32) && (c <= 126))
+							continue;
+						debugMessageBuffer.setCharAt(i, '\uFFFD');
+					}
+
+					log.log(50, "DEBUG Message from remote: '" + debugMessageBuffer.toString() + "'");
+				}
+				continue;
+			}
+
+			if (type == Packets.SSH_MSG_UNIMPLEMENTED)
+			{
+				throw new IOException("Peer sent UNIMPLEMENTED message, that should not happen.");
 			}
 
 			if (type == Packets.SSH_MSG_USERAUTH_SUCCESS) {

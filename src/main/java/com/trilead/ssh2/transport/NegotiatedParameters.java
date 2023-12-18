@@ -9,6 +9,7 @@ package com.trilead.ssh2.transport;
 public class NegotiatedParameters
 {
 	public boolean guessOK;
+	public boolean isStrictKex;
 	public String kex_algo;
 	public String server_host_key_algo;
 	public String enc_algo_client_to_server;
