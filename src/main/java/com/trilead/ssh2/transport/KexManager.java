@@ -103,6 +103,9 @@ public class KexManager
 	/** RFC 8308 Section 2 */
 	private static final String EXT_INFO_C = "ext-info-c";
 
+	private static final String KEX_STRICT_C_OPENSSH = "kex-strict-c-v00@openssh.com";
+	private static final String KEX_STRICT_S_OPENSSH = "kex-strict-s-v00@openssh.com";
+
 	private KexState kxs;
 	private int kexCount = 0;
 	private KeyMaterial km;
@@ -193,6 +196,19 @@ public class KexManager
 		return (a[0].equals(b[0]));
 	}
 
+	private boolean containsAlgo(String[] algos, String targetAlgo)
+	{
+		if (algos == null || targetAlgo == null)
+			return false;
+
+		for (String algo : algos) {
+			if (targetAlgo.equals(algo))
+				return true;
+		}
+
+		return false;
+	}
+
 	private boolean isGuessOK(KexParameters cpar, KexParameters spar)
 	{
 		if (cpar == null || spar == null)
@@ -213,6 +229,8 @@ public class KexManager
 		try
 		{
 			np.kex_algo = getFirstMatch(client.kex_algorithms, server.kex_algorithms);
+
+			np.isStrictKex = containsAlgo(server.kex_algorithms, KEX_STRICT_S_OPENSSH);
 
 			log.log(20, "kex_algo=" + np.kex_algo);
 
@@ -304,13 +322,14 @@ public class KexManager
 	 */
 	private static void addExtraKexAlgorithms(CryptoWishList cwl) {
 		String[] oldKexAlgorithms = cwl.kexAlgorithms;
-		List<String> kexAlgorithms = new ArrayList<>(oldKexAlgorithms.length + 1);
+		List<String> kexAlgorithms = new ArrayList<>(oldKexAlgorithms.length + 2);
 		for (String algo : oldKexAlgorithms)
 		{
-			if (!algo.equals(EXT_INFO_C))
+			if (!algo.equals(EXT_INFO_C) && !algo.equals(KEX_STRICT_C_OPENSSH))
 				kexAlgorithms.add(algo);
 		}
 		kexAlgorithms.add(EXT_INFO_C);
+		kexAlgorithms.add(KEX_STRICT_C_OPENSSH);
 		cwl.kexAlgorithms = kexAlgorithms.toArray(new String[0]);
 	}
 
@@ -745,5 +764,9 @@ public class KexManager
 		}
 
 		throw new IllegalStateException("Unkown KEX method! (" + kxs.np.kex_algo + ")");
+	}
+
+	public boolean isStrictKex() {
+		return kxs.np.isStrictKex;
 	}
 }

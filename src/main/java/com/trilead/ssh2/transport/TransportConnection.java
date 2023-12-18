@@ -361,4 +361,18 @@ public class TransportConnection
 		can_recv_compress = true;
 		can_send_compress = true;
 	}
+
+	/**
+	 * Resets the send sequence number for MAC calculation.
+	 */
+	public void resetSendSequenceNumber() {
+		send_seq_number = 0;
+	}
+
+	/**
+	 * Resets the receive sequence number for MAC calculation.
+	 */
+	public void resetReceiveSequenceNumber() {
+		recv_seq_number = 0;
+	}
 }
