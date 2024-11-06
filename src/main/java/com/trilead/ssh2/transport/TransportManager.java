@@ -4,6 +4,7 @@ package com.trilead.ssh2.transport;
 import com.trilead.ssh2.ExtensionInfo;
 import com.trilead.ssh2.packets.PacketExtInfo;
 import java.io.IOException;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -49,6 +50,16 @@ import com.trilead.ssh2.packets.TypesReader;
  */
 public class TransportManager
 {
+	/**
+	 * Allow the caller to restrict the IP version of the connection to
+	 * be established.
+	 */
+	public enum IpVersion {
+		IPV4_AND_IPV6, ///< Allow both IPV4 and IPv6, the default.
+		IPV4_ONLY,     ///< Require that the connection be over IPv4 only.
+		IPV6_ONLY      ///< Require that the connection be over IPv6 only.
+	}
+
 	private static final Logger log = Logger.getLogger(TransportManager.class);
 
 	class HandlerEntry
@@ -265,30 +276,59 @@ public class TransportManager
 		}
 	}
 
-	private void establishConnection(ProxyData proxyData, int connectTimeout) throws IOException
+	private static InetAddress getIPv4Address(InetAddress[] addresses) {
+		for (InetAddress address : addresses) {
+			if (! (address instanceof Inet6Address)) {
+				return address;
+			}
+		}
+		return null;
+	}
+	private static Inet6Address getIPv6Address(InetAddress[] addresses) {
+		for (InetAddress address : addresses) {
+			if (address instanceof Inet6Address) {
+				return (Inet6Address) address;
+			}
+		}
+		return null;
+	}
+
+	private void establishConnection(ProxyData proxyData, int connectTimeout, IpVersion ipVersion) throws IOException
 	{
 		if (proxyData == null)
-			sock = connectDirect(hostname, port, connectTimeout);
+			sock = connectDirect(hostname, port, connectTimeout, ipVersion);
 		else
 			sock = proxyData.openConnection(hostname, port, connectTimeout);
 	}
 
-	private static Socket connectDirect(String hostname, int port, int connectTimeout)
+	private static Socket connectDirect(String hostname, int port, int connectTimeout, IpVersion ipVersion)
 			throws IOException
 	{
 		Socket sock = new Socket();
-		InetAddress addr = InetAddress.getByName(hostname);
+		InetAddress addr;
+		if (ipVersion == IpVersion.IPV4_ONLY)
+		{
+			addr = getIPv4Address(InetAddress.getAllByName(hostname));
+		}
+		else if (ipVersion == IpVersion.IPV6_ONLY)
+		{
+			addr = getIPv6Address(InetAddress.getAllByName(hostname));
+		}
+		else // Assume (ipVersion == IpVersion.IPV4_AND_IPV6), the default.
+		{
+			addr = InetAddress.getByName(hostname);
+		}
 		sock.connect(new InetSocketAddress(addr, port), connectTimeout);
 		sock.setSoTimeout(0);
 		return sock;
 	}
 
 	public void initialize(CryptoWishList cwl, ServerHostKeyVerifier verifier, DHGexParameters dhgex,
-			int connectTimeout, SecureRandom rnd, ProxyData proxyData) throws IOException
+			int connectTimeout, IpVersion ipVersion, SecureRandom rnd, ProxyData proxyData) throws IOException
 	{
 		/* First, establish the TCP connection to the SSH-2 server */
 
-		establishConnection(proxyData, connectTimeout);
+		establishConnection(proxyData, connectTimeout, ipVersion);
 
 		/* Parse the server line and say hello - important: this information is later needed for the
 		 * key exchange (to stop man-in-the-middle attacks) - that is why we wrap it into an object
