@@ -1,4 +1,4 @@
-FROM python:3-slim AS builder
+FROM python:3.12-slim-bookworm AS builder
 RUN apt-get update && \
     apt-get install -y gcc openssh-server && \
     apt-get clean
@@ -8,7 +8,7 @@ RUN pip install --user -r requirements.txt
 RUN mkdir -p /etc/ssh && ssh-keygen -A
 COPY . /app
 
-FROM python:3-slim AS app
+FROM python:3.12-slim-bookworm AS app
 COPY --from=builder /etc/ssh /etc/ssh
 COPY --from=builder /root/.local /root/.local
 COPY --from=builder /app/server.py /app/server.py
