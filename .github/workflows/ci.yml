@@ -19,14 +19,14 @@ jobs:
         java: [ 11, 17 ]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
       with:
         distribution: 'zulu'
         java-version: ${{ matrix.java }}
     - name: Cache Gradle Home files
-      uses: actions/cache@v4.0.2
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       continue-on-error: true
       with:
         path: ~/.gradle/caches
@@ -47,7 +47,7 @@ jobs:
         SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
         SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
     - name: Upload coverate to CodeClimate
-      uses: paambaati/codeclimate-action@v5.0.0
+      uses: paambaati/codeclimate-action@a1831d7162ea1fbc612ffe5fb3b90278b7999d59 # v5.0.0
       env:
         CC_TEST_REPORTER_ID: 9c22853d2ecf28aec51c1b578072031a3a655790cffb9fecfed6101920e5446c
         JACOCO_SOURCE_PATH: "${{github.workspace}}/src/main/java"
