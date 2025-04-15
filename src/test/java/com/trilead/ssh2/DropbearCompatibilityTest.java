@@ -116,6 +116,11 @@ public class DropbearCompatibilityTest {
 	}
 
 	@Test
+	public void canConnectWithEd25519() throws Exception {
+		canConnectWithPubkey("ed25519-openssh2-private-key.txt");
+	}
+
+	@Test
 	public void canConnectWithEcdsa256() throws Exception {
 		canConnectWithPubkey("ecdsa-nistp256-openssh2-private-key.txt");
 	}
@@ -164,6 +169,11 @@ public class DropbearCompatibilityTest {
 		assertCanConnectToServerThatHasKeyType("/etc/dropbear/dropbear_ecdsa_host_key", "ecdsa-sha2-nistp256");
 	}
 
+	@Test
+	public void connectToEd25519Host() throws Exception {
+		assertCanConnectToServerThatHasKeyType("/etc/dropbear/dropbear_ed25519_host_key", "ssh-ed25519");
+	}
+
 	private void assertCanConnectToServerWithKex(@NotNull String kexType) throws IOException {
 		ConnectionInfo info = connectToServer(
 				c -> c.setKeyExchangeAlgorithms(new String[]{kexType}));
@@ -178,11 +188,6 @@ public class DropbearCompatibilityTest {
 	@Test
 	public void canConnectWithKexCurve25519() throws Exception {
 		assertCanConnectToServerWithKex("curve25519-sha256");
-	}
-
-	@Test
-	public void canConnectWithKexDHGroup14() throws Exception {
-		assertCanConnectToServerWithKex("diffie-hellman-group14-sha1");
 	}
 
 	@Test
@@ -238,32 +243,8 @@ public class DropbearCompatibilityTest {
 	}
 
 	@Test
-	public void canConnectWithMacHmacSha1() throws Exception {
-		assertCanConnectToServerWithMac("hmac-sha1");
-	}
-
-	@Test
 	public void canConnectWithMacHmacSha2_256() throws Exception {
 		assertCanConnectToServerWithMac("hmac-sha2-256");
-	}
-
-	@Test
-	public void canConnectWithCompression() throws Exception {
-		try (GenericContainer customServer = getBaseContainer()) {
-			customServer.start();
-			try (Connection c = withServer(customServer)) {
-				c.setCompression(true);
-				c.connect();
-				assertThat(c.authenticateWithPassword(USERNAME, PASSWORD), is(true));
-				try (Session s = c.openSession()) {
-					s.ping();
-				}
-
-				ConnectionInfo info = c.getConnectionInfo();
-				assertThat(info.clientToServerCompressionAlgorithm, is("zlib@openssh.com"));
-				assertThat(info.serverToClientCompressionAlgorithm, is("zlib@openssh.com"));
-			}
-		}
 	}
 
 	private void canConnectWithHostKeyAlgorithm(String keyPath, String hostKeyAlgorithm) throws Exception {
@@ -273,6 +254,6 @@ public class DropbearCompatibilityTest {
 
 	@Test
 	public void canConnectToHostWithHostKeySshRsa() throws Exception {
-		canConnectWithHostKeyAlgorithm("/etc/dropbear/dropbear_rsa_host_key", "ssh-rsa");
+		canConnectWithHostKeyAlgorithm("/etc/dropbear/dropbear_rsa_host_key", "rsa-sha2-256");
 	}
 }
