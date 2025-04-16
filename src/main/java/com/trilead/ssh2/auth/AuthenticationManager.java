@@ -330,7 +330,7 @@ public class AuthenticationManager implements MessageHandler
 				}
 				else
 				{
-					Ed25519PrivateKey pk = (Ed25519PrivateKey) privateKey;
+					Ed25519PrivateKey pk = Ed25519Verify.convertPrivateKey(privateKey);
 					ed_sig_enc = Ed25519Verify.get().generateSignature(msg, pk, rnd);
 				}
 

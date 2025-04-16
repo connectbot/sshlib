@@ -69,7 +69,7 @@ public class Ed25519Verify implements SSHSignature {
 
 	@Override
 	public byte[] encodePublicKey(PublicKey publicKey) throws IOException {
-		Ed25519PublicKey ed25519PublicKey = getEd25519PublicKey(publicKey);
+		Ed25519PublicKey ed25519PublicKey = convertPublicKey(publicKey);
 
 		TypesWriter tw = new TypesWriter();
 
@@ -104,7 +104,7 @@ public class Ed25519Verify implements SSHSignature {
 
 	@Override
 	public byte[] generateSignature(byte[] msg, PrivateKey privateKey, SecureRandom secureRandom) throws IOException {
-		Ed25519PrivateKey ed25519PrivateKey = getEd25519PrivateKey(privateKey);
+		Ed25519PrivateKey ed25519PrivateKey = convertPrivateKey(privateKey);
 		try {
 			return encodeSSHEd25519Signature(new Ed25519Sign(ed25519PrivateKey.getSeed()).sign(msg));
 		} catch (GeneralSecurityException e) {
@@ -112,7 +112,7 @@ public class Ed25519Verify implements SSHSignature {
 		}
 	}
 
-	private static Ed25519PublicKey getEd25519PublicKey(PublicKey publicKey) throws IOException {
+	public static Ed25519PublicKey convertPublicKey(PublicKey publicKey) throws IOException {
 		Ed25519KeyFactory kf = new Ed25519KeyFactory();
 		try {
 			return (Ed25519PublicKey) kf.engineTranslateKey(publicKey);
@@ -121,7 +121,7 @@ public class Ed25519Verify implements SSHSignature {
 		}
 	}
 
-	private static Ed25519PrivateKey getEd25519PrivateKey(PrivateKey privateKey) throws IOException {
+	public static Ed25519PrivateKey convertPrivateKey(PrivateKey privateKey) throws IOException {
 		Ed25519KeyFactory kf = new Ed25519KeyFactory();
 		try {
 			return (Ed25519PrivateKey) kf.engineTranslateKey(privateKey);
@@ -132,7 +132,7 @@ public class Ed25519Verify implements SSHSignature {
 
 	@Override
 	public boolean verifySignature(byte[] message, byte[] sshSig, PublicKey publicKey) throws IOException {
-		Ed25519PublicKey ed25519PublicKey = getEd25519PublicKey(publicKey);
+		Ed25519PublicKey ed25519PublicKey = convertPublicKey(publicKey);
 		byte[] javaSig = decodeSSHEd25519Signature(sshSig);
 		try {
 			new com.google.crypto.tink.subtle.Ed25519Verify(ed25519PublicKey.getAbyte()).verify(javaSig, message);

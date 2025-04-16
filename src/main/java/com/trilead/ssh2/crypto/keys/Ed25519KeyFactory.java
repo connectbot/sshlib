@@ -37,6 +37,7 @@ public class Ed25519KeyFactory extends KeyFactorySpi {
 		if (key instanceof Ed25519PublicKey || key instanceof Ed25519PrivateKey) {
 			return key;
 		}
+
 		if (key instanceof PublicKey && key.getFormat().equals("X.509")) {
 			byte[] encoded = key.getEncoded();
 			try {
