@@ -8,6 +8,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -189,5 +193,31 @@ public class Ed25519VerifyTest {
 		byte[] pubKeyEncoded = pubKey.getEncoded();
 		Ed25519PublicKey pubKey2 = new Ed25519PublicKey(new X509EncodedKeySpec(pubKeyEncoded));
 		assertThat(pubKey.getAbyte(), is(pubKey2.getAbyte()));
+	}
+
+	@Test
+	public void nativeJDKConversion() throws Exception {
+		java.security.KeyPairGenerator kpg;
+		try {
+			kpg = KeyPairGenerator.getInstance("EdDSA");
+		} catch (NoSuchAlgorithmException e) {
+			// Skip test if EdDSA is not supported by the JDK
+			System.err.println("Skipping nativeJDKConversion test: EdDSA not supported by this JDK");
+			return;
+		}
+
+		KeyPair keyPair = kpg.generateKeyPair();
+
+		// Convert and check Public Key
+		PublicKey nativePubKey = keyPair.getPublic();
+		X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(nativePubKey.getEncoded());
+		Ed25519PublicKey convertedPubKey = new Ed25519PublicKey(pubKeySpec);
+		assertArrayEquals(nativePubKey.getEncoded(), convertedPubKey.getEncoded());
+
+		// Convert and check Private Key
+		PrivateKey nativePrivKey = keyPair.getPrivate();
+		PKCS8EncodedKeySpec privKeySpec = new PKCS8EncodedKeySpec(nativePrivKey.getEncoded());
+		Ed25519PrivateKey convertedPrivKey = new Ed25519PrivateKey(privKeySpec);
+		assertArrayEquals(nativePrivKey.getEncoded(), convertedPrivKey.getEncoded());
 	}
 }
