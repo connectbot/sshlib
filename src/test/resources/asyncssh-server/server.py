@@ -2,10 +2,10 @@
 # private key in it to use as a server host key. An SSH host certificate
 # can optionally be provided in the file ``ssh_host_key-cert.pub``.
 
-import asyncio, asyncssh, crypt, sys, time, logging
+import asyncio, asyncssh, sys, time, logging
 
 passwords = {
-             'user123': 'qV2iEadIGV2rw'   # password of 'secretpw'
+             'user123': 'secretpw'
             }
 
 def handle_client(process):
@@ -38,7 +38,7 @@ class MySSHServer(asyncssh.SSHServer):
 
     def validate_password(self, username, password):
         pw = passwords.get(username, '*')
-        return crypt.crypt(password, pw) == pw
+        return password == pw
 
     def public_key_auth_supported(self):
         return True
