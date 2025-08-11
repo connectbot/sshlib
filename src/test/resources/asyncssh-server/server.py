@@ -49,8 +49,8 @@ async def start_server():
     asyncssh.set_debug_level(2)
     await asyncssh.create_server(MySSHServer, '', 8022,
                                  server_host_keys=[
-                                     '/etc/ssh/ssh_host_ecdsa_key',
-                                     '/etc/ssh/ssh_host_rsa_key',
+                                     '/app/etc/ssh/ssh_host_ecdsa_key',
+                                     '/app/etc/ssh/ssh_host_rsa_key',
                                  ],
                                  process_factory=handle_client)
 
