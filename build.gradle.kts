@@ -12,7 +12,7 @@ plugins {
     `maven-publish`
     signing
     jacoco
-    id("com.diffplug.spotless") version "7.0.4"
+    id("com.diffplug.spotless") version "7.2.1"
     id("com.github.ben-manes.versions") version "0.52.0"
     id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
     id("net.researchgate.release") version "3.1.0"
