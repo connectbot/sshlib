@@ -49,7 +49,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("commons-io:commons-io:2.19.0")
-    testImplementation("commons-codec:commons-codec:1.18.0")
+    testImplementation("commons-codec:commons-codec:1.19.0")
     testImplementation("org.testcontainers:testcontainers:1.21.3")
     testImplementation("org.jetbrains:annotations:26.0.2")
     testImplementation("ch.qos.logback:logback-classic:1.5.18")
