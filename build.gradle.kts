@@ -149,9 +149,10 @@ tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            artifact(tasks["shadowJar"])
-            artifact(tasks["javadocJar"])
-            artifact(tasks["sourcesJar"])
+            from(components["java"])
+            artifact(tasks["shadowJar"]) {
+                classifier = "shadow"
+            }
 
             pom {
                 name.set("sshlib")
