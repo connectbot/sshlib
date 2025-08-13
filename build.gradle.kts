@@ -7,15 +7,15 @@ import net.researchgate.release.ReleaseExtension
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 plugins {
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow").version("9.0.1")
     `java-library`
     `maven-publish`
     signing
     jacoco
-    id("com.diffplug.spotless") version "7.2.1"
-    id("com.github.ben-manes.versions") version "0.53.0"
-    id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
-    id("net.researchgate.release") version "3.1.0"
+    id("com.diffplug.spotless").version("8.0.0")
+    id("com.github.ben-manes.versions").version("0.53.0")
+    id("io.github.gradle-nexus.publish-plugin").version("2.0.0")
+    id("net.researchgate.release").version("3.1.0")
 }
 
 buildscript {
@@ -135,21 +135,18 @@ spotless {
     }
 }
 
-tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
-    resolutionStrategy {
-        componentSelection {
-            all {
-                val rejected =
-                    listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea")
-                        .map { qualifier -> Regex("(?i).*[.-]$qualifier[.\\d-+]*") }
-                        .any { it.matches(candidate.version) }
-                if (rejected) {
-                    reject("Release candidate")
-                }
-            }
-        }
+fun isNonStable(version: String): Boolean =
+    listOf("alpha", "beta", "rc", "cr", "m", "preview", "b", "ea")
+        .map { qualifier -> Regex("(?i).*[.-]$qualifier[.\\d-+]*") }
+        .any { it.matches(version) }
+
+tasks.withType<DependencyUpdatesTask> {
+    rejectVersionIf {
+        isNonStable(candidate.version)
     }
-    // optional parameters
+}
+
+tasks.named<DependencyUpdatesTask>("dependencyUpdates").configure {
     checkForGradleUpdate = true
     outputFormatter = "json"
     outputDir = "build/dependencyUpdates"
