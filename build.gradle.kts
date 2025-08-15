@@ -54,7 +54,7 @@ dependencies {
     testImplementation("org.jetbrains:annotations:26.0.2")
     testImplementation("ch.qos.logback:logback-classic:1.5.18")
     testImplementation("org.hamcrest:hamcrest:3.0")
-    testImplementation("org.mockito:mockito-core:5.18.0")
+    testImplementation("org.mockito:mockito-core:5.19.0")
 }
 
 java {
