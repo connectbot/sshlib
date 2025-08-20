@@ -42,10 +42,9 @@ jobs:
           GPG_PASSWORD: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-      - name: Upload coverate to CodeClimate
-        uses: paambaati/codeclimate-action@f429536ee076d758a24705203199548125a28ca7 # v9.0.0
-        env:
-          CC_TEST_REPORTER_ID: 9c22853d2ecf28aec51c1b578072031a3a655790cffb9fecfed6101920e5446c
-          JACOCO_SOURCE_PATH: "${{github.workspace}}/src/main/java"
+      - name: Upload coverate to Qlty
+        uses: qltysh/qlty-action/coverage@a19242102d17e497f437d7466aa01b528537e899 # v2.2.0
         with:
-          coverageLocations: ${{github.workspace}}/build/reports/jacoco/test/jacocoTestReport.xml:jacoco
+          token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
+          format: jacoco
+          files: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
