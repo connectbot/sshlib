@@ -46,4 +46,5 @@ jobs:
         with:
           token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
           format: jacoco
+          add-prefix: src/main/java/
           files: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
