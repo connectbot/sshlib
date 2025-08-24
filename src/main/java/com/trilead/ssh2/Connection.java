@@ -47,6 +47,16 @@ import com.trilead.ssh2.util.TimeoutService.TimeoutToken;
 public class Connection implements AutoCloseable
 {
 	/**
+	 * Allow the caller to restrict the IP version of the connection to
+	 * be established.
+	 */
+	public enum IpVersion {
+		IPV4_AND_IPV6, ///< Allow both IPV4 and IPv6, the default.
+		IPV4_ONLY,     ///< Require that the connection be over IPv4 only.
+		IPV6_ONLY      ///< Require that the connection be over IPv6 only.
+	}
+
+	/**
 	 * The identifier presented to the SSH-2 server.
 	 */
 	public final static String identification = "TrileadSSH2Java_213";
@@ -564,30 +574,74 @@ public class Connection implements AutoCloseable
 
 	/**
 	 * Same as
-	 * {@link #connect(ServerHostKeyVerifier, int, int) connect(null, 0, 0)}.
+	 * {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(null, 0, 0, IpVersion.IPV4_AND_IPV6)}.
 	 *
 	 * @return see comments for the
-	 *         {@link #connect(ServerHostKeyVerifier, int, int) connect(ServerHostKeyVerifier, int, int)}
+	 *         {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(ServerHostKeyVerifier, int, int, IpVersion)}
 	 *         method.
 	 * @throws IOException
 	 */
 	public synchronized ConnectionInfo connect() throws IOException
 	{
-		return connect(null, 0, 0);
+		return connect(null, 0, 0, IpVersion.IPV4_AND_IPV6);
 	}
 
 	/**
 	 * Same as
-	 * {@link #connect(ServerHostKeyVerifier, int, int) connect(verifier, 0, 0)}.
+	 * {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(null, 0, 0, ipVersion)}.
 	 *
 	 * @return see comments for the
-	 *         {@link #connect(ServerHostKeyVerifier, int, int) connect(ServerHostKeyVerifier, int, int)}
+	 *         {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(ServerHostKeyVerifier, int, int, IpVersion)}
+	 *         method.
+	 * @throws IOException
+	 */
+	public synchronized ConnectionInfo connect(IpVersion ipVersion) throws IOException
+	{
+		return connect(null, 0, 0, ipVersion);
+	}
+
+
+	/**
+	 * Same as
+	 * {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(verifier, 0, 0, IpVersion.IPV4_AND_IPV6)}.
+	 *
+	 * @return see comments for the
+	 *         {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(ServerHostKeyVerifier, int, int, IpVersion)}
 	 *         method.
 	 * @throws IOException
 	 */
 	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier) throws IOException
 	{
-		return connect(verifier, 0, 0);
+		return connect(verifier, 0, 0, IpVersion.IPV4_AND_IPV6);
+	}
+
+	/**
+	 * Same as
+	 * {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(verifier, 0, 0, ipVersion)}.
+	 *
+	 * @return see comments for the
+	 *         {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(ServerHostKeyVerifier, int, int, IpVersion)}
+	 *         method.
+	 * @throws IOException
+	 */
+	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier, IpVersion ipVersion) throws IOException
+	{
+		return connect(verifier, 0, 0, ipVersion);
+	}
+
+	/**
+	 * Same as
+	 * {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(verifier, connectTimeout, kexTimeout, IpVersion.IPV4_AND_IPV6)}.
+	 *
+	 * @return see comments for the
+	 *         {@link #connect(ServerHostKeyVerifier, int, int, IpVersion) connect(ServerHostKeyVerifier, int, int, IpVersion)}
+	 *         method.
+	 * @throws IOException
+	 */
+	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier, int connectTimeout, int kexTimeout)
+		throws IOException
+	{
+		return connect(verifier, connectTimeout, kexTimeout, IpVersion.IPV4_AND_IPV6);
 	}
 
 	/**
@@ -649,6 +703,11 @@ public class Connection implements AutoCloseable
 	 *            but it will only have an effect after the
 	 *            <code>verifier</code> returns.
 	 *
+	 * @param ipVersion
+	 *            Specify whether the connection should be restricted to one of
+	 *            IPv4 or IPv6, with a default of allowing both. See
+	 *            {@link IpVersion}.
+	 *
 	 * @return A {@link ConnectionInfo} object containing the details of the
 	 *         established connection.
 	 *
@@ -672,7 +731,7 @@ public class Connection implements AutoCloseable
 	 *             proxy is buggy and does not return a proper HTTP response,
 	 *             then a normal IOException is thrown instead.
 	 */
-	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier, int connectTimeout, int kexTimeout)
+	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier, int connectTimeout, int kexTimeout, IpVersion ipVersion)
 			throws IOException
 	{
 		final class TimeoutState
@@ -745,9 +804,22 @@ public class Connection implements AutoCloseable
 				token = TimeoutService.addTimeoutHandler(timeoutHorizont, timeoutHandler);
 			}
 
+			TransportManager.IpVersion tmIpVersion;
+			if (ipVersion == IpVersion.IPV4_ONLY)
+			{
+				tmIpVersion = TransportManager.IpVersion.IPV4_ONLY;
+			}
+			else if (ipVersion == IpVersion.IPV6_ONLY) {
+				tmIpVersion = TransportManager.IpVersion.IPV6_ONLY;
+			}
+			else // Assume (ipVersion == IpVersion.IPV4_AND_IPV6), the default.
+			{
+				tmIpVersion = TransportManager.IpVersion.IPV4_AND_IPV6;
+			}
+
 			try
 			{
-				tm.initialize(cryptoWishList, verifier, dhgexpara, connectTimeout, getOrCreateSecureRND(), proxyData);
+				tm.initialize(cryptoWishList, verifier, dhgexpara, connectTimeout, tmIpVersion, getOrCreateSecureRND(), proxyData);
 			}
 			catch (SocketTimeoutException se)
 			{
