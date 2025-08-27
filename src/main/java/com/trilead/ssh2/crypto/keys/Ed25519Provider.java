@@ -6,12 +6,13 @@ import java.security.Provider;
 import java.security.Security;
 
 public class Ed25519Provider extends Provider {
+	public static final String NAME = "ConnectBot Ed25519 Provider";
 	public static final String KEY_ALGORITHM = "Ed25519";
 	private static final Object sInitLock = new Object();
 	private static boolean sInitialized = false;
 
 	public Ed25519Provider() {
-		super("ConnectBot Ed25519 Provider", 1.0, "Not for use elsewhere");
+		super(NAME, 1.0, "Not for use elsewhere");
 		AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
 			setup();
 			return null;

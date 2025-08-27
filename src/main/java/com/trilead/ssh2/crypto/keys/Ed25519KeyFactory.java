@@ -33,7 +33,29 @@ public class Ed25519KeyFactory extends KeyFactorySpi {
 	}
 
 	@Override
-	protected Key engineTranslateKey(Key key) throws InvalidKeyException {
-		throw new InvalidKeyException("No other EdDSA key providers known");
+	public Key engineTranslateKey(Key key) throws InvalidKeyException {
+		if (key instanceof Ed25519PublicKey || key instanceof Ed25519PrivateKey) {
+			return key;
+		}
+
+		if (key instanceof PublicKey && key.getFormat().equals("X.509")) {
+			byte[] encoded = key.getEncoded();
+			try {
+				return new Ed25519PublicKey(new X509EncodedKeySpec(encoded));
+			} catch (InvalidKeySpecException e) {
+				throw new InvalidKeyException(e);
+			}
+		}
+
+		if (key instanceof PrivateKey && key.getFormat().equals("PKCS#8")) {
+			byte[] encoded = key.getEncoded();
+			try {
+				return new Ed25519PrivateKey(new PKCS8EncodedKeySpec(encoded));
+			} catch (InvalidKeySpecException e) {
+				throw new InvalidKeyException(e);
+			}
+		}
+
+		throw new InvalidKeyException("Could not convert EdDSA key from key class " + key.getClass());
 	}
 }

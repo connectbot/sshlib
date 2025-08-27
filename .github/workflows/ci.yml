@@ -1,55 +1,50 @@
-# This workflow will build a Java project with Gradle
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
-
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Continuous Integration
-
 on:
   push:
-    branches: '*'
+    branches: ['*']
   pull_request:
-    branches: [ main ]
+    branches: [main]
   schedule:
     - cron: "0 7 * * *"
-
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [ 11, 17 ]
-
+        java: [11, 17]
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-    - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
-      with:
-        distribution: 'zulu'
-        java-version: ${{ matrix.java }}
-    - name: Cache Gradle Home files
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-      continue-on-error: true
-      with:
-        path: ~/.gradle/caches
-        key: ${{ runner.os }}-gradle-home-examples-${{matrix.gradle_args}}_check-${{ hashFiles('**/*.gradle') }}
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build jacocoTestReport --info
-    - name: Upload to Sonatype
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '11'
-      run: |
-        echo "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" > ~/.gradle/secring.gpg.b64
-        base64 -d ~/.gradle/secring.gpg.b64 > ~/.gradle/secring.gpg
-        ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} -Psigning.keyId=${GPG_KEYID} -Psigning.secretKeyRingFile=$(echo ~/.gradle/secring.gpg) -Psigning.password=${GPG_PASSWORD}
-      env:
-        GPG_KEYID: ${{ secrets.MAVEN_GPG_KEYID }}
-        GPG_PASSWORD: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-        SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-    - name: Upload coverate to CodeClimate
-      uses: paambaati/codeclimate-action@f429536ee076d758a24705203199548125a28ca7 # v9.0.0
-      env:
-        CC_TEST_REPORTER_ID: 9c22853d2ecf28aec51c1b578072031a3a655790cffb9fecfed6101920e5446c
-        JACOCO_SOURCE_PATH: "${{github.workspace}}/src/main/java"
-      with:
-        coverageLocations: ${{github.workspace}}/build/reports/jacoco/test/jacocoTestReport.xml:jacoco
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: 'zulu'
+          java-version: ${{ matrix.java }}
+      - name: Cache Gradle Home files
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        continue-on-error: true
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-home-examples-check-${{ hashFiles('**/*.gradle') }}
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Build with Gradle
+        run: ./gradlew build jacocoTestReport --info
+      - name: Upload to Sonatype
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '11'
+        run: |
+          echo "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" > ~/.gradle/secring.gpg.b64
+          base64 -d ~/.gradle/secring.gpg.b64 > ~/.gradle/secring.gpg
+          ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} -Psigning.keyId=${GPG_KEYID} -Psigning.secretKeyRingFile=$(echo ~/.gradle/secring.gpg) -Psigning.password=${GPG_PASSWORD}
+        env:
+          GPG_KEYID: ${{ secrets.MAVEN_GPG_KEYID }}
+          GPG_PASSWORD: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+      - name: Upload coverage to Qlty
+        uses: qltysh/qlty-action/coverage@a19242102d17e497f437d7466aa01b528537e899 # v2.2.0
+        with:
+          token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
+          format: jacoco
+          add-prefix: src/main/java/
+          files: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml

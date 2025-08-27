@@ -12,10 +12,10 @@ plugins {
     `maven-publish`
     signing
     jacoco
-    id("com.diffplug.spotless") version "6.25.0"
-    id("com.github.ben-manes.versions") version "0.51.0"
+    id("com.diffplug.spotless") version "7.2.1"
+    id("com.github.ben-manes.versions") version "0.52.0"
     id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
-    id("net.researchgate.release") version "3.0.2"
+    id("net.researchgate.release") version "3.1.0"
 }
 
 buildscript {
@@ -42,19 +42,19 @@ apply(from = "$rootDir/config/quality.gradle.kts")
 dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("com.google.crypto.tink:tink:1.13.0") {
+    implementation("com.google.crypto.tink:tink:1.18.0") {
         isTransitive = false
     }
     implementation("org.connectbot:jbcrypt:1.0.2")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("commons-io:commons-io:2.15.1")
-    testImplementation("commons-codec:commons-codec:1.18.0")
-    testImplementation("org.testcontainers:testcontainers:1.20.6")
-    testImplementation("org.jetbrains:annotations:24.1.0")
-    testImplementation("ch.qos.logback:logback-classic:1.5.3")
-    testImplementation("org.hamcrest:hamcrest:2.2")
-    testImplementation("org.mockito:mockito-core:5.17.0")
+    testImplementation("commons-io:commons-io:2.20.0")
+    testImplementation("commons-codec:commons-codec:1.19.0")
+    testImplementation("org.testcontainers:testcontainers:1.21.3")
+    testImplementation("org.jetbrains:annotations:26.0.2")
+    testImplementation("ch.qos.logback:logback-classic:1.5.18")
+    testImplementation("org.hamcrest:hamcrest:3.0")
+    testImplementation("org.mockito:mockito-core:5.19.0")
 }
 
 java {
@@ -149,9 +149,10 @@ tasks.named<DependencyUpdatesTask>("dependencyUpdates") {
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            artifact(tasks["shadowJar"])
-            artifact(tasks["javadocJar"])
-            artifact(tasks["sourcesJar"])
+            from(components["java"])
+            artifact(tasks["shadowJar"]) {
+                classifier = "shadow"
+            }
 
             pom {
                 name.set("sshlib")
