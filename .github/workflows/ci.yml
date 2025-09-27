@@ -31,7 +31,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build jacocoTestReport --info
       - name: Upload to Sonatype
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '11'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
         run: |
           echo "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" > ~/.gradle/secring.gpg.b64
           base64 -d ~/.gradle/secring.gpg.b64 > ~/.gradle/secring.gpg
