@@ -35,7 +35,7 @@ public class Ed25519Provider extends Provider {
 	public static void insertIfNeeded() {
 		synchronized (sInitLock) {
 			if (!sInitialized) {
-				Security.addProvider(new Ed25519Provider());
+				Security.insertProviderAt(new Ed25519Provider(), 1);
 				sInitialized = true;
 			}
 		}
