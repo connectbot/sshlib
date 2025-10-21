@@ -42,7 +42,7 @@ apply(from = "$rootDir/config/quality.gradle.kts")
 dependencies {
     implementation("com.jcraft:jzlib:1.1.3")
     implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("com.google.crypto.tink:tink:1.18.0") {
+    implementation("com.google.crypto.tink:tink:1.19.0") {
         isTransitive = false
     }
     implementation("org.connectbot:jbcrypt:1.0.2")
