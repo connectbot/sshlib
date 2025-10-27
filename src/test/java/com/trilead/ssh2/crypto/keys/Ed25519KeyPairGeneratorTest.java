@@ -1,6 +1,6 @@
 package com.trilead.ssh2.crypto.keys;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.security.KeyPairGenerator;
 

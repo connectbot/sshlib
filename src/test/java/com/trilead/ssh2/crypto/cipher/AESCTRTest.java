@@ -1,6 +1,6 @@
 package com.trilead.ssh2.crypto.cipher;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Testing composed AES-CTR mode.

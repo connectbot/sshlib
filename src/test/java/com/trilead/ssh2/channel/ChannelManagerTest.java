@@ -3,19 +3,20 @@ package com.trilead.ssh2.channel;
 import com.trilead.ssh2.ChannelCondition;
 import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.transport.ITransportConnection;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -30,7 +31,7 @@ import static org.mockito.Mockito.verify;
  * and the SSH protocol. These tests focus on unit-testable functionality using mocks.
  * Integration tests for full channel operations are covered by OpenSSHCompatibilityTest.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ChannelManagerTest {
 
 	@Mock
@@ -38,7 +39,7 @@ public class ChannelManagerTest {
 
 	private ChannelManager channelManager;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		channelManager = new ChannelManager(mockTransportConnection);
 	}
@@ -94,9 +95,11 @@ public class ChannelManagerTest {
 		assertNull(channelManager.checkX11Cookie(cookie));
 	}
 
-	@Test(expected = IllegalStateException.class)
+	@Test
 	public void testUnRegisterX11CookieWithNull() {
+		assertThrows(IllegalStateException.class, () -> {
 		channelManager.unRegisterX11Cookie(null, false);
+		});
 	}
 
 	@Test
@@ -468,8 +471,8 @@ public class ChannelManagerTest {
 			channelManager.handleMessage(dataMsg, 9);
 			fail("Should throw IOException");
 		} catch (IOException e) {
-			assertTrue("Expected size error but got: " + e.getMessage(),
-					e.getMessage().toLowerCase().contains("wrong size"));
+			assertTrue(e.getMessage().toLowerCase().contains("wrong size"),
+					"Expected size error but got: " + e.getMessage());
 		}
 	}
 
@@ -487,8 +490,8 @@ public class ChannelManagerTest {
 			channelManager.handleMessage(eofMsg, 5);
 			fail("Should throw IOException");
 		} catch (IOException e) {
-			assertTrue("Expected 'Unexpected' in message but got: " + e.getMessage(),
-					e.getMessage().contains("Unexpected"));
+			assertTrue(e.getMessage().contains("Unexpected"),
+					"Expected 'Unexpected' in message but got: " + e.getMessage());
 		}
 	}
 
@@ -506,8 +509,8 @@ public class ChannelManagerTest {
 			channelManager.handleMessage(closeMsg, 5);
 			fail("Should throw IOException");
 		} catch (IOException e) {
-			assertTrue("Expected 'Unexpected' in message but got: " + e.getMessage(),
-					e.getMessage().contains("Unexpected"));
+			assertTrue(e.getMessage().contains("Unexpected"),
+					"Expected 'Unexpected' in message but got: " + e.getMessage());
 		}
 	}
 

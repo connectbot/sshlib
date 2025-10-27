@@ -2,10 +2,11 @@ package com.trilead.ssh2.crypto.cipher;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public abstract class AESTest {
 
@@ -19,14 +20,18 @@ public abstract class AESTest {
 
 	abstract BlockCipher getCipher(boolean forEncrypt, byte[] iv, byte[] key);
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void init_zeroKeySize_Failure() {
-		BlockCipher aes = getCipher(true, new byte[16], new byte[0]);
+		assertThrows(IllegalArgumentException.class, () -> {
+			BlockCipher aes = getCipher(true, new byte[16], new byte[0]);
+		});
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void init_8BitKeySize_Failure() {
-		BlockCipher aes = getCipher(true, new byte[16], new byte[1]);
+		assertThrows(IllegalArgumentException.class, () -> {
+			BlockCipher aes = getCipher(true, new byte[16], new byte[1]);
+		});
 	}
 
 	@Test

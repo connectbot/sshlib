@@ -1,6 +1,6 @@
 package com.trilead.ssh2.crypto.keys;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -13,7 +13,7 @@ import java.security.spec.X509EncodedKeySpec;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 public class Ed25519KeyFactoryTest {
 	private static final byte[] PRIVATE = toByteArray("302e020100300506032b657004220420f72a0a036e3479e15edb74da5f2a5418e66db450ad50687cad90247eeab6440c");

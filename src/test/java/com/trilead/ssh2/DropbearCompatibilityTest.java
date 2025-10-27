@@ -4,32 +4,34 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 import java.util.function.Consumer;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * Integration tests against Dropbear.
  *
  * @author Kenny Root
  */
+@Testcontainers
 public class DropbearCompatibilityTest {
 	private static final Logger logger = LoggerFactory.getLogger(DropbearCompatibilityTest.class.getSimpleName());
 	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger).withPrefix("DOCKER");
 
-	@Rule
+	@RegisterExtension
 	public SshLogger sshLogger = new SshLogger(logger);
 
 	private static final String OPTIONS_ENV = "OPTIONS";
@@ -45,8 +47,8 @@ public class DropbearCompatibilityTest {
 		}
 	}
 
-	@ClassRule
-	public static GenericContainer server = getBaseContainer();
+	@Container
+	public static GenericContainer<?> server = getBaseContainer();
 
 	@NotNull
 	@Contract("_ -> new")

@@ -1,12 +1,13 @@
 package com.trilead.ssh2.compression;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CompressionFactoryTest {
 	@Test
@@ -14,10 +15,12 @@ public class CompressionFactoryTest {
 		assertTrue(CompressionFactory.getDefaultCompressorList().length > 0);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void brokenCompressor_Failure() {
+		assertThrows(IllegalArgumentException.class, () -> {
 		CompressionFactory.addCompressor("fake", "class.fake");
 		CompressionFactory.createCompressor("fake");
+		});
 	}
 
 	@Test
@@ -30,8 +33,10 @@ public class CompressionFactoryTest {
 		assertNotNull(CompressionFactory.createCompressor("zlib"));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void invalidCompressor_Failure() {
+		assertThrows(IllegalArgumentException.class, () -> {
 		CompressionFactory.checkCompressorList(Collections.singletonList("broken").toArray(new String[1]));
+		});
 	}
 }
