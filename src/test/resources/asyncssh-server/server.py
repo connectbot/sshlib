@@ -2,15 +2,15 @@
 # private key in it to use as a server host key. An SSH host certificate
 # can optionally be provided in the file ``ssh_host_key-cert.pub``.
 
-import asyncio, asyncssh, sys, time, logging
+import asyncio, asyncssh, sys, logging
 
 passwords = {
              'user123': 'secretpw'
             }
 
-def handle_client(process):
+async def handle_client(process):
     process.stdout.write('success\n')
-    time.sleep(10)
+    await asyncio.sleep(10)
     process.exit(0)
 
 class MySSHServer(asyncssh.SSHServer):
@@ -47,33 +47,39 @@ class MySSHServer(asyncssh.SSHServer):
 async def start_server():
     asyncssh.set_log_level('DEBUG')
     asyncssh.set_debug_level(2)
-    await asyncssh.create_server(MySSHServer, '', 8022,
-                                 server_host_keys=[
-                                     '/app/etc/ssh/ssh_host_ecdsa_key',
-                                     '/app/etc/ssh/ssh_host_rsa_key',
-                                 ],
-                                 process_factory=handle_client)
+    server = await asyncssh.create_server(MySSHServer, '', 8022,
+                                          server_host_keys=[
+                                              '/app/etc/ssh/ssh_host_ecdsa_key',
+                                              '/app/etc/ssh/ssh_host_rsa_key',
+                                          ],
+                                          process_factory=handle_client)
+    return server
 
-print("SETTING LOGGER")
-root = logging.getLogger()
-root.setLevel(logging.DEBUG)
+async def main():
+    print("SETTING LOGGER")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
 
-ch = logging.StreamHandler(sys.stdout)
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(message)s')
-ch.setFormatter(formatter)
-root.addHandler(ch)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(message)s')
+    ch.setFormatter(formatter)
+    root.addHandler(ch)
 
-print("STARTING UP")
-loop = asyncio.get_event_loop()
+    print("STARTING UP")
 
-try:
-    loop.run_until_complete(start_server())
-except (OSError, asyncssh.Error) as exc:
-    sys.exit('Error starting server: ' + str(exc))
+    try:
+        server = await start_server()
+    except (OSError, asyncssh.Error) as exc:
+        sys.exit('Error starting server: ' + str(exc))
 
-print("LISTENER READY")
+    print("LISTENER READY")
 
-# Only run the loop once for testing
-#loop.call_soon(loop.stop)
-loop.run_forever()
+    async with server:
+        await server.wait_closed()
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nServer shutting down...")
