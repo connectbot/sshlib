@@ -1,12 +1,13 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,11 +18,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.MockitoAnnotations;
 
 @ExtendWith(MockitoExtension.class)
 public class SFTPv3ClientTest {
@@ -32,19 +31,16 @@ public class SFTPv3ClientTest {
 	@Mock
 	private Session mockSession;
 
-	@Before
-	public void setUp() {
-		MockitoAnnotations.initMocks(this);
+	@Test
+	public void testConstructorWithNullConnection() {
+		assertThrows(IllegalArgumentException.class, () ->
+			new SFTPv3Client(null));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void testConstructorWithNullConnection() throws IOException {
-		new SFTPv3Client(null);
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void testDeprecatedConstructorWithNullConnection() throws IOException {
-		new SFTPv3Client(null, System.out);
+	@Test
+	public void testDeprecatedConstructorWithNullConnection() {
+		assertThrows(IllegalArgumentException.class, () ->
+			new SFTPv3Client(null, System.out));
 	}
 
 	@Test
@@ -56,7 +52,7 @@ public class SFTPv3ClientTest {
 
 		try {
 			SFTPv3Client client = new SFTPv3Client(mockConnection);
-			assertEquals("Default protocol version should be 0", 0, client.getProtocolVersion());
+			assertEquals(0, client.getProtocolVersion(), "Default protocol version should be 0");
 		} catch (IOException e) {
 			// Expected since we're not providing a real SFTP handshake
 			// Just test that the constructor doesn't throw IllegalArgumentException
@@ -71,7 +67,7 @@ public class SFTPv3ClientTest {
 
 		try {
 			SFTPv3Client client = new SFTPv3Client(mockConnection);
-			assertNull("Default charset should be null", client.getCharset());
+			assertNull(client.getCharset(), "Default charset should be null");
 		} catch (IOException e) {
 			// Expected since we're not providing a real SFTP handshake
 		}
@@ -88,13 +84,13 @@ public class SFTPv3ClientTest {
 
 			// Test setting valid charsets
 			client.setCharset("UTF-8");
-			assertEquals("Should accept UTF-8 charset", "UTF-8", client.getCharset());
+			assertEquals("UTF-8", client.getCharset(), "Should accept UTF-8 charset");
 
 			client.setCharset("ISO-8859-1");
-			assertEquals("Should accept ISO-8859-1 charset", "ISO-8859-1", client.getCharset());
+			assertEquals("ISO-8859-1", client.getCharset(), "Should accept ISO-8859-1 charset");
 
 			client.setCharset("US-ASCII");
-			assertEquals("Should accept US-ASCII charset", "US-ASCII", client.getCharset());
+			assertEquals("US-ASCII", client.getCharset(), "Should accept US-ASCII charset");
 
 		} catch (IOException e) {
 			// Expected for connection issues, but charset setting logic should work
@@ -112,11 +108,11 @@ public class SFTPv3ClientTest {
 
 			// Set to a valid charset first
 			client.setCharset("UTF-8");
-			assertEquals("Should have UTF-8 charset", "UTF-8", client.getCharset());
+			assertEquals("UTF-8", client.getCharset(), "Should have UTF-8 charset");
 
 			// Set back to null
 			client.setCharset(null);
-			assertNull("Should accept null charset", client.getCharset());
+			assertNull(client.getCharset(), "Should accept null charset");
 
 		} catch (IOException e) {
 			// Expected for connection issues
@@ -137,8 +133,7 @@ public class SFTPv3ClientTest {
 				client.setCharset("INVALID-CHARSET-NAME");
 				fail("Should throw IOException for invalid charset");
 			} catch (IOException e) {
-				assertTrue("Should indicate unsupported charset",
-						e.getMessage().contains("unsupported") || e.getMessage().contains("charset"));
+				assertTrue(e.getMessage().contains("unsupported") || e.getMessage().contains("charset"), "Should indicate unsupported charset");
 			}
 
 		} catch (IOException e) {
@@ -195,9 +190,9 @@ public class SFTPv3ClientTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
 
-		assertNotNull("File handle should be created", fileHandle);
-		assertSame("File handle should reference the client", mockClient, fileHandle.getClient());
-		assertFalse("File handle should not be closed initially", fileHandle.isClosed());
+		assertNotNull(fileHandle, "File handle should be created");
+		assertSame(mockClient, fileHandle.getClient(), "File handle should reference the client");
+		assertFalse(fileHandle.isClosed(), "File handle should not be closed initially");
 	}
 
 	@Test
@@ -216,9 +211,9 @@ public class SFTPv3ClientTest {
 			String charset2 = client.getCharset();
 			String charset3 = client.getCharset();
 
-			assertEquals("Charset should be consistent", charset1, charset2);
-			assertEquals("Charset should be consistent", charset2, charset3);
-			assertEquals("Charset should be UTF-16", "UTF-16", charset1);
+			assertEquals(charset1, charset2, "Charset should be consistent");
+			assertEquals(charset2, charset3, "Charset should be consistent");
+			assertEquals("UTF-16", charset1, "Charset should be UTF-16");
 
 		} catch (IOException e) {
 			// Expected for connection issues
@@ -341,19 +336,19 @@ public class SFTPv3ClientTest {
 			SFTPv3Client client = new SFTPv3Client(mockConnection);
 
 			client.setCharset("UTF-8");
-			assertEquals("UTF-8", client.getCharset());
+			assertEquals(client.getCharset(), "UTF-8");
 
 			client.setCharset("ISO-8859-1");
-			assertEquals("ISO-8859-1", client.getCharset());
+			assertEquals(client.getCharset(), "ISO-8859-1");
 
 			client.setCharset("UTF-16");
-			assertEquals("UTF-16", client.getCharset());
+			assertEquals(client.getCharset(), "UTF-16");
 
 			client.setCharset(null);
 			assertNull(client.getCharset());
 
 			client.setCharset("UTF-8");
-			assertEquals("UTF-8", client.getCharset());
+			assertEquals(client.getCharset(), "UTF-8");
 
 		} catch (IOException e) {
 		}

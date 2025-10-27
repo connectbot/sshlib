@@ -1,12 +1,12 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.trilead.ssh2.sftp.ErrorCodes;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class SFTPExceptionTest {
 
@@ -17,14 +17,12 @@ public void testBasicExceptionConstruction() {
 
 	SFTPException exception = new SFTPException(message, errorCode);
 
-	assertEquals("Server error message should match", message,
-				exception.getServerErrorMessage());
-	assertEquals("Server error code should match", errorCode,
-				exception.getServerErrorCode());
-	assertNotNull("Exception message should not be null",
-				exception.getMessage());
-	assertTrue("Exception message should contain original message",
-			exception.getMessage().contains(message));
+	assertEquals(message,
+				exception.getServerErrorMessage(), "Server error message should match");
+	assertEquals(errorCode,
+				exception.getServerErrorCode(), "Server error code should match");
+	assertNotNull(exception.getMessage(), "Exception message should not be null");
+	assertTrue(exception.getMessage().contains(message), "Exception message should contain original message");
 }
 
 @Test
@@ -34,14 +32,12 @@ public void testKnownErrorCodes() {
 
 	SFTPException exception = new SFTPException(message, errorCode);
 
-	assertEquals("Error code symbol should be correct", "SSH_FX_NO_SUCH_FILE",
-				exception.getServerErrorCodeSymbol());
-	assertEquals("Error code description should be correct",
-				"A reference was made to a file which does not exist.",
-				exception.getServerErrorCodeVerbose());
+	assertEquals("SSH_FX_NO_SUCH_FILE",
+				exception.getServerErrorCodeSymbol(), "Error code symbol should be correct");
+	assertEquals("A reference was made to a file which does not exist.",
+				exception.getServerErrorCodeVerbose(), "Error code description should be correct");
 
-	assertTrue("Exception message should contain error details",
-			exception.getMessage().contains("SSH_FX_NO_SUCH_FILE"));
+	assertTrue(exception.getMessage().contains("SSH_FX_NO_SUCH_FILE"), "Exception message should contain error details");
 }
 
 @Test
@@ -58,9 +54,9 @@ public void testSomeKnownErrorCodes() {
 	assertNotNull("Error code description should not be null for code " +
 						errorCode,
 					exception.getServerErrorCodeVerbose());
-	assertFalse("Error code symbol should not indicate unknown for code " +
-					errorCode,
-				exception.getServerErrorCodeSymbol().contains("UNKNOW"));
+	assertFalse(exception.getServerErrorCodeSymbol().contains("UNKNOW"),
+				"Error code symbol should not indicate unknown for code " +
+					errorCode);
 	}
 }
 
@@ -71,23 +67,20 @@ public void testUnknownErrorCode() {
 
 	SFTPException exception = new SFTPException(message, unknownErrorCode);
 
-	assertEquals("Server error message should match", message,
-				exception.getServerErrorMessage());
-	assertEquals("Server error code should match", unknownErrorCode,
-				exception.getServerErrorCode());
+	assertEquals(message,
+				exception.getServerErrorMessage(), "Server error message should match");
+	assertEquals(unknownErrorCode,
+				exception.getServerErrorCode(), "Server error code should match");
 
 	String symbol = exception.getServerErrorCodeSymbol();
-	assertTrue("Unknown error code symbol should indicate unknown",
-			symbol.contains("UNKNOW") &&
-				symbol.contains(String.valueOf(unknownErrorCode)));
+	assertTrue(symbol.contains("UNKNOW") &&
+				symbol.contains(String.valueOf(unknownErrorCode)), "Unknown error code symbol should indicate unknown");
 
 	String description = exception.getServerErrorCodeVerbose();
-	assertTrue("Unknown error code description should indicate unknown",
-			description.contains("unknown") &&
-				description.contains(String.valueOf(unknownErrorCode)));
+	assertTrue(description.contains("unknown") &&
+				description.contains(String.valueOf(unknownErrorCode)), "Unknown error code description should indicate unknown");
 
-	assertTrue("Exception message should indicate unknown error",
-			exception.getMessage().contains("UNKNOW"));
+	assertTrue(exception.getMessage().contains("UNKNOW"), "Exception message should indicate unknown error");
 }
 
 @Test
@@ -97,10 +90,9 @@ public void testNegativeErrorCode() {
 
 	SFTPException exception = new SFTPException(message, negativeErrorCode);
 
-	assertEquals("Server error code should match", negativeErrorCode,
-				exception.getServerErrorCode());
-	assertTrue("Negative error code should be treated as unknown",
-			exception.getServerErrorCodeSymbol().contains("UNKNOW"));
+	assertEquals(negativeErrorCode,
+				exception.getServerErrorCode(), "Server error code should match");
+	assertTrue(exception.getServerErrorCodeSymbol().contains("UNKNOW"), "Negative error code should be treated as unknown");
 }
 
 @Test
@@ -110,14 +102,12 @@ public void testEmptyMessage() {
 
 	SFTPException exception = new SFTPException(emptyMessage, errorCode);
 
-	assertEquals("Empty message should be preserved", emptyMessage,
-				exception.getServerErrorMessage());
-	assertNotNull(
-		"Exception message should not be null even with empty server message",
-		exception.getMessage());
-	assertTrue("Exception message should contain error details even with " +
-			"empty server message",
-			exception.getMessage().contains("SSH_FX_FAILURE"));
+	assertEquals(emptyMessage,
+				exception.getServerErrorMessage(), "Empty message should be preserved");
+	assertNotNull(exception.getMessage(), "Exception message should not be null even with empty server message");
+	assertTrue(exception.getMessage().contains("SSH_FX_FAILURE"),
+			"Exception message should contain error details even with " +
+			"empty server message");
 }
 
 @Test
@@ -127,11 +117,9 @@ public void testNullMessage() {
 
 	SFTPException exception = new SFTPException(nullMessage, errorCode);
 
-	assertEquals("Null message should be preserved", nullMessage,
-				exception.getServerErrorMessage());
-	assertNotNull(
-		"Exception message should not be null even with null server message",
-		exception.getMessage());
+	assertEquals(nullMessage,
+				exception.getServerErrorMessage(), "Null message should be preserved");
+	assertNotNull(exception.getMessage(), "Exception message should not be null even with null server message");
 }
 
 @Test
@@ -139,8 +127,7 @@ public void testIsIOException() {
 	SFTPException exception =
 		new SFTPException("Test", ErrorCodes.SSH_FX_FAILURE);
 
-	assertTrue("SFTPException should be an IOException",
-			exception instanceof java.io.IOException);
+	assertTrue(exception instanceof java.io.IOException, "SFTPException should be an IOException");
 }
 
 @Test
@@ -151,35 +138,29 @@ public void testSerialVersionUID() {
 
 	// The presence of serialVersionUID can be checked by ensuring serialization
 	// works
-	assertNotNull("Exception should be serializable", exception);
+	assertNotNull(exception, "Exception should be serializable");
 }
 
 @Test
 public void testSpecificErrorCodeSymbols() {
 	// Test specific error codes to ensure correct mapping
-	assertEquals("SSH_FX_OK", new SFTPException("test", ErrorCodes.SSH_FX_OK)
-								.getServerErrorCodeSymbol());
-	assertEquals("SSH_FX_NO_SUCH_FILE",
-				new SFTPException("test", ErrorCodes.SSH_FX_NO_SUCH_FILE)
-					.getServerErrorCodeSymbol());
-	assertEquals("SSH_FX_PERMISSION_DENIED",
-				new SFTPException("test", ErrorCodes.SSH_FX_PERMISSION_DENIED)
-					.getServerErrorCodeSymbol());
-	assertEquals(
-		"SSH_FX_FILE_ALREADY_EXISTS",
-		new SFTPException("test", ErrorCodes.SSH_FX_FILE_ALREADY_EXISTS)
-			.getServerErrorCodeSymbol());
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_OK)
+								.getServerErrorCodeSymbol(), "SSH_FX_OK");
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_NO_SUCH_FILE)
+					.getServerErrorCodeSymbol(), "SSH_FX_NO_SUCH_FILE");
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_PERMISSION_DENIED)
+					.getServerErrorCodeSymbol(), "SSH_FX_PERMISSION_DENIED");
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_FILE_ALREADY_EXISTS)
+			.getServerErrorCodeSymbol(), "SSH_FX_FILE_ALREADY_EXISTS");
 }
 
 @Test
 public void testSpecificErrorCodeDescriptions() {
 	// Test specific error descriptions
-	assertEquals("Indicates successful completion of the operation.",
-				new SFTPException("test", ErrorCodes.SSH_FX_OK)
-					.getServerErrorCodeVerbose());
-	assertEquals("A reference was made to a file which does not exist.",
-				new SFTPException("test", ErrorCodes.SSH_FX_NO_SUCH_FILE)
-					.getServerErrorCodeVerbose());
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_OK)
+					.getServerErrorCodeVerbose(), "Indicates successful completion of the operation.");
+	assertEquals(new SFTPException("test", ErrorCodes.SSH_FX_NO_SUCH_FILE)
+					.getServerErrorCodeVerbose(), "A reference was made to a file which does not exist.");
 	assertEquals("The user does not have sufficient permissions to perform " +
 				"the operation.",
 				new SFTPException("test", ErrorCodes.SSH_FX_PERMISSION_DENIED)
@@ -194,15 +175,11 @@ public void testMessageConstruction() {
 	SFTPException exception = new SFTPException(message, errorCode);
 	String constructedMessage = exception.getMessage();
 
-	assertTrue("Constructed message should contain original message",
-			constructedMessage.contains(message));
-	assertTrue("Constructed message should contain error code symbol",
-			constructedMessage.contains("SSH_FX_INVALID_FILENAME"));
-	assertTrue("Constructed message should contain error description",
-			constructedMessage.contains("The filename is not valid."));
-	assertTrue("Constructed message should have proper format with parentheses",
-			constructedMessage.contains("(") &&
-				constructedMessage.contains(")"));
+	assertTrue(constructedMessage.contains(message), "Constructed message should contain original message");
+	assertTrue(constructedMessage.contains("SSH_FX_INVALID_FILENAME"), "Constructed message should contain error code symbol");
+	assertTrue(constructedMessage.contains("The filename is not valid."), "Constructed message should contain error description");
+	assertTrue(constructedMessage.contains("(") &&
+				constructedMessage.contains(")"), "Constructed message should have proper format with parentheses");
 }
 
 @Test
@@ -216,10 +193,9 @@ public void testLongMessage() {
 	SFTPException exception =
 		new SFTPException(message, ErrorCodes.SSH_FX_FAILURE);
 
-	assertEquals("Long message should be preserved", message,
-				exception.getServerErrorMessage());
-	assertTrue("Exception message should contain long message",
-			exception.getMessage().contains(message));
+	assertEquals(message,
+				exception.getServerErrorMessage(), "Long message should be preserved");
+	assertTrue(exception.getMessage().contains(message), "Exception message should contain long message");
 }
 
 @Test
@@ -229,10 +205,9 @@ public void testSpecialCharactersInMessage() {
 
 	SFTPException exception = new SFTPException(message, errorCode);
 
-	assertEquals("Message with special characters should be preserved", message,
-				exception.getServerErrorMessage());
-	assertTrue("Exception message should contain special characters",
-			exception.getMessage().contains(message));
+	assertEquals(message,
+				exception.getServerErrorMessage(), "Message with special characters should be preserved");
+	assertTrue(exception.getMessage().contains(message), "Exception message should contain special characters");
 }
 
 @Test
@@ -242,9 +217,8 @@ public void testUnicodeMessage() {
 
 	SFTPException exception = new SFTPException(message, errorCode);
 
-	assertEquals("Unicode message should be preserved", message,
-				exception.getServerErrorMessage());
-	assertTrue("Exception message should contain unicode characters",
-			exception.getMessage().contains(message));
+	assertEquals(message,
+				exception.getServerErrorMessage(), "Unicode message should be preserved");
+	assertTrue(exception.getMessage().contains(message), "Exception message should contain unicode characters");
 }
 }

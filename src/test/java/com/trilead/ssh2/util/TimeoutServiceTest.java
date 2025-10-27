@@ -1,24 +1,24 @@
 package com.trilead.ssh2.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class TimeoutServiceTest {
 
 	private static final long TEST_TIMEOUT_MS = 5000;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		// Clear any existing timeouts
 		TimeoutService.TimeoutToken[] activeTokens = getActiveTimeouts();
@@ -27,7 +27,7 @@ public class TimeoutServiceTest {
 		}
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() {
 		// Clean up any remaining timeouts
 		TimeoutService.TimeoutToken[] activeTokens = getActiveTimeouts();
@@ -59,10 +59,9 @@ public class TimeoutServiceTest {
 		TimeoutService.TimeoutToken token = TimeoutService.addTimeoutHandler(
 				startTime + 100, handler);
 
-		assertNotNull("Token should not be null", token);
-		assertTrue("Handler should execute within timeout",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertTrue("Handler should have been executed", executed.get());
+		assertNotNull(token, "Token should not be null");
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "Handler should execute within timeout");
+		assertTrue(executed.get(), "Handler should have been executed");
 	}
 
 	@Test
@@ -82,7 +81,7 @@ public class TimeoutServiceTest {
 		TimeoutService.TimeoutToken token = TimeoutService.addTimeoutHandler(
 				startTime + 200, handler);
 
-		assertNotNull("Token should not be null", token);
+		assertNotNull(token, "Token should not be null");
 
 		// Cancel the timeout before it executes
 		TimeoutService.cancelTimeoutHandler(token);
@@ -90,8 +89,7 @@ public class TimeoutServiceTest {
 		// Wait a bit to ensure the timeout would have fired
 		Thread.sleep(300);
 
-		assertFalse("Handler should not have been executed after cancellation",
-				executed.get());
+		assertFalse(executed.get(), "Handler should not have been executed after cancellation");
 	}
 
 	@Test
@@ -130,9 +128,8 @@ public class TimeoutServiceTest {
 		TimeoutService.addTimeoutHandler(startTime + 100, handler1);
 		TimeoutService.addTimeoutHandler(startTime + 200, handler2);
 
-		assertTrue("All handlers should execute within timeout",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertEquals("All three handlers should have executed", 3, executionCount.get());
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "All handlers should execute within timeout");
+		assertEquals(3, executionCount.get(), "All three handlers should have executed");
 	}
 
 	@Test
@@ -174,12 +171,11 @@ public class TimeoutServiceTest {
 		TimeoutService.addTimeoutHandler(startTime + 100, handler1); // Should execute first
 		TimeoutService.addTimeoutHandler(startTime + 200, handler2); // Should execute second
 
-		assertTrue("All handlers should execute within timeout",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "All handlers should execute within timeout");
 
-		assertEquals("First handler should execute first", 1, firstExecution.get());
-		assertEquals("Second handler should execute second", 2, secondExecution.get());
-		assertEquals("Third handler should execute third", 3, thirdExecution.get());
+		assertEquals(1, firstExecution.get(), "First handler should execute first");
+		assertEquals(2, secondExecution.get(), "Second handler should execute second");
+		assertEquals(3, thirdExecution.get(), "Third handler should execute third");
 	}
 
 	@Test
@@ -208,9 +204,8 @@ public class TimeoutServiceTest {
 		TimeoutService.addTimeoutHandler(timeoutTime, handler1);
 		TimeoutService.addTimeoutHandler(timeoutTime, handler2);
 
-		assertTrue("Both handlers should execute within timeout",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertEquals("Both handlers should have executed", 2, executionCount.get());
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "Both handlers should execute within timeout");
+		assertEquals(2, executionCount.get(), "Both handlers should have executed");
 	}
 
 	@Test
@@ -230,9 +225,8 @@ public class TimeoutServiceTest {
 		long startTime = System.currentTimeMillis();
 		TimeoutService.addTimeoutHandler(startTime + 100, throwingHandler);
 
-		assertTrue("Handler should execute even if it throws exception",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertTrue("Handler should have been executed", executed.get());
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "Handler should execute even if it throws exception");
+		assertTrue(executed.get(), "Handler should have been executed");
 	}
 
 	@Test
@@ -250,9 +244,9 @@ public class TimeoutServiceTest {
 		TimeoutService.TimeoutToken token2 = createTokenWithTime(200);
 		TimeoutService.TimeoutToken token3 = createTokenWithTime(100);
 
-		assertTrue("Token with earlier time should be less", token1.compareTo(token2) < 0);
-		assertTrue("Token with later time should be greater", token2.compareTo(token1) > 0);
-		assertEquals("Tokens with same time should be equal", 0, token1.compareTo(token3));
+		assertTrue(token1.compareTo(token2) < 0, "Token with earlier time should be less");
+		assertTrue(token2.compareTo(token1) > 0, "Token with later time should be greater");
+		assertEquals(0, token1.compareTo(token3), "Tokens with same time should be equal");
 	}
 
 	@Test
@@ -272,9 +266,8 @@ public class TimeoutServiceTest {
 		long pastTime = System.currentTimeMillis() - 100;
 		TimeoutService.addTimeoutHandler(pastTime, handler);
 
-		assertTrue("Handler should execute immediately for past time",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertTrue("Handler should have been executed", executed.get());
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "Handler should execute immediately for past time");
+		assertTrue(executed.get(), "Handler should have been executed");
 	}
 
 	@Test
@@ -314,9 +307,8 @@ public class TimeoutServiceTest {
 			thread.join();
 		}
 
-		assertTrue("All handlers should execute within timeout",
-				latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-		assertEquals("All 10 handlers should have executed", 10, executionCount.get());
+		assertTrue(latch.await(TEST_TIMEOUT_MS, TimeUnit.MILLISECONDS), "All handlers should execute within timeout");
+		assertEquals(10, executionCount.get(), "All 10 handlers should have executed");
 	}
 
 	// Helper methods for testing private functionality

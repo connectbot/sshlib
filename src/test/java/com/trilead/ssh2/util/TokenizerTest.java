@@ -1,8 +1,8 @@
 package com.trilead.ssh2.util;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 public class TokenizerTest {
 
@@ -12,10 +12,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'apple'", "apple", result[0]);
-		assertEquals("Second token should be 'banana'", "banana", result[1]);
-		assertEquals("Third token should be 'cherry'", "cherry", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("apple", result[0], "First token should be 'apple'");
+		assertEquals("banana", result[1], "Second token should be 'banana'");
+		assertEquals("cherry", result[2], "Third token should be 'cherry'");
 	}
 
 	@Test
@@ -24,8 +24,8 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 1 token", 1, result.length);
-		assertEquals("Token should be 'singletoken'", "singletoken", result[0]);
+		assertEquals(1, result.length, "Should have 1 token");
+		assertEquals("singletoken", result[0], "Token should be 'singletoken'");
 	}
 
 	@Test
@@ -34,7 +34,7 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should return empty array for empty string", 0, result.length);
+		assertEquals(0, result.length, "Should return empty array for empty string");
 	}
 
 	@Test
@@ -43,10 +43,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 empty tokens", 3, result.length);
-		assertEquals("First token should be empty", "", result[0]);
-		assertEquals("Second token should be empty", "", result[1]);
-		assertEquals("Third token should be empty", "", result[2]);
+		assertEquals(3, result.length, "Should have 3 empty tokens");
+		assertEquals("", result[0], "First token should be empty");
+		assertEquals("", result[1], "Second token should be empty");
+		assertEquals("", result[2], "Third token should be empty");
 	}
 
 	@Test
@@ -55,11 +55,11 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 4 tokens", 4, result.length);
-		assertEquals("First token should be 'apple'", "apple", result[0]);
-		assertEquals("Second token should be empty", "", result[1]);
-		assertEquals("Third token should be 'cherry'", "cherry", result[2]);
-		assertEquals("Fourth token should be empty", "", result[3]);
+		assertEquals(4, result.length, "Should have 4 tokens");
+		assertEquals("apple", result[0], "First token should be 'apple'");
+		assertEquals("", result[1], "Second token should be empty");
+		assertEquals("cherry", result[2], "Third token should be 'cherry'");
+		assertEquals("", result[3], "Fourth token should be empty");
 	}
 
 	@Test
@@ -68,10 +68,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be empty", "", result[0]);
-		assertEquals("Second token should be 'apple'", "apple", result[1]);
-		assertEquals("Third token should be 'banana'", "banana", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("", result[0], "First token should be empty");
+		assertEquals("apple", result[1], "Second token should be 'apple'");
+		assertEquals("banana", result[2], "Third token should be 'banana'");
 	}
 
 	@Test
@@ -80,10 +80,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'apple'", "apple", result[0]);
-		assertEquals("Second token should be 'banana'", "banana", result[1]);
-		assertEquals("Third token should be empty", "", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("apple", result[0], "First token should be 'apple'");
+		assertEquals("banana", result[1], "Second token should be 'banana'");
+		assertEquals("", result[2], "Third token should be empty");
 	}
 
 	@Test
@@ -92,9 +92,9 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 4 empty tokens", 4, result.length);
+		assertEquals(4, result.length, "Should have 4 empty tokens");
 		for (int i = 0; i < result.length; i++) {
-			assertEquals("Token " + i + " should be empty", "", result[i]);
+			assertEquals("", result[i], "Token " + i + " should be empty");
 		}
 	}
 
@@ -105,10 +105,10 @@ public class TokenizerTest {
 		char delimiter = ';';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'one'", "one", result[0]);
-		assertEquals("Second token should be 'two'", "two", result[1]);
-		assertEquals("Third token should be 'three'", "three", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("one", result[0], "First token should be 'one'");
+		assertEquals("two", result[1], "Second token should be 'two'");
+		assertEquals("three", result[2], "Third token should be 'three'");
 	}
 
 	@Test
@@ -117,10 +117,10 @@ public class TokenizerTest {
 		char delimiter = ' ';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'hello'", "hello", result[0]);
-		assertEquals("Second token should be 'world'", "world", result[1]);
-		assertEquals("Third token should be 'test'", "test", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("hello", result[0], "First token should be 'hello'");
+		assertEquals("world", result[1], "Second token should be 'world'");
+		assertEquals("test", result[2], "Third token should be 'test'");
 	}
 
 	@Test
@@ -129,10 +129,10 @@ public class TokenizerTest {
 		char delimiter = '\t';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'column1'", "column1", result[0]);
-		assertEquals("Second token should be 'column2'", "column2", result[1]);
-		assertEquals("Third token should be 'column3'", "column3", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("column1", result[0], "First token should be 'column1'");
+		assertEquals("column2", result[1], "Second token should be 'column2'");
+		assertEquals("column3", result[2], "Third token should be 'column3'");
 	}
 
 	@Test
@@ -141,10 +141,10 @@ public class TokenizerTest {
 		char delimiter = '|';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'field1'", "field1", result[0]);
-		assertEquals("Second token should be 'field2'", "field2", result[1]);
-		assertEquals("Third token should be 'field3'", "field3", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("field1", result[0], "First token should be 'field1'");
+		assertEquals("field2", result[1], "Second token should be 'field2'");
+		assertEquals("field3", result[2], "Third token should be 'field3'");
 	}
 
 	@Test
@@ -153,8 +153,8 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 1 token", 1, result.length);
-		assertEquals("Token should be the entire string", "nodelmiterhere", result[0]);
+		assertEquals(1, result.length, "Should have 1 token");
+		assertEquals("nodelmiterhere", result[0], "Token should be the entire string");
 	}
 
 	@Test
@@ -170,9 +170,9 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 100 tokens", 100, result.length);
+		assertEquals(100, result.length, "Should have 100 tokens");
 		for (int i = 0; i < 100; i++) {
-			assertEquals("Token " + i + " should match", "token" + i, result[i]);
+			assertEquals("token" + i, result[i], "Token " + i + " should match");
 		}
 	}
 
@@ -182,10 +182,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should include leading space", " apple ", result[0]);
-		assertEquals("Second token should include spaces", " banana ", result[1]);
-		assertEquals("Third token should include trailing space", " cherry ", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals(" apple ", result[0], "First token should include leading space");
+		assertEquals(" banana ", result[1], "Second token should include spaces");
+		assertEquals(" cherry ", result[2], "Third token should include trailing space");
 	}
 
 	@Test
@@ -194,10 +194,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should contain special chars", "token@with#special$chars", result[0]);
-		assertEquals("Second token should be 'normal'", "normal", result[1]);
-		assertEquals("Third token should be special chars", "!@#$%^&*()", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("token@with#special$chars", result[0], "First token should contain special chars");
+		assertEquals("normal", result[1], "Second token should be 'normal'");
+		assertEquals("!@#$%^&*()", result[2], "Third token should be special chars");
 	}
 
 	@Test
@@ -206,10 +206,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'αβγ'", "αβγ", result[0]);
-		assertEquals("Second token should be 'δεζ'", "δεζ", result[1]);
-		assertEquals("Third token should be 'ηθι'", "ηθι", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("αβγ", result[0], "First token should be 'αβγ'");
+		assertEquals("δεζ", result[1], "Second token should be 'δεζ'");
+		assertEquals("ηθι", result[2], "Third token should be 'ηθι'");
 	}
 
 	@Test
@@ -218,11 +218,11 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 4 tokens", 4, result.length);
-		assertEquals("First token should be '123'", "123", result[0]);
-		assertEquals("Second token should be '456.789'", "456.789", result[1]);
-		assertEquals("Third token should be '-42'", "-42", result[2]);
-		assertEquals("Fourth token should be '0'", "0", result[3]);
+		assertEquals(4, result.length, "Should have 4 tokens");
+		assertEquals("123", result[0], "First token should be '123'");
+		assertEquals("456.789", result[1], "Second token should be '456.789'");
+		assertEquals("-42", result[2], "Third token should be '-42'");
+		assertEquals("0", result[3], "Fourth token should be '0'");
 	}
 
 	@Test
@@ -236,9 +236,9 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 2 tokens", 2, result.length);
-		assertEquals("First token should be very long", 10000, result[0].length());
-		assertEquals("Second token should be 'short'", "short", result[1]);
+		assertEquals(2, result.length, "Should have 2 tokens");
+		assertEquals(10000, result[0].length(), "First token should be very long");
+		assertEquals("short", result[1], "Second token should be 'short'");
 	}
 
 	@Test
@@ -247,12 +247,12 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 5 tokens", 5, result.length);
-		assertEquals("First token should be 'a'", "a", result[0]);
-		assertEquals("Second token should be empty", "", result[1]);
-		assertEquals("Third token should be empty", "", result[2]);
-		assertEquals("Fourth token should be empty", "", result[3]);
-		assertEquals("Fifth token should be 'b'", "b", result[4]);
+		assertEquals(5, result.length, "Should have 5 tokens");
+		assertEquals("a", result[0], "First token should be 'a'");
+		assertEquals("", result[1], "Second token should be empty");
+		assertEquals("", result[2], "Third token should be empty");
+		assertEquals("", result[3], "Fourth token should be empty");
+		assertEquals("b", result[4], "Fifth token should be 'b'");
 	}
 
 	@Test
@@ -262,10 +262,10 @@ public class TokenizerTest {
 		char delimiter = '\n';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be 'line1'", "line1", result[0]);
-		assertEquals("Second token should be 'line2'", "line2", result[1]);
-		assertEquals("Third token should be 'line3'", "line3", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("line1", result[0], "First token should be 'line1'");
+		assertEquals("line2", result[1], "Second token should be 'line2'");
+		assertEquals("line3", result[2], "Third token should be 'line3'");
 	}
 
 	@Test
@@ -275,10 +275,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 3 tokens", 3, result.length);
-		assertEquals("First token should be empty", "", result[0]);
-		assertEquals("Second token should be 'middle'", "middle", result[1]);
-		assertEquals("Third token should be empty", "", result[2]);
+		assertEquals(3, result.length, "Should have 3 tokens");
+		assertEquals("", result[0], "First token should be empty");
+		assertEquals("middle", result[1], "Second token should be 'middle'");
+		assertEquals("", result[2], "Third token should be empty");
 	}
 
 	@Test
@@ -288,11 +288,11 @@ public class TokenizerTest {
 		char delimiter = '/';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 4 tokens", 4, result.length);
-		assertEquals("First token should be empty (root)", "", result[0]);
-		assertEquals("Second token should be 'usr'", "usr", result[1]);
-		assertEquals("Third token should be 'local'", "local", result[2]);
-		assertEquals("Fourth token should be 'bin'", "bin", result[3]);
+		assertEquals(4, result.length, "Should have 4 tokens");
+		assertEquals("", result[0], "First token should be empty (root)");
+		assertEquals("usr", result[1], "Second token should be 'usr'");
+		assertEquals("local", result[2], "Third token should be 'local'");
+		assertEquals("bin", result[3], "Fourth token should be 'bin'");
 	}
 
 	@Test
@@ -302,10 +302,10 @@ public class TokenizerTest {
 		char delimiter = ',';
 		String[] result = Tokenizer.parseTokens(source, delimiter);
 
-		assertEquals("Should have 4 tokens", 4, result.length);
-		assertEquals("First token should be 'John Doe'", "John Doe", result[0]);
-		assertEquals("Second token should be '30'", "30", result[1]);
-		assertEquals("Third token should be 'Engineer'", "Engineer", result[2]);
-		assertEquals("Fourth token should be 'New York'", "New York", result[3]);
+		assertEquals(4, result.length, "Should have 4 tokens");
+		assertEquals("John Doe", result[0], "First token should be 'John Doe'");
+		assertEquals("30", result[1], "Second token should be '30'");
+		assertEquals("Engineer", result[2], "Third token should be 'Engineer'");
+		assertEquals("New York", result[3], "Fourth token should be 'New York'");
 	}
 }

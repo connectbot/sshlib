@@ -32,7 +32,7 @@ public class BlowfishTest {
 	@Test
 	public void testGetAlgorithmName() {
 		BlowFish cipher = new BlowFish();
-		assertEquals("Blowfish", cipher.getAlgorithmName());
+		assertEquals(cipher.getAlgorithmName(), "Blowfish");
 	}
 
 	@Test
