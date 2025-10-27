@@ -103,7 +103,7 @@ public class KnownHosts
 	 *        OpenSSH sshd man page for a description of the pattern matching algorithm.
 	 * @param serverHostKeyAlgorithm as passed to the {@link ServerHostKeyVerifier}.
 	 * @param serverHostKey as passed to the {@link ServerHostKeyVerifier}.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void addHostkey(String[] hostnames, String serverHostKeyAlgorithm, byte[] serverHostKey) throws IOException
 	{
@@ -163,8 +163,8 @@ public class KnownHosts
 	/**
 	 * Parses the given known_hosts data and adds entries to the database.
 	 *
-	 * @param knownHostsData
-	 * @throws IOException
+	 * @param knownHostsData known hosts in textual format
+	 * @throws IOException on error
 	 */
 	public void addHostkeys(char[] knownHostsData) throws IOException
 	{
@@ -174,8 +174,8 @@ public class KnownHosts
 	/**
 	 * Parses the given known_hosts file and adds entries to the database.
 	 *
-	 * @param knownHosts
-	 * @throws IOException
+	 * @param knownHosts known hosts file in textual format
+	 * @throws IOException on error
 	 */
 	public void addHostkeys(File knownHosts) throws IOException
 	{
@@ -186,7 +186,7 @@ public class KnownHosts
 	 * Generate the hashed representation of the given hostname. Useful for adding entries
 	 * with hashed hostnames to a known_hosts file. (see -H option of OpenSSH key-gen).
 	 *
-	 * @param hostname
+	 * @param hostname the hostname to hash
 	 * @return the hashed representation, e.g., "|1|cDhrv7zwEUV3k71CEPHnhHZezhA=|Xo+2y6rUXo2OIWRAYhBOIijbJMA="
 	 */
 	public static final String createHashedHostname(String hostname)
@@ -331,7 +331,7 @@ public class KnownHosts
 	 * an ordered list of hostkey algorithms is returned which can be passed
 	 * to <code>Connection.setServerHostKeyAlgorithms</code>.
 	 *
-	 * @param hostname
+	 * @param hostname hostname to find preferred algorithm for
 	 * @return <code>null</code> if no key for the given hostname is present or
 	 * there are keys of multiple types present for the given hostname. Otherwise,
 	 * an array with hostkey algorithms is returned (i.e., an array of length 2).
@@ -683,7 +683,7 @@ public class KnownHosts
 	 *        OpenSSH sshd man page for a description of the pattern matching algorithm.
 	 * @param serverHostKeyAlgorithm as passed to the {@link ServerHostKeyVerifier}.
 	 * @param serverHostKey as passed to the {@link ServerHostKeyVerifier}.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public final static void addHostkeyToFile(File knownHosts, String[] hostnames, String serverHostKeyAlgorithm,
 			byte[] serverHostKey) throws IOException

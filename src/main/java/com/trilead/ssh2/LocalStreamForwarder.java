@@ -65,7 +65,7 @@ public class LocalStreamForwarder
 	 * operation is already in progress (initiated from either side), then this
 	 * call is a no-op.
 	 *
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void close() throws IOException
 	{

@@ -33,7 +33,6 @@ public Integer gid = null;
  * The POSIX permissions. <code>NULL</code> if not present.
  * <p>
  * Here is a list:
- * <p>
  * <pre>Note: these numbers are all OCTAL.
  *
  *  S_IFMT     0170000   bitmask for the file type bitfields

@@ -112,8 +112,8 @@ public class TimeoutService
 	/**
 	 * It is assumed that the passed handler will not execute for a long time.
 	 *
-	 * @param runTime
-	 * @param handler
+	 * @param runTime milliseconds to run the timer
+	 * @param handler timer handler
 	 * @return a TimeoutToken that can be used to cancel the timeout.
 	 */
 	public static final TimeoutToken addTimeoutHandler(long runTime, Runnable handler)

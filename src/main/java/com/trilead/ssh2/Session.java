@@ -66,7 +66,7 @@ public class Session implements AutoCloseable
 	 * Basically just a wrapper for lazy people - identical to calling
 	 * <code>requestPTY("dumb", 0, 0, 0, 0, null)</code>.
 	 *
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void requestDumbPTY() throws IOException
 	{
@@ -77,7 +77,8 @@ public class Session implements AutoCloseable
 	 * Basically just another wrapper for lazy people - identical to calling
 	 * <code>requestPTY(term, 0, 0, 0, 0, null)</code>.
 	 *
-	 * @throws IOException
+	 * @param term the terminal type.
+	 * @throws IOException on error
 	 */
 	public void requestPTY(String term) throws IOException
 	{
@@ -89,9 +90,8 @@ public class Session implements AutoCloseable
 	 * <p>
 	 * This method may only be called before a program or shell is started in
 	 * this session.
-	 * <p>
+	 *
 	 * Different aspects can be specified:
-	 * <p>
 	 * <ul>
 	 * <li>The TERM environment variable value (e.g., vt100)</li>
 	 * <li>The terminal's dimensions.</li>
@@ -115,7 +115,7 @@ public class Session implements AutoCloseable
 	 *            terminal height, pixels (e.g., 480)
 	 * @param terminal_modes
 	 *            encoded terminal modes (may be <code>null</code>)
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void requestPTY(String term, int term_width_characters, int term_height_characters, int term_width_pixels,
 			int term_height_pixels, byte[] terminal_modes) throws IOException
@@ -167,7 +167,7 @@ public class Session implements AutoCloseable
 	 *            terminal width, pixels (e.g., 640)
 	 * @param term_height_pixels
 	 *            terminal height, pixels (e.g., 480)
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void resizePTY(int term_width_characters, int term_height_characters, int term_width_pixels,
 			int term_height_pixels) throws IOException {
@@ -195,7 +195,7 @@ public class Session implements AutoCloseable
 	 * @param singleConnection if true, then the server is instructed to only forward one single
 	 *        connection, no more connections shall be forwarded after first, or after the session
 	 *        channel has been closed
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void requestX11Forwarding(String hostname, int port, byte[] cookie, boolean singleConnection)
 			throws IOException
@@ -278,7 +278,7 @@ public class Session implements AutoCloseable
 	 *
 	 * @param cmd
 	 *            The command to execute on the remote host.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void execCommand(String cmd) throws IOException
 	{
@@ -303,7 +303,7 @@ public class Session implements AutoCloseable
 	/**
 	 * Start a shell on the remote machine.
 	 *
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void startShell() throws IOException
 	{
@@ -327,7 +327,7 @@ public class Session implements AutoCloseable
 	 * Unless you know what you are doing, you will never need this.
 	 *
 	 * @param name the name of the subsystem.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void startSubSystem(String name) throws IOException
 	{
@@ -378,6 +378,7 @@ public class Session implements AutoCloseable
 	/**
 	 * Request authentication agent forwarding.
 	 * @param agent object that implements the callbacks
+	 * @return true if the agent was forwarded
 	 *
 	 * @throws IOException in case of any problem or when the session is closed
 	 */

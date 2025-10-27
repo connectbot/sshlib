@@ -61,9 +61,9 @@ public class DHGexParameters
 	 * All values have to be &gt;= 1024 and &lt;= 8192. Furthermore,
 	 * min_group_len &lt;= pref_group_len &lt;= max_group_len.
 	 *
-	 * @param min_group_len
-	 * @param pref_group_len
-	 * @param max_group_len
+	 * @param min_group_len the minimum group length
+	 * @param pref_group_len the preferred group length
+	 * @param max_group_len the maximum group length
 	 */
 	public DHGexParameters(int min_group_len, int pref_group_len, int max_group_len)
 	{

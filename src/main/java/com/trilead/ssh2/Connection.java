@@ -149,7 +149,7 @@ public class Connection implements AutoCloseable
 	 *            An <code>InteractiveCallback</code> which will be used to
 	 *            determine the responses to the questions asked by the server.
 	 * @return whether the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithKeyboardInteractive(String user, InteractiveCallback cb)
 			throws IOException
@@ -189,7 +189,7 @@ public class Connection implements AutoCloseable
 	 *            determine the responses to the questions asked by the server.
 	 *
 	 * @return whether the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithKeyboardInteractive(String user, String[] submethods,
 			InteractiveCallback cb) throws IOException
@@ -225,10 +225,10 @@ public class Connection implements AutoCloseable
 	 * authentication (e.g., when using the putty or openssh clients) it is
 	 * *not* the same mechanism.
 	 *
-	 * @param user
-	 * @param password
+	 * @param user the username
+	 * @param password the password
 	 * @return if the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithPassword(String user, String password) throws IOException
 	{
@@ -266,7 +266,7 @@ public class Connection implements AutoCloseable
 	 *
 	 * @param user the username to attempt to log in as
 	 * @return if the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithNone(String user) throws IOException
 	{
@@ -322,7 +322,7 @@ public class Connection implements AutoCloseable
 	 *            will be ignored and can be set to <code>null</code>.
 	 *
 	 * @return whether the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithPublicKey(String user, char[] pemPrivateKey, String password)
 			throws IOException
@@ -362,7 +362,7 @@ public class Connection implements AutoCloseable
 	 *            corresponding PublicKey.
 	 *
 	 * @return whether the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithPublicKey(String user, KeyPair pair)
 			throws IOException
@@ -401,7 +401,7 @@ public class Connection implements AutoCloseable
 	 *            set to <code>null</code>.
 	 *
 	 * @return whether the connection is now authenticated.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean authenticateWithPublicKey(String user, File pemFile, String password)
 			throws IOException
@@ -526,7 +526,7 @@ public class Connection implements AutoCloseable
 	 * <p>
 	 * Note: This can only be called before connect()
 	 * @param enabled whether to enable compression
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized void setCompression(boolean enabled) throws IOException {
 		if (tm != null)
@@ -564,13 +564,11 @@ public class Connection implements AutoCloseable
 
 	/**
 	 * Same as
-	 * {@link #connect(ServerHostKeyVerifier, int, int) connect(null, 0, 0)}.
-	 *
-	 * @return see comments for the
-	 *         {@link #connect(ServerHostKeyVerifier, int, int) connect(ServerHostKeyVerifier, int, int)}
-	 *         method.
-	 * @throws IOException
-	 */
+		 * @return see comments for the
+		 *         {@link #connect(ServerHostKeyVerifier, int, int) connect(ServerHostKeyVerifier, int, int)}
+		 *         method.
+		 * @throws IOException on error
+		 */
 	public synchronized ConnectionInfo connect() throws IOException
 	{
 		return connect(null, 0, 0);
@@ -583,7 +581,8 @@ public class Connection implements AutoCloseable
 	 * @return see comments for the
 	 *         {@link #connect(ServerHostKeyVerifier, int, int) connect(ServerHostKeyVerifier, int, int)}
 	 *         method.
-	 * @throws IOException
+	 * @param verifier the verifier
+	 * @throws IOException on error
 	 */
 	public synchronized ConnectionInfo connect(ServerHostKeyVerifier verifier) throws IOException
 	{
@@ -652,7 +651,7 @@ public class Connection implements AutoCloseable
 	 * @return A {@link ConnectionInfo} object containing the details of the
 	 *         established connection.
 	 *
-	 * @throws IOException
+	 * @throws IOException on error
 	 *             If any problem occurs, e.g., the server's host key is not
 	 *             accepted by the <code>verifier</code> or there is problem
 	 *             during the initial crypto setup (e.g., the signature sent by
@@ -826,7 +825,7 @@ public class Connection implements AutoCloseable
 	 * @param port_to_connect
 	 *            target port
 	 * @return A {@link LocalPortForwarder} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized LocalPortForwarder createLocalPortForwarder(int local_port, String host_to_connect,
 			int port_to_connect) throws IOException
@@ -858,7 +857,7 @@ public class Connection implements AutoCloseable
 	 * @param port_to_connect
 	 *            target port
 	 * @return A {@link LocalPortForwarder} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized LocalPortForwarder createLocalPortForwarder(InetSocketAddress addr, String host_to_connect,
 			int port_to_connect) throws IOException
@@ -879,10 +878,10 @@ public class Connection implements AutoCloseable
 	 * another host (which may or may not be identical to the remote SSH-2
 	 * server).
 	 *
-	 * @param host_to_connect
-	 * @param port_to_connect
+	 * @param host_to_connect the host to connect to
+	 * @param port_to_connect the port to connect to
 	 * @return A {@link LocalStreamForwarder} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized LocalStreamForwarder createLocalStreamForwarder(String host_to_connect, int port_to_connect)
 			throws IOException
@@ -906,9 +905,9 @@ public class Connection implements AutoCloseable
 	 * authentication step. There is no limit on the number of concurrent
 	 * forwardings.
 	 *
-	 * @param local_port
+	 * @param local_port the local port to bind to
 	 * @return A {@link DynamicPortForwarder} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized DynamicPortForwarder createDynamicPortForwarder(int local_port) throws IOException
 	{
@@ -935,7 +934,7 @@ public class Connection implements AutoCloseable
 	 *            specifies the InetSocketAddress where the local socket shall
 	 *            be bound to.
 	 * @return A {@link DynamicPortForwarder} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized DynamicPortForwarder createDynamicPortForwarder(InetSocketAddress addr) throws IOException
 	{
@@ -979,8 +978,7 @@ public class Connection implements AutoCloseable
 	 * Note: This implementation will never start a key exchange (other than the
 	 * initial one) unless you or the SSH-2 server ask for it.
 	 *
-	 * @throws IOException
-	 *             In case of any failure behind the scenes.
+	 * @throws IOException In case of any failure behind the scenes.
 	 */
 	public synchronized void forceKeyExchange() throws IOException
 	{
@@ -1016,8 +1014,7 @@ public class Connection implements AutoCloseable
 	 * (successfully connected).
 	 *
 	 * @return A {@link ConnectionInfo} object.
-	 * @throws IOException
-	 *             In case of any failure behind the scenes.
+	 * @throws IOException In case of any failure behind the scenes.
 	 */
 	public synchronized ConnectionInfo getConnectionInfo() throws IOException
 	{
@@ -1050,7 +1047,7 @@ public class Connection implements AutoCloseable
 	 *            A <code>String</code> holding the username.
 	 *
 	 * @return a (possibly emtpy) array holding authentication method names.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized String[] getRemainingAuthMethods(String user) throws IOException
 	{
@@ -1115,7 +1112,7 @@ public class Connection implements AutoCloseable
 	 *            An authentication method name (e.g., "publickey", "password",
 	 *            "keyboard-interactive") as specified by the SSH-2 standard.
 	 * @return if the specified authentication method is currently available.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized boolean isAuthMethodAvailable(String user, String method) throws IOException
 	{
@@ -1147,7 +1144,7 @@ public class Connection implements AutoCloseable
 	 * number of concurrent sessions.
 	 *
 	 * @return A {@link Session} object.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized Session openSession() throws IOException
 	{
@@ -1167,7 +1164,7 @@ public class Connection implements AutoCloseable
 	 * <p>
 	 * This method must only be called once the connection is established.
 	 *
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized void sendIgnorePacket() throws IOException
 	{
@@ -1184,7 +1181,8 @@ public class Connection implements AutoCloseable
 	 * <p>
 	 * This method must only be called once the connection is established.
 	 *
-	 * @throws IOException
+	 * @param data the data to send
+	 * @throws IOException on error
 	 */
 	public synchronized void sendIgnorePacket(byte[] data) throws IOException
 	{
@@ -1252,7 +1250,7 @@ public class Connection implements AutoCloseable
 	/**
 	 * Unless you know what you are doing, you will never need this.
 	 *
-	 * @param ciphers
+	 * @param ciphers the ciphers
 	 */
 	public synchronized void setClient2ServerCiphers(String[] ciphers)
 	{
@@ -1266,7 +1264,7 @@ public class Connection implements AutoCloseable
 	/**
 	 * Unless you know what you are doing, you will never need this.
 	 *
-	 * @param macs
+	 * @param macs array of MAC types
 	 */
 	public synchronized void setClient2ServerMACs(String[] macs)
 	{
@@ -1297,7 +1295,7 @@ public class Connection implements AutoCloseable
 	/**
 	 * Unless you know what you are doing, you will never need this.
 	 *
-	 * @param ciphers
+	 * @param ciphers the ciphers
 	 */
 	public synchronized void setServer2ClientCiphers(String[] ciphers)
 	{
@@ -1311,7 +1309,7 @@ public class Connection implements AutoCloseable
 	/**
 	 * Unless you know what you are doing, you will never need this.
 	 *
-	 * @param macs
+	 * @param macs array of MAC types
 	 */
 	public synchronized void setServer2ClientMACs(String[] macs)
 	{
@@ -1430,7 +1428,7 @@ public class Connection implements AutoCloseable
 	 *            the target address (IP or hostname)
 	 * @param targetPort
 	 *            the target port
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public synchronized void requestRemotePortForwarding(String bindAddress, int bindPort, String targetAddress,
 			int targetPort) throws IOException
@@ -1455,10 +1453,7 @@ public class Connection implements AutoCloseable
 	 *
 	 * @param bindPort
 	 *            the allocated port number on the server
-	 * @throws IOException
-	 *             if the remote side refuses the cancel request or another low
-	 *             level error occurs (e.g., the underlying connection is
-	 *             closed)
+	 * @throws IOException if the remote side refuses the cancel request or another low level error occurs (e.g., the underlying connection is closed)
 	 */
 	public synchronized void cancelRemotePortForwarding(int bindPort) throws IOException
 	{
@@ -1548,8 +1543,7 @@ public class Connection implements AutoCloseable
 	 * request ('trilead-ping') to the server and waits for the
 	 * SSH_MSG_REQUEST_FAILURE reply packet from the server.
 	 *
-	 * @throws IOException
-	 *             in case of any problem
+	 * @throws IOException in case of any problem
 	 */
 	public synchronized void ping() throws IOException
 	{

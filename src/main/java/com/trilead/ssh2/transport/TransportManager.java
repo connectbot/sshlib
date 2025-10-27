@@ -434,14 +434,14 @@ public class TransportManager implements ITransportConnection
 	}
 
 	/**
-	 * @param comp
+	 * @param comp compression algorithm
 	 */
 	public void changeRecvCompression(ICompressor comp) {
 		tc.changeRecvCompression(comp);
 	}
 
 	/**
-	 * @param comp
+	 * @param comp compression algorithm
 	 */
 	public void changeSendCompression(ICompressor comp) {
 		tc.changeSendCompression(comp);

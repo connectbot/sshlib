@@ -593,7 +593,7 @@ public class AuthAgentForwardThread extends Thread implements IChannelWorkerThre
 
 	/**
 	 * @param message
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	private void sendPacket(byte[] message) throws IOException
 	{

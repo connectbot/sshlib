@@ -72,6 +72,7 @@ public class DhGroupExchange
 
 	/**
 	 * Sets f and calculates the shared secret.
+	 * @param f the server's public host key
 	 */
 	public void setF(BigInteger f)
 	{

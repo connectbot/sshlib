@@ -47,18 +47,19 @@ public interface AuthAgentCallback {
 	KeyPair getKeyPair(byte[] publicKey);
 
 	/**
-	 * @return
+	 * @return true if the agent is locked
 	 */
 	boolean isAgentLocked();
 
 	/**
-	 * @param lockPassphrase
+	 * @param lockPassphrase the passphrase to lock the agent with
+	 * @return true if the agent was locked
 	 */
 	boolean setAgentLock(String lockPassphrase);
 
 	/**
-	 * @param unlockPassphrase
-	 * @return
+	 * @param unlockPassphrase the passphrase to unlock the agent with
+	 * @return true if the agent was unlocked
 	 */
 	boolean requestAgentUnlock(String unlockPassphrase);
 }

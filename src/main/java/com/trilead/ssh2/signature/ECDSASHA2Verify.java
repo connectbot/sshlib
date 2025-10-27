@@ -338,6 +338,8 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 
 	/**
 	 * Decode an OctetString to EllipticCurvePoint according to SECG 2.3.4
+	 * @param M the octet string
+	 * @return the elliptic curve point
 	 */
 	public ECPoint decodeECPoint(byte[] M) {
 		if (M.length == 0) {
@@ -374,6 +376,9 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 
 	/**
 	 * Encode EllipticCurvePoint to an OctetString
+	 * @param group the elliptic curve point
+	 * @param curve the elliptic curve
+	 * @return the octet string
 	 */
 	public static byte[] encodeECPoint(ECPoint group, EllipticCurve curve)
 	{

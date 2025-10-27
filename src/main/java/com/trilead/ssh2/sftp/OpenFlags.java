@@ -5,56 +5,6 @@ package com.trilead.ssh2.sftp;
  *
  * SFTP Open Flags.
  *
- * The following table is provided to assist in mapping POSIX semantics
- * to equivalent SFTP file open parameters:
- * <p>
- * TODO: This comment should be moved to the open method.
- * <p>
- * <ul>
- * <li>O_RDONLY
- * <ul><li>desired-access = READ_DATA | READ_ATTRIBUTES</li></ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_WRONLY
- * <ul><li>desired-access = WRITE_DATA | WRITE_ATTRIBUTES</li></ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_RDWR
- * <ul><li>desired-access = READ_DATA | READ_ATTRIBUTES | WRITE_DATA | WRITE_ATTRIBUTES</li></ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_APPEND
- * <ul>
- * <li>desired-access = WRITE_DATA | WRITE_ATTRIBUTES | APPEND_DATA</li>
- * <li>flags = SSH_FXF_ACCESS_APPEND_DATA and or SSH_FXF_ACCESS_APPEND_DATA_ATOMIC</li>
- * </ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_CREAT
- * <ul>
- * <li>flags = SSH_FXF_OPEN_OR_CREATE</li>
- * </ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_TRUNC
- * <ul>
- * <li>flags = SSH_FXF_TRUNCATE_EXISTING</li>
- * </ul>
- * </li>
- * </ul>
- * <ul>
- * <li>O_TRUNC|O_CREATE
- * <ul>
- * <li>flags = SSH_FXF_CREATE_TRUNCATE</li>
- * </ul>
- * </li>
- * </ul>
- *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: OpenFlags.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
  */
