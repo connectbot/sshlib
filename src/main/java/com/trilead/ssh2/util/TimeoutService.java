@@ -24,6 +24,9 @@ public class TimeoutService
 {
 	private static final Logger log = Logger.getLogger(TimeoutService.class);
 
+	/**
+	 * A token that represents a timeout request.
+	 */
 	public static class TimeoutToken implements Comparable
 	{
 		private long runTime;

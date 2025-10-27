@@ -28,11 +28,10 @@ package com.trilead.ssh2.crypto.cipher;
  */
 
 /**
- * DES.
+ * A class that provides a basic DES engine.
  *
  * @author See comments in the source file
  * @version $Id: DES.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
- *
  */
 public class DES implements BlockCipher
 {
@@ -369,6 +368,9 @@ public class DES implements BlockCipher
 		out[outOff + 7] = (byte) (left & 0xff);
 	}
 
+	/**
+	 * DES in CBC mode.
+	 */
 	public static class CBC implements BlockCipher {
 		protected BlockCipher bc;
 

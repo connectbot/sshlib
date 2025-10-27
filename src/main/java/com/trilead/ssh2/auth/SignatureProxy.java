@@ -7,6 +7,14 @@ package com.trilead.ssh2.auth;
 import java.io.IOException;
 import java.security.PublicKey;
 
+/**
+ * Proxy for signing operations using external private keys.
+ * <p>
+ * Enables SSH authentication with keys stored in external systems
+ * (hardware tokens, key managers) by delegating the signing operation.
+ *
+ * @see AuthenticationManager
+ */
 public abstract class SignatureProxy
 {
 	public static final String SHA1 = "SHA-1";

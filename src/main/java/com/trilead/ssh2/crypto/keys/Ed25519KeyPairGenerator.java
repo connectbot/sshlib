@@ -7,6 +7,14 @@ import java.security.KeyPair;
 import java.security.KeyPairGeneratorSpi;
 import java.security.SecureRandom;
 
+/**
+ * KeyPairGenerator implementation for Ed25519 keys.
+ * <p>
+ * Generates Ed25519 key pairs for SSH authentication and signing.
+ *
+ * @see Ed25519PublicKey
+ * @see Ed25519PrivateKey
+ */
 public class Ed25519KeyPairGenerator extends KeyPairGeneratorSpi {
 	@Override
 	public void initialize(int keySize, SecureRandom secureRandom) {

@@ -12,6 +12,14 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 
+/**
+ * RSA signature verification using SHA-512 hash algorithm for SSH.
+ * <p>
+ * Implements the rsa-sha2-512 signature algorithm defined in RFC 8332.
+ *
+ * @see SSHSignature
+ * @see RSASHA256Verify
+ */
 public class RSASHA512Verify implements SSHSignature
 {
 	private static final Logger log = Logger.getLogger(RSASHA512Verify.class);

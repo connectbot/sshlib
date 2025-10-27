@@ -16,9 +16,30 @@ import com.trilead.ssh2.channel.X11ServerData;
  * in this context either a shell, an application or a system command. The
  * program may or may not have a tty. Only one single program can be started on
  * a session. However, multiple sessions can be active simultaneously.
+ * <p>
+ * Basic example - execute a command and read output:
+ * <pre>{@code
+ * Connection conn = new Connection("hostname");
+ * conn.connect();
+ * conn.authenticateWithPassword("username", "password");
+ *
+ * Session sess = conn.openSession();
+ * sess.execCommand("uname -a");
+ *
+ * InputStream stdout = sess.getStdout();
+ * BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
+ * while (true) {
+ *     String line = br.readLine();
+ *     if (line == null) break;
+ *     System.out.println(line);
+ * }
+ * sess.close();
+ * conn.close();
+ * }</pre>
  *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: Session.java,v 1.2 2008/03/03 07:01:36 cplattne Exp $
+ * @see Connection#openSession()
  */
 public class Session implements AutoCloseable
 {

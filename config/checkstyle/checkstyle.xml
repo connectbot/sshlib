@@ -23,6 +23,10 @@
 		<module name="WhitespaceAround">
 			<property name="allowEmptyMethods" value="true" />
 		</module>
+		<!-- Javadoc checks for public classes only -->
+		<module name="JavadocType">
+			<property name="scope" value="public" />
+		</module>
 		<!-- No trailing whitespace -->
 		<module name="Regexp">
 			<property name="format" value="[ \t]+$" />

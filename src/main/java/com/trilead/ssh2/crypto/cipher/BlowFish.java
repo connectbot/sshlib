@@ -415,6 +415,9 @@ public class BlowFish implements BlockCipher
 		}
 	}
 
+	/**
+	 * BlowFish in CBC mode.
+	 */
 	public static class CBC extends Wrapper {
 		@Override
 		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
@@ -424,6 +427,9 @@ public class BlowFish implements BlockCipher
 		}
 	}
 
+	/**
+	 * BlowFish in CTR mode.
+	 */
 	public static class CTR extends Wrapper {
 		@Override
 		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {

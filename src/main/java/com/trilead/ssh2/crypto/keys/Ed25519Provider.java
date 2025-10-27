@@ -5,6 +5,15 @@ import java.security.PrivilegedAction;
 import java.security.Provider;
 import java.security.Security;
 
+/**
+ * JCA Provider for Ed25519 cryptographic operations.
+ * <p>
+ * Registers KeyFactory and KeyPairGenerator implementations for the
+ * Ed25519 signature algorithm with the Java security framework.
+ *
+ * @see Ed25519KeyFactory
+ * @see Ed25519KeyPairGenerator
+ */
 public class Ed25519Provider extends Provider {
 	public static final String NAME = "ConnectBot Ed25519 Provider";
 	public static final String KEY_ALGORITHM = "Ed25519";

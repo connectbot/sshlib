@@ -43,4 +43,7 @@
 		checks="RegexpSinglelineJavaCheck" />
 	<suppress files="sshlib/src/main/java/de/mud/.+\.java"
 		checks=".*" />
+	<!-- Test files don't need Javadoc -->
+	<suppress files="sshlib/src/test/java/.+\.java"
+		checks="JavadocType" />
 </suppressions>

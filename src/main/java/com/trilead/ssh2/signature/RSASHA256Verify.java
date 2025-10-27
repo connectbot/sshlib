@@ -12,6 +12,14 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 
+/**
+ * RSA signature verification using SHA-256 hash algorithm for SSH.
+ * <p>
+ * Implements the rsa-sha2-256 signature algorithm defined in RFC 8332.
+ *
+ * @see SSHSignature
+ * @see RSASHA512Verify
+ */
 public class RSASHA256Verify implements SSHSignature
 {
 	private static final Logger log = Logger.getLogger(RSASHA256Verify.class);

@@ -10,6 +10,15 @@ import java.security.spec.KeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
+/**
+ * KeyFactory implementation for Ed25519 keys.
+ * <p>
+ * Provides JCE integration for Ed25519 signature algorithm keys,
+ * supporting X.509 encoded public keys and PKCS#8 encoded private keys.
+ *
+ * @see Ed25519PublicKey
+ * @see Ed25519PrivateKey
+ */
 public class Ed25519KeyFactory extends KeyFactorySpi {
 	@Override
 	protected PublicKey engineGeneratePublic(KeySpec keySpec) throws InvalidKeySpecException {

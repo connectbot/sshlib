@@ -28,11 +28,10 @@ package com.trilead.ssh2.crypto.cipher;
  */
 
 /**
- * DESede.
+ * A class that provides a basic DESede (Triple-DES) engine.
  *
  * @author See comments in the source file
  * @version $Id: DESede.java,v 1.1 2007/10/15 12:49:55 cplattne Exp $
- *
  */
 public class DESede extends DES
 {
@@ -110,6 +109,9 @@ public class DESede extends DES
 		}
 	}
 
+	/**
+	 * DESede in CBC mode.
+	 */
 	public static class CBC extends Wrapper {
 		@Override
 		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {
@@ -119,6 +121,9 @@ public class DESede extends DES
 		}
 	}
 
+	/**
+	 * DESede in CTR mode.
+	 */
 	public static class CTR extends Wrapper {
 		@Override
 		public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException {

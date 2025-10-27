@@ -57,8 +57,12 @@ import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
 
 /**
- * @author Kenny Root
+ * ECDSA signature verification for SSH using SHA-2 hash algorithms.
+ * <p>
+ * Supports NIST P-256, P-384, and P-521 elliptic curves.
  *
+ * @author Kenny Root
+ * @see SSHSignature
  */
 public abstract class ECDSASHA2Verify implements SSHSignature {
 	private static final Logger log = Logger.getLogger(ECDSASHA2Verify.class);
@@ -409,6 +413,9 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 		return output;
 	}
 
+	/**
+	 * ECDSA signature verification for NIST P-256 curve with SHA-256.
+	 */
 	public static class ECDSASHA2NISTP256Verify extends ECDSASHA2Verify {
 		private static final String NISTP256 = "nistp256";
 		private static final String NISTP256_OID = "1.2.840.10045.3.1.7";
@@ -466,6 +473,9 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 			1);
 	}
 
+	/**
+	 * ECDSA signature verification for NIST P-384 curve with SHA-384.
+	 */
 	public static class ECDSASHA2NISTP384Verify extends ECDSASHA2Verify {
 		private static final String NISTP384 = "nistp384";
 		private static final String NISTP384_OID = "1.3.132.0.34";
@@ -523,6 +533,9 @@ public abstract class ECDSASHA2Verify implements SSHSignature {
 			1);
 	}
 
+	/**
+	 * ECDSA signature verification for NIST P-521 curve with SHA-512.
+	 */
 	public static class ECDSASHA2NISTP521Verify extends ECDSASHA2Verify {
 		private static final String NISTP521 = "nistp521";
 		private static final String NISTP521_OID = "1.3.132.0.35";
