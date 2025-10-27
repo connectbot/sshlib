@@ -47,7 +47,7 @@ import com.trilead.ssh2.packets.TypesReader;
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: TransportManager.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
  */
-public class TransportManager
+public class TransportManager implements ITransportConnection
 {
 	private static final Logger log = Logger.getLogger(TransportManager.class);
 
