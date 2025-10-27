@@ -9,6 +9,14 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
+/**
+ * Ed25519 public key implementation for SSH.
+ * <p>
+ * Supports X.509 encoding for use in SSH authentication and signature verification.
+ *
+ * @see Ed25519PrivateKey
+ * @see Ed25519KeyFactory
+ */
 public class Ed25519PublicKey implements PublicKey {
 	private static final byte[] ED25519_OID = new byte[]{43, 101, 112};
 	private static final int KEY_BYTES_LENGTH = 32;

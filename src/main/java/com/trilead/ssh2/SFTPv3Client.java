@@ -28,10 +28,27 @@ import com.trilead.ssh2.sftp.Packet;
  * Note: this is experimental code.
  * <p>
  * Error handling: the methods of this class throw IOExceptions. However, unless
- * there is catastrophic failure, exceptions of the type {@link SFTPv3Client} will
+ * there is catastrophic failure, exceptions of the type {@link SFTPException} will
  * be thrown (a subclass of IOException). Therefore, you can implement more verbose
  * behavior by checking if a thrown exception if of this type. If yes, then you
  * can cast the exception and access detailed information about the failure.
+ * <p>
+ * Basic example - upload a file:
+ * <pre>{@code
+ * Connection conn = new Connection("hostname");
+ * conn.connect();
+ * conn.authenticateWithPassword("username", "password");
+ *
+ * SFTPv3Client sftp = new SFTPv3Client(conn);
+ *
+ * SFTPv3FileHandle handle = sftp.createFile("remote.txt");
+ * byte[] data = "Hello, SFTP!".getBytes();
+ * sftp.write(handle, 0, data, 0, data.length);
+ * sftp.closeFile(handle);
+ *
+ * sftp.close();
+ * conn.close();
+ * }</pre>
  * <p>
  * Notes about file names, directory names and paths, copy-pasted
  * from the specs:
@@ -57,6 +74,8 @@ import com.trilead.ssh2.sftp.Packet;
  *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SFTPv3Client.java,v 1.3 2008/04/01 12:38:09 cplattne Exp $
+ * @see Connection
+ * @see SFTPException
  */
 public class SFTPv3Client
 {

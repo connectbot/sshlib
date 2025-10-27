@@ -44,6 +44,9 @@ public abstract class AES implements BlockCipher
 		}
 	}
 
+	/**
+	 * AES in CBC (Cipher Block Chaining) mode for SSH.
+	 */
 	public static class CBC extends AES {
 		public CBC() throws IllegalArgumentException {
 			try {
@@ -54,6 +57,9 @@ public abstract class AES implements BlockCipher
 		}
 	}
 
+	/**
+	 * AES in CTR (Counter) mode for SSH.
+	 */
 	public static class CTR extends AES {
 		public CTR() throws IllegalArgumentException {
 			try {

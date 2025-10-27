@@ -18,9 +18,23 @@ import java.io.UnsupportedEncodingException;
  * This scp client is thread safe - you can download (and upload) different sets
  * of files concurrently without any troubles. The <code>SCPClient</code> is
  * actually mapping every request to a distinct {@link Session}.
+ * <p>
+ * Basic example - copy a file to the remote server:
+ * <pre>{@code
+ * Connection conn = new Connection("hostname");
+ * conn.connect();
+ * conn.authenticateWithPassword("username", "password");
+ *
+ * SCPClient scp = new SCPClient(conn);
+ * scp.put("local.txt", "/remote/path/");
+ *
+ * conn.close();
+ * }</pre>
  *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: SCPClient.java,v 1.2 2008/04/01 12:38:09 cplattne Exp $
+ * @see Connection
+ * @see Session
  */
 
 public class SCPClient

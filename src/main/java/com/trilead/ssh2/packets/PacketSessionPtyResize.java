@@ -1,5 +1,13 @@
 package com.trilead.ssh2.packets;
 
+/**
+ * SSH packet for resizing a pseudo-terminal window.
+ * <p>
+ * Sends a window-change request to update PTY dimensions when the
+ * terminal window is resized on the client side.
+ *
+ * @see com.trilead.ssh2.Session#resizePTY(int, int, int, int)
+ */
 public class PacketSessionPtyResize {
 	byte[] payload;
 

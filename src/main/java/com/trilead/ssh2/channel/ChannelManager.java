@@ -30,12 +30,33 @@ import com.trilead.ssh2.transport.ITransportConnection;
 import com.trilead.ssh2.transport.MessageHandler;
 
 /**
- * ChannelManager. Please read the comments in Channel.java.
+ * ChannelManager coordinates all SSH channels over a single transport connection.
  * <p>
- * Besides the crypto part, this is the core of the library.
+ * This class is the core of the SSH channel layer, managing:
+ * <ul>
+ * <li>Channel lifecycle (open, close, EOF)</li>
+ * <li>Data transmission and flow control</li>
+ * <li>Channel requests (PTY, X11, exec, shell, subsystem)</li>
+ * <li>Global requests (port forwarding, ping)</li>
+ * <li>SSH message routing to appropriate channel handlers</li>
+ * </ul>
+ * <p>
+ * Architecture: ChannelManager implements {@link MessageHandler} to receive
+ * SSH packets in the range 80-100 (channel-related messages) from the
+ * {@link com.trilead.ssh2.transport.TransportManager}. It maintains a registry
+ * of active channels and routes messages to the appropriate channel instance.
+ * <p>
+ * The manager handles both synchronous operations (like opening a session channel)
+ * and asynchronous message processing (incoming data, window adjustments, channel close).
+ * <p>
+ * Thread safety: All channel operations are synchronized on the channels list or
+ * individual channel objects to ensure proper concurrency control.
  *
  * @author Christian Plattner, plattner@trilead.com
  * @version $Id: ChannelManager.java,v 1.2 2008/03/03 07:01:36 cplattne Exp $
+ * @see Channel
+ * @see MessageHandler
+ * @see com.trilead.ssh2.transport.ITransportConnection
  */
 public class ChannelManager implements MessageHandler
 {

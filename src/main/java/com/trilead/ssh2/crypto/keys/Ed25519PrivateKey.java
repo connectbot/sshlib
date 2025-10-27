@@ -11,6 +11,14 @@ import java.util.Arrays;
 
 import javax.security.auth.DestroyFailedException;
 
+/**
+ * Ed25519 private key implementation for SSH.
+ * <p>
+ * Supports PKCS#8 encoding and provides secure key destruction.
+ *
+ * @see Ed25519PublicKey
+ * @see Ed25519KeyFactory
+ */
 public class Ed25519PrivateKey implements PrivateKey {
 	private static final byte[] ED25519_OID = new byte[] {43, 101, 112};
 	private static final int KEY_BYTES_LENGTH = 32;
