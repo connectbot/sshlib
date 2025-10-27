@@ -42,19 +42,19 @@ public abstract class GenericDhExchange
 
 	/**
 	 * @return Returns the e (public value)
-	 * @throws IllegalStateException
+	 * @throws IllegalStateException if the exchange has not been initialized.
 	 */
 	public abstract byte[] getE();
 
 	/**
 	 * @return Returns the server's e (public value)
-	 * @throws IllegalStateException
+	 * @throws IllegalStateException if the exchange has not been initialized.
 	 */
 	protected abstract byte[] getServerE();
 
 	/**
 	 * @return Returns the shared secret k.
-	 * @throws IllegalStateException
+	 * @throws IllegalStateException if the shared secret is not available.
 	 */
 	public BigInteger getK()
 	{
@@ -65,7 +65,8 @@ public abstract class GenericDhExchange
 	}
 
 	/**
-	 * @param f
+	 * @param f the server's public host key
+	 * @throws IOException on error
 	 */
 	public abstract void setF(byte[] f) throws IOException;
 

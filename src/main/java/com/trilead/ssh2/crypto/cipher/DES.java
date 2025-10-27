@@ -47,10 +47,8 @@ public class DES implements BlockCipher
 	/**
 	 * initialise a DES cipher.
 	 *
-	 * @param encrypting
-	 *            whether or not we are for encryption.
-	 * @param key
-	 *            the parameters required to set up the cipher.
+	 * @param encrypting whether or not we are for encryption.
+	 * @param key the parameters required to set up the cipher.
 	 * @exception IllegalArgumentException
 	 *                if the params argument is inappropriate.
 	 */
@@ -186,6 +184,11 @@ public class DES implements BlockCipher
 	 *
 	 * Acknowledgements for this routine go to James Gillogly &amp; Phil Karn.
 	 * (whoever, and wherever they are!).
+	 *
+	 * @param encrypting whether or not we are for encryption.
+	 * @param key key to use to encrypt or decrypt
+	 * @param off offset into the key
+	 * @return the working key
 	 */
 	protected int[] generateWorkingKey(boolean encrypting, byte[] key, int off)
 	{
@@ -277,6 +280,11 @@ public class DES implements BlockCipher
 
 	/**
 	 * the DES engine.
+	 * @param wKey round key
+	 * @param in input byte array
+	 * @param inOff input offset
+	 * @param out output byte array
+	 * @param outOff output offset
 	 */
 	protected void desFunc(int[] wKey, byte[] in, int inOff, byte[] out, int outOff)
 	{

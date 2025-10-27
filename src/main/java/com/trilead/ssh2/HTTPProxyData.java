@@ -31,7 +31,7 @@ public class HTTPProxyData implements ProxyData
 	private final String[] requestHeaderLines;
 
 	/**
-	 * Same as calling {@link #HTTPProxyData(String, int, String, String) HTTPProxyData(proxyHost, proxyPort, <code>null</code>, <code>null</code>)}
+	 * Same as calling {@link #HTTPProxyData(String, int, String, String) HTTPProxyData(proxyHost, proxyPort, null, null)}
 	 *
 	 * @param proxyHost Proxy hostname.
 	 * @param proxyPort Proxy port.
@@ -42,7 +42,7 @@ public class HTTPProxyData implements ProxyData
 	}
 
 	/**
-	 * Same as calling {@link #HTTPProxyData(String, int, String, String, String[]) HTTPProxyData(proxyHost, proxyPort, <code>null</code>, <code>null</code>, <code>null</code>)}
+	 * Same as calling {@link #HTTPProxyData(String, int, String, String, String[]) HTTPProxyData(proxyHost, proxyPort, null, null, null)}
 	 *
 	 * @param proxyHost Proxy hostname.
 	 * @param proxyPort Proxy port.

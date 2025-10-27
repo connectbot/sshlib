@@ -554,9 +554,10 @@ public class ChannelManager implements MessageHandler
 	}
 
 	/**
-	 * @param c
-	 * @param authAgent
-	 * @throws IOException
+	 * @param c the channel
+	 * @param authAgent the auth agent
+	 * @return see {@link com.trilead.ssh2.Session#requestAuthAgentForwarding(AuthAgentCallback)}
+	 * @throws IOException on error
 	 */
 	public boolean requestChannelAgentForwarding(Channel c, AuthAgentCallback authAgent) throws IOException {
 		synchronized (this)
