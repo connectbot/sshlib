@@ -3,37 +3,39 @@ package com.trilead.ssh2;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
- * Integration tests against OpenSSH.
+ * Integration tests against AsyncSSH.
  *
  * @author Kenny Root
  */
+@Testcontainers
 public class AsyncSSHCompatibilityTest {
 	private static final Logger logger = LoggerFactory.getLogger(AsyncSSHCompatibilityTest.class.getSimpleName());
 
-	@Rule
+	@RegisterExtension
 	public SshLogger sshLogger = new SshLogger(logger);
 
 	private static final String USERNAME = "user123";
 	private static final String PASSWORD = "secretpw";
 
-	@ClassRule
-	public static GenericContainer server;
+	@Container
+	public static GenericContainer<?> server;
 
 	static {
 		ImageFromDockerfile baseImage = new ImageFromDockerfile("asyncssh-server", false)
@@ -42,7 +44,7 @@ public class AsyncSSHCompatibilityTest {
 			baseImage.withFileFromClasspath(key, "com/trilead/ssh2/crypto/" + key);
 		}
 
-		server = new GenericContainer(baseImage)
+		server = new GenericContainer<>(baseImage)
 				.withExposedPorts(8022)
 				.withLogConsumer(new Slf4jLogConsumer(logger).withPrefix("DOCKER"))
 				.waitingFor(new LogMessageWaitStrategy()

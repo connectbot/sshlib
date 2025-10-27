@@ -1,7 +1,7 @@
 package com.trilead.ssh2.signature;
 
 import com.trilead.ssh2.crypto.PEMDecoder;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 
 /**

@@ -6,17 +6,19 @@ import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.packets.PacketKexInit;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.testcontainers.shaded.com.trilead.ssh2.packets.Packets;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -25,7 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@RunWith(value = MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class KexManagerTest {
 	@Mock private TransportManager tm;
 	@Mock private ClientServerHello csh;
@@ -38,27 +40,33 @@ public class KexManagerTest {
 	@Captor
 	private ArgumentCaptor<byte[]> packetCaptor;
 
-	@Before
+	@BeforeEach
 	public void setupMocks() {
 		kexManager = new KexManager(tm, csh, initialCwl, null, 0,
 			keyVerifier, rnd);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void invalidServerHostkeyAlgorithms_Exception() {
+		assertThrows(IllegalArgumentException.class, () -> {
 		KexManager.checkServerHostkeyAlgorithmsList(new String[]{"non-existent"});
+		});
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void invalidKexAlgorithm_Exception() {
+		assertThrows(IllegalArgumentException.class, () -> {
 		KexManager.checkKexAlgorithmList(new String[]{"non-existent"});
+		});
 	}
 
-	@Test(expected = IOException.class)
+	@Test
 	public void noExchange_IOException() throws Exception {
+		assertThrows(IOException.class, () -> {
 		kexManager.handleMessage(null, 0);
 		when(tm.getReasonClosedCause()).thenReturn(new IOException("boom"));
 		kexManager.getOrWaitForConnectionInfo(0);
+		});
 	}
 
 	@Test
@@ -68,9 +76,11 @@ public class KexManagerTest {
 		verify(tm, times(1)).sendKexMessage(any());
 	}
 
-	@Test(expected = IOException.class)
+	@Test
 	public void handlePacket_BeforeKex_NotKexInit_ThrowsException() throws Exception {
+		assertThrows(IOException.class, () -> {
 		kexManager.handleMessage(new byte[] {Packets.SSH_MSG_NEWKEYS}, 1);
+		});
 	}
 
 	public static class PacketTypeMatcher extends TypeSafeMatcher<byte[]> {
@@ -107,20 +117,24 @@ public class KexManagerTest {
 		));
 	}
 
-	@Test(expected = IOException.class)
+	@Test
 	public void handlePacket_KexInit_StartsKex_RejectsDoubleKexInit() throws Exception {
+		assertThrows(IOException.class, () -> {
 		PacketKexInit packetKexInit = new PacketKexInit(new CryptoWishList());
 		byte[] payload = packetKexInit.getPayload();
 		kexManager.handleMessage(payload, payload.length);
 		kexManager.handleMessage(payload, payload.length);
+		});
 	}
 
-	@Test(expected = IOException.class)
+	@Test
 	public void handlePacket_KexInit_NonMatchingProposals() throws Exception {
+		assertThrows(IOException.class, () -> {
 		PacketKexInit packetKexInit = new PacketKexInit(new CryptoWishList());
 		packetKexInit.getKexParameters().kex_algorithms = new String[] { "non-existent" };
 		byte[] payload = packetKexInit.getPayload();
 		kexManager.handleMessage(payload, payload.length);
+		});
 	}
 
 	@Test

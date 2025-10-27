@@ -1,12 +1,13 @@
 package com.trilead.ssh2.packets;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class PacketExtInfoTest {
 	@Test
@@ -16,18 +17,22 @@ public class PacketExtInfoTest {
 		assertEquals(Collections.emptyMap(), p.getExtNameToValue());
 	}
 
-	@Test(expected = IOException.class)
-	public void packetWithPadding_Fails() throws IOException {
+	@Test
+	public void packetWithPadding_Fails() {
+		assertThrows(IOException.class, () -> {
 		byte[] unpaddedPacket = new PacketExtInfo(Collections.emptyMap()).getPayload();
 		byte[] paddedPacket = new byte[unpaddedPacket.length + 1];
 		System.arraycopy(unpaddedPacket, 0, paddedPacket, 0, unpaddedPacket.length);
 		new PacketExtInfo(paddedPacket, 0, paddedPacket.length);
+		});
 	}
 
-	@Test(expected = IOException.class)
-	public void wrongPacket_Fails() throws IOException {
+	@Test
+	public void wrongPacket_Fails() {
+		assertThrows(IOException.class, () -> {
 		byte[] wrongPacket = new PacketGlobalTrileadPing().getPayload();
 		new PacketExtInfo(wrongPacket, 0, wrongPacket.length);
+		});
 	}
 
 	@Test

@@ -4,7 +4,7 @@ import com.trilead.ssh2.crypto.Base64;
 import com.trilead.ssh2.crypto.PEMDecoder;
 import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.KeyPair;
@@ -19,10 +19,11 @@ import java.util.Arrays;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Created by kenny on 1/24/16.
@@ -146,12 +147,14 @@ public class Ed25519VerifyTest {
 		assertArrayEquals(getTestPubKey().getEncoded(), Ed25519Verify.get().decodePublicKey(getTestPubKeyBytes()).getEncoded());
 	}
 
-	@Test(expected = IOException.class)
+	@Test
 	public void publicKeyDecode_ExcessPadding_Failure() throws Exception {
+		assertThrows(IOException.class, () -> {
 		byte[] validKey = getTestPubKeyBytes();
 		byte[] invalidKey = new byte[validKey.length + 1];
 		System.arraycopy(validKey, 0, invalidKey, 0, validKey.length);
 		Ed25519Verify.get().decodePublicKey(invalidKey);
+		});
 	}
 
 	@Test

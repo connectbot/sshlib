@@ -47,14 +47,19 @@ dependencies {
     }
     implementation("org.connectbot:jbcrypt:1.0.2")
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("commons-io:commons-io:2.20.0")
-    testImplementation("commons-codec:commons-codec:1.19.0")
-    testImplementation("org.testcontainers:testcontainers:1.21.3")
-    testImplementation("org.jetbrains:annotations:26.0.2")
     testImplementation("ch.qos.logback:logback-classic:1.5.20")
+    testImplementation("commons-codec:commons-codec:1.19.0")
+    testImplementation("commons-io:commons-io:2.20.0")
     testImplementation("org.hamcrest:hamcrest:3.0")
+    testImplementation("org.jetbrains:annotations:26.0.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
     testImplementation("org.mockito:mockito-core:5.19.0")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.19.0")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.3")
+    testImplementation("org.testcontainers:testcontainers:1.21.3")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
@@ -68,6 +73,10 @@ java {
 tasks.withType<ShadowJar> {
     archiveClassifier.set("")
     minimize()
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.jacocoTestReport {

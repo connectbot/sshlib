@@ -1,9 +1,11 @@
 package com.trilead.ssh2;
 
-import org.junit.rules.ExternalResource;
+import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.slf4j.Logger;
 
-public class SshLogger extends ExternalResource {
+public class SshLogger implements BeforeEachCallback, AfterEachCallback {
 	private final Logger logger;
 
 	private DebugLogger oldLogger;
@@ -14,7 +16,7 @@ public class SshLogger extends ExternalResource {
 	}
 
 	@Override
-	protected void before() throws Throwable {
+	public void beforeEach(ExtensionContext context) throws Exception {
 		oldEnabled = com.trilead.ssh2.log.Logger.enabled;
 		oldLogger = com.trilead.ssh2.log.Logger.logger;
 
@@ -23,7 +25,7 @@ public class SshLogger extends ExternalResource {
 	}
 
 	@Override
-	protected void after() {
+	public void afterEach(ExtensionContext context) throws Exception {
 		com.trilead.ssh2.log.Logger.enabled = oldEnabled;
 		com.trilead.ssh2.log.Logger.logger = oldLogger;
 	}

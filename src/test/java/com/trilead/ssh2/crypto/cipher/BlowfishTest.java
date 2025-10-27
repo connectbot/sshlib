@@ -2,11 +2,12 @@ package com.trilead.ssh2.crypto.cipher;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test coverage for Blowfish cipher implementation.
@@ -34,12 +35,14 @@ public class BlowfishTest {
 		assertEquals("Blowfish", cipher.getAlgorithmName());
 	}
 
-	@Test(expected = IllegalStateException.class)
+	@Test
 	public void testTransformBlockWithoutInit() {
+		assertThrows(IllegalStateException.class, () -> {
 		BlowFish cipher = new BlowFish();
 		byte[] input = new byte[8];
 		byte[] output = new byte[8];
 		cipher.transformBlock(input, 0, output, 0);
+		});
 	}
 
 	@Test

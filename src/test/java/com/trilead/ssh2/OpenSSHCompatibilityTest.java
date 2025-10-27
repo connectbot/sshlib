@@ -3,8 +3,8 @@ package com.trilead.ssh2;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -26,7 +26,7 @@ public class OpenSSHCompatibilityTest {
 	private static final Logger logger = LoggerFactory.getLogger(OpenSSHCompatibilityTest.class.getSimpleName());
 	private static final Slf4jLogConsumer logConsumer = new Slf4jLogConsumer(logger).withPrefix("DOCKER");
 
-	@Rule
+	@RegisterExtension
 	public SshLogger sshLogger = new SshLogger(logger);
 
 	private static final String OPTIONS_ENV = "OPTIONS";
