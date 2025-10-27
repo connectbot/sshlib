@@ -1,9 +1,9 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for DHGexParameters validation and construction logic.
@@ -16,9 +16,9 @@ public class DHGexParametersTest {
 		DHGexParameters params = new DHGexParameters();
 
 		// Default values should be 1024, 1024, 4096
-		assertEquals("Default min group length should be 1024", 1024, params.getMin_group_len());
-		assertEquals("Default preferred group length should be 1024", 1024, params.getPref_group_len());
-		assertEquals("Default max group length should be 4096", 4096, params.getMax_group_len());
+		assertEquals(1024, params.getMin_group_len(), "Default min group length should be 1024");
+		assertEquals(1024, params.getPref_group_len(), "Default preferred group length should be 1024");
+		assertEquals(4096, params.getMax_group_len(), "Default max group length should be 4096");
 	}
 
 	@Test
@@ -26,23 +26,23 @@ public class DHGexParametersTest {
 		DHGexParameters params = new DHGexParameters(2048);
 
 		// Single parameter constructor sets min and max to 0
-		assertEquals("Min should be 0 for old-style request", 0, params.getMin_group_len());
-		assertEquals("Preferred should be set value", 2048, params.getPref_group_len());
-		assertEquals("Max should be 0 for old-style request", 0, params.getMax_group_len());
+		assertEquals(0, params.getMin_group_len(), "Min should be 0 for old-style request");
+		assertEquals(2048, params.getPref_group_len(), "Preferred should be set value");
+		assertEquals(0, params.getMax_group_len(), "Max should be 0 for old-style request");
 	}
 
 	@Test
 	public void testSingleParameterConstructorMinBoundary() {
 		// Test minimum allowed value (1024)
 		DHGexParameters params = new DHGexParameters(1024);
-		assertEquals("Min allowed value should be accepted", 1024, params.getPref_group_len());
+		assertEquals(1024, params.getPref_group_len(), "Min allowed value should be accepted");
 	}
 
 	@Test
 	public void testSingleParameterConstructorMaxBoundary() {
 		// Test maximum allowed value (8192)
 		DHGexParameters params = new DHGexParameters(8192);
-		assertEquals("Max allowed value should be accepted", 8192, params.getPref_group_len());
+		assertEquals(8192, params.getPref_group_len(), "Max allowed value should be accepted");
 	}
 
 	@Test
@@ -51,8 +51,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1023);
 			fail("Should throw IllegalArgumentException for value below minimum");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate out of range");
 		}
 	}
 
@@ -62,8 +61,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(8193);
 			fail("Should throw IllegalArgumentException for value above maximum");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate out of range");
 	}
 	}
 
@@ -73,8 +71,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(0);
 			fail("Should throw IllegalArgumentException for zero");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate out of range");
 		}
 	}
 
@@ -84,8 +81,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(-1);
 			fail("Should throw IllegalArgumentException for negative value");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate out of range");
 		}
 	}
 
@@ -93,9 +89,9 @@ public class DHGexParametersTest {
 	public void testThreeParameterConstructorValidValues() {
 		DHGexParameters params = new DHGexParameters(1024, 2048, 4096);
 
-		assertEquals("Min should be set correctly", 1024, params.getMin_group_len());
-		assertEquals("Preferred should be set correctly", 2048, params.getPref_group_len());
-		assertEquals("Max should be set correctly", 4096, params.getMax_group_len());
+		assertEquals(1024, params.getMin_group_len(), "Min should be set correctly");
+		assertEquals(2048, params.getPref_group_len(), "Preferred should be set correctly");
+		assertEquals(4096, params.getMax_group_len(), "Max should be set correctly");
 	}
 
 	@Test
@@ -103,9 +99,9 @@ public class DHGexParametersTest {
 		// All three values can be the same
 		DHGexParameters params = new DHGexParameters(2048, 2048, 2048);
 
-		assertEquals("Min should be 2048", 2048, params.getMin_group_len());
-		assertEquals("Preferred should be 2048", 2048, params.getPref_group_len());
-		assertEquals("Max should be 2048", 2048, params.getMax_group_len());
+		assertEquals(2048, params.getMin_group_len(), "Min should be 2048");
+		assertEquals(2048, params.getPref_group_len(), "Preferred should be 2048");
+		assertEquals(2048, params.getMax_group_len(), "Max should be 2048");
 	}
 
 	@Test
@@ -114,8 +110,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1023, 2048, 4096);
 			fail("Should throw IllegalArgumentException for min below range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate min out of range",
-					"min_group_len out of range!", e.getMessage());
+			assertEquals("min_group_len out of range!", e.getMessage(), "Error message should indicate min out of range");
 		}
 	}
 
@@ -125,8 +120,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(8193, 8193, 8193);
 			fail("Should throw IllegalArgumentException for min above range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate min out of range",
-					"min_group_len out of range!", e.getMessage());
+			assertEquals("min_group_len out of range!", e.getMessage(), "Error message should indicate min out of range");
 		}
 	}
 
@@ -136,8 +130,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1024, 1023, 4096);
 			fail("Should throw IllegalArgumentException for pref below range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate pref out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate pref out of range");
 		}
 	}
 
@@ -147,8 +140,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1024, 8193, 8193);
 			fail("Should throw IllegalArgumentException for pref above range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate pref out of range",
-					"pref_group_len out of range!", e.getMessage());
+			assertEquals("pref_group_len out of range!", e.getMessage(), "Error message should indicate pref out of range");
 		}
 	}
 
@@ -158,8 +150,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1024, 1024, 1023);
 			fail("Should throw IllegalArgumentException for max below range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate max out of range",
-					"max_group_len out of range!", e.getMessage());
+			assertEquals("max_group_len out of range!", e.getMessage(), "Error message should indicate max out of range");
 		}
 	}
 
@@ -169,8 +160,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1024, 2048, 8193);
 			fail("Should throw IllegalArgumentException for max above range");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate max out of range",
-					"max_group_len out of range!", e.getMessage());
+			assertEquals("max_group_len out of range!", e.getMessage(), "Error message should indicate max out of range");
 		}
 	}
 
@@ -180,8 +170,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(2048, 1024, 4096);
 			fail("Should throw IllegalArgumentException when pref < min");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate pref incompatible with min/max",
-					"pref_group_len is incompatible with min and max!", e.getMessage());
+			assertEquals("pref_group_len is incompatible with min and max!", e.getMessage(), "Error message should indicate pref incompatible with min/max");
 		}
 	}
 
@@ -191,8 +180,7 @@ public class DHGexParametersTest {
 			new DHGexParameters(1024, 4096, 2048);
 			fail("Should throw IllegalArgumentException when pref > max");
 		} catch (IllegalArgumentException e) {
-			assertEquals("Error message should indicate pref incompatible with min/max",
-					"pref_group_len is incompatible with min and max!", e.getMessage());
+			assertEquals("pref_group_len is incompatible with min and max!", e.getMessage(), "Error message should indicate pref incompatible with min/max");
 		}
 	}
 
@@ -204,8 +192,7 @@ public class DHGexParametersTest {
 			fail("Should throw IllegalArgumentException when max < min");
 		} catch (IllegalArgumentException e) {
 			// Pref validation happens before max<min check in the actual code
-			assertEquals("Error message should indicate pref incompatibility",
-					"pref_group_len is incompatible with min and max!", e.getMessage());
+			assertEquals("pref_group_len is incompatible with min and max!", e.getMessage(), "Error message should indicate pref incompatibility");
 		}
 	}
 
@@ -218,8 +205,7 @@ public class DHGexParametersTest {
 			fail("Should throw IllegalArgumentException when max < min");
 		} catch (IllegalArgumentException e) {
 			// With pref between max and min, pref check triggers first
-			assertEquals("Error message depends on validation order",
-					"pref_group_len is incompatible with min and max!", e.getMessage());
+			assertEquals("pref_group_len is incompatible with min and max!", e.getMessage(), "Error message depends on validation order");
 		}
 	}
 
@@ -228,8 +214,8 @@ public class DHGexParametersTest {
 		// Pref can equal min
 		DHGexParameters params = new DHGexParameters(2048, 2048, 4096);
 
-		assertEquals("Pref equals min should be valid", 2048, params.getPref_group_len());
-		assertEquals("Min should be correct", 2048, params.getMin_group_len());
+		assertEquals(2048, params.getPref_group_len(), "Pref equals min should be valid");
+		assertEquals(2048, params.getMin_group_len(), "Min should be correct");
 	}
 
 	@Test
@@ -237,8 +223,8 @@ public class DHGexParametersTest {
 		// Pref can equal max
 		DHGexParameters params = new DHGexParameters(1024, 4096, 4096);
 
-		assertEquals("Pref equals max should be valid", 4096, params.getPref_group_len());
-		assertEquals("Max should be correct", 4096, params.getMax_group_len());
+		assertEquals(4096, params.getPref_group_len(), "Pref equals max should be valid");
+		assertEquals(4096, params.getMax_group_len(), "Max should be correct");
 	}
 
 	@Test
@@ -246,9 +232,9 @@ public class DHGexParametersTest {
 		// Min can equal max (and pref must also equal them)
 		DHGexParameters params = new DHGexParameters(3072, 3072, 3072);
 
-		assertEquals("All values should be equal", 3072, params.getMin_group_len());
-		assertEquals("All values should be equal", 3072, params.getPref_group_len());
-		assertEquals("All values should be equal", 3072, params.getMax_group_len());
+		assertEquals(3072, params.getMin_group_len(), "All values should be equal");
+		assertEquals(3072, params.getPref_group_len(), "All values should be equal");
+		assertEquals(3072, params.getMax_group_len(), "All values should be equal");
 	}
 
 	@Test
@@ -256,9 +242,9 @@ public class DHGexParametersTest {
 		// Test with all boundary values
 		DHGexParameters params = new DHGexParameters(1024, 4096, 8192);
 
-		assertEquals("Min boundary should work", 1024, params.getMin_group_len());
-		assertEquals("Mid value should work", 4096, params.getPref_group_len());
-		assertEquals("Max boundary should work", 8192, params.getMax_group_len());
+		assertEquals(1024, params.getMin_group_len(), "Min boundary should work");
+		assertEquals(4096, params.getPref_group_len(), "Mid value should work");
+		assertEquals(8192, params.getMax_group_len(), "Max boundary should work");
 	}
 
 	@Test
@@ -266,12 +252,9 @@ public class DHGexParametersTest {
 		DHGexParameters params = new DHGexParameters(1536, 3072, 6144);
 
 		// Test all getters
-		assertEquals("getMin_group_len() should return correct value",
-				1536, params.getMin_group_len());
-		assertEquals("getPref_group_len() should return correct value",
-				3072, params.getPref_group_len());
-		assertEquals("getMax_group_len() should return correct value",
-				6144, params.getMax_group_len());
+		assertEquals(1536, params.getMin_group_len(), "getMin_group_len() should return correct value");
+		assertEquals(3072, params.getPref_group_len(), "getPref_group_len() should return correct value");
+		assertEquals(6144, params.getMax_group_len(), "getMax_group_len() should return correct value");
 	}
 
 	@Test
@@ -281,8 +264,8 @@ public class DHGexParametersTest {
 
 		for (int size : commonSizes) {
 			DHGexParameters params = new DHGexParameters(size);
-			assertEquals("Common size " + size + " should be valid",
-					size, params.getPref_group_len());
+			assertEquals(size, params.getPref_group_len(),
+					"Common size " + size + " should be valid");
 		}
 	}
 
@@ -293,9 +276,9 @@ public class DHGexParametersTest {
 			for (int pref = min; pref <= 6144; pref += 1024) {
 				for (int max = pref; max <= 8192; max += 1024) {
 					DHGexParameters params = new DHGexParameters(min, pref, max);
-					assertEquals("Min should match", min, params.getMin_group_len());
-					assertEquals("Pref should match", pref, params.getPref_group_len());
-					assertEquals("Max should match", max, params.getMax_group_len());
+					assertEquals(min, params.getMin_group_len(), "Min should match");
+					assertEquals(pref, params.getPref_group_len(), "Pref should match");
+					assertEquals(max, params.getMax_group_len(), "Max should match");
 				}
 			}
 		}

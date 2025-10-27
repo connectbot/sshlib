@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class TestExtendedHostKeyVerifier extends ExtendedServerHostKeyVerifier {
 	private final Logger logger = Logger.getLogger("TestHostKeyVerifier");

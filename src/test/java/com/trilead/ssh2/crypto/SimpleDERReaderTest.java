@@ -72,7 +72,7 @@ public class SimpleDERReaderTest {
 				(byte) 0x02, (byte) 0x04, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
 		};
 		SimpleDERReader reader = new SimpleDERReader(vector);
-		assertEquals("ffffffff", reader.readInt().toString(16));
+		assertEquals(reader.readInt().toString(16), "ffffffff");
 	}
 
 	@Test
@@ -155,7 +155,7 @@ public class SimpleDERReaderTest {
 				(byte) 0x06, (byte) 0x01, (byte) 0x28
 		};
 		SimpleDERReader reader = new SimpleDERReader(vector);
-		assertEquals("1.0", reader.readOid());
+		assertEquals(reader.readOid(), "1.0");
 	}
 
 	@Test
@@ -164,7 +164,7 @@ public class SimpleDERReaderTest {
 				(byte) 0x06, (byte) 0x09, (byte) 0x2a, (byte) 0x86, (byte) 0x48, (byte) 0x86, (byte) 0xf7, (byte) 0x0d, (byte) 0x01, (byte) 0x01, (byte) 0x0b
 		};
 		SimpleDERReader reader = new SimpleDERReader(vector);
-		assertEquals("1.2.840.113549.1.1.11", reader.readOid());
+		assertEquals(reader.readOid(), "1.2.840.113549.1.1.11");
 	}
 
 	@Test
@@ -173,7 +173,7 @@ public class SimpleDERReaderTest {
 				(byte) 0x06, (byte) 0x0A, (byte) 0x09, (byte) 0x92, (byte) 0x26, (byte) 0x89, (byte) 0x93, (byte) 0xF2, (byte) 0x2C, (byte) 0x64, (byte) 0x04, (byte) 0x0D
 		};
 		SimpleDERReader reader = new SimpleDERReader(vector);
-		assertEquals("0.9.2342.19200300.100.4.13", reader.readOid());
+		assertEquals(reader.readOid(), "0.9.2342.19200300.100.4.13");
 	}
 
 	@Test
@@ -182,6 +182,6 @@ public class SimpleDERReaderTest {
 				(byte) 0x06, (byte) 0x03, (byte) 0x55, (byte) 0x1D, (byte) 0x0E
 		};
 		SimpleDERReader reader = new SimpleDERReader(vector);
-		assertEquals("2.5.29.14", reader.readOid());
+		assertEquals(reader.readOid(), "2.5.29.14");
 	}
 }

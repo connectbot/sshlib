@@ -63,7 +63,7 @@ public class ChannelManagerTest {
 		// Verify the cookie was registered by trying to check it
 		X11ServerData retrieved = channelManager.checkX11Cookie(cookie);
 		assertNotNull(retrieved);
-		assertEquals("localhost", retrieved.hostname);
+		assertEquals(retrieved.hostname, "localhost");
 		assertEquals(6000, retrieved.port);
 	}
 
@@ -560,9 +560,9 @@ public class ChannelManagerTest {
 
 		assertNotNull(retrieved1);
 		assertNotNull(retrieved2);
-		assertEquals("host1", retrieved1.hostname);
+		assertEquals(retrieved1.hostname, "host1");
 		assertEquals(6000, retrieved1.port);
-		assertEquals("host2", retrieved2.hostname);
+		assertEquals(retrieved2.hostname, "host2");
 		assertEquals(6001, retrieved2.port);
 
 		channelManager.unRegisterX11Cookie(cookie1, false);

@@ -1,23 +1,23 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.security.SecureRandom;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class ConnectionTest {
 
 private Connection connection;
 
-@Before
+@BeforeEach
 public void setUp() {
 	connection = new Connection("testhost.example.com", 2222);
 }
@@ -29,10 +29,10 @@ public void testConnectionConstructorWithHostnameAndPort() {
 
 	Connection conn = new Connection(hostname, port);
 
-	assertEquals("Hostname should match constructor parameter", hostname,
-				conn.getHostname());
-	assertEquals("Port should match constructor parameter", port,
-				conn.getPort());
+	assertEquals(hostname,
+				conn.getHostname(), "Hostname should match constructor parameter");
+	assertEquals(port,
+				conn.getPort(), "Port should match constructor parameter");
 }
 
 @Test
@@ -41,46 +41,43 @@ public void testConnectionConstructorWithHostnameOnly() {
 
 	Connection conn = new Connection(hostname);
 
-	assertEquals("Hostname should match constructor parameter", hostname,
-				conn.getHostname());
-	assertEquals("Port should default to 22", 22, conn.getPort());
+	assertEquals(hostname,
+				conn.getHostname(), "Hostname should match constructor parameter");
+	assertEquals(22, conn.getPort(), "Port should default to 22");
 }
 
 @Test
 public void testGetHostname() {
-	assertEquals("Should return hostname passed to constructor",
-				"testhost.example.com", connection.getHostname());
+	assertEquals("testhost.example.com", connection.getHostname(), "Should return hostname passed to constructor");
 }
 
 @Test
 public void testGetPort() {
-	assertEquals("Should return port passed to constructor", 2222,
-				connection.getPort());
+	assertEquals(2222,
+				connection.getPort(), "Should return port passed to constructor");
 }
 
 @Test
 public void testIsAuthenticationCompleteInitiallyFalse() {
-	assertFalse("Authentication should initially be incomplete",
-				connection.isAuthenticationComplete());
+	assertFalse(connection.isAuthenticationComplete(), "Authentication should initially be incomplete");
 }
 
 @Test
 public void testIsAuthenticationPartialSuccessInitiallyFalse() {
-	assertFalse("Partial success should initially be false",
-				connection.isAuthenticationPartialSuccess());
+	assertFalse(connection.isAuthenticationPartialSuccess(), "Partial success should initially be false");
 }
 
 @Test
 public void testGetAvailableCiphers() {
 	String[] ciphers = Connection.getAvailableCiphers();
 
-	assertNotNull("Cipher list should not be null", ciphers);
-	assertTrue("Should have at least one cipher available", ciphers.length > 0);
+	assertNotNull(ciphers, "Cipher list should not be null");
+	assertTrue(ciphers.length > 0, "Should have at least one cipher available");
 
 	// Check that all returned values are non-null strings
 	for (String cipher : ciphers) {
-	assertNotNull("Cipher name should not be null", cipher);
-	assertTrue("Cipher name should not be empty", cipher.length() > 0);
+	assertNotNull(cipher, "Cipher name should not be null");
+	assertTrue(cipher.length() > 0, "Cipher name should not be empty");
 	}
 }
 
@@ -88,13 +85,13 @@ public void testGetAvailableCiphers() {
 public void testGetAvailableMACs() {
 	String[] macs = Connection.getAvailableMACs();
 
-	assertNotNull("MAC list should not be null", macs);
-	assertTrue("Should have at least one MAC available", macs.length > 0);
+	assertNotNull(macs, "MAC list should not be null");
+	assertTrue(macs.length > 0, "Should have at least one MAC available");
 
 	// Check that all returned values are non-null strings
 	for (String mac : macs) {
-	assertNotNull("MAC name should not be null", mac);
-	assertTrue("MAC name should not be empty", mac.length() > 0);
+	assertNotNull(mac, "MAC name should not be null");
+	assertTrue(mac.length() > 0, "MAC name should not be empty");
 	}
 }
 
@@ -102,14 +99,13 @@ public void testGetAvailableMACs() {
 public void testGetAvailableServerHostKeyAlgorithms() {
 	String[] algorithms = Connection.getAvailableServerHostKeyAlgorithms();
 
-	assertNotNull("Algorithm list should not be null", algorithms);
-	assertTrue("Should have at least one algorithm available",
-			algorithms.length > 0);
+	assertNotNull(algorithms, "Algorithm list should not be null");
+	assertTrue(algorithms.length > 0, "Should have at least one algorithm available");
 
 	// Check that all returned values are non-null strings
 	for (String algorithm : algorithms) {
-	assertNotNull("Algorithm name should not be null", algorithm);
-	assertTrue("Algorithm name should not be empty", algorithm.length() > 0);
+	assertNotNull(algorithm, "Algorithm name should not be null");
+	assertTrue(algorithm.length() > 0, "Algorithm name should not be empty");
 	}
 }
 
@@ -119,17 +115,17 @@ public void testStaticMethodsReturnSameResults() {
 	String[] ciphers1 = Connection.getAvailableCiphers();
 	String[] ciphers2 = Connection.getAvailableCiphers();
 
-	assertArrayEquals("Cipher lists should be identical", ciphers1, ciphers2);
+	assertArrayEquals(ciphers1, ciphers2, "Cipher lists should be identical");
 
 	String[] macs1 = Connection.getAvailableMACs();
 	String[] macs2 = Connection.getAvailableMACs();
 
-	assertArrayEquals("MAC lists should be identical", macs1, macs2);
+	assertArrayEquals(macs1, macs2, "MAC lists should be identical");
 
 	String[] algos1 = Connection.getAvailableServerHostKeyAlgorithms();
 	String[] algos2 = Connection.getAvailableServerHostKeyAlgorithms();
 
-	assertArrayEquals("Algorithm lists should be identical", algos1, algos2);
+	assertArrayEquals(algos1, algos2, "Algorithm lists should be identical");
 }
 
 @Test
@@ -156,8 +152,7 @@ public void testGetConnectionInfoThrowsWhenNotConnected() {
 	connection.getConnectionInfo();
 	fail("Should throw IllegalStateException when not connected");
 	} catch (IllegalStateException e) {
-	assertTrue("Exception message should indicate connection required",
-				e.getMessage().contains("establish a connection first"));
+	assertTrue(e.getMessage().contains("establish a connection first"), "Exception message should indicate connection required");
 	} catch (Exception e) {
 	fail("Should throw IllegalStateException, got: " +
 		e.getClass().getSimpleName());
@@ -170,8 +165,7 @@ public void testIsAuthMethodAvailableWithNullMethod() {
 	connection.isAuthMethodAvailable("testuser", null);
 	fail("Should throw IllegalArgumentException with null method");
 	} catch (IllegalArgumentException e) {
-	assertTrue("Exception message should mention method argument",
-				e.getMessage().contains("method argument"));
+	assertTrue(e.getMessage().contains("method argument"), "Exception message should mention method argument");
 	} catch (Exception e) {
 	fail("Should throw IllegalArgumentException, got: " +
 		e.getClass().getSimpleName());
@@ -184,14 +178,11 @@ public void testSendIgnorePacketWithNullData() {
 	connection.sendIgnorePacket(null);
 	fail("Should throw IllegalArgumentException with null data");
 	} catch (IllegalArgumentException e) {
-	assertTrue("Exception message should mention data argument",
-				e.getMessage().contains("data argument"));
+	assertTrue(e.getMessage().contains("data argument"), "Exception message should mention data argument");
 	} catch (Exception e) {
 	// May also throw IllegalStateException if not connected
-	assertTrue(
-		"Should throw IllegalArgumentException or IllegalStateException",
-		e instanceof IllegalArgumentException || e instanceof
-													IllegalStateException);
+	assertTrue(e instanceof IllegalArgumentException || e instanceof
+													IllegalStateException, "Should throw IllegalArgumentException or IllegalStateException");
 	}
 }
 
@@ -228,11 +219,9 @@ public void testSetCompressionWithoutConnection() {
 public void testConnectionIdentification() {
 	String identification = Connection.identification;
 
-	assertNotNull("Identification should not be null", identification);
-	assertTrue("Identification should not be empty",
-			identification.length() > 0);
-	assertTrue("Identification should contain version info",
-			identification.contains("TrileadSSH2Java"));
+	assertNotNull(identification, "Identification should not be null");
+	assertTrue(identification.length() > 0, "Identification should not be empty");
+	assertTrue(identification.contains("TrileadSSH2Java"), "Identification should contain version info");
 }
 
 @Test
@@ -240,7 +229,7 @@ public void testHostnameNullHandling() {
 	// Test with null hostname (may be allowed by implementation)
 	try {
 	Connection conn = new Connection(null, 22);
-	assertNull("Null hostname should be preserved", conn.getHostname());
+	assertNull(conn.getHostname(), "Null hostname should be preserved");
 	} catch (Exception e) {
 	// If constructor throws exception with null hostname, that's also
 	// acceptable
@@ -251,15 +240,15 @@ public void testHostnameNullHandling() {
 public void testPortEdgeCases() {
 	// Test with port 0
 	Connection conn1 = new Connection("example.com", 0);
-	assertEquals("Port 0 should be preserved", 0, conn1.getPort());
+	assertEquals(0, conn1.getPort(), "Port 0 should be preserved");
 
 	// Test with high port number
 	Connection conn2 = new Connection("example.com", 65535);
-	assertEquals("High port should be preserved", 65535, conn2.getPort());
+	assertEquals(65535, conn2.getPort(), "High port should be preserved");
 
 	// Test with negative port (behavior depends on implementation)
 	Connection conn3 = new Connection("example.com", -1);
-	assertEquals("Negative port should be preserved", -1, conn3.getPort());
+	assertEquals(-1, conn3.getPort(), "Negative port should be preserved");
 }
 
 @Test

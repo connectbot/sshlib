@@ -1,11 +1,11 @@
 package com.trilead.ssh2.packets;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for TypesWriter - SSH protocol binary data serialization.
@@ -17,8 +17,8 @@ public class TypesWriterTest {
 	public void testConstructorInitialization() {
 		TypesWriter tw = new TypesWriter();
 
-		assertEquals("Initial length should be 0", 0, tw.length());
-		assertArrayEquals("Initial bytes should be empty", new byte[0], tw.getBytes());
+		assertEquals(0, tw.length(), "Initial length should be 0");
+		assertArrayEquals(new byte[0], tw.getBytes(), "Initial bytes should be empty");
 	}
 
 	@Test
@@ -26,8 +26,8 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeByte(0x42);
 
-		assertEquals("Length should be 1", 1, tw.length());
-		assertArrayEquals("Byte should be written correctly", new byte[] {0x42}, tw.getBytes());
+		assertEquals(1, tw.length(), "Length should be 1");
+		assertArrayEquals(new byte[] {0x42}, tw.getBytes(), "Byte should be written correctly");
 	}
 
 	@Test
@@ -37,11 +37,9 @@ public class TypesWriterTest {
 		tw.writeByte(0x02);
 		tw.writeByte(0xFF);
 
-		assertEquals("Length should be 3", 3, tw.length());
-		assertArrayEquals(
-				"Bytes should be written in order",
-				new byte[] {0x01, 0x02, (byte) 0xFF},
-				tw.getBytes());
+		assertEquals(3, tw.length(), "Length should be 3");
+		assertArrayEquals(new byte[] {0x01, 0x02, (byte) 0xFF},
+				tw.getBytes(), "Bytes should be written in order");
 	}
 
 	@Test
@@ -56,8 +54,8 @@ public class TypesWriterTest {
 		tw.writeByte(0x20, 1); // Write at offset 1
 
 		byte[] bytes = tw.getBytes();
-		assertEquals("First byte should be 0x10", 0x10, bytes[0]);
-		assertEquals("Second byte should be 0x20", 0x20, bytes[1]);
+		assertEquals(0x10, bytes[0], "First byte should be 0x10");
+		assertEquals(0x20, bytes[1], "Second byte should be 0x20");
 	}
 
 	@Test
@@ -65,8 +63,8 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeBoolean(true);
 
-		assertEquals("Length should be 1", 1, tw.length());
-		assertArrayEquals("True should be encoded as 1", new byte[] {0x01}, tw.getBytes());
+		assertEquals(1, tw.length(), "Length should be 1");
+		assertArrayEquals(new byte[] {0x01}, tw.getBytes(), "True should be encoded as 1");
 	}
 
 	@Test
@@ -74,8 +72,8 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeBoolean(false);
 
-		assertEquals("Length should be 1", 1, tw.length());
-		assertArrayEquals("False should be encoded as 0", new byte[] {0x00}, tw.getBytes());
+		assertEquals(1, tw.length(), "Length should be 1");
+		assertArrayEquals(new byte[] {0x00}, tw.getBytes(), "False should be encoded as 0");
 	}
 
 	@Test
@@ -83,11 +81,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT32(0);
 
-		assertEquals("Length should be 4", 4, tw.length());
-		assertArrayEquals(
-				"Zero should be encoded as 4 zero bytes",
-				new byte[] {0x00, 0x00, 0x00, 0x00},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Length should be 4");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00},
+				tw.getBytes(), "Zero should be encoded as 4 zero bytes");
 	}
 
 	@Test
@@ -95,11 +91,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT32(1);
 
-		assertEquals("Length should be 4", 4, tw.length());
-		assertArrayEquals(
-				"One should be big-endian encoded",
-				new byte[] {0x00, 0x00, 0x00, 0x01},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Length should be 4");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x01},
+				tw.getBytes(), "One should be big-endian encoded");
 	}
 
 	@Test
@@ -107,11 +101,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT32(0xFFFFFFFF);
 
-		assertEquals("Length should be 4", 4, tw.length());
-		assertArrayEquals(
-				"Max uint32 should be all 0xFF",
-				new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Length should be 4");
+		assertArrayEquals(new byte[] {(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF},
+				tw.getBytes(), "Max uint32 should be all 0xFF");
 	}
 
 	@Test
@@ -119,11 +111,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT32(0x12345678);
 
-		assertEquals("Length should be 4", 4, tw.length());
-		assertArrayEquals(
-				"Should encode in big-endian order",
-				new byte[] {0x12, 0x34, 0x56, 0x78},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Length should be 4");
+		assertArrayEquals(new byte[] {0x12, 0x34, 0x56, 0x78},
+				tw.getBytes(), "Should encode in big-endian order");
 	}
 
 	@Test
@@ -136,10 +126,8 @@ public class TypesWriterTest {
 		tw.writeUINT32(0xAABBCCDD, 0);
 
 		byte[] bytes = tw.getBytes();
-		assertArrayEquals(
-				"Should write at specified offset",
-				new byte[] {(byte) 0xAA, (byte) 0xBB, (byte) 0xCC, (byte) 0xDD},
-				bytes);
+		assertArrayEquals(new byte[] {(byte) 0xAA, (byte) 0xBB, (byte) 0xCC, (byte) 0xDD},
+				bytes, "Should write at specified offset");
 	}
 
 	@Test
@@ -147,11 +135,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT64(0L);
 
-		assertEquals("Length should be 8", 8, tw.length());
-		assertArrayEquals(
-				"Zero should be 8 zero bytes",
-				new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-				tw.getBytes());
+		assertEquals(8, tw.length(), "Length should be 8");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+				tw.getBytes(), "Zero should be 8 zero bytes");
 	}
 
 	@Test
@@ -159,11 +145,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT64(1L);
 
-		assertEquals("Length should be 8", 8, tw.length());
-		assertArrayEquals(
-				"One should be big-endian encoded",
-				new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-				tw.getBytes());
+		assertEquals(8, tw.length(), "Length should be 8");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+				tw.getBytes(), "One should be big-endian encoded");
 	}
 
 	@Test
@@ -171,10 +155,8 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT64(0xFFFFFFFFFFFFFFFFL);
 
-		assertEquals("Length should be 8", 8, tw.length());
-		assertArrayEquals(
-				"Max uint64 should be all 0xFF",
-				new byte[] {
+		assertEquals(8, tw.length(), "Length should be 8");
+		assertArrayEquals(new byte[] {
 					(byte) 0xFF,
 					(byte) 0xFF,
 					(byte) 0xFF,
@@ -184,7 +166,7 @@ public class TypesWriterTest {
 					(byte) 0xFF,
 					(byte) 0xFF
 				},
-				tw.getBytes());
+				tw.getBytes(), "Max uint64 should be all 0xFF");
 	}
 
 	@Test
@@ -192,11 +174,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeUINT64(0x0123456789ABCDEFL);
 
-		assertEquals("Length should be 8", 8, tw.length());
-		assertArrayEquals(
-				"Should encode in big-endian order",
-				new byte[] {0x01, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xAB, (byte) 0xCD, (byte) 0xEF},
-				tw.getBytes());
+		assertEquals(8, tw.length(), "Length should be 8");
+		assertArrayEquals(new byte[] {0x01, 0x23, 0x45, 0x67, (byte) 0x89, (byte) 0xAB, (byte) 0xCD, (byte) 0xEF},
+				tw.getBytes(), "Should encode in big-endian order");
 	}
 
 	@Test
@@ -205,8 +185,8 @@ public class TypesWriterTest {
 		byte[] data = {0x01, 0x02, 0x03};
 		tw.writeBytes(data);
 
-		assertEquals("Length should match input", 3, tw.length());
-		assertArrayEquals("Bytes should be copied", data, tw.getBytes());
+		assertEquals(3, tw.length(), "Length should match input");
+		assertArrayEquals(data, tw.getBytes(), "Bytes should be copied");
 	}
 
 	@Test
@@ -214,8 +194,8 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeBytes(new byte[0]);
 
-		assertEquals("Length should be 0", 0, tw.length());
-		assertArrayEquals("Should remain empty", new byte[0], tw.getBytes());
+		assertEquals(0, tw.length(), "Length should be 0");
+		assertArrayEquals(new byte[0], tw.getBytes(), "Should remain empty");
 	}
 
 	@Test
@@ -224,11 +204,9 @@ public class TypesWriterTest {
 		byte[] data = {0x01, 0x02, 0x03, 0x04, 0x05};
 		tw.writeBytes(data, 1, 3); // Write bytes at index 1, 2, 3
 
-		assertEquals("Length should be 3", 3, tw.length());
-		assertArrayEquals(
-				"Should write specified range",
-				new byte[] {0x02, 0x03, 0x04},
-				tw.getBytes());
+		assertEquals(3, tw.length(), "Length should be 3");
+		assertArrayEquals(new byte[] {0x02, 0x03, 0x04},
+				tw.getBytes(), "Should write specified range");
 	}
 
 	@Test
@@ -237,14 +215,14 @@ public class TypesWriterTest {
 		tw.writeString("test");
 
 		// String format: 4 bytes length + content
-		assertEquals("Length should be 4 + 4", 8, tw.length());
+		assertEquals(8, tw.length(), "Length should be 4 + 4");
 
 		byte[] result = tw.getBytes();
 		// First 4 bytes are length (4 in big-endian)
-		assertEquals("Length prefix should be 4", 4, (result[3] & 0xFF));
+		assertEquals(4, (result[3] & 0xFF), "Length prefix should be 4");
 		// Next 4 bytes are 'test'
-		assertEquals("First char should be 't'", 't', (char) result[4]);
-		assertEquals("Second char should be 'e'", 'e', (char) result[5]);
+		assertEquals('t', (char) result[4], "First char should be 't'");
+		assertEquals('e', (char) result[5], "Second char should be 'e'");
 	}
 
 	@Test
@@ -252,11 +230,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeString("");
 
-		assertEquals("Length should be 4 (just the length prefix)", 4, tw.length());
-		assertArrayEquals(
-				"Empty string should have zero length",
-				new byte[] {0x00, 0x00, 0x00, 0x00},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Length should be 4 (just the length prefix)");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00},
+				tw.getBytes(), "Empty string should have zero length");
 	}
 
 	@Test
@@ -264,9 +240,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeString("test", "UTF-8");
 
-		assertEquals("Length should be 4 + 4", 8, tw.length());
+		assertEquals(8, tw.length(), "Length should be 4 + 4");
 		byte[] result = tw.getBytes();
-		assertEquals("Length prefix should be 4", 4, (result[3] & 0xFF));
+		assertEquals(4, (result[3] & 0xFF), "Length prefix should be 4");
 	}
 
 	@Test
@@ -275,7 +251,7 @@ public class TypesWriterTest {
 		tw.writeString("test", null);
 
 		// Should use default charset
-		assertEquals("Should write string with default charset", 8, tw.length());
+		assertEquals(8, tw.length(), "Should write string with default charset");
 	}
 
 	@Test
@@ -284,15 +260,15 @@ public class TypesWriterTest {
 		byte[] data = {0x41, 0x42, 0x43}; // "ABC"
 		tw.writeString(data, 0, 3);
 
-		assertEquals("Length should be 4 + 3", 7, tw.length());
+		assertEquals(7, tw.length(), "Length should be 4 + 3");
 
 		byte[] result = tw.getBytes();
 		// First 4 bytes: length = 3
-		assertEquals("Length should be 3", 3, (result[3] & 0xFF));
+		assertEquals(3, (result[3] & 0xFF), "Length should be 3");
 		// Next 3 bytes: data
-		assertEquals("First byte should be 0x41", 0x41, result[4]);
-		assertEquals("Second byte should be 0x42", 0x42, result[5]);
-		assertEquals("Third byte should be 0x43", 0x43, result[6]);
+		assertEquals(0x41, result[4], "First byte should be 0x41");
+		assertEquals(0x42, result[5], "Second byte should be 0x42");
+		assertEquals(0x43, result[6], "Third byte should be 0x43");
 	}
 
 	@Test
@@ -300,11 +276,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeNameList(new String[0]);
 
-		assertEquals("Empty name list should have 4-byte length", 4, tw.length());
-		assertArrayEquals(
-				"Empty list should be zero-length string",
-				new byte[] {0x00, 0x00, 0x00, 0x00},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Empty name list should have 4-byte length");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00},
+				tw.getBytes(), "Empty list should be zero-length string");
 	}
 
 	@Test
@@ -314,10 +288,10 @@ public class TypesWriterTest {
 
 		byte[] result = tw.getBytes();
 		// Length prefix (4 bytes) + "ssh-rsa" (7 bytes) = 11
-		assertEquals("Length should be 11", 11, tw.length());
+		assertEquals(11, tw.length(), "Length should be 11");
 
 		// Verify length prefix is 7
-		assertEquals("Length prefix should be 7", 7, (result[3] & 0xFF));
+		assertEquals(7, (result[3] & 0xFF), "Length prefix should be 7");
 	}
 
 	@Test
@@ -327,14 +301,14 @@ public class TypesWriterTest {
 
 		byte[] result = tw.getBytes();
 		// Length prefix (4 bytes) + "ssh-rsa,ssh-dss" (15 bytes) = 19
-		assertEquals("Length should be 19", 19, tw.length());
+		assertEquals(19, tw.length(), "Length should be 19");
 
 		// Verify length prefix is 15
-		assertEquals("Length prefix should be 15", 15, (result[3] & 0xFF));
+		assertEquals(15, (result[3] & 0xFF), "Length prefix should be 15");
 
 		// Verify comma separator exists
 		String content = new String(result, 4, result.length - 4);
-		assertEquals("Content should be comma-separated", "ssh-rsa,ssh-dss", content);
+		assertEquals("ssh-rsa,ssh-dss", content, "Content should be comma-separated");
 	}
 
 	@Test
@@ -342,11 +316,9 @@ public class TypesWriterTest {
 		TypesWriter tw = new TypesWriter();
 		tw.writeMPInt(BigInteger.ZERO);
 
-		assertEquals("Zero should be encoded as 4-byte zero length", 4, tw.length());
-		assertArrayEquals(
-				"Zero mpint is zero-length string",
-				new byte[] {0x00, 0x00, 0x00, 0x00},
-				tw.getBytes());
+		assertEquals(4, tw.length(), "Zero should be encoded as 4-byte zero length");
+		assertArrayEquals(new byte[] {0x00, 0x00, 0x00, 0x00},
+				tw.getBytes(), "Zero mpint is zero-length string");
 	}
 
 	@Test
@@ -357,10 +329,10 @@ public class TypesWriterTest {
 		byte[] result = tw.getBytes();
 		// Length will be 4 bytes + the bigint bytes
 		// 0x1234 = 2 bytes, so total = 6
-		assertEquals("Should have length prefix + data", 6, tw.length());
+		assertEquals(6, tw.length(), "Should have length prefix + data");
 
 		// Verify length prefix
-		assertEquals("Length prefix should be 2", 2, (result[3] & 0xFF));
+		assertEquals(2, (result[3] & 0xFF), "Length prefix should be 2");
 	}
 
 	@Test
@@ -371,7 +343,7 @@ public class TypesWriterTest {
 		// Negative numbers are encoded with sign bit
 		byte[] result = tw.getBytes();
 		// Should have length prefix + signed representation
-		assertEquals("Negative mpint should have length prefix", true, tw.length() > 4);
+		assertEquals(true, tw.length() > 4, "Negative mpint should have length prefix");
 	}
 
 	@Test
@@ -383,13 +355,13 @@ public class TypesWriterTest {
 		tw.writeByte(0xFF);
 
 		// 1 byte + 1 byte + 4 bytes + 1 byte = 7 bytes
-		assertEquals("Total length should be 7", 7, tw.length());
+		assertEquals(7, tw.length(), "Total length should be 7");
 
 		byte[] result = tw.getBytes();
-		assertEquals("First byte should be 0x01", 0x01, result[0]);
-		assertEquals("Second byte should be true (0x01)", 0x01, result[1]);
-		assertEquals("UINT32 first byte", 0x12, result[2]);
-		assertEquals("Last byte should be 0xFF", (byte) 0xFF, result[6]);
+		assertEquals(0x01, result[0], "First byte should be 0x01");
+		assertEquals(0x01, result[1], "Second byte should be true (0x01)");
+		assertEquals(0x12, result[2], "UINT32 first byte");
+		assertEquals((byte) 0xFF, result[6], "Last byte should be 0xFF");
 	}
 
 	@Test
@@ -404,13 +376,13 @@ public class TypesWriterTest {
 
 		tw.writeBytes(largeData);
 
-		assertEquals("Length should be 300", 300, tw.length());
+		assertEquals(300, tw.length(), "Length should be 300");
 		byte[] result = tw.getBytes();
-		assertEquals("Result should have 300 bytes", 300, result.length);
+		assertEquals(300, result.length, "Result should have 300 bytes");
 
 		// Verify data integrity after resize
 		for (int i = 0; i < 300; i++) {
-			assertEquals("Byte " + i + " should match", (byte) i, result[i]);
+			assertEquals((byte) i, result[i], "Byte " + i + " should match");
 		}
 	}
 
@@ -422,8 +394,8 @@ public class TypesWriterTest {
 		byte[] first = tw.getBytes();
 		byte[] second = tw.getBytes();
 
-		assertArrayEquals("Multiple getBytes() calls should return same data", first, second);
-		assertEquals("Length should remain unchanged", 4, tw.length());
+		assertArrayEquals(first, second, "Multiple getBytes() calls should return same data");
+		assertEquals(4, tw.length(), "Length should remain unchanged");
 	}
 
 	@Test
@@ -436,28 +408,26 @@ public class TypesWriterTest {
 		byte[] dest = new byte[3];
 		tw.getBytes(dest);
 
-		assertArrayEquals(
-				"Destination array should be filled",
-				new byte[] {0x01, 0x02, 0x03},
-				dest);
+		assertArrayEquals(new byte[] {0x01, 0x02, 0x03},
+				dest, "Destination array should be filled");
 	}
 
 	@Test
 	public void testLengthTracking() {
 		TypesWriter tw = new TypesWriter();
 
-		assertEquals("Initial length should be 0", 0, tw.length());
+		assertEquals(0, tw.length(), "Initial length should be 0");
 
 		tw.writeByte(0x00);
-		assertEquals("Length after 1 byte", 1, tw.length());
+		assertEquals(1, tw.length(), "Length after 1 byte");
 
 		tw.writeUINT32(0);
-		assertEquals("Length after uint32", 5, tw.length());
+		assertEquals(5, tw.length(), "Length after uint32");
 
 		tw.writeUINT64(0L);
-		assertEquals("Length after uint64", 13, tw.length());
+		assertEquals(13, tw.length(), "Length after uint64");
 
 		tw.writeBoolean(true);
-		assertEquals("Length after boolean", 14, tw.length());
+		assertEquals(14, tw.length(), "Length after boolean");
 	}
 }

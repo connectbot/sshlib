@@ -1,10 +1,11 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,11 +22,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.SecureRandom;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
+@ExtendWith(MockitoExtension.class)
 public class SessionTest {
 
 @Mock private ChannelManager mockChannelManager;
@@ -35,10 +38,8 @@ public class SessionTest {
 private SecureRandom secureRandom;
 private Session session;
 
-@Before
+@BeforeEach
 public void setUp() throws IOException {
-	MockitoAnnotations.initMocks(this);
-
 	secureRandom = new SecureRandom();
 
 	// Setup mock behavior
@@ -51,7 +52,7 @@ public void setUp() throws IOException {
 public void testSessionConstruction() throws IOException {
 	// Verify that session was created with channel manager
 	verify(mockChannelManager).openSessionChannel();
-	assertNotNull("Session should be created successfully", session);
+	assertNotNull(session, "Session should be created successfully");
 }
 
 @Test
@@ -119,11 +120,12 @@ public void testRequestX11Forwarding() throws IOException {
 	session.requestX11Forwarding(hostname, port, cookie, singleConnection);
 }
 
-@Test(expected = IllegalArgumentException.class)
-public void testRequestX11ForwardingWithNullHostname() throws IOException {
-	byte[] cookie = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-
-	session.requestX11Forwarding(null, 6000, cookie, false);
+@Test
+public void testRequestX11ForwardingWithNullHostname() {
+	assertThrows(IllegalArgumentException.class, () -> {
+		byte[] cookie = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+		session.requestX11Forwarding(null, 6000, cookie, false);
+	});
 }
 
 @Test
@@ -138,9 +140,10 @@ public void testExecCommand() throws IOException {
 	session.execCommand(command);
 }
 
-@Test(expected = IllegalArgumentException.class)
-public void testExecCommandWithNull() throws IOException {
-	session.execCommand(null);
+@Test
+public void testExecCommandWithNull() {
+	assertThrows(IllegalArgumentException.class, () ->
+		session.execCommand(null));
 }
 
 @Test
@@ -158,9 +161,10 @@ public void testStartSubSystem() throws IOException {
 	session.startSubSystem("sftp");
 }
 
-@Test(expected = IllegalArgumentException.class)
-public void testStartSubSystemWithNull() throws IOException {
-	session.startSubSystem(null);
+@Test
+public void testStartSubSystemWithNull() {
+	assertThrows(IllegalArgumentException.class, () ->
+		session.startSubSystem(null));
 }
 
 @Test
@@ -179,7 +183,7 @@ public void testGetExitStatusWhenNull() {
 
 	Integer exitStatus = session.getExitStatus();
 
-	assertNull("Exit status should be null when not available", exitStatus);
+	assertNull(exitStatus, "Exit status should be null when not available");
 	verify(mockChannel).getExitStatus();
 }
 
@@ -190,8 +194,7 @@ public void testGetExitStatusWhenAvailable() {
 
 	Integer exitStatus = session.getExitStatus();
 
-	assertEquals("Exit status should match channel exit status",
-				expectedExitCode, exitStatus);
+	assertEquals(expectedExitCode, exitStatus, "Exit status should match channel exit status");
 	verify(mockChannel).getExitStatus();
 }
 
@@ -202,8 +205,7 @@ public void testGetExitStatusWithNonZeroCode() {
 
 	Integer exitStatus = session.getExitStatus();
 
-	assertEquals("Exit status should match channel exit status",
-				expectedExitCode, exitStatus);
+	assertEquals(expectedExitCode, exitStatus, "Exit status should match channel exit status");
 }
 
 @Test
@@ -212,7 +214,7 @@ public void testGetExitSignalWhenNull() {
 
 	String signal = session.getExitSignal();
 
-	assertNull("Exit signal should be null when not available", signal);
+	assertNull(signal, "Exit signal should be null when not available");
 	verify(mockChannel).getExitSignal();
 }
 
@@ -223,8 +225,8 @@ public void testGetExitSignalWhenAvailable() {
 
 	String signal = session.getExitSignal();
 
-	assertEquals("Exit signal should match channel exit signal", expectedSignal,
-				signal);
+	assertEquals(expectedSignal,
+				signal, "Exit signal should match channel exit signal");
 	verify(mockChannel).getExitSignal();
 }
 
@@ -242,9 +244,9 @@ public void testGetStreams() {
 	InputStream stderr = session.getStderr();
 	OutputStream stdin = session.getStdin();
 
-	assertSame("Stdout should be from channel", mockStdout, stdout);
-	assertSame("Stderr should be from channel", mockStderr, stderr);
-	assertSame("Stdin should be from channel", mockStdin, stdin);
+	assertSame(mockStdout, stdout, "Stdout should be from channel");
+	assertSame(mockStderr, stderr, "Stderr should be from channel");
+	assertSame(mockStdin, stdin, "Stdin should be from channel");
 
 	verify(mockChannel).getStdoutStream();
 	verify(mockChannel).getStderrStream();
@@ -260,7 +262,7 @@ public void testWaitUntilDataAvailable() {
 
 	int result = session.waitUntilDataAvailable(1000L);
 
-	assertEquals("Should return 1 for data available", 1, result);
+	assertEquals(1, result, "Should return 1 for data available");
 	verify(mockChannelManager)
 		.waitForCondition(eq(mockChannel), eq(1000L), anyInt());
 }
@@ -272,7 +274,7 @@ public void testWaitUntilDataAvailableWithZeroTimeout() {
 
 	int result = session.waitUntilDataAvailable(0L);
 
-	assertEquals("Should return 0 for EOF", 0, result);
+	assertEquals(0, result, "Should return 0 for EOF");
 	verify(mockChannelManager)
 		.waitForCondition(eq(mockChannel), eq(0L), anyInt());
 }
@@ -288,8 +290,8 @@ public void testWaitForCondition() {
 
 	int result = session.waitForCondition(condition, timeout);
 
-	assertEquals("Should return channel manager result", expectedResult,
-				result);
+	assertEquals(expectedResult,
+				result, "Should return channel manager result");
 	verify(mockChannelManager)
 		.waitForCondition(mockChannel, timeout, condition);
 }
@@ -303,7 +305,7 @@ public void testWaitForConditionMultipleBits() {
 
 	int result = session.waitForCondition(condition, 2000L);
 
-	assertEquals("Should return the conditions", condition, result);
+	assertEquals(condition, result, "Should return the conditions");
 	verify(mockChannelManager).waitForCondition(mockChannel, 2000L, condition);
 }
 
@@ -325,10 +327,10 @@ public void testCloseIdempotent() throws IOException {
 		.closeChannel(eq(mockChannel), anyString(), eq(true));
 }
 
-@Test(expected = NullPointerException.class)
-public void testSessionConstructionFailsWithNullChannelManager()
-	throws IOException {
-	new Session(null, secureRandom);
+@Test
+public void testSessionConstructionFailsWithNullChannelManager() {
+	assertThrows(NullPointerException.class, () ->
+		new Session(null, secureRandom));
 }
 
 @Test
@@ -349,7 +351,7 @@ public void testSessionConstructionWithIOException() throws IOException {
 	new Session(failingChannelManager, secureRandom);
 	fail("Should propagate IOException from channel manager");
 	} catch (IOException e) {
-	assertEquals("Mock failure", e.getMessage());
+	assertEquals(e.getMessage(), "Mock failure");
 	}
 }
 }

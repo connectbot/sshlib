@@ -1,12 +1,12 @@
 package com.trilead.ssh2;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class SFTPv3FileHandleTest {
@@ -19,8 +19,8 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
 
-		assertSame("getClient should return the same client instance", mockClient,
-				fileHandle.getClient());
+		assertSame(mockClient,
+				fileHandle.getClient(), "getClient should return the same client instance");
 	}
 
 	@Test
@@ -30,8 +30,7 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
 
-		assertFalse("File handle should not be closed initially",
-				fileHandle.isClosed());
+		assertFalse(fileHandle.isClosed(), "File handle should not be closed initially");
 	}
 
 	@Test
@@ -44,8 +43,7 @@ public class SFTPv3FileHandleTest {
 		// Since isClosed field is package-private, we need to use reflection or
 		// test through the SFTPv3Client.closeFile() method behavior
 		// For now, test the initial state
-		assertFalse("File handle should not be closed initially",
-				fileHandle.isClosed());
+		assertFalse(fileHandle.isClosed(), "File handle should not be closed initially");
 	}
 
 	@Test
@@ -54,9 +52,8 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(null, handle);
 
-		assertNull("Should accept null client", fileHandle.getClient());
-		assertFalse("Should not be closed initially even with null client",
-				fileHandle.isClosed());
+		assertNull(fileHandle.getClient(), "Should accept null client");
+		assertFalse(fileHandle.isClosed(), "Should not be closed initially even with null client");
 	}
 
 	@Test
@@ -65,9 +62,8 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, null);
 
-		assertSame("Should accept null handle", mockClient, fileHandle.getClient());
-		assertFalse("Should not be closed initially even with null handle",
-				fileHandle.isClosed());
+		assertSame(mockClient, fileHandle.getClient(), "Should accept null handle");
+		assertFalse(fileHandle.isClosed(), "Should not be closed initially even with null handle");
 	}
 
 	@Test
@@ -77,10 +73,9 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, emptyHandle);
 
-		assertSame("Should accept empty handle", mockClient,
-				fileHandle.getClient());
-		assertFalse("Should not be closed initially with empty handle",
-				fileHandle.isClosed());
+		assertSame(mockClient,
+				fileHandle.getClient(), "Should accept empty handle");
+		assertFalse(fileHandle.isClosed(), "Should not be closed initially with empty handle");
 	}
 
 	@Test
@@ -93,10 +88,9 @@ public class SFTPv3FileHandleTest {
 
 		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, largeHandle);
 
-		assertSame("Should accept large handle", mockClient,
-				fileHandle.getClient());
-		assertFalse("Should not be closed initially with large handle",
-				fileHandle.isClosed());
+		assertSame(mockClient,
+				fileHandle.getClient(), "Should accept large handle");
+		assertFalse(fileHandle.isClosed(), "Should not be closed initially with large handle");
 	}
 
 	@Test
@@ -108,12 +102,11 @@ public class SFTPv3FileHandleTest {
 		SFTPv3FileHandle fileHandle1 = new SFTPv3FileHandle(mockClient, handle1);
 		SFTPv3FileHandle fileHandle2 = new SFTPv3FileHandle(mockClient, handle2);
 
-		assertSame("Both handles should reference the same client",
-				fileHandle1.getClient(), fileHandle2.getClient());
-		assertFalse("First handle should not be closed", fileHandle1.isClosed());
-		assertFalse("Second handle should not be closed", fileHandle2.isClosed());
-		assertNotSame("Handles should be different objects", fileHandle1,
-				fileHandle2);
+		assertSame(fileHandle1.getClient(), fileHandle2.getClient(), "Both handles should reference the same client");
+		assertFalse(fileHandle1.isClosed(), "First handle should not be closed");
+		assertFalse(fileHandle2.isClosed(), "Second handle should not be closed");
+		assertNotSame(fileHandle1,
+				fileHandle2, "Handles should be different objects");
 	}
 
 	@Test
@@ -127,10 +120,9 @@ public class SFTPv3FileHandleTest {
 		SFTPv3Client client1 = fileHandle.getClient();
 		SFTPv3Client client2 = fileHandle.getClient();
 
-		assertSame("Multiple calls to getClient should return the same instance",
-				client1, client2);
-		assertSame("Client should remain the same as originally passed", mockClient,
-				client1);
+		assertSame(client1, client2, "Multiple calls to getClient should return the same instance");
+		assertSame(mockClient,
+				client1, "Client should remain the same as originally passed");
 	}
 
 	@Test
@@ -144,9 +136,7 @@ public class SFTPv3FileHandleTest {
 		boolean closed1 = fileHandle.isClosed();
 		boolean closed2 = fileHandle.isClosed();
 
-		assertEquals("Multiple calls to isClosed should return the same value",
-				closed1, closed2);
-		assertFalse("Should consistently return false for newly created handle",
-				closed1);
+		assertEquals(closed1, closed2, "Multiple calls to isClosed should return the same value");
+		assertFalse(closed1, "Should consistently return false for newly created handle");
 	}
 }

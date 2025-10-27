@@ -39,6 +39,6 @@ public class PacketExtInfoTest {
 	public void createPacketAndParsePayload_Success() throws IOException {
 		byte[] payload = new PacketExtInfo(Collections.singletonMap("test", "value")).getPayload();
 		PacketExtInfo copy = new PacketExtInfo(payload, 0, payload.length);
-		assertEquals("value", copy.getExtNameToValue().get("test"));
+		assertEquals(copy.getExtNameToValue().get("test"), "value");
 	}
 }
