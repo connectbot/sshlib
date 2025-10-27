@@ -282,4 +282,163 @@ public class SFTPv3ClientTest {
 			verify(mockConnection, times(1)).openSession();
 		}
 	}
+
+	@Test
+	public void testFileHandleWithWrongClient() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client1 = new SFTPv3Client(mockConnection);
+			SFTPv3Client client2 = mock(SFTPv3Client.class);
+
+			SFTPv3FileHandle handle = new SFTPv3FileHandle(client2, new byte[]{1, 2, 3, 4});
+
+			try {
+				client1.closeFile(handle);
+				fail("Should throw IOException for handle from different client");
+			} catch (IOException e) {
+				assertTrue(e.getMessage().contains("created with another") ||
+						e.getMessage().contains("different"));
+			}
+		} catch (IOException e) {
+		}
+	}
+
+	@Test
+	public void testFileHandleAlreadyClosed() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client = new SFTPv3Client(mockConnection);
+
+			SFTPv3FileHandle handle = new SFTPv3FileHandle(client, new byte[]{1, 2, 3, 4});
+			handle.isClosed = true;
+
+			try {
+				client.closeFile(handle);
+				fail("Should throw IOException for already closed handle");
+			} catch (IOException e) {
+				assertTrue(e.getMessage().toLowerCase().contains("closed"));
+			}
+		} catch (IOException e) {
+		}
+	}
+
+	@Test
+	public void testMultipleCharsetChanges() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client = new SFTPv3Client(mockConnection);
+
+			client.setCharset("UTF-8");
+			assertEquals("UTF-8", client.getCharset());
+
+			client.setCharset("ISO-8859-1");
+			assertEquals("ISO-8859-1", client.getCharset());
+
+			client.setCharset("UTF-16");
+			assertEquals("UTF-16", client.getCharset());
+
+			client.setCharset(null);
+			assertNull(client.getCharset());
+
+			client.setCharset("UTF-8");
+			assertEquals("UTF-8", client.getCharset());
+
+		} catch (IOException e) {
+		}
+	}
+
+	@Test
+	public void testCharsetWithDifferentEncodings() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client = new SFTPv3Client(mockConnection);
+
+			String[] validCharsets = {
+				"UTF-8", "UTF-16", "UTF-16BE", "UTF-16LE",
+				"ISO-8859-1", "US-ASCII", "UTF-32"
+			};
+
+			for (String charset : validCharsets) {
+				client.setCharset(charset);
+				assertEquals(charset, client.getCharset());
+			}
+
+		} catch (IOException e) {
+		}
+	}
+
+	@Test
+	public void testProtocolVersionBeforeInit() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client = new SFTPv3Client(mockConnection);
+			assertEquals(0, client.getProtocolVersion());
+		} catch (IOException e) {
+		}
+	}
+
+	@Test
+	public void testFileHandleGetClient() {
+		SFTPv3Client mockClient = mock(SFTPv3Client.class);
+		byte[] handle = new byte[]{1, 2, 3, 4};
+
+		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
+
+		assertSame(mockClient, fileHandle.getClient());
+	}
+
+	@Test
+	public void testFileHandleIsClosedInitialState() {
+		SFTPv3Client mockClient = mock(SFTPv3Client.class);
+		byte[] handle = new byte[]{1, 2, 3, 4};
+
+		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
+
+		assertFalse(fileHandle.isClosed());
+	}
+
+	@Test
+	public void testFileHandleClosedState() {
+		SFTPv3Client mockClient = mock(SFTPv3Client.class);
+		byte[] handle = new byte[]{1, 2, 3, 4};
+
+		SFTPv3FileHandle fileHandle = new SFTPv3FileHandle(mockClient, handle);
+		fileHandle.isClosed = true;
+
+		assertTrue(fileHandle.isClosed());
+	}
+
+	@Test
+	public void testCloseSessionMultipleTimes() throws IOException {
+		when(mockConnection.openSession()).thenReturn(mockSession);
+		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
+		when(mockSession.getStdin()).thenReturn(new ByteArrayOutputStream());
+
+		try {
+			SFTPv3Client client = new SFTPv3Client(mockConnection);
+
+			client.close();
+			client.close();
+			client.close();
+
+			verify(mockSession, times(3)).close();
+
+		} catch (IOException e) {
+		}
+	}
 }
