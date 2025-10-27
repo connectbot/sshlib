@@ -91,7 +91,7 @@ spotless {
         removeUnusedImports()
         trimTrailingWhitespace()
 
-        indentWithTabs()
+        leadingSpacesToTabs()
         replaceRegex("class-level javadoc indentation fix", "^\\*", " *")
         replaceRegex("method-level javadoc indentation fix", "\t\\*", "\t *")
     }
@@ -119,7 +119,7 @@ spotless {
 
     format("misc") {
         target("**/.gitignore")
-        indentWithTabs()
+        leadingSpacesToTabs()
         trimTrailingWhitespace()
         endWithNewline()
     }
