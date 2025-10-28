@@ -50,7 +50,7 @@ dependencies {
     testImplementation("commons-codec:commons-codec:1.19.0")
     testImplementation("commons-io:commons-io:2.20.0")
     testImplementation("org.hamcrest:hamcrest:3.0")
-    testImplementation("org.jetbrains:annotations:26.0.2")
+    testImplementation("org.jetbrains:annotations:26.0.2-1")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
     testImplementation("org.mockito:mockito-core:5.20.0")
