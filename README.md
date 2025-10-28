@@ -9,6 +9,7 @@ This library retains its original [3-Clause BSD license](
 https://opensource.org/licenses/BSD-3-Clause).
 
 ##### Encryption:
+  * chacha20-poly1305@openssh.com ([draft-ietf-sshm-chacha20-poly1305](https://datatracker.ietf.org/doc/html/draft-ietf-sshm-chacha20-poly1305)) - **AEAD cipher, requires Java 11+**
   * aes256-ctr ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
   * aes128-ctr ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
   * aes256-cbc ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))

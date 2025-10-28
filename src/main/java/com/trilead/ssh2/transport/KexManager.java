@@ -371,11 +371,14 @@ public class KexManager
 	{
 		try
 		{
-			int mac_cs_key_len = MACs.getKeyLen(kxs.np.mac_algo_client_to_server);
+			boolean c2s_is_aead = BlockCipherFactory.isAead(kxs.np.enc_algo_client_to_server);
+			boolean s2c_is_aead = BlockCipherFactory.isAead(kxs.np.enc_algo_server_to_client);
+
+			int mac_cs_key_len = c2s_is_aead ? 0 : MACs.getKeyLen(kxs.np.mac_algo_client_to_server);
 			int enc_cs_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_client_to_server);
 			int enc_cs_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_client_to_server);
 
-			int mac_sc_key_len = MACs.getKeyLen(kxs.np.mac_algo_server_to_client);
+			int mac_sc_key_len = s2c_is_aead ? 0 : MACs.getKeyLen(kxs.np.mac_algo_server_to_client);
 			int enc_sc_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_server_to_client);
 			int enc_sc_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_server_to_client);
 
@@ -400,26 +403,34 @@ public class KexManager
 		PacketNewKeys ign = new PacketNewKeys();
 		tm.sendKexMessage(ign.getPayload());
 
-		BlockCipher cbc;
-		MAC mac;
 		ICompressor comp;
 
 		try
 		{
-			cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_client_to_server, true, km.enc_key_client_to_server,
-					km.initial_iv_client_to_server);
+			boolean c2s_is_aead = BlockCipherFactory.isAead(kxs.np.enc_algo_client_to_server);
 
-			mac = new HMAC(kxs.np.mac_algo_client_to_server, km.integrity_key_client_to_server);
+			if (c2s_is_aead)
+			{
+				com.trilead.ssh2.crypto.cipher.AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
+						kxs.np.enc_algo_client_to_server, true, km.enc_key_client_to_server);
+				tm.changeSendAeadCipher(aeadCipher);
+			}
+			else
+			{
+				BlockCipher cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_client_to_server, true,
+						km.enc_key_client_to_server, km.initial_iv_client_to_server);
+				MAC mac = new HMAC(kxs.np.mac_algo_client_to_server, km.integrity_key_client_to_server);
+				tm.changeSendCipher(cbc, mac);
+			}
 
 			comp = CompressionFactory.createCompressor(kxs.np.comp_algo_client_to_server);
 
 		}
 		catch (IllegalArgumentException e1)
 		{
-			throw new IOException("Fatal error during MAC startup!");
+			throw new IOException("Fatal error during cipher/MAC startup!");
 		}
 
-		tm.changeSendCipher(cbc, mac);
 		tm.changeSendCompression(comp);
 		tm.kexFinished();
 	}
@@ -586,25 +597,33 @@ public class KexManager
 			if (km == null)
 				throw new IOException("Peer sent SSH_MSG_NEWKEYS, but I have no key material ready!");
 
-			BlockCipher cbc;
-			MAC mac;
 			ICompressor comp;
 
 			try
 			{
-				cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_server_to_client, false,
-						km.enc_key_server_to_client, km.initial_iv_server_to_client);
+				boolean s2c_is_aead = BlockCipherFactory.isAead(kxs.np.enc_algo_server_to_client);
 
-				mac = new HMAC(kxs.np.mac_algo_server_to_client, km.integrity_key_server_to_client);
+				if (s2c_is_aead)
+				{
+					com.trilead.ssh2.crypto.cipher.AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
+							kxs.np.enc_algo_server_to_client, false, km.enc_key_server_to_client);
+					tm.changeRecvAeadCipher(aeadCipher);
+				}
+				else
+				{
+					BlockCipher cbc = BlockCipherFactory.createCipher(kxs.np.enc_algo_server_to_client, false,
+							km.enc_key_server_to_client, km.initial_iv_server_to_client);
+					MAC mac = new HMAC(kxs.np.mac_algo_server_to_client, km.integrity_key_server_to_client);
+					tm.changeRecvCipher(cbc, mac);
+				}
 
 				comp = CompressionFactory.createCompressor(kxs.np.comp_algo_server_to_client);
 			}
 			catch (IllegalArgumentException e1)
 			{
-				throw new IOException("Fatal error during MAC startup: " + e1.getMessage());
+				throw new IOException("Fatal error during cipher/MAC startup: " + e1.getMessage());
 			}
 
-			tm.changeRecvCipher(cbc, mac);
 			tm.changeRecvCompression(comp);
 
 			ConnectionInfo sci = new ConnectionInfo();

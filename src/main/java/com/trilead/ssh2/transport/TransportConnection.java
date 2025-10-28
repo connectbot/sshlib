@@ -52,6 +52,14 @@ public class TransportConnection
 
 	int recv_padd_blocksize = 8;
 
+	com.trilead.ssh2.crypto.cipher.AeadCipher send_aead_cipher;
+
+	com.trilead.ssh2.crypto.cipher.AeadCipher recv_aead_cipher;
+
+	boolean send_is_aead = false;
+
+	boolean recv_is_aead = false;
+
 	ICompressor recv_comp = null;
 
 	ICompressor send_comp = null;
@@ -113,6 +121,21 @@ public class TransportConnection
 			send_padd_blocksize = 8;
 	}
 
+	public void changeRecvAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	{
+		recv_aead_cipher = cipher;
+		recv_is_aead = true;
+		recv_padd_blocksize = 8;  // ChaCha20-Poly1305 uses 8-byte alignment
+	}
+
+	public void changeSendAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	{
+		send_aead_cipher = cipher;
+		send_is_aead = true;
+		send_padd_blocksize = 8;  // ChaCha20-Poly1305 uses 8-byte alignment
+		useRandomPadding = true;  // Always use random padding with AEAD
+	}
+
 	public void changeRecvCompression(ICompressor comp)
 	{
 		recv_comp = comp;
@@ -151,6 +174,12 @@ public class TransportConnection
 
 	public void sendMessage(byte[] message, int off, int len, int padd) throws IOException
 	{
+		if (send_is_aead)
+		{
+			sendMessageAead(message, off, len);
+			return;
+		}
+
 		if (padd < 4)
 			padd = 4;
 		else if (padd > 64)
@@ -254,8 +283,81 @@ public class TransportConnection
 		send_seq_number++;
 	}
 
+	private void sendMessageAead(byte[] message, int off, int len) throws IOException
+	{
+		if (send_comp != null && can_send_compress)
+		{
+			if (send_comp_buffer.length < message.length + 1024)
+				send_comp_buffer = new byte[message.length + 1024];
+			len = send_comp.compress(message, off, len, send_comp_buffer);
+			message = send_comp_buffer;
+			off = 0;
+		}
+
+		// Calculate padding
+		int packet_len_without_length_field = 1 + len; // padding_length byte + payload
+		int slack = packet_len_without_length_field % send_padd_blocksize;
+
+		int padding_length = send_padd_blocksize - slack;
+		if (padding_length < 4)
+			padding_length += send_padd_blocksize;
+
+		int packet_len = 1 + len + padding_length; // padding_length + payload + padding
+
+		// Build plaintext packet: padding_length || payload || padding
+		byte[] plaintext = new byte[packet_len];
+		plaintext[0] = (byte) padding_length;
+		System.arraycopy(message, off, plaintext, 1, len);
+
+		// Random padding
+		for (int i = 0; i < padding_length; i = i + 4)
+		{
+			int r = rnd.nextInt();
+			plaintext[1 + len + i] = (byte) r;
+			if (i + 1 < padding_length)
+				plaintext[1 + len + i + 1] = (byte) (r >> 8);
+			if (i + 2 < padding_length)
+				plaintext[1 + len + i + 2] = (byte) (r >> 16);
+			if (i + 3 < padding_length)
+				plaintext[1 + len + i + 3] = (byte) (r >> 24);
+		}
+
+		// Encrypt 4-byte length with header cipher
+		byte[] lengthBytes = new byte[4];
+		lengthBytes[0] = (byte) (packet_len >>> 24);
+		lengthBytes[1] = (byte) (packet_len >>> 16);
+		lengthBytes[2] = (byte) (packet_len >>> 8);
+		lengthBytes[3] = (byte) packet_len;
+
+		byte[] encryptedLength = new byte[4];
+		send_aead_cipher.encryptPacketLength(send_seq_number, lengthBytes, encryptedLength, 0);
+
+		// Encrypt payload and generate tag
+		byte[] ciphertext = new byte[packet_len];
+		byte[] tag = new byte[send_aead_cipher.getTagSize()];
+		send_aead_cipher.seal(send_seq_number, plaintext, ciphertext, tag, encryptedLength);
+
+		// Write: encrypted_length || ciphertext || tag
+		cos.writePlain(encryptedLength, 0, 4);
+		cos.writePlain(ciphertext, 0, ciphertext.length);
+		cos.writePlain(tag, 0, tag.length);
+		cos.flush();
+
+		if (log.isEnabled())
+		{
+			log.log(90, "Sent " + Packets.getMessageName(message[off] & 0xff) + " " + len + " bytes payload (AEAD)");
+		}
+
+		send_seq_number++;
+	}
+
 	public int receiveMessage(byte[] buffer, int off, int len) throws IOException
 	{
+		if (recv_is_aead)
+		{
+			return receiveMessageAead(buffer, off, len);
+		}
+
 		final int packetLength;
 		final int payloadLength;
 
@@ -319,6 +421,83 @@ public class TransportConnection
 			}
 		} else {
 			return payloadLength;
+		}
+	}
+
+	private int receiveMessageAead(byte[] buffer, int off, int len) throws IOException
+	{
+		// Read and decrypt 4-byte length
+		byte[] encryptedLength = new byte[4];
+		cis.readPlain(encryptedLength, 0, 4);
+
+		byte[] lengthBytes = new byte[4];
+		recv_aead_cipher.decryptPacketLength(recv_seq_number, encryptedLength, lengthBytes, 0);
+
+		int packet_len = ((lengthBytes[0] & 0xff) << 24) |
+						((lengthBytes[1] & 0xff) << 16) |
+						((lengthBytes[2] & 0xff) << 8) |
+						(lengthBytes[3] & 0xff);
+
+		if (packet_len > 35000 || packet_len < 8)
+		{
+			throw new IOException("Invalid packet length: " + packet_len);
+		}
+
+		// Read ciphertext and tag
+		byte[] ciphertext = new byte[packet_len];
+		byte[] tag = new byte[recv_aead_cipher.getTagSize()];
+
+		cis.readPlain(ciphertext, 0, packet_len);
+		cis.readPlain(tag, 0, tag.length);
+
+		// Decrypt and verify tag
+		byte[] plaintext = new byte[packet_len];
+		boolean valid = recv_aead_cipher.open(recv_seq_number, ciphertext, tag, plaintext, encryptedLength);
+
+		if (!valid)
+		{
+			throw new IOException("MAC verification failed");
+		}
+
+		// Extract payload (skip padding_length byte and padding)
+		int padding_length = plaintext[0] & 0xff;
+		int payload_length = packet_len - padding_length - 1;
+
+		if (payload_length < 0)
+			throw new IOException("Illegal padding_length in packet from remote (" + padding_length + ")");
+
+		if (payload_length > len)
+		{
+			throw new IOException("Receive buffer too small (" + len + ", need " + payload_length + ")");
+		}
+
+		System.arraycopy(plaintext, 1, buffer, off, payload_length);
+
+		recv_seq_number++;
+
+		if (log.isEnabled())
+		{
+			log.log(90, "Received " + Packets.getMessageName(buffer[off] & 0xff) + " " + payload_length
+					+ " bytes payload (AEAD)");
+		}
+
+		if (recv_comp != null && can_recv_compress)
+		{
+			int[] uncomp_len = new int[] { payload_length };
+			buffer = recv_comp.uncompress(buffer, off, uncomp_len);
+
+			if (buffer == null)
+			{
+				throw new IOException("Error while inflating remote data");
+			}
+			else
+			{
+				return uncomp_len[0];
+			}
+		}
+		else
+		{
+			return payload_length;
 		}
 	}
 
