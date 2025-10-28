@@ -7,8 +7,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Vector;
+import java.util.List;
+import java.util.Map;
 
 import com.trilead.ssh2.packets.TypesReader;
 import com.trilead.ssh2.packets.TypesWriter;
@@ -89,7 +91,7 @@ public class SFTPv3Client
 	OutputStream os;
 
 	int protocol_version = 0;
-	HashMap server_extensions = new HashMap();
+	Map<String, byte[]> server_extensions = new HashMap<>();
 
 	int next_request_id = 1000;
 
@@ -317,30 +319,30 @@ public class SFTPv3Client
 		{
 			if (debug != null)
 				debug.println("SSH_FILEXFER_ATTR_SIZE");
-			fa.size = new Long(tr.readUINT64());
+			fa.size = Long.valueOf(tr.readUINT64());
 		}
 
 		if ((flags & AttribFlags.SSH_FILEXFER_ATTR_V3_UIDGID) != 0)
 		{
 			if (debug != null)
 				debug.println("SSH_FILEXFER_ATTR_V3_UIDGID");
-			fa.uid = new Integer(tr.readUINT32());
-			fa.gid = new Integer(tr.readUINT32());
+			fa.uid = Integer.valueOf(tr.readUINT32());
+			fa.gid = Integer.valueOf(tr.readUINT32());
 		}
 
 		if ((flags & AttribFlags.SSH_FILEXFER_ATTR_PERMISSIONS) != 0)
 		{
 			if (debug != null)
 				debug.println("SSH_FILEXFER_ATTR_PERMISSIONS");
-			fa.permissions = new Integer(tr.readUINT32());
+			fa.permissions = Integer.valueOf(tr.readUINT32());
 		}
 
 		if ((flags & AttribFlags.SSH_FILEXFER_ATTR_V3_ACMODTIME) != 0)
 		{
 			if (debug != null)
 				debug.println("SSH_FILEXFER_ATTR_V3_ACMODTIME");
-			fa.atime = new Long(((long) tr.readUINT32()) & 0xffffffffl);
-			fa.mtime = new Long(((long) tr.readUINT32()) & 0xffffffffl);
+			fa.atime = Long.valueOf(((long) tr.readUINT32()) & 0xffffffffl);
+			fa.mtime = Long.valueOf(((long) tr.readUINT32()) & 0xffffffffl);
 
 		}
 
@@ -723,9 +725,9 @@ public class SFTPv3Client
 		throw new SFTPException(tr.readString(), errorCode);
 	}
 
-	private final Vector scanDirectory(byte[] handle) throws IOException
+	private final List<SFTPv3DirectoryEntry> scanDirectory(byte[] handle) throws IOException
 	{
-		Vector files = new Vector();
+		List<SFTPv3DirectoryEntry> files = new ArrayList<>();
 
 		while (true)
 		{
@@ -776,7 +778,7 @@ public class SFTPv3Client
 					dirEnt.longEntry = tr.readString(charsetName);
 
 					dirEnt.attributes = readAttrs(tr);
-					files.addElement(dirEnt);
+					files.add(dirEnt);
 
 					if (debug != null)
 						debug.println("File: '" + dirEnt.filename + "'");
@@ -942,13 +944,13 @@ public class SFTPv3Client
 	 * List the contents of a directory.
 	 *
 	 * @param dirName See the {@link SFTPv3Client comment} for the class for more details.
-	 * @return A Vector containing {@link SFTPv3DirectoryEntry} objects.
+	 * @return A List containing {@link SFTPv3DirectoryEntry} objects.
 	 * @throws IOException on error
 	 */
-	public Vector ls(String dirName) throws IOException
+	public List<SFTPv3DirectoryEntry> ls(String dirName) throws IOException
 	{
 		byte[] handle = openDirectory(dirName);
-		Vector result = scanDirectory(handle);
+		List<SFTPv3DirectoryEntry> result = scanDirectory(handle);
 		closeHandle(handle);
 		return result;
 	}

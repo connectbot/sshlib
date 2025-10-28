@@ -254,6 +254,7 @@ public void testGetStreams() {
 }
 
 @Test
+@SuppressWarnings("deprecation")
 public void testWaitUntilDataAvailable() {
 	int conditions = ChannelCondition.STDOUT_DATA;
 	when(mockChannelManager.waitForCondition(eq(mockChannel), eq(1000L),
@@ -268,6 +269,7 @@ public void testWaitUntilDataAvailable() {
 }
 
 @Test
+@SuppressWarnings("deprecation")
 public void testWaitUntilDataAvailableWithZeroTimeout() {
 	when(mockChannelManager.waitForCondition(eq(mockChannel), eq(0L), anyInt()))
 		.thenReturn(ChannelCondition.EOF);

@@ -27,7 +27,7 @@ public class TimeoutService
 	/**
 	 * A token that represents a timeout request.
 	 */
-	public static class TimeoutToken implements Comparable
+	public static class TimeoutToken implements Comparable<TimeoutToken>
 	{
 		private long runTime;
 		private Runnable handler;
@@ -38,9 +38,8 @@ public class TimeoutService
 			this.handler = handler;
 		}
 
-		public int compareTo(Object o)
+		public int compareTo(TimeoutToken t)
 		{
-			TimeoutToken t = (TimeoutToken) o;
 			if (runTime > t.runTime)
 				return 1;
 			if (runTime == t.runTime)
@@ -105,7 +104,7 @@ public class TimeoutService
 	}
 
 	/* The list object is also used for locking purposes */
-	private static final LinkedList todolist = new LinkedList();
+	private static final LinkedList<TimeoutToken> todolist = new LinkedList<>();
 
 	private static Thread timeoutThread = null;
 
