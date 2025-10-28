@@ -34,6 +34,8 @@ public class BlockCipherFactory
 	{
 		/* Higher Priority First */
 
+		ciphers.add(new CipherEntry("chacha20-poly1305@openssh.com", 8, 64, "com.trilead.ssh2.crypto.cipher.ChaCha20Poly1305"));
+
 		ciphers.add(new CipherEntry("aes256-ctr", 16, 32, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
 		ciphers.add(new CipherEntry("aes128-ctr", 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
 		ciphers.add(new CipherEntry("blowfish-ctr", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish$CTR"));
@@ -99,5 +101,40 @@ public class BlockCipherFactory
 	{
 		CipherEntry ce = getEntry(type);
 		return ce.keysize;
+	}
+
+	public static boolean isAead(String type)
+	{
+		try
+		{
+			CipherEntry ce = getEntry(type);
+			Class<?> cc = Class.forName(ce.cipherClass);
+			return AeadCipher.class.isAssignableFrom(cc);
+		}
+		catch (Exception e)
+		{
+			return false;
+		}
+	}
+
+	public static AeadCipher createAeadCipher(String type, boolean encrypt, byte[] key)
+	{
+		if (!isAead(type))
+		{
+			throw new IllegalArgumentException("Not an AEAD cipher: " + type);
+		}
+		try
+		{
+			CipherEntry ce = getEntry(type);
+			Class<?> cc = Class.forName(ce.cipherClass);
+			Constructor<?> constructor = cc.getConstructor();
+			AeadCipher cipher = (AeadCipher) constructor.newInstance();
+			cipher.init(encrypt, key);
+			return cipher;
+		}
+		catch (Exception e)
+		{
+			throw new IllegalArgumentException("Cannot instantiate " + type, e);
+		}
 	}
 }

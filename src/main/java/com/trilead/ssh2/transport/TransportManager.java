@@ -433,6 +433,20 @@ public class TransportManager implements ITransportConnection
 			tc.resetSendSequenceNumber();
 	}
 
+	public void changeRecvAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	{
+		tc.changeRecvAeadCipher(cipher);
+		if (km.isStrictKex())
+			tc.resetReceiveSequenceNumber();
+	}
+
+	public void changeSendAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	{
+		tc.changeSendAeadCipher(cipher);
+		if (km.isStrictKex())
+			tc.resetSendSequenceNumber();
+	}
+
 	/**
 	 * @param comp compression algorithm
 	 */

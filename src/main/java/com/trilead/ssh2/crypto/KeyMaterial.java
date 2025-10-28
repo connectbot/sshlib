@@ -26,6 +26,10 @@ public class KeyMaterial
 	{
 		byte[] res = new byte[keyLength];
 
+		// For AEAD ciphers, MAC key length is 0
+		if (keyLength == 0)
+			return res;
+
 		int dglen = sh.getDigestLength();
 		int numRounds = (keyLength + dglen - 1) / dglen;
 
