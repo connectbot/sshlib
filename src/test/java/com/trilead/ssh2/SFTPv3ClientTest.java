@@ -38,6 +38,7 @@ public class SFTPv3ClientTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	public void testDeprecatedConstructorWithNullConnection() {
 		assertThrows(IllegalArgumentException.class, () ->
 			new SFTPv3Client(null, System.out));
@@ -240,6 +241,7 @@ public class SFTPv3ClientTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	public void testDeprecatedConstructorWithDebug() throws IOException {
 		when(mockConnection.openSession()).thenReturn(mockSession);
 		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));
@@ -264,6 +266,7 @@ public class SFTPv3ClientTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	public void testDeprecatedConstructorWithNullDebug() throws IOException {
 		when(mockConnection.openSession()).thenReturn(mockSession);
 		when(mockSession.getStdout()).thenReturn(new ByteArrayInputStream(new byte[0]));

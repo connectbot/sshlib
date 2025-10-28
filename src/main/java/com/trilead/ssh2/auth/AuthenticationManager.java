@@ -12,8 +12,9 @@ import java.security.SecureRandom;
 import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
-import java.util.Vector;
 
 import com.trilead.ssh2.InteractiveCallback;
 import com.trilead.ssh2.crypto.PEMDecoder;
@@ -48,7 +49,7 @@ public class AuthenticationManager implements MessageHandler
 {
 	TransportManager tm;
 
-	Vector packets = new Vector();
+	List<byte[]> packets = new ArrayList<>();
 	boolean connectionClosed = false;
 
 	String banner;
@@ -94,9 +95,8 @@ public class AuthenticationManager implements MessageHandler
 				{
 				}
 			}
-			/* This sequence works with J2ME */
-			byte[] res = (byte[]) packets.firstElement();
-			packets.removeElementAt(0);
+			byte[] res = packets.get(0);
+			packets.remove(0);
 			return res;
 		}
 	}
@@ -462,7 +462,7 @@ public class AuthenticationManager implements MessageHandler
 			{
 				byte[] tmp = new byte[msglen];
 				System.arraycopy(msg, 0, tmp, 0, msglen);
-				packets.addElement(tmp);
+				packets.add(tmp);
 			}
 
 			packets.notifyAll();

@@ -68,9 +68,9 @@ public class BlockCipherFactory
 		try
 		{
 			CipherEntry ce = getEntry(type);
-			Class cc = Class.forName(ce.cipherClass);
-			Constructor<BlockCipher> constructor = cc.getConstructor();
-			BlockCipher bc = constructor.newInstance();
+			Class<?> cc = Class.forName(ce.cipherClass);
+			Constructor<?> constructor = cc.getConstructor();
+			BlockCipher bc = (BlockCipher) constructor.newInstance();
 			bc.init(encrypt, key, iv);
 			return bc;
 		}

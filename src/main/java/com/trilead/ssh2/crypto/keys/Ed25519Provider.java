@@ -21,7 +21,7 @@ public class Ed25519Provider extends Provider {
 	private static boolean sInitialized = false;
 
 	public Ed25519Provider() {
-		super(NAME, 1.0, "Not for use elsewhere");
+		super(NAME, "1.0", "Not for use elsewhere");
 		AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
 			setup();
 			return null;

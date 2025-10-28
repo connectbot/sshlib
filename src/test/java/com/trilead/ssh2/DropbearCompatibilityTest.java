@@ -53,11 +53,11 @@ public class DropbearCompatibilityTest {
 	@NotNull
 	@Contract("_ -> new")
 	private Connection withServer(@NotNull GenericContainer container) {
-		return new Connection(container.getContainerIpAddress(), container.getMappedPort(22));
+		return new Connection(container.getHost(), container.getMappedPort(22));
 	}
 
 	private static GenericContainer getBaseContainer() {
-		return new GenericContainer(baseImage)
+		return new GenericContainer<>(baseImage)
 				.withExposedPorts(22)
 				.withLogConsumer(logConsumer)
 				.waitingFor(new LogMessageWaitStrategy()

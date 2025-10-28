@@ -54,7 +54,7 @@ public class AsyncSSHCompatibilityTest {
 	@NotNull
 	@Contract("_ -> new")
 	private Connection withServer(@NotNull GenericContainer container) {
-		return new Connection(container.getContainerIpAddress(), container.getMappedPort(8022));
+		return new Connection(container.getHost(), container.getMappedPort(8022));
 	}
 
 	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
