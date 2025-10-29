@@ -52,11 +52,12 @@ public class DropbearCompatibilityTest {
 
 	@NotNull
 	@Contract("_ -> new")
-	private Connection withServer(@NotNull GenericContainer container) {
+	private Connection withServer(@NotNull GenericContainer<?> container) {
 		return new Connection(container.getHost(), container.getMappedPort(22));
 	}
 
-	private static GenericContainer getBaseContainer() {
+	@SuppressWarnings("resource")
+	private static GenericContainer<?> getBaseContainer() {
 		return new GenericContainer<>(baseImage)
 				.withExposedPorts(22)
 				.withLogConsumer(logConsumer)
@@ -64,11 +65,12 @@ public class DropbearCompatibilityTest {
 						.withRegEx(".*Not backgrounding.*\\s"));
 	}
 
-	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server) throws IOException {
+	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer<?> server) throws IOException {
 		return assertCanPasswordAuthenticate(server, null);
 	}
 
-	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer server, Consumer<Connection> setupFunc) throws IOException {
+	private ConnectionInfo assertCanPasswordAuthenticate(GenericContainer<?> server, Consumer<Connection> setupFunc)
+			throws IOException {
 		try (Connection c = withServer(server)) {
 			if (setupFunc != null) {
 				setupFunc.accept(c);
@@ -90,8 +92,9 @@ public class DropbearCompatibilityTest {
 		return assertCanPasswordAuthenticate(server, setupFunc);
 	}
 
-	private ConnectionInfo connectToServerWithOptions(@NotNull String options, @Nullable Consumer<Connection> setupFunc) throws IOException {
-		try (GenericContainer customServer = getBaseContainer().withEnv(OPTIONS_ENV, options)) {
+	private ConnectionInfo connectToServerWithOptions(@NotNull String options, @Nullable Consumer<Connection> setupFunc)
+			throws IOException {
+		try (GenericContainer<?> customServer = getBaseContainer().withEnv(OPTIONS_ENV, options)) {
 			customServer.start();
 			return assertCanPasswordAuthenticate(customServer, setupFunc);
 		}
@@ -105,7 +108,7 @@ public class DropbearCompatibilityTest {
 	private void canConnectWithPubkey(String keyFilename) throws Exception {
 		char[] keyChars = IOUtils.toCharArray(getClass().getResourceAsStream("crypto/" + keyFilename), "UTF-8");
 
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			try (Connection connection = withServer(server)) {
 				connection.connect();
@@ -144,7 +147,7 @@ public class DropbearCompatibilityTest {
 
 	@Test
 	public void canConnectWithPassword() throws Exception {
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			assertCanPasswordAuthenticate(server);
 		}
@@ -152,7 +155,7 @@ public class DropbearCompatibilityTest {
 
 	@Test
 	public void wrongPasswordFails() throws Exception {
-		try (GenericContainer server = getBaseContainer()) {
+		try (GenericContainer<?> server = getBaseContainer()) {
 			server.start();
 			try (Connection c = withServer(server)) {
 				c.connect();
@@ -178,7 +181,7 @@ public class DropbearCompatibilityTest {
 
 	private void assertCanConnectToServerWithKex(@NotNull String kexType) throws IOException {
 		ConnectionInfo info = connectToServer(
-				c -> c.setKeyExchangeAlgorithms(new String[]{kexType}));
+				c -> c.setKeyExchangeAlgorithms(new String[] { kexType }));
 		assertThat(info.keyExchangeAlgorithm, is(kexType));
 	}
 
@@ -213,8 +216,8 @@ public class DropbearCompatibilityTest {
 	}
 
 	private void setCiphers(Connection c, String cipher) {
-		c.setClient2ServerCiphers(new String[]{cipher});
-		c.setServer2ClientCiphers(new String[]{cipher});
+		c.setClient2ServerCiphers(new String[] { cipher });
+		c.setServer2ClientCiphers(new String[] { cipher });
 	}
 
 	private void assertCanConnectToServerWithCipher(@NotNull String cipher) throws IOException {
@@ -233,9 +236,14 @@ public class DropbearCompatibilityTest {
 		assertCanConnectToServerWithCipher("aes256-ctr");
 	}
 
+	@Test
+	public void canConnectWithCipherChacha20Poly1305() throws Exception {
+		assertCanConnectToServerWithCipher("chacha20-poly1305@openssh.com");
+	}
+
 	private void setMac(Connection c, String mac) {
-		c.setClient2ServerMACs(new String[]{mac});
-		c.setServer2ClientMACs(new String[]{mac});
+		c.setClient2ServerMACs(new String[] { mac });
+		c.setServer2ClientMACs(new String[] { mac });
 	}
 
 	private void assertCanConnectToServerWithMac(@NotNull String mac) throws IOException {
@@ -250,7 +258,8 @@ public class DropbearCompatibilityTest {
 	}
 
 	private void canConnectWithHostKeyAlgorithm(String keyPath, String hostKeyAlgorithm) throws Exception {
-		ConnectionInfo info = connectToServerWithOptions("-r " + keyPath, c -> c.setServerHostKeyAlgorithms(new String[]{hostKeyAlgorithm}));
+		ConnectionInfo info = connectToServerWithOptions("-r " + keyPath,
+				c -> c.setServerHostKeyAlgorithms(new String[] { hostKeyAlgorithm }));
 		assertThat(info.serverHostKeyAlgorithm, is(hostKeyAlgorithm));
 	}
 
