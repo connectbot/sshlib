@@ -29,12 +29,12 @@ import java.util.Arrays;
 public class ChaCha20Poly1305 implements AeadCipher
 {
 	public static final String SSH_NAME = "chacha20-poly1305@openssh.com";
+	public static final int BLOCK_SIZE = 8;
 	public static final int KEY_SIZE = 64;  // 2 x 32-byte keys
 	public static final int TAG_SIZE = 16;  // Poly1305 tag
 
 	private byte[] mainKey;     // K_1: first 32 bytes
 	private byte[] headerKey;   // K_2: second 32 bytes
-	private boolean forEncryption;
 
 	// Reusable cipher instances to reduce garbage
 	private Cipher headerCipher;
@@ -53,14 +53,12 @@ public class ChaCha20Poly1305 implements AeadCipher
 	private final byte[] computedTag = new byte[TAG_SIZE];
 
 	@Override
-	public void init(boolean forEncryption, byte[] key) throws IllegalArgumentException
+	public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException
 	{
 		if (key.length != KEY_SIZE)
 		{
 			throw new IllegalArgumentException("ChaCha20-Poly1305 requires 64 bytes of key material");
 		}
-
-		this.forEncryption = forEncryption;
 
 		// Copy keys
 		if (this.mainKey == null)
@@ -286,5 +284,10 @@ public class ChaCha20Poly1305 implements AeadCipher
 			result |= a[i] ^ b[i];
 		}
 		return result == 0;
+	}
+
+	@Override
+	public int getBlockSize() {
+		return BLOCK_SIZE;
 	}
 }

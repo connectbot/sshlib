@@ -21,6 +21,7 @@ import com.trilead.ssh2.compression.CompressionFactory;
 import com.trilead.ssh2.compression.ICompressor;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.KeyMaterial;
+import com.trilead.ssh2.crypto.cipher.AeadCipher;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
 import com.trilead.ssh2.crypto.dh.Curve25519Exchange;
@@ -376,18 +377,18 @@ public class KexManager
 
 			int mac_cs_key_len = c2s_is_aead ? 0 : MACs.getKeyLen(kxs.np.mac_algo_client_to_server);
 			int enc_cs_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_client_to_server);
-			int enc_cs_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_client_to_server);
+			int enc_cs_iv_len = BlockCipherFactory.getIVSize(kxs.np.enc_algo_client_to_server);
 
 			int mac_sc_key_len = s2c_is_aead ? 0 : MACs.getKeyLen(kxs.np.mac_algo_server_to_client);
 			int enc_sc_key_len = BlockCipherFactory.getKeySize(kxs.np.enc_algo_server_to_client);
-			int enc_sc_block_len = BlockCipherFactory.getBlockSize(kxs.np.enc_algo_server_to_client);
+			int enc_sc_iv_len = BlockCipherFactory.getIVSize(kxs.np.enc_algo_server_to_client);
 
-			km = KeyMaterial.create(kxs.hashAlgo, kxs.H, kxs.K, sessionId, enc_cs_key_len, enc_cs_block_len, mac_cs_key_len,
-					enc_sc_key_len, enc_sc_block_len, mac_sc_key_len);
+			km = KeyMaterial.create(kxs.hashAlgo, kxs.H, kxs.K, sessionId, enc_cs_key_len, enc_cs_iv_len, mac_cs_key_len,
+					enc_sc_key_len, enc_sc_iv_len, mac_sc_key_len);
 		}
 		catch (IllegalArgumentException e)
 		{
-			throw new IOException("Could not establish key material: " + e.getMessage());
+			throw new IOException("Could not establish key material");
 		}
 	}
 
@@ -411,8 +412,8 @@ public class KexManager
 
 			if (c2s_is_aead)
 			{
-				com.trilead.ssh2.crypto.cipher.AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
-						kxs.np.enc_algo_client_to_server, true, km.enc_key_client_to_server);
+				AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
+						kxs.np.enc_algo_client_to_server, true, km.enc_key_client_to_server, km.initial_iv_client_to_server);
 				tm.changeSendAeadCipher(aeadCipher);
 			}
 			else
@@ -428,7 +429,7 @@ public class KexManager
 		}
 		catch (IllegalArgumentException e1)
 		{
-			throw new IOException("Fatal error during cipher/MAC startup!");
+			throw new IOException("Fatal error during cipher/MAC startup: " + e1.getMessage(), e1);
 		}
 
 		tm.changeSendCompression(comp);
@@ -605,8 +606,8 @@ public class KexManager
 
 				if (s2c_is_aead)
 				{
-					com.trilead.ssh2.crypto.cipher.AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
-							kxs.np.enc_algo_server_to_client, false, km.enc_key_server_to_client);
+					AeadCipher aeadCipher = BlockCipherFactory.createAeadCipher(
+							kxs.np.enc_algo_server_to_client, false, km.enc_key_server_to_client, km.initial_iv_server_to_client);
 					tm.changeRecvAeadCipher(aeadCipher);
 				}
 				else

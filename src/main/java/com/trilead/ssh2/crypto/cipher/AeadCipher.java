@@ -6,9 +6,6 @@ package com.trilead.ssh2.crypto.cipher;
  * AEAD ciphers combine encryption and authentication in a single operation,
  * unlike traditional SSH ciphers that use separate cipher and MAC algorithms.
  *
- * This interface supports the OpenSSH ChaCha20-Poly1305 AEAD cipher
- * (chacha20-poly1305@openssh.com) as specified in draft-ietf-sshm-chacha20-poly1305-02.
- *
  * @author Kenny Root
  */
 public interface AeadCipher
@@ -17,10 +14,11 @@ public interface AeadCipher
 	 * Initialize the AEAD cipher for encryption or decryption.
 	 *
 	 * @param forEncryption true for encryption, false for decryption
-	 * @param key key material (size depends on cipher, e.g., 64 bytes for ChaCha20-Poly1305)
-	 * @throws IllegalArgumentException if key size is invalid
+	 * @param key encryption key material (size depends on cipher)
+	 * @param iv initial IV material (size depends on cipher, may be unused for some AEAD ciphers)
+	 * @throws IllegalArgumentException if key or IV size is invalid
 	 */
-	void init(boolean forEncryption, byte[] key) throws IllegalArgumentException;
+	void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException;
 
 	/**
 	 * Get the key size in bytes required by this cipher.
@@ -35,6 +33,13 @@ public interface AeadCipher
 	 * @return tag size in bytes
 	 */
 	int getTagSize();
+
+	/**
+	 * Gets the block size of the cipher.
+	 *
+	 * @return block size in bytes
+	 */
+	int getBlockSize();
 
 	/**
 	 * Encrypt the 4-byte packet length field.

@@ -17,13 +17,15 @@ public class BlockCipherFactory
 		final String type;
 		final int blocksize;
 		final int keysize;
+		final int ivsize;
 		final String cipherClass;
 
-		CipherEntry(String type, int blockSize, int keySize, String cipherClass)
+		CipherEntry(String type, int blockSize, int keySize, int ivSize, String cipherClass)
 		{
 			this.type = type;
 			this.blocksize = blockSize;
 			this.keysize = keySize;
+			this.ivsize = ivSize;
 			this.cipherClass = cipherClass;
 		}
 	}
@@ -34,18 +36,20 @@ public class BlockCipherFactory
 	{
 		/* Higher Priority First */
 
-		ciphers.add(new CipherEntry("chacha20-poly1305@openssh.com", 8, 64, "com.trilead.ssh2.crypto.cipher.ChaCha20Poly1305"));
+		ciphers.add(new CipherEntry("chacha20-poly1305@openssh.com", 8, 64, 0, "com.trilead.ssh2.crypto.cipher.ChaCha20Poly1305"));
+		ciphers.add(new CipherEntry("aes256-gcm@openssh.com", 16, 32, 12, "com.trilead.ssh2.crypto.cipher.AesGcm$AES256"));
+		ciphers.add(new CipherEntry("aes128-gcm@openssh.com", 16, 16, 12, "com.trilead.ssh2.crypto.cipher.AesGcm$AES128"));
 
-		ciphers.add(new CipherEntry("aes256-ctr", 16, 32, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
-		ciphers.add(new CipherEntry("aes128-ctr", 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
-		ciphers.add(new CipherEntry("blowfish-ctr", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish$CTR"));
+		ciphers.add(new CipherEntry("aes256-ctr", 16, 32, 16, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
+		ciphers.add(new CipherEntry("aes128-ctr", 16, 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CTR"));
+		ciphers.add(new CipherEntry("blowfish-ctr", 8, 16, 8, "com.trilead.ssh2.crypto.cipher.BlowFish$CTR"));
 
-		ciphers.add(new CipherEntry("aes256-cbc", 16, 32, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
-		ciphers.add(new CipherEntry("aes128-cbc", 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
-		ciphers.add(new CipherEntry("blowfish-cbc", 8, 16, "com.trilead.ssh2.crypto.cipher.BlowFish$CBC"));
+		ciphers.add(new CipherEntry("aes256-cbc", 16, 32, 16, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
+		ciphers.add(new CipherEntry("aes128-cbc", 16, 16, 16, "com.trilead.ssh2.crypto.cipher.AES$CBC"));
+		ciphers.add(new CipherEntry("blowfish-cbc", 8, 16, 8, "com.trilead.ssh2.crypto.cipher.BlowFish$CBC"));
 
-		ciphers.add(new CipherEntry("3des-ctr", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede$CTR"));
-		ciphers.add(new CipherEntry("3des-cbc", 8, 24, "com.trilead.ssh2.crypto.cipher.DESede$CBC"));
+		ciphers.add(new CipherEntry("3des-ctr", 8, 24, 8, "com.trilead.ssh2.crypto.cipher.DESede$CTR"));
+		ciphers.add(new CipherEntry("3des-cbc", 8, 24, 8, "com.trilead.ssh2.crypto.cipher.DESede$CBC"));
 	}
 
 	public static String[] getDefaultCipherList()
@@ -97,6 +101,12 @@ public class BlockCipherFactory
 		return ce.blocksize;
 	}
 
+	public static int getIVSize(String type)
+	{
+		CipherEntry ce = getEntry(type);
+		return ce.ivsize;
+	}
+
 	public static int getKeySize(String type)
 	{
 		CipherEntry ce = getEntry(type);
@@ -117,7 +127,7 @@ public class BlockCipherFactory
 		}
 	}
 
-	public static AeadCipher createAeadCipher(String type, boolean encrypt, byte[] key)
+	public static AeadCipher createAeadCipher(String type, boolean encrypt, byte[] key, byte[] iv)
 	{
 		if (!isAead(type))
 		{
@@ -129,7 +139,7 @@ public class BlockCipherFactory
 			Class<?> cc = Class.forName(ce.cipherClass);
 			Constructor<?> constructor = cc.getConstructor();
 			AeadCipher cipher = (AeadCipher) constructor.newInstance();
-			cipher.init(encrypt, key);
+			cipher.init(encrypt, key, iv);
 			return cipher;
 		}
 		catch (Exception e)
