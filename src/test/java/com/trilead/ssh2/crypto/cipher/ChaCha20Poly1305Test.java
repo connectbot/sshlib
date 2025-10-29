@@ -69,7 +69,7 @@ public class ChaCha20Poly1305Test
 		};
 
 		ChaCha20Poly1305 cipher = new ChaCha20Poly1305();
-		cipher.init(true, keyMaterial);
+		cipher.init(true, keyMaterial, null);
 
 		// Test 1: Length encryption
 		byte[] plainLength = new byte[] { 0x00, 0x00, 0x00, 0x48 };
@@ -90,7 +90,7 @@ public class ChaCha20Poly1305Test
 
 		// Test 3: Decryption
 		ChaCha20Poly1305 decCipher = new ChaCha20Poly1305();
-		decCipher.init(false, keyMaterial);
+		decCipher.init(false, keyMaterial, null);
 
 		byte[] decryptedLength = new byte[4];
 		decCipher.decryptPacketLength(seqNum, encryptedLength, decryptedLength, 0);
@@ -115,10 +115,10 @@ public class ChaCha20Poly1305Test
 		}
 
 		ChaCha20Poly1305 encCipher = new ChaCha20Poly1305();
-		encCipher.init(true, key);
+		encCipher.init(true, key, null);
 
 		ChaCha20Poly1305 decCipher = new ChaCha20Poly1305();
-		decCipher.init(false, key);
+		decCipher.init(false, key, null);
 
 		byte[] plaintext = "Hello, ChaCha20-Poly1305!".getBytes();
 		byte[] lengthBytes = new byte[] { 0x00, 0x00, 0x00, 0x19 };
@@ -148,7 +148,7 @@ public class ChaCha20Poly1305Test
 	{
 		byte[] key = new byte[64];
 		ChaCha20Poly1305 cipher = new ChaCha20Poly1305();
-		cipher.init(false, key);
+		cipher.init(false, key, null);
 
 		byte[] ciphertext = new byte[32];
 		byte[] badTag = new byte[16]; // All zeros - invalid
@@ -170,10 +170,10 @@ public class ChaCha20Poly1305Test
 		}
 
 		ChaCha20Poly1305 encCipher = new ChaCha20Poly1305();
-		encCipher.init(true, key);
+		encCipher.init(true, key, null);
 
 		ChaCha20Poly1305 decCipher = new ChaCha20Poly1305();
-		decCipher.init(false, key);
+		decCipher.init(false, key, null);
 
 		byte[] plaintext = "Test message".getBytes();
 
@@ -202,10 +202,10 @@ public class ChaCha20Poly1305Test
 	{
 		byte[] key = new byte[64];
 		ChaCha20Poly1305 encCipher = new ChaCha20Poly1305();
-		encCipher.init(true, key);
+		encCipher.init(true, key, null);
 
 		ChaCha20Poly1305 decCipher = new ChaCha20Poly1305();
-		decCipher.init(false, key);
+		decCipher.init(false, key, null);
 
 		byte[] plaintext = "Test".getBytes();
 		byte[] lengthBytes = new byte[] { 0x00, 0x00, 0x00, 0x04 };

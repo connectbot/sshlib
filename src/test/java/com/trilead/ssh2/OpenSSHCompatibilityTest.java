@@ -252,6 +252,21 @@ public class OpenSSHCompatibilityTest {
 		assertCanConnectToServerWithCipher("3des-cbc");
 	}
 
+	@Test
+	public void canConnectWithCipherAes128Gcm() throws Exception {
+		assertCanConnectToServerWithCipher("aes128-gcm@openssh.com");
+	}
+
+	@Test
+	public void canConnectWithCipherAes256Gcm() throws Exception {
+		assertCanConnectToServerWithCipher("aes256-gcm@openssh.com");
+	}
+
+	@Test
+	public void canConnectWithCipherChaCha20Poly1305() throws Exception {
+		assertCanConnectToServerWithCipher("chacha20-poly1305@openssh.com");
+	}
+
 	private void assertCanConnectToServerWithMac(@NotNull String macs) throws IOException {
 		ConnectionInfo info = connectToServerWithOptions("-oMACs=" + macs);
 		assertThat(macs, is(info.clientToServerMACAlgorithm));

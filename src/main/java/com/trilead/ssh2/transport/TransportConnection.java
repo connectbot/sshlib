@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.security.SecureRandom;
 
 import com.trilead.ssh2.compression.ICompressor;
+import com.trilead.ssh2.crypto.cipher.AeadCipher;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.CipherInputStream;
 import com.trilead.ssh2.crypto.cipher.CipherOutputStream;
@@ -52,9 +53,9 @@ public class TransportConnection
 
 	int recv_padd_blocksize = 8;
 
-	com.trilead.ssh2.crypto.cipher.AeadCipher send_aead_cipher;
+	AeadCipher send_aead_cipher;
 
-	com.trilead.ssh2.crypto.cipher.AeadCipher recv_aead_cipher;
+	AeadCipher recv_aead_cipher;
 
 	boolean send_is_aead = false;
 
@@ -121,18 +122,22 @@ public class TransportConnection
 			send_padd_blocksize = 8;
 	}
 
-	public void changeRecvAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	public void changeRecvAeadCipher(AeadCipher cipher)
 	{
 		recv_aead_cipher = cipher;
 		recv_is_aead = true;
-		recv_padd_blocksize = 8;  // ChaCha20-Poly1305 uses 8-byte alignment
+		recv_padd_blocksize = cipher.getBlockSize();
+		if (recv_padd_blocksize < 8)
+			recv_padd_blocksize = 8;
 	}
 
-	public void changeSendAeadCipher(com.trilead.ssh2.crypto.cipher.AeadCipher cipher)
+	public void changeSendAeadCipher(AeadCipher cipher)
 	{
 		send_aead_cipher = cipher;
 		send_is_aead = true;
-		send_padd_blocksize = 8;  // ChaCha20-Poly1305 uses 8-byte alignment
+		send_padd_blocksize = cipher.getBlockSize();
+		if (send_padd_blocksize < 8)
+			send_padd_blocksize = 8;
 		useRandomPadding = true;  // Always use random padding with AEAD
 	}
 
