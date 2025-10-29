@@ -20,8 +20,9 @@ public class Ed25519Provider extends Provider {
 	private static final Object sInitLock = new Object();
 	private static boolean sInitialized = false;
 
+	@SuppressWarnings("deprecation") // Android only has the Provider(String, double, String) constructor
 	public Ed25519Provider() {
-		super(NAME, "1.0", "Not for use elsewhere");
+		super(NAME, 1.0, "Not for use elsewhere");
 		AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
 			setup();
 			return null;
