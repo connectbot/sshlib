@@ -3,9 +3,9 @@ package com.trilead.ssh2.crypto.cipher;
 import com.trilead.ssh2.crypto.digest.Poly1305;
 
 import javax.crypto.Cipher;
-import javax.crypto.spec.ChaCha20ParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.GeneralSecurityException;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 
 /**
@@ -105,14 +105,13 @@ public class ChaCha20Poly1305 implements AeadCipher
 	 * - Bytes 0-7: 0x0000000000000000 (always zero)
 	 * - Bytes 8-11: sequence number in big-endian
 	 *
+	 * When using IvParameterSpec, the provider manages the block counter internally.
 	 * This method reuses the instance nonce buffer to avoid allocations.
 	 *
 	 * @param seqNum SSH packet sequence number
 	 */
 	private void updateNonce(int seqNum)
 	{
-		// First 8 bytes are always zero (kept from initialization)
-		// Update last 4 bytes with sequence number
 		nonce[8] = (byte) (seqNum >>> 24);
 		nonce[9] = (byte) (seqNum >>> 16);
 		nonce[10] = (byte) (seqNum >>> 8);
@@ -124,12 +123,10 @@ public class ChaCha20Poly1305 implements AeadCipher
 	{
 		try
 		{
-			// Use plain ChaCha20 stream cipher for length encryption (not AEAD)
 			updateNonce(seqNum);
-			ChaCha20ParameterSpec params = new ChaCha20ParameterSpec(nonce, 0);
+			AlgorithmParameterSpec params = ChaCha20ParamFactory.create(nonce, 0);
 			headerCipher.init(Cipher.ENCRYPT_MODE, headerKeySpec, params);
 
-			// Encrypt directly into destination buffer
 			int len = headerCipher.doFinal(plainLength, 0, 4, dest, destOff);
 			if (len != 4)
 			{
@@ -147,12 +144,10 @@ public class ChaCha20Poly1305 implements AeadCipher
 	{
 		try
 		{
-			// Use plain ChaCha20 stream cipher for length decryption (not AEAD)
 			updateNonce(seqNum);
-			ChaCha20ParameterSpec params = new ChaCha20ParameterSpec(nonce, 0);
+			AlgorithmParameterSpec params = ChaCha20ParamFactory.create(nonce, 0);
 			headerCipher.init(Cipher.DECRYPT_MODE, headerKeySpec, params);
 
-			// Decrypt directly into destination buffer
 			int len = headerCipher.doFinal(encryptedLength, 0, 4, dest, destOff);
 			if (len != 4)
 			{
@@ -172,35 +167,49 @@ public class ChaCha20Poly1305 implements AeadCipher
 		{
 			updateNonce(seqNum);
 
-			// Step 1: Generate Poly1305 key using K_1 with counter=0
-			ChaCha20ParameterSpec polyKeyParams = new ChaCha20ParameterSpec(nonce, 0);
-			polyKeyCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, polyKeyParams);
-
-			// Generate Poly1305 key by encrypting zeros
-			int keyLen = polyKeyCipher.doFinal(polyKeyZeros, 0, 32, polyKey, 0);
-			if (keyLen != 32)
+			if (ChaCha20ParamFactory.usesChaCha20ParameterSpec())
 			{
-				throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				AlgorithmParameterSpec polyKeyParams = ChaCha20ParamFactory.create(nonce, 0);
+				polyKeyCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, polyKeyParams);
+
+				int keyLen = polyKeyCipher.doFinal(polyKeyZeros, 0, 32, polyKey, 0);
+				if (keyLen != 32)
+				{
+					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				}
+
+				AlgorithmParameterSpec payloadParams = ChaCha20ParamFactory.create(nonce, 1);
+				payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, payloadParams);
+
+				int encLen = payloadCipher.doFinal(plaintext, 0, plaintext.length, ciphertext, 0);
+				if (encLen != plaintext.length)
+				{
+					throw new IllegalStateException("Unexpected ciphertext length: " + encLen);
+				}
+			}
+			else
+			{
+				AlgorithmParameterSpec params = ChaCha20ParamFactory.create(nonce, 0);
+				payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, params);
+
+				int keyLen = payloadCipher.update(polyKeyZeros, 0, 32, polyKey, 0);
+				if (keyLen != 32)
+				{
+					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				}
+
+				int encLen = payloadCipher.doFinal(plaintext, 0, plaintext.length, ciphertext, 0);
+				if (encLen != plaintext.length)
+				{
+					throw new IllegalStateException("Unexpected ciphertext length: " + encLen);
+				}
 			}
 
-			// Step 2: Encrypt payload using K_1 with counter=1
-			ChaCha20ParameterSpec payloadParams = new ChaCha20ParameterSpec(nonce, 1);
-			payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, payloadParams);
-
-			// Encrypt directly into ciphertext buffer
-			int encLen = payloadCipher.doFinal(plaintext, 0, plaintext.length, ciphertext, 0);
-			if (encLen != plaintext.length)
-			{
-				throw new IllegalStateException("Unexpected ciphertext length: " + encLen);
-			}
-
-			// Step 3: Calculate Poly1305 MAC over encrypted_length || ciphertext
 			poly.init(polyKey);
 			poly.update(encryptedLength, 0, 4);
 			poly.update(ciphertext, 0, ciphertext.length);
 			poly.finish(tag, 0);
 
-			// Wipe sensitive data
 			Arrays.fill(polyKey, (byte) 0);
 		}
 		catch (GeneralSecurityException e)
@@ -216,54 +225,78 @@ public class ChaCha20Poly1305 implements AeadCipher
 		{
 			updateNonce(seqNum);
 
-			// Step 1: Generate Poly1305 key using K_1 with counter=0
-			// ChaCha20 is a stream cipher, so ENCRYPT_MODE generates the keystream
-			ChaCha20ParameterSpec polyKeyParams = new ChaCha20ParameterSpec(nonce, 0);
-			polyKeyCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, polyKeyParams);
-
-			// Generate Poly1305 key by encrypting zeros
-			int keyLen = polyKeyCipher.doFinal(polyKeyZeros, 0, 32, polyKey, 0);
-			if (keyLen != 32)
+			if (ChaCha20ParamFactory.usesChaCha20ParameterSpec())
 			{
-				throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				AlgorithmParameterSpec polyKeyParams = ChaCha20ParamFactory.create(nonce, 0);
+				polyKeyCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, polyKeyParams);
+
+				int keyLen = polyKeyCipher.doFinal(polyKeyZeros, 0, 32, polyKey, 0);
+				if (keyLen != 32)
+				{
+					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				}
+
+				poly.init(polyKey);
+				poly.update(encryptedLength, 0, 4);
+				poly.update(ciphertext, 0, ciphertext.length);
+				poly.finish(computedTag, 0);
+
+				boolean tagValid = constantTimeEquals(tag, computedTag);
+
+				Arrays.fill(computedTag, (byte) 0);
+				Arrays.fill(polyKey, (byte) 0);
+
+				if (!tagValid)
+				{
+					return false;
+				}
+
+				AlgorithmParameterSpec payloadParams = ChaCha20ParamFactory.create(nonce, 1);
+				payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, payloadParams);
+
+				int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
+				if (decLen != ciphertext.length)
+				{
+					throw new IllegalStateException("Unexpected decrypted length: " + decLen);
+				}
 			}
-
-			// Step 2: Verify Poly1305 MAC over encrypted_length || ciphertext
-			poly.init(polyKey);
-			poly.update(encryptedLength, 0, 4);
-			poly.update(ciphertext, 0, ciphertext.length);
-			poly.finish(computedTag, 0);
-
-			// Constant-time comparison
-			boolean tagValid = constantTimeEquals(tag, computedTag);
-
-			// Wipe computed tag
-			Arrays.fill(computedTag, (byte) 0);
-			// Wipe Poly1305 key
-			Arrays.fill(polyKey, (byte) 0);
-
-			if (!tagValid)
+			else
 			{
-				return false;
-			}
+				AlgorithmParameterSpec params = ChaCha20ParamFactory.create(nonce, 0);
+				payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, params);
 
-			// Step 3: Decrypt payload using K_1 with counter=1
-			// For stream ciphers, decryption is same as encryption (XOR with keystream)
-			ChaCha20ParameterSpec payloadParams = new ChaCha20ParameterSpec(nonce, 1);
-			payloadCipher.init(Cipher.ENCRYPT_MODE, mainKeySpec, payloadParams);
+				int keyLen = payloadCipher.update(polyKeyZeros, 0, 32, polyKey, 0);
+				if (keyLen != 32)
+				{
+					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+				}
 
-			// Decrypt directly into plaintext buffer
-			int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
-			if (decLen != ciphertext.length)
-			{
-				throw new IllegalStateException("Unexpected decrypted length: " + decLen);
+				poly.init(polyKey);
+				poly.update(encryptedLength, 0, 4);
+				poly.update(ciphertext, 0, ciphertext.length);
+				poly.finish(computedTag, 0);
+
+				boolean tagValid = constantTimeEquals(tag, computedTag);
+
+				Arrays.fill(computedTag, (byte) 0);
+				Arrays.fill(polyKey, (byte) 0);
+
+				if (!tagValid)
+				{
+					return false;
+				}
+
+				int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
+				if (decLen != ciphertext.length)
+				{
+					throw new IllegalStateException("Unexpected decrypted length: " + decLen);
+				}
 			}
 
 			return true;
 		}
 		catch (GeneralSecurityException e)
 		{
-			// Tag verification failed or other crypto error
 			return false;
 		}
 	}
