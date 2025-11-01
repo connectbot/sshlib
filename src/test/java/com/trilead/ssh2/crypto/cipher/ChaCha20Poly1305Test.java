@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 /**
  * Test ChaCha20-Poly1305 using the worked example from
  * draft-ietf-sshm-chacha20-poly1305-02, Appendix A.
@@ -13,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ChaCha20Poly1305Test
 {
 	@Test
-	public void testRfcWorkingExample()
+	public void testRfcWorkingExample() throws IOException
 	{
 		// Complete test from draft-ietf-sshm-chacha20-poly1305-02 Appendix A
 		// Key material from RFC Appendix A (Figure 5)
@@ -105,7 +107,7 @@ public class ChaCha20Poly1305Test
 	}
 
 	@Test
-	public void testEncryptDecryptRoundTrip()
+	public void testEncryptDecryptRoundTrip() throws IOException
 	{
 		byte[] key = new byte[64];
 		// Initialize with test key
@@ -144,7 +146,7 @@ public class ChaCha20Poly1305Test
 	}
 
 	@Test
-	public void testTagVerificationFailure()
+	public void testTagVerificationFailure() throws IOException
 	{
 		byte[] key = new byte[64];
 		ChaCha20Poly1305 cipher = new ChaCha20Poly1305();
@@ -161,7 +163,7 @@ public class ChaCha20Poly1305Test
 	}
 
 	@Test
-	public void testSequenceNumbers()
+	public void testSequenceNumbers() throws IOException
 	{
 		byte[] key = new byte[64];
 		for (int i = 0; i < 64; i++)
@@ -198,7 +200,7 @@ public class ChaCha20Poly1305Test
 	}
 
 	@Test
-	public void testWrongSequenceNumberFails()
+	public void testWrongSequenceNumberFails() throws IOException
 	{
 		byte[] key = new byte[64];
 		ChaCha20Poly1305 encCipher = new ChaCha20Poly1305();
