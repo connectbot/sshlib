@@ -1,5 +1,7 @@
 package com.trilead.ssh2.crypto.cipher;
 
+import java.io.IOException;
+
 /**
  * Authenticated Encryption with Associated Data (AEAD) cipher interface.
  *
@@ -82,5 +84,6 @@ public interface AeadCipher
 	 * @param encryptedLength the encrypted 4-byte length field (for AAD)
 	 * @return true if tag verification succeeded, false otherwise
 	 */
-	boolean open(int seqNum, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[] encryptedLength);
+	boolean open(int seqNum, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[] encryptedLength)
+			throws IOException;
 }

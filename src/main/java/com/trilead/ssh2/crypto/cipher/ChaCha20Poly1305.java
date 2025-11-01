@@ -4,6 +4,8 @@ import com.trilead.ssh2.crypto.digest.Poly1305;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
+
+import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
@@ -222,7 +224,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 	}
 
 	@Override
-	public boolean open(int seqNum, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[] encryptedLength)
+	public boolean open(int seqNum, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[] encryptedLength) throws IOException
 	{
 		try
 		{
@@ -236,7 +238,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 				int keyLen = polyKeyCipher.doFinal(polyKeyZeros, 0, 32, polyKey, 0);
 				if (keyLen != 32)
 				{
-					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+					throw new IOException("Unexpected Poly1305 key length: " + keyLen);
 				}
 
 				poly.init(polyKey);
@@ -260,7 +262,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 				int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
 				if (decLen != ciphertext.length)
 				{
-					throw new IllegalStateException("Unexpected decrypted length: " + decLen);
+					throw new IOException("Unexpected decrypted length: " + decLen);
 				}
 			}
 			else
@@ -271,7 +273,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 				int keyLen = payloadCipher.update(polyKeyZeros, 0, 32, polyKey, 0);
 				if (keyLen != 32)
 				{
-					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
+					throw new IOException("Unexpected Poly1305 key length: " + keyLen);
 				}
 
 				poly.init(polyKey);
@@ -294,7 +296,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 				int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
 				if (decLen != ciphertext.length)
 				{
-					throw new IllegalStateException("Unexpected decrypted length: " + decLen);
+					throw new IOException("Unexpected decrypted length: " + decLen);
 				}
 			}
 
