@@ -1,19 +1,16 @@
 package com.trilead.ssh2.crypto.cipher;
 
+import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.lang.reflect.Constructor;
 import java.security.spec.AlgorithmParameterSpec;
 
 /**
- * Factory for creating ChaCha20 algorithm parameter specs with compatibility
- * across different Java platforms.
+ * Factory for creating ChaCha20 algorithm parameter specs.
  *
- * Desktop JDK requires ChaCha20ParameterSpec (with explicit counter support).
- * Android prior to API 35 doesn't have ChaCha20ParameterSpec and uses IvParameterSpec.
- *
- * This factory detects the available class at runtime and creates the appropriate
- * parameter spec without causing ClassNotFoundException on platforms that don't
- * support ChaCha20ParameterSpec.
+ * Tests whether the JCE provider supports ChaCha20ParameterSpec by attempting
+ * to initialize a cipher with it. Falls back to IvParameterSpec if not supported.
  */
 class ChaCha20ParamFactory
 {
@@ -29,9 +26,18 @@ class ChaCha20ParamFactory
 		{
 			Class<?> chaCha20ParamSpecClass = Class.forName("javax.crypto.spec.ChaCha20ParameterSpec");
 			constructor = chaCha20ParamSpecClass.getConstructor(byte[].class, int.class);
+
+			byte[] testNonce = new byte[12];
+			byte[] testKey = new byte[32];
+			AlgorithmParameterSpec testParams = (AlgorithmParameterSpec) constructor.newInstance(testNonce, 0);
+			SecretKeySpec testKeySpec = new SecretKeySpec(testKey, "ChaCha20");
+
+			Cipher testCipher = Cipher.getInstance("ChaCha20");
+			testCipher.init(Cipher.DECRYPT_MODE, testKeySpec, testParams);
+
 			useChaCha20ParamSpec = true;
 		}
-		catch (ClassNotFoundException | NoSuchMethodException e)
+		catch (Exception e)
 		{
 		}
 

@@ -51,6 +51,7 @@ public class ChaCha20Poly1305 implements AeadCipher
 	private final byte[] polyKeyZeros = new byte[32];
 	private final byte[] polyKey = new byte[32];
 	private final byte[] computedTag = new byte[TAG_SIZE];
+	private final byte[] skipToNextBlock = new byte[64];
 
 	@Override
 	public void init(boolean forEncryption, byte[] key, byte[] iv) throws IllegalArgumentException
@@ -198,6 +199,8 @@ public class ChaCha20Poly1305 implements AeadCipher
 					throw new IllegalStateException("Unexpected Poly1305 key length: " + keyLen);
 				}
 
+				payloadCipher.update(skipToNextBlock, 0, 32, skipToNextBlock, 0);
+
 				int encLen = payloadCipher.doFinal(plaintext, 0, plaintext.length, ciphertext, 0);
 				if (encLen != plaintext.length)
 				{
@@ -285,6 +288,8 @@ public class ChaCha20Poly1305 implements AeadCipher
 				{
 					return false;
 				}
+
+				payloadCipher.update(skipToNextBlock, 0, 32, skipToNextBlock, 0);
 
 				int decLen = payloadCipher.doFinal(ciphertext, 0, ciphertext.length, plaintext, 0);
 				if (decLen != ciphertext.length)
