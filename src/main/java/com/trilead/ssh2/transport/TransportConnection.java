@@ -173,8 +173,12 @@ public class TransportConnection
 
 	public int getPacketOverheadEstimate()
 	{
-		// return an estimate for the paket overhead (for send operations)
-		return 5 + 4 + (send_padd_blocksize - 1) + send_mac_buffer.length;
+		if (send_is_aead)
+		{
+			return 4 + 1 + (send_padd_blocksize - 1) + send_aead_cipher.getTagSize();
+		}
+		int macSize = (send_mac_buffer != null) ? send_mac_buffer.length : 0;
+		return 5 + 4 + (send_padd_blocksize - 1) + macSize;
 	}
 
 	public void sendMessage(byte[] message, int off, int len, int padd) throws IOException
