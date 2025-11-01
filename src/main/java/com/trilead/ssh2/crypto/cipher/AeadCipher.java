@@ -83,6 +83,7 @@ public interface AeadCipher
 	 * @param plaintext output buffer for plaintext
 	 * @param encryptedLength the encrypted 4-byte length field (for AAD)
 	 * @return true if tag verification succeeded, false otherwise
+	 * @throws IOException on decryption errors
 	 */
 	boolean open(int seqNum, byte[] ciphertext, byte[] tag, byte[] plaintext, byte[] encryptedLength)
 			throws IOException;
