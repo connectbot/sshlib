@@ -21,13 +21,16 @@ public abstract class GenericDhExchange
 
 	/* Shared secret */
 
-	BigInteger sharedSecret;
+	protected BigInteger sharedSecret;
 
 	protected GenericDhExchange()
 	{
 	}
 
 	public static GenericDhExchange getInstance(String algo) {
+		if (MlKemHybridExchange.NAME.equals(algo)) {
+			return new MlKemHybridExchange();
+		}
 		if (Curve25519Exchange.NAME.equals(algo) || Curve25519Exchange.ALT_NAME.equals(algo)) {
 			return new Curve25519Exchange();
 		}
@@ -53,15 +56,15 @@ public abstract class GenericDhExchange
 	protected abstract byte[] getServerE();
 
 	/**
-	 * @return Returns the shared secret k.
+	 * @return Returns the shared secret k as a byte array for key derivation.
 	 * @throws IllegalStateException if the shared secret is not available.
 	 */
-	public BigInteger getK()
+	public byte[] getK()
 	{
 		if (sharedSecret == null)
 			throw new IllegalStateException("Shared secret not yet known, need f first!");
 
-		return sharedSecret;
+		return sharedSecret.toByteArray();
 	}
 
 	/**
@@ -88,7 +91,7 @@ public abstract class GenericDhExchange
 		hash.updateByteString(hostKey);
 		hash.updateByteString(getE());
 		hash.updateByteString(getServerE());
-		hash.updateBigInt(sharedSecret);
+		hash.updateByteString(getK());
 
 		return hash.getDigest();
 	}

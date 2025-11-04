@@ -60,14 +60,14 @@ public class DhGroupExchange
 	}
 
 	/**
-	 * @return Returns the shared secret k.
+	 * @return Returns the shared secret k as a byte array for key derivation.
 	 */
-	public BigInteger getK()
+	public byte[] getK()
 	{
 		if (k == null)
 			throw new IllegalStateException("Shared secret not yet known, need f first!");
 
-		return k;
+		return k.toByteArray();
 	}
 
 	/**
@@ -107,7 +107,7 @@ public class DhGroupExchange
 		hash.updateBigInt(g);
 		hash.updateBigInt(e);
 		hash.updateBigInt(f);
-		hash.updateBigInt(k);
+		hash.updateByteString(getK());
 
 		return hash.getDigest();
 	}

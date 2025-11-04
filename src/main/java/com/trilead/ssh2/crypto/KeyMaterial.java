@@ -2,8 +2,6 @@
 package com.trilead.ssh2.crypto;
 
 
-import java.math.BigInteger;
-
 import com.trilead.ssh2.crypto.digest.HashForSSH2Types;
 
 /**
@@ -21,7 +19,7 @@ public class KeyMaterial
 	public byte[] integrity_key_client_to_server;
 	public byte[] integrity_key_server_to_client;
 
-	private static byte[] calculateKey(HashForSSH2Types sh, BigInteger K, byte[] H, byte type, byte[] SessionID,
+	private static byte[] calculateKey(HashForSSH2Types sh, byte[] K, byte[] H, byte type, byte[] SessionID,
 			int keyLength)
 	{
 		byte[] res = new byte[keyLength];
@@ -36,7 +34,7 @@ public class KeyMaterial
 		byte[][] tmp = new byte[numRounds][];
 
 		sh.reset();
-		sh.updateBigInt(K);
+		sh.updateByteString(K);
 		sh.updateBytes(H);
 		sh.updateByte(type);
 		sh.updateBytes(SessionID);
@@ -53,7 +51,7 @@ public class KeyMaterial
 
 		for (int i = 1; i < numRounds; i++)
 		{
-			sh.updateBigInt(K);
+			sh.updateByteString(K);
 			sh.updateBytes(H);
 
 			for (int j = 0; j < i; j++)
@@ -70,7 +68,7 @@ public class KeyMaterial
 		return res;
 	}
 
-	public static KeyMaterial create(String hashAlgo, byte[] H, BigInteger K, byte[] SessionID, int keyLengthCS,
+	public static KeyMaterial create(String hashAlgo, byte[] H, byte[] K, byte[] SessionID, int keyLengthCS,
 			int blockSizeCS, int macLengthCS, int keyLengthSC, int blockSizeSC, int macLengthSC)
 			throws IllegalArgumentException
 	{

@@ -4,6 +4,7 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
@@ -213,6 +214,12 @@ public class DropbearCompatibilityTest {
 	@Test
 	public void canConnectWithKexEcdhSha2Nistp521() throws Exception {
 		assertCanConnectToServerWithKex("ecdh-sha2-nistp521");
+	}
+
+	@Test
+	public void canConnectWithKexMlKem768X25519() throws Exception {
+		Assumptions.assumeTrue(MlKemAvailability.isAvailable(), "ML-KEM not available on this JDK");
+		assertCanConnectToServerWithKex("mlkem768x25519-sha256");
 	}
 
 	private void setCiphers(Connection c, String cipher) {

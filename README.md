@@ -38,6 +38,7 @@ https://opensource.org/licenses/BSD-3-Clause).
   * RSA  ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.6))
 
 ##### Key exchange:
+  * mlkem768x25519-sha256 ([draft-ietf-sshm-mlkem-hybrid-kex](https://datatracker.ietf.org/doc/draft-ietf-sshm-mlkem-hybrid-kex/) (depends on JEP-496 support)
   * ecdh-sha2-nistp521 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
   * ecdh-sha2-nistp384 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
   * ecdh-sha2-nistp256 ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
