@@ -63,7 +63,8 @@ java {
     withJavadocJar()
     withSourcesJar()
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
+        val jdkVersion = (project.findProperty("jdkVersion") as String?)?.toIntOrNull() ?: 11
+        languageVersion.set(JavaLanguageVersion.of(jdkVersion))
     }
 }
 

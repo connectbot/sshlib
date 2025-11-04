@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [17, 21]
+        java: [17, 21, 25]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up JDK ${{ matrix.java }}
@@ -29,13 +29,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Build with Gradle
-        run: ./gradlew build jacocoTestReport --info
+        run: ./gradlew build jacocoTestReport --info -PjdkVersion=${{ matrix.java }}
+        env:
+          SSH_TEST_REQUIRE_MLKEM: ${{ matrix.java >= 25 }}
       - name: Upload to Sonatype
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
         run: |
           echo "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" > ~/.gradle/secring.gpg.b64
           base64 -d ~/.gradle/secring.gpg.b64 > ~/.gradle/secring.gpg
-          ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} -Psigning.keyId=${GPG_KEYID} -Psigning.secretKeyRingFile=$(echo ~/.gradle/secring.gpg) -Psigning.password=${GPG_PASSWORD}
+          ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository -PjdkVersion=${{ matrix.java }} -PsonatypeUsername=${SONATYPE_USERNAME} -PsonatypePassword=${SONATYPE_PASSWORD} -Psigning.keyId=${GPG_KEYID} -Psigning.secretKeyRingFile=$(echo ~/.gradle/secring.gpg) -Psigning.password=${GPG_PASSWORD}
         env:
           GPG_KEYID: ${{ secrets.MAVEN_GPG_KEYID }}
           GPG_PASSWORD: ${{ secrets.MAVEN_GPG_PASSPHRASE }}

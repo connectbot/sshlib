@@ -27,6 +27,7 @@ import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
 import com.trilead.ssh2.crypto.dh.Curve25519Exchange;
 import com.trilead.ssh2.crypto.dh.DhGroupExchange;
 import com.trilead.ssh2.crypto.dh.GenericDhExchange;
+import com.trilead.ssh2.crypto.dh.MlKemHybridExchange;
 import com.trilead.ssh2.crypto.digest.HMAC;
 import com.trilead.ssh2.crypto.digest.MAC;
 import com.trilead.ssh2.crypto.digest.MACs;
@@ -58,6 +59,8 @@ public class KexManager
 	private static final Logger log = Logger.getLogger(KexManager.class);
 
 	private static final boolean supportsEc;
+	private static final boolean supportsMlKem;
+
 	static {
 		KeyFactory keyFact;
 		try {
@@ -67,6 +70,29 @@ public class KexManager
 			log.log(10, "Disabling EC support due to lack of KeyFactory");
 		}
 		supportsEc = keyFact != null;
+
+		boolean mlkemSupported = false;
+		try {
+			java.security.KeyPairGenerator.getInstance("ML-KEM-768");
+
+			try {
+				Class<?> kemClass = Class.forName("javax.crypto.KEM");
+				java.lang.reflect.Method getInstance = kemClass.getMethod("getInstance", String.class);
+				getInstance.invoke(null, "ML-KEM");
+			} catch (ClassNotFoundException e) {
+				throw e;
+			}
+
+			mlkemSupported = true;
+			log.log(10, "ML-KEM-768 support detected (Java 23+, KEM API available)");
+		} catch (NoSuchAlgorithmException e) {
+			log.log(10, "ML-KEM-768 unavailable: algorithm not found (requires Java 23+)");
+		} catch (ClassNotFoundException e) {
+			log.log(10, "ML-KEM-768 unavailable: KEM API not found (requires Java 23+, not on all Android versions)");
+		} catch (Exception e) {
+			log.log(10, "ML-KEM-768 unavailable: " + e.getMessage());
+		}
+		supportsMlKem = mlkemSupported;
 	}
 
 	private static final Set<String> HOSTKEY_ALGS = new LinkedHashSet<>();
@@ -85,6 +111,9 @@ public class KexManager
 
 	private static final Set<String> KEX_ALGS = new LinkedHashSet<>();
 	static {
+		if (supportsMlKem) {
+			KEX_ALGS.add(MlKemHybridExchange.NAME);
+		}
 		KEX_ALGS.add(Curve25519Exchange.NAME);
 		KEX_ALGS.add(Curve25519Exchange.ALT_NAME);
 		if (supportsEc) {
@@ -569,7 +598,8 @@ public class KexManager
 				return;
 			}
 
-			if (kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
+			if (kxs.np.kex_algo.equals(MlKemHybridExchange.NAME)
+				|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
 					|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME)
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
 					|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
@@ -731,7 +761,8 @@ public class KexManager
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp384")
 				|| kxs.np.kex_algo.equals("ecdh-sha2-nistp521")
 				|| kxs.np.kex_algo.equals(Curve25519Exchange.NAME)
-				|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME))
+				|| kxs.np.kex_algo.equals(Curve25519Exchange.ALT_NAME)
+				|| kxs.np.kex_algo.equals(MlKemHybridExchange.NAME))
 		{
 			if (kxs.state == 1)
 			{
