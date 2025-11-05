@@ -249,6 +249,9 @@ public class DropbearCompatibilityTest {
 	}
 
 	private void setMac(Connection c, String mac) {
+		// This is needed because AEAD selection would result in null MAC.
+		setCiphers(c, "aes128-ctr");
+
 		c.setClient2ServerMACs(new String[] { mac });
 		c.setServer2ClientMACs(new String[] { mac });
 	}
