@@ -277,10 +277,22 @@ public class KexManager
 			log.log(20, "enc_algo_client_to_server=" + np.enc_algo_client_to_server);
 			log.log(20, "enc_algo_server_to_client=" + np.enc_algo_server_to_client);
 
-			np.mac_algo_client_to_server = getFirstMatch(client.mac_algorithms_client_to_server,
-					server.mac_algorithms_client_to_server);
-			np.mac_algo_server_to_client = getFirstMatch(client.mac_algorithms_server_to_client,
-					server.mac_algorithms_server_to_client);
+			boolean c2s_is_aead = BlockCipherFactory.isAead(np.enc_algo_client_to_server);
+			boolean s2c_is_aead = BlockCipherFactory.isAead(np.enc_algo_server_to_client);
+
+			if (c2s_is_aead) {
+				np.mac_algo_client_to_server = null;
+			} else {
+				np.mac_algo_client_to_server = getFirstMatch(client.mac_algorithms_client_to_server,
+						server.mac_algorithms_client_to_server);
+			}
+
+			if (s2c_is_aead) {
+				np.mac_algo_server_to_client = null;
+			} else {
+				np.mac_algo_server_to_client = getFirstMatch(client.mac_algorithms_server_to_client,
+						server.mac_algorithms_server_to_client);
+			}
 
 			log.log(20, "mac_algo_client_to_server=" + np.mac_algo_client_to_server);
 			log.log(20, "mac_algo_server_to_client=" + np.mac_algo_server_to_client);
