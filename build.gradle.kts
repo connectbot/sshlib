@@ -45,7 +45,7 @@ dependencies {
     implementation("org.connectbot:jbcrypt:1.0.2")
 
     testImplementation("ch.qos.logback:logback-classic:1.5.21")
-    testImplementation("commons-codec:commons-codec:1.19.0")
+    testImplementation("commons-codec:commons-codec:1.20.0")
     testImplementation("commons-io:commons-io:2.21.0")
     testImplementation("org.hamcrest:hamcrest:3.0")
     testImplementation("org.jetbrains:annotations:26.0.2-1")
