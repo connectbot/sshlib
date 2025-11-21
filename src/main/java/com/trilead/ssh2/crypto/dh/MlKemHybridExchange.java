@@ -2,21 +2,15 @@ package com.trilead.ssh2.crypto.dh;
 
 import com.google.crypto.tink.subtle.X25519;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.spec.PKCS8EncodedKeySpec;
 
 /**
  * ML-KEM-768 hybrid key exchange implementation (mlkem768x25519-sha256).
  * Combines post-quantum ML-KEM-768 with classical X25519 key exchange.
- * Uses reflection to access Java 23+ KEM APIs while maintaining compatibility with Java 11+.
+ * Supports both Java 23+ native KEM API and Kyber Kotlin fallback for Android.
  * Implements draft-ietf-sshm-mlkem-hybrid-kex-03 specification.
  */
 public class MlKemHybridExchange extends GenericDhExchange {
@@ -28,7 +22,7 @@ public class MlKemHybridExchange extends GenericDhExchange {
 	private static final int X25519_KEY_SIZE = 32;
 
 	private byte[] mlkemPublicKey;
-	private byte[] mlkemPrivateKeyEncoded;
+	private byte[] mlkemPrivateKey;
 	private byte[] x25519PublicKey;
 	private byte[] x25519PrivateKey;
 
@@ -38,10 +32,24 @@ public class MlKemHybridExchange extends GenericDhExchange {
 	private byte[] serverReply;
 	private byte[] hybridSharedSecretK;
 
-	private Object kemInstance;
+	private final MlKemAdapter mlkemAdapter;
 
-	public MlKemHybridExchange() {
+	public MlKemHybridExchange() throws IOException {
 		super();
+		this.mlkemAdapter = createMlKemAdapter();
+	}
+
+	public MlKemHybridExchange(MlKemAdapter adapter) {
+		super();
+		this.mlkemAdapter = adapter;
+	}
+
+	private static MlKemAdapter createMlKemAdapter() throws IOException {
+		try {
+			return new JavaKemAdapter();
+		} catch (IOException e) {
+			return new KyberKotlinAdapter();
+		}
 	}
 
 	@Override
@@ -51,11 +59,9 @@ public class MlKemHybridExchange extends GenericDhExchange {
 		}
 
 		try {
-			KeyPairGenerator mlkemKpg = KeyPairGenerator.getInstance("ML-KEM-768");
-			KeyPair mlkemKeyPair = mlkemKpg.generateKeyPair();
-			byte[] x509Encoded = mlkemKeyPair.getPublic().getEncoded();
-			mlkemPublicKey = extractRawMlKemPublicKey(x509Encoded);
-			mlkemPrivateKeyEncoded = mlkemKeyPair.getPrivate().getEncoded();
+			MlKemAdapter.MlKemKeyPair mlkemKeyPair = mlkemAdapter.generateKeyPair();
+			mlkemPublicKey = mlkemKeyPair.getPublicKey();
+			mlkemPrivateKey = mlkemKeyPair.getPrivateKey();
 
 			if (mlkemPublicKey.length != MLKEM768_PUBLIC_KEY_SIZE) {
 				throw new IOException(
@@ -78,8 +84,6 @@ public class MlKemHybridExchange extends GenericDhExchange {
 								+ ")");
 			}
 
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException("ML-KEM-768 or X25519 not available", e);
 		} catch (InvalidKeyException e) {
 			throw new IOException("Failed to generate key pair", e);
 		}
@@ -119,7 +123,7 @@ public class MlKemHybridExchange extends GenericDhExchange {
 			serverX25519PublicKey = new byte[X25519_KEY_SIZE];
 			System.arraycopy(f, MLKEM768_CIPHERTEXT_SIZE, serverX25519PublicKey, 0, X25519_KEY_SIZE);
 
-			mlkemSharedSecret = performMlKemDecapsulation(mlkemCiphertext);
+			mlkemSharedSecret = mlkemAdapter.decapsulate(mlkemPrivateKey, mlkemCiphertext);
 
 			x25519SharedSecret = X25519.computeSharedSecret(x25519PrivateKey, serverX25519PublicKey);
 			validateX25519SharedSecret(x25519SharedSecret);
@@ -135,38 +139,6 @@ public class MlKemHybridExchange extends GenericDhExchange {
 			throw new IOException("X25519 key agreement failed", e);
 		} catch (Exception e) {
 			throw new IOException("ML-KEM decapsulation or key agreement failed", e);
-		}
-	}
-
-	private byte[] performMlKemDecapsulation(byte[] ciphertext) throws IOException {
-		try {
-			if (kemInstance == null) {
-				Class<?> kemClass = Class.forName("javax.crypto.KEM");
-				Method getInstance = kemClass.getMethod("getInstance", String.class);
-				kemInstance = getInstance.invoke(null, "ML-KEM");
-			}
-
-			KeyFactory kf = KeyFactory.getInstance("ML-KEM");
-			PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(mlkemPrivateKeyEncoded);
-			PrivateKey mlkemPrivateKey = kf.generatePrivate(privateKeySpec);
-
-			Class<?> kemClass = Class.forName("javax.crypto.KEM");
-			Method newDecapsulator = kemClass.getMethod("newDecapsulator", PrivateKey.class);
-			Object decapsulator = newDecapsulator.invoke(kemInstance, mlkemPrivateKey);
-
-			Class<?> decapsulatorClass = Class.forName("javax.crypto.KEM$Decapsulator");
-			Method decapsulateMethod = decapsulatorClass.getMethod("decapsulate", byte[].class);
-			Object secretKey = decapsulateMethod.invoke(decapsulator, ciphertext);
-
-			javax.crypto.SecretKey sk = (javax.crypto.SecretKey) secretKey;
-			return sk.getEncoded();
-
-		} catch (ClassNotFoundException e) {
-			throw new IOException("ML-KEM not available (Java 23+ required)", e);
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException("ML-KEM not available", e);
-		} catch (Exception e) {
-			throw new IOException("ML-KEM decapsulation failed", e);
 		}
 	}
 
@@ -200,27 +172,5 @@ public class MlKemHybridExchange extends GenericDhExchange {
 			throw new IllegalStateException("Shared secret not yet known, need f first!");
 		}
 		return hybridSharedSecretK.clone();
-	}
-
-	private static byte[] extractRawMlKemPublicKey(byte[] x509Encoded) throws IOException {
-		if (x509Encoded.length < 22) {
-			throw new IOException("X.509 encoded ML-KEM public key too short");
-		}
-
-		if (x509Encoded[0] != 0x30) {
-			throw new IOException("Invalid X.509 encoding: expected SEQUENCE tag");
-		}
-
-		if (x509Encoded[17] != 0x03) {
-			throw new IOException("Invalid X.509 encoding: BIT STRING not found at expected position");
-		}
-
-		if (x509Encoded[21] != 0x00) {
-			throw new IOException("Invalid X.509 encoding: unexpected unused bits in BIT STRING");
-		}
-
-		byte[] rawKey = new byte[MLKEM768_PUBLIC_KEY_SIZE];
-		System.arraycopy(x509Encoded, 22, rawKey, 0, MLKEM768_PUBLIC_KEY_SIZE);
-		return rawKey;
 	}
 }

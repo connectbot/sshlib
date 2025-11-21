@@ -29,7 +29,11 @@ public abstract class GenericDhExchange
 
 	public static GenericDhExchange getInstance(String algo) {
 		if (MlKemHybridExchange.NAME.equals(algo)) {
-			return new MlKemHybridExchange();
+			try {
+				return new MlKemHybridExchange();
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to create ML-KEM hybrid exchange", e);
+			}
 		}
 		if (Curve25519Exchange.NAME.equals(algo) || Curve25519Exchange.ALT_NAME.equals(algo)) {
 			return new Curve25519Exchange();

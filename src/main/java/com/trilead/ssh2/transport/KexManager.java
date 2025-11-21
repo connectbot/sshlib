@@ -86,13 +86,26 @@ public class KexManager
 			mlkemSupported = true;
 			log.log(10, "ML-KEM-768 support detected (Java 23+, KEM API available)");
 		} catch (NoSuchAlgorithmException e) {
-			log.log(10, "ML-KEM-768 unavailable: algorithm not found (requires Java 23+)");
+			log.log(10, "ML-KEM-768 unavailable via Java KEM API, trying Kyber Kotlin fallback");
+			mlkemSupported = tryKyberKotlin();
 		} catch (ClassNotFoundException e) {
-			log.log(10, "ML-KEM-768 unavailable: KEM API not found (requires Java 23+, not on all Android versions)");
+			log.log(10, "ML-KEM-768 unavailable via Java KEM API (requires Java 23+), trying Kyber Kotlin fallback");
+			mlkemSupported = tryKyberKotlin();
 		} catch (Exception e) {
 			log.log(10, "ML-KEM-768 unavailable: " + e.getMessage());
 		}
 		supportsMlKem = mlkemSupported;
+	}
+
+	private static boolean tryKyberKotlin() {
+		try {
+			Class.forName("asia.hombre.kyber.KyberKeyGenerator");
+			log.log(10, "ML-KEM-768 support detected via Kyber Kotlin");
+			return true;
+		} catch (ClassNotFoundException e) {
+			log.log(10, "Kyber Kotlin not available, ML-KEM-768 disabled");
+			return false;
+		}
 	}
 
 	private static final Set<String> HOSTKEY_ALGS = new LinkedHashSet<>();

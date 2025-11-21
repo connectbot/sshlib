@@ -43,6 +43,7 @@ dependencies {
         isTransitive = false
     }
     implementation("org.connectbot:jbcrypt:1.0.2")
+    implementation("asia.hombre:kyber:2.0.1")
 
     testImplementation("ch.qos.logback:logback-classic:1.5.21")
     testImplementation("commons-codec:commons-codec:1.19.0")
@@ -63,7 +64,7 @@ java {
     withJavadocJar()
     withSourcesJar()
     toolchain {
-        val jdkVersion = (project.findProperty("jdkVersion") as String?)?.toIntOrNull() ?: 11
+        val jdkVersion = (project.findProperty("jdkVersion") as String?)?.toIntOrNull() ?: 17
         languageVersion.set(JavaLanguageVersion.of(jdkVersion))
     }
 }
