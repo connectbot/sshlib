@@ -6,15 +6,12 @@ package com.trilead.ssh2;
  * @author Kenny Root
  */
 public final class MlKemAvailability {
-	private static final String REQUIRE_MLKEM_PROPERTY = "ssh.test.require.mlkem";
-	private static final String REQUIRE_MLKEM_ENV = "SSH_TEST_REQUIRE_MLKEM";
-
 	private MlKemAvailability() {
 	}
 
 	/**
 	 * Checks if ML-KEM-768 support is available in the current JDK.
-	 * This requires Java 23 or later with JEP-496 support.
+	 * This requires either Java 23+ with JEP-496 support or Kyber Kotlin library.
 	 *
 	 * <p>If the system property "ssh.test.require.mlkem" or environment variable
 	 * "SSH_TEST_REQUIRE_MLKEM" is set to "true", this method will throw an
@@ -26,13 +23,11 @@ public final class MlKemAvailability {
 	 */
 	public static boolean isAvailable() {
 		boolean available = checkAvailability();
-		boolean required = isRequired();
 
-		if (required && !available) {
+		if (!available) {
 			throw new AssertionError(
-					"ML-KEM support is required (via " + REQUIRE_MLKEM_PROPERTY
-							+ " or " + REQUIRE_MLKEM_ENV + ") but not available. "
-							+ "Ensure Java 23+ with JEP-496 support is being used.");
+					"ML-KEM support is required but not available. "
+							+ "Ensure Java 23+ with JEP-496 support or Kyber Kotlin library is present.");
 		}
 
 		return available;
@@ -44,21 +39,12 @@ public final class MlKemAvailability {
 			java.security.KeyPairGenerator.getInstance("ML-KEM-768");
 			return true;
 		} catch (Exception e) {
-			return false;
+			try {
+				Class.forName("asia.hombre.kyber.KyberKeyGenerator");
+				return true;
+			} catch (ClassNotFoundException e2) {
+				return false;
+			}
 		}
-	}
-
-	private static boolean isRequired() {
-		String sysProp = System.getProperty(REQUIRE_MLKEM_PROPERTY);
-		if (sysProp != null) {
-			return Boolean.parseBoolean(sysProp);
-		}
-
-		String envVar = System.getenv(REQUIRE_MLKEM_ENV);
-		if (envVar != null) {
-			return Boolean.parseBoolean(envVar);
-		}
-
-		return false;
 	}
 }

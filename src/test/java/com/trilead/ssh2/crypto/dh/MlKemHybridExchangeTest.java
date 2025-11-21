@@ -6,10 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -77,25 +73,9 @@ class MlKemHybridExchangeTest {
 		System.arraycopy(clientInit, 0, mlkemPublicKey, 0, 1184);
 		System.arraycopy(clientInit, 1184, x25519PublicKey, 0, 32);
 
-		byte[] x509EncodedPublicKey = wrapRawMlKemPublicKey(mlkemPublicKey);
-		KeyFactory kf = KeyFactory.getInstance("ML-KEM");
-		X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(x509EncodedPublicKey);
-		PublicKey clientMlkemPublicKey = kf.generatePublic(publicKeySpec);
-
-		Class<?> kemClass = Class.forName("javax.crypto.KEM");
-		Method getInstance = kemClass.getMethod("getInstance", String.class);
-		Object kem = getInstance.invoke(null, "ML-KEM");
-
-		Method newEncapsulator = kemClass.getMethod("newEncapsulator", PublicKey.class);
-		Object encapsulator = newEncapsulator.invoke(kem, clientMlkemPublicKey);
-
-		Class<?> encapsulatorClass = Class.forName("javax.crypto.KEM$Encapsulator");
-		Method encapsulateMethod = encapsulatorClass.getMethod("encapsulate");
-		Object encapsulated = encapsulateMethod.invoke(encapsulator);
-
-		Class<?> encapsulatedClass = Class.forName("javax.crypto.KEM$Encapsulated");
-		Method encapsulationMethod = encapsulatedClass.getMethod("encapsulation");
-		byte[] ciphertext = (byte[]) encapsulationMethod.invoke(encapsulated);
+		MlKemAdapter adapter = createMlKemAdapter();
+		MlKemAdapter.MlKemEncapsulationResult result = adapter.encapsulate(mlkemPublicKey);
+		byte[] ciphertext = result.getCiphertext();
 
 		assertEquals(1088, ciphertext.length, "ML-KEM-768 ciphertext should be 1088 bytes");
 	}
@@ -261,25 +241,9 @@ class MlKemHybridExchangeTest {
 		System.arraycopy(clientInit, 0, mlkemPublicKey, 0, 1184);
 		System.arraycopy(clientInit, 1184, x25519PublicKey, 0, 32);
 
-		byte[] x509EncodedPublicKey = wrapRawMlKemPublicKey(mlkemPublicKey);
-		KeyFactory kf = KeyFactory.getInstance("ML-KEM");
-		X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(x509EncodedPublicKey);
-		PublicKey clientMlkemPublicKey = kf.generatePublic(publicKeySpec);
-
-		Class<?> kemClass = Class.forName("javax.crypto.KEM");
-		Method getInstance = kemClass.getMethod("getInstance", String.class);
-		Object kem = getInstance.invoke(null, "ML-KEM");
-
-		Method newEncapsulator = kemClass.getMethod("newEncapsulator", PublicKey.class);
-		Object encapsulator = newEncapsulator.invoke(kem, clientMlkemPublicKey);
-
-		Class<?> encapsulatorClass = Class.forName("javax.crypto.KEM$Encapsulator");
-		Method encapsulateMethod = encapsulatorClass.getMethod("encapsulate");
-		Object encapsulated = encapsulateMethod.invoke(encapsulator);
-
-		Class<?> encapsulatedClass = Class.forName("javax.crypto.KEM$Encapsulated");
-		Method encapsulationMethod = encapsulatedClass.getMethod("encapsulation");
-		byte[] ciphertext = (byte[]) encapsulationMethod.invoke(encapsulated);
+		MlKemAdapter adapter = createMlKemAdapter();
+		MlKemAdapter.MlKemEncapsulationResult result = adapter.encapsulate(mlkemPublicKey);
+		byte[] ciphertext = result.getCiphertext();
 
 		byte[] serverX25519PublicKey = new byte[32];
 		System.arraycopy(serverPublicKey, 1184, serverX25519PublicKey, 0, 32);
@@ -289,6 +253,14 @@ class MlKemHybridExchangeTest {
 		System.arraycopy(serverX25519PublicKey, 0, reply, 1088, 32);
 
 		return reply;
+	}
+
+	private MlKemAdapter createMlKemAdapter() throws Exception {
+		try {
+			return new JavaKemAdapter();
+		} catch (IOException e) {
+			return new KyberKotlinAdapter();
+		}
 	}
 
 	private byte[] wrapRawMlKemPublicKey(byte[] rawKey) {

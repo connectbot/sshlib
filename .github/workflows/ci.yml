@@ -30,8 +30,6 @@ jobs:
         run: chmod +x gradlew
       - name: Build with Gradle
         run: ./gradlew build jacocoTestReport --info -PjdkVersion=${{ matrix.java }}
-        env:
-          SSH_TEST_REQUIRE_MLKEM: ${{ matrix.java >= 25 }}
       - name: Upload to Sonatype
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
         run: |
