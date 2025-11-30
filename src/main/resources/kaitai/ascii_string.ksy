@@ -13,6 +13,8 @@ doc-ref: 'https://tools.ietf.org/html/rfc4251#section-5'
 seq:
   - id: len
     type: u4
+    valid:
+      expr: _ <= 65535
   - id: value
     type: str
     size: len

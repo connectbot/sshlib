@@ -124,6 +124,29 @@ class SshClient(
         get() = authenticated && connection != null && transport?.isConnected == true
 
     /**
+     * Open a session channel (RFC 4254 section 6.1).
+     *
+     * @return SessionChannel instance if successful, null otherwise
+     */
+    fun openSessionChannel(): SessionChannel? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated - call connect() and authenticatePassword() first")
+            return null
+        }
+
+        return try {
+            logger.info("Opening session channel")
+            runBlocking {
+                conn.openSessionChannel()
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to open session channel", e)
+            null
+        }
+    }
+
+    /**
      * Disconnect from the SSH server.
      */
     fun disconnect() {
