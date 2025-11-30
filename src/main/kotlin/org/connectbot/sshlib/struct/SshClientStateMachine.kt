@@ -59,6 +59,23 @@ class SshClientStateMachine(
         data class ReceiveServiceAccept(val service: String) : SshEvent()
         object AuthenticationSuccess : SshEvent()
         object AuthenticationFailure : SshEvent()
+        data class OpenChannel(
+            val channelType: String,
+            val localChannelNumber: Int,
+            val initialWindowSize: Int,
+            val maxPacketSize: Int
+        ) : SshEvent()
+        data class ReceiveChannelOpenConfirmation(val msg: SshMsgChannelOpenConfirmation) : SshEvent()
+        data class ReceiveChannelOpenFailure(val msg: SshMsgChannelOpenFailure) : SshEvent()
+        data class SendChannelRequest(
+            val recipientChannel: Int,
+            val requestType: String,
+            val wantReply: Boolean,
+            val message: SshMsgChannelRequest
+        ) : SshEvent()
+        object ReceiveChannelSuccess : SshEvent()
+        object ReceiveChannelFailure : SshEvent()
+        data class ReceiveGlobalRequest(val msg: SshMsgGlobalRequest) : SshEvent()
         data class ReceiveDebug(val msg: SshMsgDebug) : SshEvent()
         object ReceiveIgnore : SshEvent()
         object Disconnect : SshEvent()
@@ -71,7 +88,10 @@ class SshClientStateMachine(
         val waitNewKeys = state("WaitNewKeys")
         val waitService = state("WaitService")
         val waitAuthentication = state("WaitAuthentication")
-        val connected = state("Connected")
+        val authenticated = state("Authenticated")
+        val waitChannelOpenConfirmation = state("WaitChannelOpenConfirmation")
+        val channelOpen = state("ChannelOpen")
+        val waitChannelRequestReply = state("WaitChannelRequestReply")
         val disconnected = finalState("Disconnected")
 
         initialState("Unconnected") {
@@ -173,7 +193,7 @@ class SshClientStateMachine(
             onExit { callbacks.onStateExit("WaitAuthentication") }
 
             transition<SshEvent.AuthenticationSuccess> {
-                targetState = connected
+                targetState = authenticated
                 onTriggered {
                     callbacks.authenticationSuccess()
                 }
@@ -186,9 +206,66 @@ class SshClientStateMachine(
             }
         }
 
-        connected {
-            onEntry { callbacks.onStateEnter("Connected") }
-            onExit { callbacks.onStateExit("Connected") }
+        authenticated {
+            onEntry { callbacks.onStateEnter("Authenticated") }
+            onExit { callbacks.onStateExit("Authenticated") }
+
+            transition<SshEvent.OpenChannel> {
+                targetState = waitChannelOpenConfirmation
+                onTriggered {
+                    callbacks.sendChannelOpen(it.event.channelType, it.event.localChannelNumber, it.event.initialWindowSize, it.event.maxPacketSize)
+                }
+            }
+        }
+
+        waitChannelOpenConfirmation {
+            onEntry { callbacks.onStateEnter("WaitChannelOpenConfirmation") }
+            onExit { callbacks.onStateExit("WaitChannelOpenConfirmation") }
+
+            transition<SshEvent.ReceiveChannelOpenConfirmation> {
+                targetState = channelOpen
+                onTriggered {
+                    callbacks.receiveChannelOpenConfirmation(it.event.msg)
+                }
+            }
+
+            transition<SshEvent.ReceiveChannelOpenFailure> {
+                targetState = authenticated
+                onTriggered {
+                    callbacks.receiveChannelOpenFailure(it.event.msg)
+                }
+            }
+        }
+
+        channelOpen {
+            onEntry { callbacks.onStateEnter("ChannelOpen") }
+            onExit { callbacks.onStateExit("ChannelOpen") }
+
+            transition<SshEvent.SendChannelRequest> {
+                targetState = waitChannelRequestReply
+                onTriggered {
+                    callbacks.sendChannelRequest(it.event.recipientChannel, it.event.requestType, it.event.wantReply, it.event.message)
+                }
+            }
+        }
+
+        waitChannelRequestReply {
+            onEntry { callbacks.onStateEnter("WaitChannelRequestReply") }
+            onExit { callbacks.onStateExit("WaitChannelRequestReply") }
+
+            transition<SshEvent.ReceiveChannelSuccess> {
+                targetState = channelOpen
+                onTriggered {
+                    callbacks.receiveChannelSuccess()
+                }
+            }
+
+            transition<SshEvent.ReceiveChannelFailure> {
+                targetState = channelOpen
+                onTriggered {
+                    callbacks.receiveChannelFailure()
+                }
+            }
         }
 
         disconnected {
@@ -204,6 +281,12 @@ class SshClientStateMachine(
         transition<SshEvent.ReceiveIgnore> {
             onTriggered {
                 callbacks.ignore()
+            }
+        }
+
+        transition<SshEvent.ReceiveGlobalRequest> {
+            onTriggered {
+                callbacks.receiveGlobalRequest(it.event.msg)
             }
         }
 
@@ -244,6 +327,13 @@ interface SshClientCallbacks {
     fun startAuthentication()
     fun authenticationSuccess()
     fun authenticationFailure()
+    fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int)
+    fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation)
+    fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure)
+    fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest)
+    fun receiveChannelSuccess()
+    fun receiveChannelFailure()
+    fun receiveGlobalRequest(msg: SshMsgGlobalRequest)
     fun debug(msg: SshMsgDebug)
     fun ignore()
     fun disconnect()

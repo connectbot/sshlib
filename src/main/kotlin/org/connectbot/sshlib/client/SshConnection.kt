@@ -18,6 +18,7 @@ package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.crypto.*
 import org.connectbot.sshlib.struct.*
@@ -26,8 +27,6 @@ import org.connectbot.sshlib.struct.SshClientStateMachine
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
 
 /**
  * SSH connection handler that manages the protocol flow.
@@ -68,6 +67,13 @@ class SshConnection(
     private var exchangeHash: ByteArray? = null
     private var sessionId: ByteArray? = null
 
+    private var nextLocalChannelNumber = 0
+    private val channels = mutableMapOf<Int, SessionChannel>()
+
+    // Pending async operations - completed by callbacks
+    private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
+    private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
+
     /**
      * Initiate SSH connection.
      * This is a blocking call that returns when authentication is complete.
@@ -100,7 +106,7 @@ class SshConnection(
             // _raw_body() excludes the message type byte, so we need to prepend it
             val messageTypeByte = dhReplyPacket.messageType().id().toByte()
             val rawBody = byteArrayOf(messageTypeByte) + dhReplyPacket._raw_body()
-            val kexdhStream = io.kaitai.struct.ByteBufferKaitaiStream(rawBody)
+            val kexdhStream = ByteBufferKaitaiStream(rawBody)
             val kexdhPayload = KexdhPayload(kexdhStream)
             kexdhPayload._read()
             val dhReply = kexdhPayload.body() as SshMsgKexdhReply
@@ -403,6 +409,139 @@ class SshConnection(
         // Not logging state exits to reduce verbosity
     }
 
+    override fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
+        logger.debug("Sending CHANNEL_OPEN: $channelType (local=$localChannelNumber)")
+
+        val msg = SshMsgChannelOpen()
+        msg.setChannelType(createAsciiString(channelType))
+        msg.setSenderChannel(localChannelNumber.toLong())
+        msg.setInitialWindowSize(initialWindowSize.toLong())
+        msg.setMaximumPacketSize(maxPacketSize.toLong())
+
+        val sessionData = ChannelOpenSession()
+        sessionData._check()
+        msg.setChannelSpecificData(sessionData)
+
+        runBlocking {
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
+                toByteArray(msg)
+            )
+        }
+    }
+
+    override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
+        logger.info("Channel open confirmed")
+        pendingChannelOpen?.complete(msg)
+        pendingChannelOpen = null
+    }
+
+    override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
+        logger.error("Channel open failed: ${msg.reasonCode()}")
+        pendingChannelOpen?.complete(null)
+        pendingChannelOpen = null
+    }
+
+    override fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
+        logger.debug("Sending CHANNEL_REQUEST: $requestType (channel=$recipientChannel, wantReply=$wantReply)")
+
+        runBlocking {
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
+                toByteArray(message)
+            )
+        }
+    }
+
+    override fun receiveChannelSuccess() {
+        logger.debug("Channel request succeeded")
+        pendingChannelRequest?.complete(true)
+        pendingChannelRequest = null
+    }
+
+    override fun receiveChannelFailure() {
+        logger.warn("Channel request failed")
+        pendingChannelRequest?.complete(false)
+        pendingChannelRequest = null
+    }
+
+    override fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
+        val requestName = msg.requestName().value()
+        val wantReply = msg.wantReply() != 0
+
+        logger.debug("Received global request: $requestName (want_reply=$wantReply)")
+
+        // Note: Sending response should be done by the caller in the coroutine context
+        // For now, we just log it and let the server timeout if it wants a reply
+        if (wantReply) {
+            logger.warn("Global request wants reply but we don't handle it: $requestName")
+            // TODO: Send SSH_MSG_REQUEST_FAILURE asynchronously
+        }
+    }
+
+    // Packet processing
+
+    /**
+     * Read and dispatch the next packet through the state machine.
+     * This is the central packet processing loop that converts packets to events.
+     */
+    private suspend fun processNextPacket() {
+        val packet = packetIO.readPacket()
+        logger.debug("Received message type ${packet.messageType()}")
+
+        when (packet.messageType()) {
+            SshEnums.MessageType.SSH_MSG_IGNORE -> {
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
+            }
+            SshEnums.MessageType.SSH_MSG_DEBUG -> {
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveDebug(packet.body() as SshMsgDebug))
+            }
+            SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
+                try {
+                    val rawBody = packet._raw_body()
+                    val stream = ByteBufferKaitaiStream(rawBody)
+                    val globalRequestMsg = SshMsgGlobalRequest(stream)
+                    globalRequestMsg._read()
+                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveGlobalRequest(globalRequestMsg))
+                } catch (e: Exception) {
+                    logger.error("Failed to parse SSH_MSG_GLOBAL_REQUEST", e)
+                }
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
+                val messageTypeByte = packet.messageType().id().toByte()
+                val rawBody = byteArrayOf(messageTypeByte) + packet._raw_body()
+                val stream = ByteBufferKaitaiStream(rawBody)
+                val confirmationMsg = SshMsgChannelOpenConfirmation(stream)
+                confirmationMsg._read()
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
+                val messageTypeByte = packet.messageType().id().toByte()
+                val rawBody = byteArrayOf(messageTypeByte) + packet._raw_body()
+                val stream = ByteBufferKaitaiStream(rawBody)
+                val failureMsg = SshMsgChannelOpenFailure(stream)
+                failureMsg._read()
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
+                logger.debug("Received SSH_MSG_CHANNEL_WINDOW_ADJUST")
+                // TODO: Update channel window size
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE -> {
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
+            }
+            SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
+                stateMachine.processEvent(SshClientStateMachine.SshEvent.Disconnect)
+            }
+            else -> {
+                logger.warn("Unhandled message type: ${packet.messageType()}")
+            }
+        }
+    }
+
     // Helper methods for SSH protocol encoding
 
     /**
@@ -427,6 +566,33 @@ class SshConnection(
                 }
                 else -> {
                     throw IllegalStateException("Expected $expectedType but got $messageType")
+                }
+            }
+        }
+    }
+
+    /**
+     * Read packets until we get one of the expected message types, skipping IGNORE/DEBUG messages.
+     */
+    private suspend inline fun <reified T> readExpectedMessage(vararg expectedTypes: SshEnums.MessageType): T {
+        while (true) {
+            val packet = packetIO.readPacket()
+            val messageType = packet.messageType()
+
+            when (messageType) {
+                SshEnums.MessageType.SSH_MSG_IGNORE -> {
+                    logger.debug("Received SSH_MSG_IGNORE, skipping")
+                    continue
+                }
+                SshEnums.MessageType.SSH_MSG_DEBUG -> {
+                    logger.debug("Received SSH_MSG_DEBUG, skipping")
+                    continue
+                }
+                in expectedTypes -> {
+                    return packet as T
+                }
+                else -> {
+                    throw IllegalStateException("Expected one of ${expectedTypes.joinToString()} but got $messageType")
                 }
             }
         }
@@ -503,5 +669,116 @@ class SshConnection(
         m.setBody(formatted)
         m._check()
         return m
+    }
+
+    private fun createByteString(data: ByteArray): ByteString {
+        val bs = ByteString()
+        bs.setLenData(data.size.toLong())
+        bs.setData(data)
+        bs._check()
+        return bs
+    }
+
+    // Channel management methods
+
+    /**
+     * Open a session channel (RFC 4254 section 6.1).
+     *
+     * @return SessionChannel instance if successful, null otherwise
+     */
+    suspend fun openSessionChannel(
+        initialWindowSize: Int = 64 * 1024, // 64KiB
+        maxPacketSize: Int = 32 * 1024  // 32KiB
+    ): SessionChannel? {
+        val localChannelNumber = nextLocalChannelNumber++
+
+        logger.info("Opening session channel (local=$localChannelNumber)")
+
+        val deferred = CompletableDeferred<SshMsgChannelOpenConfirmation?>()
+        pendingChannelOpen = deferred
+
+        stateMachine.processEvent(SshClientStateMachine.SshEvent.OpenChannel(
+            channelType = "session",
+            localChannelNumber = localChannelNumber,
+            initialWindowSize = initialWindowSize,
+            maxPacketSize = maxPacketSize
+        ))
+
+        // Process packets until the pending operation completes
+        while (!deferred.isCompleted) {
+            processNextPacket()
+        }
+
+        val confirmationMsg = deferred.await() ?: return null
+
+        val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
+        logger.info("Channel opened: local=$localChannelNumber, remote=$remoteChannelNumber")
+
+        val channel = SessionChannel(
+            this,
+            localChannelNumber,
+            remoteChannelNumber,
+            maxPacketSize
+        )
+        channels[localChannelNumber] = channel
+        return channel
+    }
+
+    /**
+     * Send a channel request (RFC 4254 section 5.4).
+     *
+     * @param recipientChannel Remote channel number
+     * @param requestType Request type (e.g., "shell", "pty-req")
+     * @param wantReply Whether to wait for a reply
+     * @param configureRequest Lambda to configure request-specific fields
+     * @return true if request succeeded (when wantReply=true), false otherwise
+     */
+    internal suspend fun sendChannelRequest(
+        recipientChannel: Int,
+        requestType: String,
+        wantReply: Boolean,
+        configureRequest: (SshMsgChannelRequest) -> Unit
+    ): Boolean {
+        val msg = SshMsgChannelRequest()
+        msg.setRecipientChannel(recipientChannel.toLong())
+        msg.setRequestType(createAsciiString(requestType))
+        msg.setWantReply(if (wantReply) 1 else 0)
+
+        configureRequest(msg)
+
+        val deferred = if (wantReply) {
+            CompletableDeferred<Boolean>().also { pendingChannelRequest = it }
+        } else null
+
+        stateMachine.processEvent(SshClientStateMachine.SshEvent.SendChannelRequest(
+            recipientChannel = recipientChannel,
+            requestType = requestType,
+            wantReply = wantReply,
+            message = msg
+        ))
+
+        if (deferred == null) {
+            return true
+        }
+
+        // Process packets until the pending operation completes
+        while (!deferred.isCompleted) {
+            processNextPacket()
+        }
+
+        return deferred.await()
+    }
+
+    /**
+     * Send SSH_MSG_CHANNEL_CLOSE (RFC 4254 section 5.3).
+     */
+    internal suspend fun sendChannelClose(recipientChannel: Int) {
+        val msg = SshMsgChannelClose()
+        msg.setRecipientChannel(recipientChannel.toLong())
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
+            toByteArray(msg)
+        )
     }
 }

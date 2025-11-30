@@ -147,4 +147,32 @@ class SshClientIntegrationTest {
         client.disconnect()
         assertFalse(client.isAuthenticated, "Should not be authenticated after disconnect")
     }
+
+    @Test
+    fun `should open session channel and request shell`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = SshClient(host, port)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate successfully"
+            )
+
+            val session = client.openSessionChannel()
+            assertNotNull(session, "Should successfully open session channel")
+            assertTrue(session!!.isOpen, "Channel should be open")
+
+            val shellRequested = session.requestShell()
+            assertTrue(shellRequested, "Should successfully request shell")
+
+            session.close()
+            assertFalse(session.isOpen, "Channel should be closed")
+        } finally {
+            client.disconnect()
+        }
+    }
 }
