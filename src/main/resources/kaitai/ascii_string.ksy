@@ -5,7 +5,7 @@ meta:
   xref:
     rfc: 4251
   license: CC0-1.0
-doc: |
+doc: >
   A integer-prefixed string in ASCII encoding. All internal strings
   are represented in ASCII.
 doc-ref: 'https://tools.ietf.org/html/rfc4251#section-5'

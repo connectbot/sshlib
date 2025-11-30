@@ -5,7 +5,7 @@ meta:
   xref:
     rfc: 4251
   license: CC0-1.0
-doc: |
+doc: >
   The Secure Shell Protocol defines a "name-list" which is a list of
   comma-separated names. For expediency they are represented as
   individual values in Kaitai.
@@ -18,7 +18,8 @@ seq:
     size: len_entries
 types:
   name_entry:
-    doc: 'An individual entry in a `name_list`.'
+    doc: >
+      An individual entry in a `name_list`.
     doc-ref: 'https://tools.ietf.org/html/rfc4251#section-5'
     seq:
       - id: data

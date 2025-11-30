@@ -48,18 +48,18 @@ class SshClientStateMachine(
 ) {
     sealed class SshEvent : Event {
         object Connect : SshEvent()
-        data class ReceiveVersion(val banner: Ssh.IdBanner) : SshEvent()
-        data class ReceiveKexInit(val msg: Ssh.SshMsgKexinit) : SshEvent()
+        data class ReceiveVersion(val banner: IdBanner) : SshEvent()
+        data class ReceiveKexInit(val msg: SshMsgKexinit) : SshEvent()
         sealed class ReceiveKex : SshEvent() {
-            data class DhReply(val msg: Ssh.SshMsgKexdhReply) : ReceiveKex()
-            data class EcdhReply(val msg: Ssh.SshMsgKexEcdhReply) : ReceiveKex()
-            data class DhGexReply(val msg: Ssh.SshMsgKexDhGexReply) : ReceiveKex()
+            data class DhReply(val msg: SshMsgKexdhReply) : ReceiveKex()
+            data class EcdhReply(val msg: SshMsgKexEcdhReply) : ReceiveKex()
+            data class DhGexReply(val msg: SshMsgKexDhGexReply) : ReceiveKex()
         }
         object ReceiveNewKeys : SshEvent()
         data class ReceiveServiceAccept(val service: String) : SshEvent()
         object AuthenticationSuccess : SshEvent()
         object AuthenticationFailure : SshEvent()
-        data class ReceiveDebug(val msg: Ssh.SshMsgDebug) : SshEvent()
+        data class ReceiveDebug(val msg: SshMsgDebug) : SshEvent()
         object ReceiveIgnore : SshEvent()
         object Disconnect : SshEvent()
     }
@@ -93,7 +93,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveVersion> {
                 targetState = waitKexInit
                 onTriggered {
-                    callbacks.receiveVersion((it.event as SshEvent.ReceiveVersion).banner)
+                    callbacks.receiveVersion(it.event.banner)
                     callbacks.sendKexInit()
                 }
             }
@@ -106,7 +106,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveKexInit> {
                 targetState = waitKex
                 onTriggered {
-                    callbacks.receiveKexInit((it.event as SshEvent.ReceiveKexInit).msg)
+                    callbacks.receiveKexInit(it.event.msg)
                     callbacks.sendKexDhInit()
                 }
             }
@@ -119,7 +119,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveKex.DhReply> {
                 targetState = waitNewKeys
                 onTriggered {
-                    callbacks.receiveKexDhReply((it.event as SshEvent.ReceiveKex.DhReply).msg)
+                    callbacks.receiveKexDhReply(it.event.msg)
                     callbacks.sendNewKeys()
                 }
             }
@@ -127,7 +127,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveKex.EcdhReply> {
                 targetState = waitNewKeys
                 onTriggered {
-                    callbacks.receiveKexEcdhReply((it.event as SshEvent.ReceiveKex.EcdhReply).msg)
+                    callbacks.receiveKexEcdhReply(it.event.msg)
                     callbacks.sendNewKeys()
                 }
             }
@@ -135,7 +135,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveKex.DhGexReply> {
                 targetState = waitNewKeys
                 onTriggered {
-                    callbacks.receiveKexDhGexReply((it.event as SshEvent.ReceiveKex.DhGexReply).msg)
+                    callbacks.receiveKexDhGexReply(it.event.msg)
                     callbacks.sendNewKeys()
                 }
             }
@@ -162,7 +162,7 @@ class SshClientStateMachine(
             transition<SshEvent.ReceiveServiceAccept> {
                 targetState = waitAuthentication
                 onTriggered {
-                    callbacks.receiveServiceAccept((it.event as SshEvent.ReceiveServiceAccept).service)
+                    callbacks.receiveServiceAccept(it.event.service)
                     callbacks.startAuthentication()
                 }
             }
@@ -197,7 +197,7 @@ class SshClientStateMachine(
 
         transition<SshEvent.ReceiveDebug> {
             onTriggered {
-                callbacks.debug((it.event as SshEvent.ReceiveDebug).msg)
+                callbacks.debug(it.event.msg)
             }
         }
 
@@ -229,13 +229,13 @@ class SshClientStateMachine(
 
 interface SshClientCallbacks {
     fun sendVersion()
-    fun receiveVersion(banner: Ssh.IdBanner)
+    fun receiveVersion(banner: IdBanner)
     fun sendKexInit()
-    fun receiveKexInit(msg: Ssh.SshMsgKexinit)
+    fun receiveKexInit(msg: SshMsgKexinit)
     fun sendKexDhInit()
-    fun receiveKexDhReply(msg: Ssh.SshMsgKexdhReply)
-    fun receiveKexEcdhReply(msg: Ssh.SshMsgKexEcdhReply)
-    fun receiveKexDhGexReply(msg: Ssh.SshMsgKexDhGexReply)
+    fun receiveKexDhReply(msg: SshMsgKexdhReply)
+    fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
+    fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply)
     fun sendNewKeys()
     fun receiveNewKeys()
     fun activateEncryption()
@@ -244,7 +244,7 @@ interface SshClientCallbacks {
     fun startAuthentication()
     fun authenticationSuccess()
     fun authenticationFailure()
-    fun debug(msg: Ssh.SshMsgDebug)
+    fun debug(msg: SshMsgDebug)
     fun ignore()
     fun disconnect()
     fun onStateEnter(stateName: String)
