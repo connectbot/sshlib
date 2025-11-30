@@ -47,7 +47,6 @@ class HmacSha256(private val key: ByteArray) : PacketMac {
         // sequence_number is uint32
         val buffer = ByteBuffer.allocate(4)
         buffer.putInt(sequenceNumber.toInt())
-        System.out.println("okay ${buffer.array().joinToString("") { "%02x".format(it) }}")
 
         mac.update(buffer.array())
         mac.update(packet)
