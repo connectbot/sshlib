@@ -5,7 +5,7 @@ meta:
   xref:
     rfc: 4251
   license: CC0-1.0
-doc: |
+doc: >
   An integer-prefixed byte array designed to be used for arbitrary data
   that is not expected to be a string.
 -webide-representation: '{value}'

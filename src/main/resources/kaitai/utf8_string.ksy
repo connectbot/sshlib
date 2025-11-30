@@ -5,7 +5,7 @@ meta:
   xref:
     rfc: 4251
   license: CC0-1.0
-doc: |
+doc: >
   A integer-prefixed string in UTF-8 encoding. All strings presented to
   the user should be in UTF-8.
 -webide-representation: '{value}'

@@ -17,7 +17,7 @@
 package org.connectbot.sshlib.transport
 
 import io.kaitai.struct.ByteBufferKaitaiStream
-import org.connectbot.sshlib.struct.Ssh
+import org.connectbot.sshlib.struct.*
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketMac
 import java.io.ByteArrayOutputStream
@@ -91,7 +91,7 @@ class PacketIO(private val transport: Transport) {
      * @return Parsed SSH message payload
      * @throws TransportException if packet is malformed or transport fails
      */
-    suspend fun readPacket(): Ssh.UnencryptedPayload {
+    suspend fun readPacket(): UnencryptedPacket.UnencryptedPayload {
         val currentCipher = receiveCipher
         val currentMac = receiveMac
 
@@ -102,7 +102,7 @@ class PacketIO(private val transport: Transport) {
         }
     }
 
-    private suspend fun readUnencryptedPacket(): Ssh.UnencryptedPayload {
+    private suspend fun readUnencryptedPacket(): UnencryptedPacket.UnencryptedPayload {
         // Read packet_length (4 bytes)
         val lengthBytes = transport.read(4)
         val packetLength = ByteBuffer.wrap(lengthBytes).int
@@ -119,14 +119,14 @@ class PacketIO(private val transport: Transport) {
         val stream = ByteBufferKaitaiStream(fullPacket)
 
         // Parse using Kaitai struct
-        val packet = Ssh.UnencryptedPacket(stream)
+        val packet = UnencryptedPacket(stream)
         packet._read()
 
         receiveSequenceNumber++
         return packet.payload()
     }
 
-    private suspend fun readEncryptedPacket(cipher: PacketCipher, mac: PacketMac): Ssh.UnencryptedPayload {
+    private suspend fun readEncryptedPacket(cipher: PacketCipher, mac: PacketMac): UnencryptedPacket.UnencryptedPayload {
         val blockSize = cipher.blockSize
         val macLength = mac.macLength
 
@@ -175,7 +175,7 @@ class PacketIO(private val transport: Transport) {
 
         // Parse payload
         val stream = ByteBufferKaitaiStream(decryptedPacket)
-        val packet = Ssh.UnencryptedPacket(stream)
+        val packet = UnencryptedPacket(stream)
         packet._read()
 
         receiveSequenceNumber++
@@ -303,7 +303,7 @@ class PacketIO(private val transport: Transport) {
      *
      * @return Parsed banner
      */
-    suspend fun readBanner(): Ssh.IdBanner {
+    suspend fun readBanner(): IdBanner {
         val bannerBytes = ByteArrayOutputStream()
 
         // Read until we get \r\n (RFC 4253 section 4.2)
@@ -326,7 +326,7 @@ class PacketIO(private val transport: Transport) {
         }
 
         val stream = ByteBufferKaitaiStream(bannerBytes.toByteArray())
-        val banner = Ssh.IdBanner(stream)
+        val banner = IdBanner(stream)
         banner._read()
         return banner
     }

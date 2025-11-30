@@ -37,25 +37,25 @@ public class CaptureTest {
         byte[] bytes = new byte[dis.available()];
         dis.readFully(bytes);
         ByteBufferKaitaiStream bb = new ByteBufferKaitaiStream(bytes);
-        Ssh.IdBanner banner = new Ssh.IdBanner(bb);
+        IdBanner banner = new IdBanner(bb);
         banner._read();
         System.out.println("Banner: " + banner.protoVersion());
 
         int seqNum = 1;
-        while (printPlain(bb) != Ssh.MessageType.SSH_MSG_NEWKEYS) { seqNum++; }
+        while (printPlain(bb) != SshEnums.MessageType.SSH_MSG_NEWKEYS) { seqNum++; }
         while (!bb.isEof()) {
             printEnc(bb, seqNum++);
         }
     }
 
-    private Ssh.MessageType printPlain(ByteBufferKaitaiStream bb) {
-        Ssh.UnencryptedPacket msg = new Ssh.UnencryptedPacket(bb);
+    private SshEnums.MessageType printPlain(ByteBufferKaitaiStream bb) {
+        UnencryptedPacket msg = new UnencryptedPacket(bb);
         msg._read();
         System.out.print("unencrypted msg: ");
         switch (msg.payload().messageType()) {
             case SSH_MSG_KEXINIT:
                 System.out.println(msg.payload().messageType());
-                Ssh.SshMsgKexinit init = (Ssh.SshMsgKexinit) msg.payload().body();
+                SshMsgKexinit init = (SshMsgKexinit) msg.payload().body();
                 System.out.print("serverHostKeyAlgorithms: ");
                 System.out.println(init.serverHostKeyAlgorithms());
                 break;
@@ -89,19 +89,19 @@ public class CaptureTest {
         return msg.payload().messageType();
     }
 
-    private void kexdhPrint(Ssh.UnencryptedPacket msg) {
-        Ssh.KexdhPayload kexdhPayload = new Ssh.KexdhPayload(
-                new ByteBufferKaitaiStream(msg._raw_payload()), msg, msg._root());
+    private void kexdhPrint(UnencryptedPacket msg) {
+        KexdhPayload kexdhPayload = new KexdhPayload(
+                new ByteBufferKaitaiStream(msg._raw_payload()), msg);
         kexdhPayload._read();
         System.out.println(kexdhPayload.messageType());
         switch (kexdhPayload.messageType()) {
             case SSH_MSG_KEXDH_INIT:
                 System.out.print("e: ");
-                Ssh.SshMsgKexdhInit dhinit = (Ssh.SshMsgKexdhInit) kexdhPayload.body();
+                SshMsgKexdhInit dhinit = (SshMsgKexdhInit) kexdhPayload.body();
                 System.out.println(new BigInteger(1, dhinit.e().body()).toString(16));
                 break;
             case SSH_MSG_KEXDH_REPLY:
-                Ssh.SshMsgKexdhReply dhreply = (Ssh.SshMsgKexdhReply) kexdhPayload.body();
+                SshMsgKexdhReply dhreply = (SshMsgKexdhReply) kexdhPayload.body();
                 System.out.print("server_key: ");
                 System.out.println(new String(dhreply.serverKey().data()));
                 System.out.print("f: ");
@@ -163,14 +163,14 @@ public class CaptureTest {
     }
 
     private void printEnc(ByteBufferKaitaiStream bb, int seqNum) throws Exception {
-        Ssh.EncryptedPacket msg = new Ssh.EncryptedPacket(bb, 32);
+        EncryptedPacket msg = new EncryptedPacket(bb, 32);
         msg._read();
         System.out.print("encrypted size: ");
         System.out.println(msg.lenEncryptedPayload());
         Mac mac = Mac.getInstance(MAC_ALGO);
         mac.init(MAC_KEY);
 
-        Ssh.EtmMac macInput = new Ssh.EtmMac();
+        EtmMac macInput = new EtmMac();
         macInput.setLenEncryptedPacket(msg.lenEncryptedPayload());
         macInput.setEncryptedPacket(msg.encryptedPayload());
         macInput.setSequenceNumber(seqNum);
@@ -190,13 +190,13 @@ public class CaptureTest {
         incrementIv(iv, decryptedBytes.length / c.getBlockSize());
 
         ByteBufferKaitaiStream dbytes = new ByteBufferKaitaiStream(decryptedBytes);
-        Ssh.DecryptedPacket dmsg = new Ssh.DecryptedPacket(dbytes, msg);
+        EncryptedPacket.DecryptedPacket dmsg = new EncryptedPacket.DecryptedPacket(dbytes, msg);
         dmsg._read();
         System.out.print("decrypted msg: ");
         System.out.println(dmsg.payload().messageType());
         switch (dmsg.payload().messageType()) {
             case SSH_MSG_CHANNEL_DATA:
-                Ssh.SshMsgChannelData data = (Ssh.SshMsgChannelData) dmsg.payload().body();
+                SshMsgChannelData data = (SshMsgChannelData) dmsg.payload().body();
                 System.out.print("channel: ");
                 System.out.println(data.recipientChannel());
                 System.out.print("data: ");

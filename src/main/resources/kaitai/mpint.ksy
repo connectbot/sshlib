@@ -15,6 +15,6 @@ seq:
 instances:
   length_in_bits:
     value: (len_body - 1) * 8
-    doc: |
+    doc: >
       Length of big integer in bits. In OpenSSH sources, this corresponds to
       `BN_num_bits` function.

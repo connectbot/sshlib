@@ -17,9 +17,10 @@
 package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.crypto.*
-import org.connectbot.sshlib.struct.Ssh
+import org.connectbot.sshlib.struct.*
 import org.connectbot.sshlib.struct.SshClientCallbacks
 import org.connectbot.sshlib.struct.SshClientStateMachine
 import org.connectbot.sshlib.transport.PacketIO
@@ -79,11 +80,10 @@ class SshConnection(
             packetIO.writeBanner(clientVersion)
             val banner = packetIO.readBanner()
             stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveVersion(banner))
-            // Note: ReceiveVersion transition triggers sendKexInit() via state machine
 
             // Key exchange initialization - read server's KEXINIT
             val kexInitPacket = packetIO.readPacket()
-            val kexInit = kexInitPacket.body() as Ssh.SshMsgKexinit
+            val kexInit = kexInitPacket.body() as SshMsgKexinit
 
             // Save raw KEXINIT payload for exchange hash (message type + body)
             val kexInitMsgType = kexInitPacket.messageType().id().toByte()
@@ -101,9 +101,9 @@ class SshConnection(
             val messageTypeByte = dhReplyPacket.messageType().id().toByte()
             val rawBody = byteArrayOf(messageTypeByte) + dhReplyPacket._raw_body()
             val kexdhStream = io.kaitai.struct.ByteBufferKaitaiStream(rawBody)
-            val kexdhPayload = Ssh.KexdhPayload(kexdhStream)
+            val kexdhPayload = KexdhPayload(kexdhStream)
             kexdhPayload._read()
-            val dhReply = kexdhPayload.body() as Ssh.SshMsgKexdhReply
+            val dhReply = kexdhPayload.body() as SshMsgKexdhReply
 
             stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
             // Note: ReceiveKex.DhReply transition triggers sendNewKeys() via state machine
@@ -114,8 +114,8 @@ class SshConnection(
 
             // Service request (ssh-userauth)
             // Loop until we get SERVICE_ACCEPT (skip IGNORE/DEBUG messages)
-            val serviceAccept = readExpectedMessage<Ssh.SshMsgServiceAccept>(
-                Ssh.MessageType.SSH_MSG_SERVICE_ACCEPT
+            val serviceAccept = readExpectedMessage<SshMsgServiceAccept>(
+                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT
             )
             stateMachine.processEvent(
                 SshClientStateMachine.SshEvent.ReceiveServiceAccept(serviceAccept.serviceName().value())
@@ -138,36 +138,33 @@ class SshConnection(
      */
     suspend fun authenticatePassword(username: String, password: String): Boolean {
         try {
-            // Build SSH_MSG_USERAUTH_REQUEST packet
-            val buffer = ByteArrayOutputStream()
+            val req = SshMsgUserauthRequest()
+            req.setUserName(createAsciiString(username))
+            req.setServiceName(createAsciiString("ssh-connection"))
+            req.setMethodName(createAsciiString("password"))
 
-            // user name (string)
-            writeString(buffer, username.toByteArray())
+            val passAuth = UserauthRequestPassword().apply {
+                setChangePassword(0)
+                setPlaintextPassword(createUtf8String(password))
+                _check()
+            }
 
-            // service name (string) - always "ssh-connection"
-            writeString(buffer, "ssh-connection".toByteArray())
+            req.setMethodSpecificFields(passAuth)
 
-            // method name (string) - "password"
-            writeString(buffer, "password".toByteArray())
-
-            // FALSE (boolean) - not changing password
-            buffer.write(0)
-
-            // password (string)
-            writeString(buffer, password.toByteArray())
-
-            val payload = buffer.toByteArray()
-            packetIO.writePacket(Ssh.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(), payload)
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
+                toByteArray(req)
+            )
 
             // Wait for response
             val response = packetIO.readPacket()
             return when (response.messageType()) {
-                Ssh.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
+                SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
                     stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
                     logger.info("Authentication successful")
                     true
                 }
-                Ssh.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
+                SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
                     stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
                     logger.warn("Authentication failed")
                     false
@@ -189,7 +186,7 @@ class SshConnection(
         logger.debug("Sending version: $clientVersion")
     }
 
-    override fun receiveVersion(banner: Ssh.IdBanner) {
+    override fun receiveVersion(banner: IdBanner) {
         // protoVersion() includes everything after "SSH-" up to and including \r\n
         // For exchange hash, we need "SSH-" + version without the CR-LF
         val versionWithCrlf = banner.protoVersion()
@@ -201,44 +198,37 @@ class SshConnection(
     override fun sendKexInit() {
         logger.debug("Sending KEX_INIT")
 
-        val buffer = ByteArrayOutputStream()
+        val kexInit = SshMsgKexinit()
 
         // Cookie (16 random bytes)
         val cookie = ByteArray(16).apply {
             java.security.SecureRandom().nextBytes(this)
         }
-        buffer.write(cookie)
+        kexInit.setCookie(cookie)
 
-        // Algorithm name-lists
-        writeNameList(buffer, KEX_ALGORITHMS)
-        writeNameList(buffer, HOST_KEY_ALGORITHMS)
-        writeNameList(buffer, ENCRYPTION_ALGORITHMS)
-        writeNameList(buffer, ENCRYPTION_ALGORITHMS)
-        writeNameList(buffer, MAC_ALGORITHMS)
-        writeNameList(buffer, MAC_ALGORITHMS)
-        writeNameList(buffer, COMPRESSION_ALGORITHMS)
-        writeNameList(buffer, COMPRESSION_ALGORITHMS)
-        writeNameList(buffer, "") // languages client-to-server
-        writeNameList(buffer, "") // languages server-to-client
+        kexInit.setKexAlgorithms(createNameList(KEX_ALGORITHMS))
+        kexInit.setServerHostKeyAlgorithms(createNameList(HOST_KEY_ALGORITHMS))
+        kexInit.setEncryptionAlgorithmsClientToServer(createNameList(ENCRYPTION_ALGORITHMS))
+        kexInit.setEncryptionAlgorithmsServerToClient(createNameList(ENCRYPTION_ALGORITHMS))
+        kexInit.setMacAlgorithmsClientToServer(createNameList(MAC_ALGORITHMS))
+        kexInit.setMacAlgorithmsServerToClient(createNameList(MAC_ALGORITHMS))
+        kexInit.setCompressionAlgorithmsClientToServer(createNameList(COMPRESSION_ALGORITHMS))
+        kexInit.setCompressionAlgorithmsServerToClient(createNameList(COMPRESSION_ALGORITHMS))
+        kexInit.setLanguagesClientToServer(createNameList(""))
+        kexInit.setLanguagesServerToClient(createNameList(""))
+        kexInit.setFirstKexPacketFollows(0)
+        kexInit.setReserved(0)
 
-        // first_kex_packet_follows (boolean) - FALSE
-        buffer.write(0)
+        val kexInitPayload = toByteArray(kexInit)
 
-        // reserved (uint32) - 0
-        buffer.write(ByteArray(4))
-
-        // Save the payload (without message type)
-        val kexInitPayload = buffer.toByteArray()
-
-        // For exchange hash, we need message type (20) + payload
-        clientKexInit = byteArrayOf(Ssh.MessageType.SSH_MSG_KEXINIT.id().toByte()) + kexInitPayload
+        clientKexInit = byteArrayOf(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toByte()) + kexInitPayload
 
         runBlocking {
-            packetIO.writePacket(Ssh.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
         }
     }
 
-    override fun receiveKexInit(msg: Ssh.SshMsgKexinit) {
+    override fun receiveKexInit(msg: SshMsgKexinit) {
         logger.info("Received KEX_INIT from server")
 
         val serverKexAlgs = msg.kexAlgorithms().entries().data()
@@ -265,16 +255,15 @@ class SshConnection(
         // Generate client's DH key pair
         clientPublicKey = dh.generateClientKeys()
 
-        // Build SSH_MSG_KEXDH_INIT packet
-        val buffer = ByteArrayOutputStream()
-        writeMpint(buffer, clientPublicKey!!)
+        val msg = SshMsgKexdhInit()
+        msg.setE(createMpint(clientPublicKey!!))
 
         runBlocking {
-            packetIO.writePacket(Ssh.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), buffer.toByteArray())
+            packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), toByteArray(msg))
         }
     }
 
-    override fun receiveKexDhReply(msg: Ssh.SshMsgKexdhReply) {
+    override fun receiveKexDhReply(msg: SshMsgKexdhReply) {
         logger.info("Received DH_REPLY from server")
 
         // Extract server's public key and signature
@@ -306,18 +295,18 @@ class SshConnection(
         logger.debug("Shared secret computed, exchange hash calculated")
     }
 
-    override fun receiveKexEcdhReply(msg: Ssh.SshMsgKexEcdhReply) {
+    override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
         logger.warn("ECDH not implemented yet")
     }
 
-    override fun receiveKexDhGexReply(msg: Ssh.SshMsgKexDhGexReply) {
+    override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
         logger.warn("DH-GEX not implemented yet")
     }
 
     override fun sendNewKeys() {
         logger.debug("Sending NEW_KEYS")
         runBlocking {
-            packetIO.writePacket(Ssh.MessageType.SSH_MSG_NEWKEYS.id().toInt())
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
             // TODO check if we're using strict KEX
             packetIO.resetSendSequenceNumber()
         }
@@ -367,11 +356,11 @@ class SshConnection(
     override fun sendServiceRequest(service: String) {
         logger.info("Requesting service: $service")
 
-        val buffer = ByteArrayOutputStream()
-        writeString(buffer, service.toByteArray())
+        val msg = SshMsgServiceRequest()
+        msg.setServiceName(createAsciiString(service))
 
         runBlocking {
-            packetIO.writePacket(Ssh.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), buffer.toByteArray())
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), toByteArray(msg))
         }
     }
 
@@ -391,7 +380,7 @@ class SshConnection(
         logger.warn("Authentication failed")
     }
 
-    override fun debug(msg: Ssh.SshMsgDebug) {
+    override fun debug(msg: SshMsgDebug) {
         logger.debug("SSH debug: ${msg.message()}")
     }
 
@@ -419,17 +408,17 @@ class SshConnection(
     /**
      * Read packets until we get the expected message type, skipping IGNORE/DEBUG messages.
      */
-    private suspend inline fun <reified T> readExpectedMessage(expectedType: Ssh.MessageType): T {
+    private suspend inline fun <reified T> readExpectedMessage(expectedType: SshEnums.MessageType): T {
         while (true) {
             val packet = packetIO.readPacket()
             val messageType = packet.messageType()
 
             when (messageType) {
-                Ssh.MessageType.SSH_MSG_IGNORE -> {
+                SshEnums.MessageType.SSH_MSG_IGNORE -> {
                     logger.debug("Received SSH_MSG_IGNORE, skipping")
                     continue
                 }
-                Ssh.MessageType.SSH_MSG_DEBUG -> {
+                SshEnums.MessageType.SSH_MSG_DEBUG -> {
                     logger.debug("Received SSH_MSG_DEBUG, skipping")
                     continue
                 }
@@ -443,38 +432,76 @@ class SshConnection(
         }
     }
 
-    private fun writeString(out: ByteArrayOutputStream, data: ByteArray) {
-        val length = data.size
-        out.write((length shr 24) and 0xFF)
-        out.write((length shr 16) and 0xFF)
-        out.write((length shr 8) and 0xFF)
-        out.write(length and 0xFF)
-        out.write(data)
+    private fun toByteArray(struct: KaitaiStruct.ReadWrite): ByteArray {
+        struct._check()
+        val io = ByteBufferKaitaiStream(1024 * 32)
+        struct._write(io)
+        val size = io.pos()
+        io.seek(0)
+        return io.readBytes(size.toLong())
     }
 
-    private fun writeNameList(out: ByteArrayOutputStream, names: String) {
-        writeString(out, names.toByteArray())
+    private fun createAsciiString(str: String): AsciiString {
+        val s = AsciiString()
+        s.setLen(str.length.toLong())
+        s.setValue(str)
+        s._check()
+        return s
     }
 
-    private fun writeMpint(out: ByteArrayOutputStream, data: ByteArray) {
-        // Remove leading zeros
+    private fun createUtf8String(str: String): Utf8String {
+        val bytes = str.toByteArray(Charsets.UTF_8)
+        val s = Utf8String()
+        s.setLen(bytes.size.toLong())
+        s.setValue(str)
+        s._check()
+        return s
+    }
+
+    private fun createNameList(names: String): NameList {
+        val nameList = NameList()
+        val entries = NameList.NameEntry()
+        entries.set_parent(nameList)
+        entries.set_root(nameList)
+
+        if (names.isEmpty()) {
+            entries.setData(emptyList())
+            nameList.setLenEntries(0)
+        } else {
+            val list = names.split(",")
+            entries.setData(list)
+            val contentBytes = names.toByteArray(Charsets.US_ASCII)
+            nameList.setLenEntries(contentBytes.size.toLong())
+        }
+
+        entries._check()
+        nameList.setEntries(entries)
+        nameList._check()
+        return nameList
+    }
+
+    private fun createMpint(data: ByteArray): Mpint {
         var start = 0
         while (start < data.size - 1 && data[start] == 0.toByte()) {
             start++
         }
 
-        // Check if we need to add 0x00 to keep it positive
-        val needsPadding = data[start].toInt() and 0x80 != 0
+        val needsPadding = (data[start].toInt() and 0x80) != 0
 
-        val length = data.size - start + if (needsPadding) 1 else 0
-        out.write((length shr 24) and 0xFF)
-        out.write((length shr 16) and 0xFF)
-        out.write((length shr 8) and 0xFF)
-        out.write(length and 0xFF)
+        val formattedLength = data.size - start + if (needsPadding) 1 else 0
+        val formatted = ByteArray(formattedLength)
 
         if (needsPadding) {
-            out.write(0)
+            formatted[0] = 0
+            System.arraycopy(data, start, formatted, 1, data.size - start)
+        } else {
+            System.arraycopy(data, start, formatted, 0, data.size - start)
         }
-        out.write(data, start, data.size - start)
+
+        val m = Mpint()
+        m.setLenBody(formattedLength.toLong())
+        m.setBody(formatted)
+        m._check()
+        return m
     }
 }
