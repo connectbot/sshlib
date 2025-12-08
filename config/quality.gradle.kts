@@ -1,7 +1,9 @@
 apply(plugin = "checkstyle")
 
+val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+
 configure<CheckstyleExtension> {
-    toolVersion = "8.14"
+    toolVersion = libs.findVersion("checkstyle").get().toString()
 }
 
 tasks.named<Task>("check") {
