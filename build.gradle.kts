@@ -10,10 +10,10 @@ plugins {
     `maven-publish`
     signing
     jacoco
-    id("com.diffplug.spotless").version("8.0.0")
-    id("com.github.ben-manes.versions").version("0.53.0")
-    id("io.github.gradle-nexus.publish-plugin").version("2.0.0")
-    id("net.researchgate.release").version("3.1.0")
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.versions)
+    alias(libs.plugins.nexus.publish)
+    alias(libs.plugins.release)
 }
 
 buildscript {
@@ -38,26 +38,26 @@ val gitHubUrl = "https://github.com/connectbot/sshlib"
 apply(from = "$rootDir/config/quality.gradle.kts")
 
 dependencies {
-    implementation("org.connectbot:simplesocks:1.0.1")
-    implementation("com.google.crypto.tink:tink:1.19.0") {
+    implementation(libs.simplesocks)
+    implementation(libs.tink) {
         isTransitive = false
     }
-    implementation("org.connectbot:jbcrypt:1.0.2")
-    implementation("asia.hombre:kyber:2.0.1")
+    implementation(libs.jbcrypt)
+    implementation(libs.kyber)
 
-    testImplementation("ch.qos.logback:logback-classic:1.5.21")
-    testImplementation("commons-codec:commons-codec:1.20.0")
-    testImplementation("commons-io:commons-io:2.21.0")
-    testImplementation("org.hamcrest:hamcrest:3.0")
-    testImplementation("org.jetbrains:annotations:26.0.2-1")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.0.1")
-    testImplementation("org.mockito:mockito-core:5.20.0")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.20.0")
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.2")
-    testImplementation("org.testcontainers:testcontainers:2.0.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.1")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(libs.logback.classic)
+    testImplementation(libs.commons.codec)
+    testImplementation(libs.commons.io)
+    testImplementation(libs.hamcrest)
+    testImplementation(libs.jetbrains.annotations)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.junit.jupiter)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 java {
