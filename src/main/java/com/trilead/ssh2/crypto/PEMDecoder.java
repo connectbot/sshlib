@@ -24,20 +24,13 @@ import java.security.spec.KeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
-import java.util.Arrays;
 import java.util.Locale;
 
 import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
-import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
-import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
-import com.trilead.ssh2.packets.TypesReader;
-import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
-import com.trilead.ssh2.signature.Ed25519Verify;
-import com.trilead.ssh2.signature.RSASHA1Verify;
 import org.mindrot.jbcrypt.BCrypt;
 
 /**
@@ -52,10 +45,6 @@ public class PEMDecoder
 	public static final int PEM_DSA_PRIVATE_KEY = 2;
 	public static final int PEM_EC_PRIVATE_KEY = 3;
 	public static final int PEM_OPENSSH_PRIVATE_KEY = 4;
-
-	private static final byte[] OPENSSH_V1_MAGIC = new byte[] {
-		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1', '\0',
-	};
 
 	private static int hexToInt(char c)
 	{
@@ -386,15 +375,7 @@ public class PEMDecoder
 	public static final boolean isPEMEncrypted(PEMStructure ps) throws IOException
 	{
 		if (ps.pemType == PEM_OPENSSH_PRIVATE_KEY) {
-			TypesReader tr = new TypesReader(ps.data);
-			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
-			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic));
-			}
-
-			tr.readString();
-			String kdfname = tr.readString();
-			return !"none".equals(kdfname);
+			return OpenSSHKeyDecoder.isEncrypted(ps.data);
 		}
 
 		if (ps.procType == null)
@@ -542,136 +523,7 @@ public class PEMDecoder
 		}
 
 		if (ps.pemType == PEM_OPENSSH_PRIVATE_KEY) {
-			TypesReader tr = new TypesReader(ps.data);
-			byte[] magic = tr.readBytes(OPENSSH_V1_MAGIC.length);
-			if (!Arrays.equals(OPENSSH_V1_MAGIC, magic)) {
-				throw new IOException("Could not find OPENSSH key magic: " + new String(magic));
-			}
-
-			String ciphername = tr.readString();
-			String kdfname = tr.readString();
-			byte[] kdfoptions = tr.readByteString();
-			int numberOfKeys = tr.readUINT32();
-
-			// TODO support multiple keys
-			if (numberOfKeys != 1) {
-				throw new IOException("Only one key supported, but encountered bundle of " + numberOfKeys);
-			}
-
-			// OpenSSH discards this, so we will as well.
-			tr.readByteString();
-
-			byte[] dataBytes = tr.readByteString();
-
-			if ("bcrypt".equals(kdfname)) {
-				if (password == null) {
-					throw new IOException("PEM is encrypted, but no password was specified");
-				}
-
-				TypesReader optionsReader = new TypesReader(kdfoptions);
-				byte[] salt = optionsReader.readByteString();
-				int rounds = optionsReader.readUINT32();
-				byte[] passwordBytes;
-				try {
-					passwordBytes = password.getBytes("UTF-8");
-				} catch (UnsupportedEncodingException e) {
-					passwordBytes = password.getBytes();
-				}
-				dataBytes = decryptData(dataBytes, passwordBytes, salt, rounds, ciphername);
-			} else if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
-				throw new IOException("encryption not supported");
-			}
-
-			TypesReader trEnc = new TypesReader(dataBytes);
-
-			int checkInt1 = trEnc.readUINT32();
-			int checkInt2 = trEnc.readUINT32();
-
-			if (checkInt1 != checkInt2) {
-				throw new IOException("Decryption failed when trying to read private keys");
-			}
-
-			String keyType = trEnc.readString();
-
-			KeyPair keyPair;
-			if (Ed25519Verify.ED25519_ID.equals(keyType)) {
-				byte[] publicBytes = trEnc.readByteString();
-				byte[] privateBytes = trEnc.readByteString();
-				PrivateKey privKey = new Ed25519PrivateKey(
-						Arrays.copyOfRange(privateBytes, 0, 32));
-				PublicKey pubKey = new Ed25519PublicKey(publicBytes);
-				keyPair = new KeyPair(pubKey, privKey);
-			} else if (keyType.startsWith("ecdsa-sha2-")) {
-				String curveName = trEnc.readString();
-
-				byte[] groupBytes = trEnc.readByteString();
-				BigInteger privateKey = trEnc.readMPINT();
-
-				final ECDSASHA2Verify verifier;
-				if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get().getCurveName())) {
-					verifier = ECDSASHA2Verify.ECDSASHA2NISTP256Verify.get();
-				} else if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get().getCurveName())) {
-					verifier = ECDSASHA2Verify.ECDSASHA2NISTP384Verify.get();
-				} else if (curveName.equals(ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get().getCurveName())) {
-					verifier = ECDSASHA2Verify.ECDSASHA2NISTP521Verify.get();
-				} else {
-					throw new IOException("Invalid ECDSA group");
-				}
-
-				ECParameterSpec spec = verifier.getParameterSpec();
-				ECPoint group = verifier.decodeECPoint(groupBytes);
-
-				ECPublicKeySpec publicKeySpec = new ECPublicKeySpec(group, spec);
-				ECPrivateKeySpec privateKeySpec = new ECPrivateKeySpec(privateKey, spec);
-				keyPair = generateKeyPair("EC", privateKeySpec, publicKeySpec);
-			} else if (RSASHA1Verify.get().getKeyFormat().equals(keyType)) {
-				BigInteger n = trEnc.readMPINT();
-				BigInteger e = trEnc.readMPINT();
-				BigInteger d = trEnc.readMPINT();
-
-				BigInteger crtCoefficient = trEnc.readMPINT();
-				BigInteger p = trEnc.readMPINT();
-
-				RSAPrivateKeySpec privateKeySpec;
-				if (null == p || null == crtCoefficient) {
-					privateKeySpec = new RSAPrivateKeySpec(n, d);
-				} else {
-					BigInteger q = crtCoefficient.modInverse(p);
-					BigInteger pE = d.mod(p.subtract(BigInteger.ONE));
-					BigInteger qE = d.mod(q.subtract(BigInteger.ONE));
-					privateKeySpec = new RSAPrivateCrtKeySpec(n, e, d, p, q, pE, qE, crtCoefficient);
-
-				}
-
-				RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(n, e);
-
-				keyPair = generateKeyPair("RSA", privateKeySpec, publicKeySpec);
-			} else if (DSASHA1Verify.get().getKeyFormat().equals(keyType)) {
-				BigInteger p = trEnc.readMPINT();
-				BigInteger q = trEnc.readMPINT();
-				BigInteger g = trEnc.readMPINT();
-				BigInteger y = trEnc.readMPINT();
-				BigInteger x = trEnc.readMPINT();
-
-				DSAPrivateKeySpec privateKeySpec = new DSAPrivateKeySpec(x, p, q, g);
-				DSAPublicKeySpec publicKeySpec = new DSAPublicKeySpec(y, p, q, g);
-
-				keyPair = generateKeyPair("DSA", privateKeySpec, publicKeySpec);
-			} else {
-				throw new IOException("Unknown key type " + keyType);
-			}
-
-			byte[] comment = trEnc.readByteString();
-
-			// Make sure the padding is correct first.
-			int remaining = tr.remain();
-			for (int i = 1; i <= remaining; i++) {
-				if (i != tr.readByte()) {
-					throw new IOException("Bad padding value on decrypted private keys");
-				}
-			}
-
-			return keyPair;
+			return OpenSSHKeyDecoder.decode(ps.data, password);
 		}
 
 		throw new IOException("PEM problem: it is of unknown type");
