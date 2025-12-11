@@ -17,8 +17,8 @@ public class DHGexParametersTest {
 
 		// Default values should be 1024, 1024, 4096
 		assertEquals(1024, params.getMin_group_len(), "Default min group length should be 1024");
-		assertEquals(1024, params.getPref_group_len(), "Default preferred group length should be 1024");
-		assertEquals(4096, params.getMax_group_len(), "Default max group length should be 4096");
+		assertEquals(2048, params.getPref_group_len(), "Default preferred group length should be 2048");
+		assertEquals(8192, params.getMax_group_len(), "Default max group length should be 8192");
 	}
 
 	@Test

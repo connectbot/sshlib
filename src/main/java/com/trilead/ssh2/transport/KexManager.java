@@ -521,6 +521,41 @@ public class KexManager
 		}
 	}
 
+	private int getDhNeed(NegotiatedParameters np)
+	{
+		int dh_need = 0;
+
+		String[] encAlgos = { np.enc_algo_client_to_server, np.enc_algo_server_to_client };
+		String[] macAlgos = { np.mac_algo_client_to_server, np.mac_algo_server_to_client };
+
+		for (String enc : encAlgos)
+		{
+			if (enc == null)
+				continue;
+			int keySize = BlockCipherFactory.getKeySize(enc);
+			int blockSize = BlockCipherFactory.getBlockSize(enc);
+			int ivSize = BlockCipherFactory.getIVSize(enc);
+
+			int secLen = keySize;
+			if ("3des-ctr".equals(enc) || "3des-cbc".equals(enc))
+				secLen = 14;
+
+			dh_need = Math.max(dh_need, secLen);
+			dh_need = Math.max(dh_need, blockSize);
+			dh_need = Math.max(dh_need, ivSize);
+		}
+
+		for (String mac : macAlgos)
+		{
+			if (mac == null)
+				continue;
+			int macKeyLen = MACs.getKeyLen(mac);
+			dh_need = Math.max(dh_need, macKeyLen);
+		}
+
+		return dh_need;
+	}
+
 	private boolean verifySignature(byte[] sig, byte[] hostkey) throws IOException {
 		SSHSignature sshSignature;
 		if (kxs.np.server_host_key_algo.equals(Ed25519Verify.get().getKeyFormat())) {
@@ -609,6 +644,11 @@ public class KexManager
 			if (kxs.np.kex_algo.equals("diffie-hellman-group-exchange-sha1")
 					|| kxs.np.kex_algo.equals("diffie-hellman-group-exchange-sha256"))
 			{
+				if (kxs.dhgexParameters.getMin_group_len() != 0) {
+					int need = getDhNeed(kxs.np);
+					kxs.dhgexParameters = DHGexParameters.estimate(need * 8);
+				}
+
 				if (kxs.dhgexParameters.getMin_group_len() == 0 || csh.server_versioncomment.matches("OpenSSH_2\\.([0-4]\\.|5\\.[0-2]).*"))
 				{
 					PacketKexDhGexRequestOld dhgexreq = new PacketKexDhGexRequestOld(kxs.dhgexParameters);

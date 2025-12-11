@@ -24,13 +24,39 @@ public class DHGexParameters
 	private static final int MAX_ALLOWED = 8192;
 
 	/**
-	 * Same as calling {@link #DHGexParameters(int, int, int) DHGexParameters(1024, 1024, 4096)}.
+	 * Same as calling {@link #DHGexParameters(int, int, int) DHGexParameters(1024, 2048, 8192)}.
 	 * This is also the default used by the Connection class.
 	 *
 	 */
 	public DHGexParameters()
 	{
-		this(1024, 1024, 4096);
+		this(1024, 2048, 8192);
+	}
+
+	/**
+	 * Estimates the group order for a Diffie-Hellman group that has an
+	 * attack complexity approximately the same as O(2**bits).
+	 * Values from NIST Special Publication 800-57: Recommendation for Key
+	 * Management Part 1 (rev 3) limited by the recommended maximum value
+	 * from RFC4419 section 3.
+	 *
+	 * @param bits the estimated number of bits of security required
+	 * @return a DHGexParameters object with the estimated parameters
+	 */
+	public static DHGexParameters estimate(int bits) {
+		int min = 2048;
+		int pref = 8192;
+		int max = 8192;
+
+		if (bits <= 112) {
+			pref = 2048;
+		} else if (bits <= 128) {
+			pref = 3072;
+		} else if (bits <= 192) {
+			pref = 7680;
+		}
+
+		return new DHGexParameters(min, pref, max);
 	}
 
 	/**
