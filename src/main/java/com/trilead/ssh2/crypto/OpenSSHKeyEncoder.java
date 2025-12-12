@@ -60,7 +60,8 @@ import org.mindrot.jbcrypt.BCrypt;
  * The OpenSSH format uses the header "-----BEGIN OPENSSH PRIVATE KEY-----"
  * and is the default format used by modern versions of ssh-keygen.
  * <p>
- * This is the encoding counterpart to the OpenSSH decoding in {@link OpenSSHKeyDecoder}.
+ * This is the encoding counterpart to the OpenSSH decoding in
+ * {@link OpenSSHKeyDecoder}.
  *
  * @author Kenny Root
  */
@@ -76,12 +77,13 @@ public class OpenSSHKeyEncoder {
 	private static final String OPENSSH_KDF_BCRYPT = "bcrypt";
 	private static final int OPENSSH_BCRYPT_SALT_SIZE = 16;
 	private static final int OPENSSH_BCRYPT_ROUNDS = 16;
-	private static final int OPENSSH_AES_KEY_SIZE = 32;  // 256 bits
-	private static final int OPENSSH_AES_IV_SIZE = 16;   // 128 bits
+	private static final int OPENSSH_AES_KEY_SIZE = 32; // 256 bits
+	private static final int OPENSSH_AES_IV_SIZE = 16; // 128 bits
 	private static final int OPENSSH_AES_BLOCK_SIZE = 16;
 
 	/**
-	 * Derives a key and IV from a passphrase using bcrypt_pbkdf for OpenSSH encrypted keys.
+	 * Derives a key and IV from a passphrase using bcrypt_pbkdf for OpenSSH
+	 * encrypted keys.
 	 *
 	 * @param passphrase The passphrase to derive from
 	 * @param salt       The salt (typically 16 bytes)
@@ -89,7 +91,7 @@ public class OpenSSHKeyEncoder {
 	 * @return A byte array containing the key (32 bytes) followed by IV (16 bytes)
 	 */
 	private static byte[] deriveOpenSSHKey(String passphrase, byte[] salt, int rounds) {
-		int keyLength = OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE;  // 48 bytes
+		int keyLength = OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE; // 48 bytes
 		byte[] output = new byte[keyLength];
 		new BCrypt().pbkdf(passphrase.getBytes(java.nio.charset.StandardCharsets.UTF_8), salt, rounds, output);
 		return output;
@@ -111,33 +113,10 @@ public class OpenSSHKeyEncoder {
 			IvParameterSpec ivSpec = new IvParameterSpec(iv);
 			cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
 			return cipher.doFinal(data);
-		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
-				InvalidAlgorithmParameterException | javax.crypto.IllegalBlockSizeException |
-				javax.crypto.BadPaddingException e) {
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
+				| InvalidAlgorithmParameterException | javax.crypto.IllegalBlockSizeException
+				| javax.crypto.BadPaddingException e) {
 			throw new IOException("Encryption failed", e);
-		}
-	}
-
-	/**
-	 * Decrypts data using AES-256-CTR for OpenSSH encrypted key format.
-	 *
-	 * @param data The encrypted data
-	 * @param key  The 32-byte AES key
-	 * @param iv   The 16-byte IV
-	 * @return The decrypted data
-	 * @throws IOException if decryption fails
-	 */
-	private static byte[] decryptAesCtr(byte[] data, byte[] key, byte[] iv) throws IOException {
-		try {
-			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
-			SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-			IvParameterSpec ivSpec = new IvParameterSpec(iv);
-			cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
-			return cipher.doFinal(data);
-		} catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
-				InvalidAlgorithmParameterException | javax.crypto.IllegalBlockSizeException |
-				javax.crypto.BadPaddingException e) {
-			throw new IOException("Decryption failed", e);
 		}
 	}
 
@@ -158,12 +137,14 @@ public class OpenSSHKeyEncoder {
 
 	/**
 	 * Exports an Ed25519 key pair in OpenSSH format.
-	 * This is the standard format used by ssh-keygen and compatible with other SSH tools.
+	 * This is the standard format used by ssh-keygen and compatible with other SSH
+	 * tools.
 	 *
 	 * @param privateKey The Ed25519 private key
 	 * @param publicKey  The Ed25519 public key
 	 * @param comment    Optional comment (typically the key nickname)
-	 * @param passphrase Optional passphrase for encryption. If null or empty, key is unencrypted.
+	 * @param passphrase Optional passphrase for encryption. If null or empty, key
+	 *                   is unencrypted.
 	 * @return The key in OpenSSH PEM format
 	 */
 	public static String exportOpenSSHEd25519(
@@ -237,7 +218,8 @@ public class OpenSSHKeyEncoder {
 		// Padding to block size (16 for encrypted, 8 for unencrypted)
 		int blockSize = encrypted ? OPENSSH_AES_BLOCK_SIZE : 8;
 		int paddingNeeded = blockSize - (privateSection.length() % blockSize);
-		if (paddingNeeded == blockSize) paddingNeeded = 0;
+		if (paddingNeeded == blockSize)
+			paddingNeeded = 0;
 		for (int i = 1; i <= paddingNeeded; i++) {
 			privateSection.writeByte(i);
 		}
@@ -247,7 +229,8 @@ public class OpenSSHKeyEncoder {
 		if (encrypted && salt != null) {
 			byte[] derivedKey = deriveOpenSSHKey(passphrase, salt, OPENSSH_BCRYPT_ROUNDS);
 			byte[] key = java.util.Arrays.copyOfRange(derivedKey, 0, OPENSSH_AES_KEY_SIZE);
-			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE, OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
+			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE,
+					OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
 			try {
 				privateSectionBytes = encryptAesCtr(privateSection.getBytes(), key, iv);
 			} catch (IOException e) {
@@ -284,7 +267,8 @@ public class OpenSSHKeyEncoder {
 	 * @param privateKey The RSA private key (must be RSAPrivateCrtKey)
 	 * @param publicKey  The RSA public key
 	 * @param comment    Optional comment
-	 * @param passphrase Optional passphrase for encryption. If null or empty, key is unencrypted.
+	 * @param passphrase Optional passphrase for encryption. If null or empty, key
+	 *                   is unencrypted.
 	 * @return The key in OpenSSH format
 	 */
 	public static String exportOpenSSHRSA(
@@ -338,19 +322,20 @@ public class OpenSSHKeyEncoder {
 		privateSection.writeUINT32(checkInt);
 
 		privateSection.writeString("ssh-rsa");
-		privateSection.writeMPInt(publicKey.getModulus());          // n
-		privateSection.writeMPInt(publicKey.getPublicExponent());   // e
+		privateSection.writeMPInt(publicKey.getModulus()); // n
+		privateSection.writeMPInt(publicKey.getPublicExponent()); // e
 		privateSection.writeMPInt(privateKey.getPrivateExponent()); // d
-		privateSection.writeMPInt(privateKey.getCrtCoefficient());  // iqmp (q^-1 mod p)
-		privateSection.writeMPInt(privateKey.getPrimeP());          // p
-		privateSection.writeMPInt(privateKey.getPrimeQ());          // q
+		privateSection.writeMPInt(privateKey.getCrtCoefficient()); // iqmp (q^-1 mod p)
+		privateSection.writeMPInt(privateKey.getPrimeP()); // p
+		privateSection.writeMPInt(privateKey.getPrimeQ()); // q
 
 		privateSection.writeString(comment != null ? comment : "");
 
 		// Padding to block size (16 for encrypted, 8 for unencrypted)
 		int blockSize = encrypted ? OPENSSH_AES_BLOCK_SIZE : 8;
 		int paddingNeeded = blockSize - (privateSection.length() % blockSize);
-		if (paddingNeeded == blockSize) paddingNeeded = 0;
+		if (paddingNeeded == blockSize)
+			paddingNeeded = 0;
 		for (int i = 1; i <= paddingNeeded; i++) {
 			privateSection.writeByte(i);
 		}
@@ -360,7 +345,8 @@ public class OpenSSHKeyEncoder {
 		if (encrypted && salt != null) {
 			byte[] derivedKey = deriveOpenSSHKey(passphrase, salt, OPENSSH_BCRYPT_ROUNDS);
 			byte[] key = java.util.Arrays.copyOfRange(derivedKey, 0, OPENSSH_AES_KEY_SIZE);
-			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE, OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
+			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE,
+					OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
 			try {
 				privateSectionBytes = encryptAesCtr(privateSection.getBytes(), key, iv);
 			} catch (IOException e) {
@@ -396,7 +382,8 @@ public class OpenSSHKeyEncoder {
 	 * @param privateKey The DSA private key
 	 * @param publicKey  The DSA public key
 	 * @param comment    Optional comment
-	 * @param passphrase Optional passphrase for encryption. If null or empty, key is unencrypted.
+	 * @param passphrase Optional passphrase for encryption. If null or empty, key
+	 *                   is unencrypted.
 	 * @return The key in OpenSSH format
 	 */
 	public static String exportOpenSSHDSA(
@@ -465,7 +452,8 @@ public class OpenSSHKeyEncoder {
 		// Padding to block size (16 for encrypted, 8 for unencrypted)
 		int blockSize = encrypted ? OPENSSH_AES_BLOCK_SIZE : 8;
 		int paddingNeeded = blockSize - (privateSection.length() % blockSize);
-		if (paddingNeeded == blockSize) paddingNeeded = 0;
+		if (paddingNeeded == blockSize)
+			paddingNeeded = 0;
 		for (int i = 1; i <= paddingNeeded; i++) {
 			privateSection.writeByte(i);
 		}
@@ -475,7 +463,8 @@ public class OpenSSHKeyEncoder {
 		if (encrypted && salt != null) {
 			byte[] derivedKey = deriveOpenSSHKey(passphrase, salt, OPENSSH_BCRYPT_ROUNDS);
 			byte[] key = java.util.Arrays.copyOfRange(derivedKey, 0, OPENSSH_AES_KEY_SIZE);
-			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE, OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
+			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE,
+					OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
 			try {
 				privateSectionBytes = encryptAesCtr(privateSection.getBytes(), key, iv);
 			} catch (IOException e) {
@@ -512,7 +501,8 @@ public class OpenSSHKeyEncoder {
 	 * @param privateKey The EC private key
 	 * @param publicKey  The EC public key
 	 * @param comment    Optional comment
-	 * @param passphrase Optional passphrase for encryption. If null or empty, key is unencrypted.
+	 * @param passphrase Optional passphrase for encryption. If null or empty, key
+	 *                   is unencrypted.
 	 * @return The key in OpenSSH format
 	 * @throws InvalidKeyException if the EC curve is not supported
 	 */
@@ -600,7 +590,8 @@ public class OpenSSHKeyEncoder {
 		// Padding to block size (16 for encrypted, 8 for unencrypted)
 		int blockSize = encrypted ? OPENSSH_AES_BLOCK_SIZE : 8;
 		int paddingNeeded = blockSize - (privateSection.length() % blockSize);
-		if (paddingNeeded == blockSize) paddingNeeded = 0;
+		if (paddingNeeded == blockSize)
+			paddingNeeded = 0;
 		for (int i = 1; i <= paddingNeeded; i++) {
 			privateSection.writeByte(i);
 		}
@@ -610,7 +601,8 @@ public class OpenSSHKeyEncoder {
 		if (encrypted && salt != null) {
 			byte[] derivedKey = deriveOpenSSHKey(passphrase, salt, OPENSSH_BCRYPT_ROUNDS);
 			byte[] key = java.util.Arrays.copyOfRange(derivedKey, 0, OPENSSH_AES_KEY_SIZE);
-			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE, OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
+			byte[] iv = java.util.Arrays.copyOfRange(derivedKey, OPENSSH_AES_KEY_SIZE,
+					OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE);
 			try {
 				privateSectionBytes = encryptAesCtr(privateSection.getBytes(), key, iv);
 			} catch (IOException e) {
@@ -645,7 +637,8 @@ public class OpenSSHKeyEncoder {
 	 * @param privateKey The private key (RSA, DSA, EC, or Ed25519)
 	 * @param publicKey  The public key
 	 * @param comment    Optional comment
-	 * @param passphrase Optional passphrase for encryption. If null or empty, key is unencrypted.
+	 * @param passphrase Optional passphrase for encryption. If null or empty, key
+	 *                   is unencrypted.
 	 * @return The key in OpenSSH format, or null if the key type is not supported
 	 * @throws InvalidKeyException if an EC key has an unsupported curve
 	 */
@@ -658,9 +651,11 @@ public class OpenSSHKeyEncoder {
 		} else if (privateKey instanceof ECPrivateKey && publicKey instanceof ECPublicKey) {
 			return exportOpenSSHEC((ECPrivateKey) privateKey, (ECPublicKey) publicKey, comment, passphrase);
 		} else if (privateKey instanceof Ed25519PrivateKey && publicKey instanceof Ed25519PublicKey) {
-			return exportOpenSSHEd25519((Ed25519PrivateKey) privateKey, (Ed25519PublicKey) publicKey, comment, passphrase);
+			return exportOpenSSHEd25519((Ed25519PrivateKey) privateKey, (Ed25519PublicKey) publicKey, comment,
+					passphrase);
 		}
-		throw new InvalidKeyException("Unsupported key type: " + privateKey.getClass().getName() + " / " + publicKey.getClass().getName());
+		throw new InvalidKeyException(
+				"Unsupported key type: " + privateKey.getClass().getName() + " / " + publicKey.getClass().getName());
 	}
 
 	/**
@@ -692,8 +687,10 @@ public class OpenSSHKeyEncoder {
 	/**
 	 * Recovers a KeyPair from PKCS#8 encoded private key bytes.
 	 * <p>
-	 * This method can derive the public key from the private key for supported key types
-	 * (RSA, DSA, EC, Ed25519). For Ed25519 keys, it uses Tink's Ed25519Sign to derive
+	 * This method can derive the public key from the private key for supported key
+	 * types
+	 * (RSA, DSA, EC, Ed25519). For Ed25519 keys, it uses Tink's Ed25519Sign to
+	 * derive
 	 * the public key from the private key seed.
 	 *
 	 * @param encoded The PKCS#8 encoded private key bytes
@@ -741,9 +738,7 @@ public class OpenSSHKeyEncoder {
 			return kf.generatePublic(
 					new java.security.spec.RSAPublicKeySpec(
 							rsaPriv.getModulus(),
-							rsaPriv.getPublicExponent()
-					)
-			);
+							rsaPriv.getPublicExponent()));
 		} else if (priv instanceof java.security.interfaces.RSAPrivateKey) {
 			BigInteger publicExponent = getRSAPublicExponentFromPkcs8Encoded(priv.getEncoded());
 			java.security.interfaces.RSAPrivateKey rsaPriv = (java.security.interfaces.RSAPrivateKey) priv;
@@ -757,15 +752,14 @@ public class OpenSSHKeyEncoder {
 
 			return kf.generatePublic(
 					new java.security.spec.DSAPublicKeySpec(
-							y, params.getP(), params.getQ(), params.getG()
-					)
-			);
+							y, params.getP(), params.getQ(), params.getG()));
 		} else if (priv instanceof ECPrivateKey) {
 			ECPrivateKey ecPriv = (ECPrivateKey) priv;
 			java.security.spec.ECParameterSpec params = ecPriv.getParams();
 
 			// Calculate public key point using EC point multiplication
-			// This requires a helper method to multiply the generator point by the private scalar
+			// This requires a helper method to multiply the generator point by the private
+			// scalar
 			java.security.spec.ECPoint generator = params.getGenerator();
 			java.security.spec.ECPoint w = multiplyECPoint(generator, ecPriv.getS(), params);
 

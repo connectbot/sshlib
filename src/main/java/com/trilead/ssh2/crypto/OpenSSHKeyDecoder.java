@@ -37,12 +37,7 @@ import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Arrays;
-import java.util.Locale;
 
-import com.trilead.ssh2.crypto.cipher.AES;
-import com.trilead.ssh2.crypto.cipher.BlockCipher;
-import com.trilead.ssh2.crypto.cipher.DES;
-import com.trilead.ssh2.crypto.cipher.DESede;
 import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.crypto.keys.Ed25519PublicKey;
 import com.trilead.ssh2.packets.TypesReader;
@@ -50,8 +45,6 @@ import com.trilead.ssh2.signature.DSASHA1Verify;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
-
-import org.mindrot.jbcrypt.BCrypt;
 
 /**
  * OpenSSH Key Decoder for importing SSH keys in OpenSSH format.
@@ -70,7 +63,7 @@ import org.mindrot.jbcrypt.BCrypt;
 public class OpenSSHKeyDecoder {
 
 	static final byte[] OPENSSH_V1_MAGIC = new byte[] {
-		'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1', '\0',
+			'o', 'p', 'e', 'n', 's', 's', 'h', '-', 'k', 'e', 'y', '-', 'v', '1', '\0',
 	};
 
 	/**
@@ -95,7 +88,7 @@ public class OpenSSHKeyDecoder {
 	/**
 	 * Decodes an OpenSSH format private key.
 	 *
-	 * @param data The raw key data (after base64 decoding)
+	 * @param data     The raw key data (after base64 decoding)
 	 * @param password The password for encrypted keys, or null for unencrypted keys
 	 * @return The decoded KeyPair
 	 * @throws IOException if the key cannot be decoded
@@ -136,7 +129,7 @@ public class OpenSSHKeyDecoder {
 			} catch (UnsupportedEncodingException e) {
 				passwordBytes = password.getBytes();
 			}
-			dataBytes = decryptData(dataBytes, passwordBytes, salt, rounds, ciphername);
+			dataBytes = CommonDecoder.decryptData(dataBytes, passwordBytes, salt, rounds, ciphername);
 		} else if (!"none".equals(ciphername) || !"none".equals(kdfname)) {
 			throw new IOException("Unsupported encryption: cipher=" + ciphername + ", kdf=" + kdfname);
 		}
@@ -190,12 +183,12 @@ public class OpenSSHKeyDecoder {
 
 			BigInteger crtCoefficient = trEnc.readMPINT();
 			BigInteger p = trEnc.readMPINT();
+			BigInteger q = trEnc.readMPINT();
 
 			RSAPrivateKeySpec privateKeySpec;
 			if (null == p || null == crtCoefficient) {
 				privateKeySpec = new RSAPrivateKeySpec(n, d);
 			} else {
-				BigInteger q = crtCoefficient.modInverse(p);
 				BigInteger pE = d.mod(p.subtract(BigInteger.ONE));
 				BigInteger qE = d.mod(q.subtract(BigInteger.ONE));
 				privateKeySpec = new RSAPrivateCrtKeySpec(n, e, d, p, q, pE, qE, crtCoefficient);
@@ -222,79 +215,22 @@ public class OpenSSHKeyDecoder {
 		// Read comment (not used, but part of the format)
 		trEnc.readByteString();
 
-		// Note: The original PEMDecoder code had a bug at lines 666-672 where it checked
-		// padding using `tr.remain()` (the outer TypesReader) instead of `trEnc.remain()`
+		// Note: The original PEMDecoder code had a bug at lines 666-672 where it
+		// checked
+		// padding using `tr.remain()` (the outer TypesReader) instead of
+		// `trEnc.remain()`
 		// (the inner decrypted section). Since `tr` is fully consumed after reading the
 		// private section blob, `tr.remain()` always returns 0, causing the padding
-		// verification loop to never execute. The actual padding bytes (e.g., [1,2,3,...,12])
+		// verification loop to never execute. The actual padding bytes (e.g.,
+		// [1,2,3,...,12])
 		// exist in `trEnc` but were never validated.
 		//
-		// For backward compatibility, we preserve this behavior and skip padding verification.
-		// The checkInt1 == checkInt2 check above already validates successful decryption.
+		// For backward compatibility, we preserve this behavior and skip padding
+		// verification.
+		// The checkInt1 == checkInt2 check above already validates successful
+		// decryption.
 
 		return keyPair;
-	}
-
-	/**
-	 * Decrypts the private key section using the specified cipher and KDF.
-	 */
-	private static byte[] decryptData(byte[] data, byte[] pw, byte[] salt, int rounds, String algo) throws IOException {
-		BlockCipher bc;
-		int keySize;
-
-		String algoLower = algo.toLowerCase(Locale.US);
-		if (algoLower.equals("aes-128-cbc") || algoLower.equals("aes128-cbc")) {
-			bc = new AES.CBC();
-			keySize = 16;
-		} else if (algoLower.equals("aes-192-cbc") || algoLower.equals("aes192-cbc")) {
-			bc = new AES.CBC();
-			keySize = 24;
-		} else if (algoLower.equals("aes-256-cbc") || algoLower.equals("aes256-cbc")) {
-			bc = new AES.CBC();
-			keySize = 32;
-		} else if (algoLower.equals("aes-128-ctr") || algoLower.equals("aes128-ctr")) {
-			bc = new AES.CTR();
-			keySize = 16;
-		} else if (algoLower.equals("aes-192-ctr") || algoLower.equals("aes192-ctr")) {
-			bc = new AES.CTR();
-			keySize = 24;
-		} else if (algoLower.equals("aes-256-ctr") || algoLower.equals("aes256-ctr")) {
-			bc = new AES.CTR();
-			keySize = 32;
-		} else if (algoLower.equals("des-ede3-cbc") || algoLower.equals("3des-cbc")) {
-			bc = new DESede.CBC();
-			keySize = 24;
-		} else if (algoLower.equals("des-cbc")) {
-			bc = new DES.CBC();
-			keySize = 8;
-		} else {
-			throw new IOException("Cannot decrypt OpenSSH key, unknown cipher: " + algo);
-		}
-
-		byte[] key = new byte[keySize];
-		byte[] iv = new byte[bc.getBlockSize()];
-
-		byte[] keyAndIV = new byte[key.length + iv.length];
-
-		new BCrypt().pbkdf(pw, salt, rounds, keyAndIV);
-
-		System.arraycopy(keyAndIV, 0, key, 0, key.length);
-		System.arraycopy(keyAndIV, key.length, iv, 0, iv.length);
-
-		bc.init(false, key, iv);
-
-		if ((data.length % bc.getBlockSize()) != 0)
-			throw new IOException("Invalid OpenSSH key structure, size of encrypted block is not a multiple of "
-					+ bc.getBlockSize());
-
-		/* Now decrypt the content */
-		byte[] dz = new byte[data.length];
-
-		for (int i = 0; i < data.length / bc.getBlockSize(); i++) {
-			bc.transformBlock(data, i * bc.getBlockSize(), dz, i * bc.getBlockSize());
-		}
-
-		return dz;
 	}
 
 	/**
