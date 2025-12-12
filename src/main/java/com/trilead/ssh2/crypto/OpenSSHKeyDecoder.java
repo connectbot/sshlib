@@ -124,7 +124,7 @@ public class OpenSSHKeyDecoder {
 
 		if ("bcrypt".equals(kdfname)) {
 			if (password == null) {
-				throw new IOException("Key is encrypted, but no password was specified");
+				throw new IOException("OpenSSH key is encrypted");
 			}
 
 			TypesReader optionsReader = new TypesReader(kdfoptions);
