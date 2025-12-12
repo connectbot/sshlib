@@ -60,7 +60,7 @@ import org.mindrot.jbcrypt.BCrypt;
  * The OpenSSH format uses the header "-----BEGIN OPENSSH PRIVATE KEY-----"
  * and is the default format used by modern versions of ssh-keygen.
  * <p>
- * This is the encoding counterpart to the OpenSSH decoding in {@link PEMDecoder}.
+ * This is the encoding counterpart to the OpenSSH decoding in {@link OpenSSHKeyDecoder}.
  *
  * @author Kenny Root
  */
@@ -660,7 +660,7 @@ public class OpenSSHKeyEncoder {
 		} else if (privateKey instanceof Ed25519PrivateKey && publicKey instanceof Ed25519PublicKey) {
 			return exportOpenSSHEd25519((Ed25519PrivateKey) privateKey, (Ed25519PublicKey) publicKey, comment, passphrase);
 		}
-		return null;
+		throw new InvalidKeyException("Unsupported key type: " + privateKey.getClass().getName() + " / " + publicKey.getClass().getName());
 	}
 
 	/**
