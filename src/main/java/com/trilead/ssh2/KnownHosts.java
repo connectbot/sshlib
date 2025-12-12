@@ -899,9 +899,13 @@ public class KnownHosts extends ExtendedServerHostKeyVerifier
 		List<String> algorithms = new ArrayList<>();
 
 		for (PublicKey key : keys) {
-			String algo = publicKeyToAlgorithm(key);
-			if (algo != null && !algorithms.contains(algo)) {
-				algorithms.add(algo);
+			if (key instanceof RSAPublicKey) {
+				algorithms.addAll(Arrays.asList(ALGOS_FOR_RSA));
+			} else {
+				String algo = publicKeyToAlgorithm(key);
+				if (algo != null && !algorithms.contains(algo)) {
+					algorithms.add(algo);
+				}
 			}
 		}
 

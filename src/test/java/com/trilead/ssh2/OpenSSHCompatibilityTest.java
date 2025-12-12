@@ -8,12 +8,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
+
+import com.trilead.ssh2.crypto.Base64;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -348,5 +351,55 @@ public class OpenSSHCompatibilityTest {
 	@Test
 	public void canConnectToHostWithHostKeySshRsa() throws Exception {
 		canConnectWithHostKeyAlgorithm("/etc/ssh/ssh_host_rsa_key", "ssh-rsa");
+	}
+
+	@Test
+	public void canConnectAndRotateHostKey() throws Exception {
+		try (GenericContainer<?> server = getBaseContainer()) {
+			server.start();
+
+			// Get the RSA host key from the server
+			Container.ExecResult result = server.execInContainer("cat", "/etc/ssh/ssh_host_rsa_key.pub");
+			String rsaPublicKey = result.getStdout().trim();
+			// Format: ssh-rsa <blob> <comment>
+			String[] parts = rsaPublicKey.split(" ");
+			String keyType = parts[0];
+			String keyBlob = parts[1];
+			byte[] keyBytes = Base64.decode(keyBlob.toCharArray());
+
+			// Setup KnownHosts with only the RSA key
+			KnownHosts knownHosts = new KnownHosts();
+			knownHosts.addHostkey(new String[] { server.getHost() }, keyType, keyBytes);
+
+			// Verify we can connect with this setup
+			try (Connection c = withServer(server)) {
+				c.connect(knownHosts);
+				c.authenticateWithPassword(USERNAME, PASSWORD);
+
+				// Now wait for the hostkeys-00@openssh.com global request to be processed.
+				// This happens asynchronously.
+				// We can poll KnownHosts until we see the ed25519 key.
+
+				long start = System.currentTimeMillis();
+				boolean found = false;
+				while (System.currentTimeMillis() - start < 10000) {
+					// Check if we have ed25519 key for this host
+					String[] algos = knownHosts.getPreferredServerHostkeyAlgorithmOrder(server.getHost());
+					if (algos != null) {
+						for (String algo : algos) {
+							if ("ssh-ed25519".equals(algo)) {
+								found = true;
+								break;
+							}
+						}
+					}
+					if (found)
+						break;
+					Thread.sleep(100);
+				}
+
+				assertThat("Should have received and processed hostkeys-00@openssh.com update", found, is(true));
+			}
+		}
 	}
 }
