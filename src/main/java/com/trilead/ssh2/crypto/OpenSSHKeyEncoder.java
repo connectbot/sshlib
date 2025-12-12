@@ -19,6 +19,7 @@ package com.trilead.ssh2.crypto;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -34,6 +35,7 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPublicKey;
+import java.security.spec.ECPoint;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
@@ -93,7 +95,7 @@ public class OpenSSHKeyEncoder {
 	private static byte[] deriveOpenSSHKey(String passphrase, byte[] salt, int rounds) {
 		int keyLength = OPENSSH_AES_KEY_SIZE + OPENSSH_AES_IV_SIZE; // 48 bytes
 		byte[] output = new byte[keyLength];
-		new BCrypt().pbkdf(passphrase.getBytes(java.nio.charset.StandardCharsets.UTF_8), salt, rounds, output);
+		new BCrypt().pbkdf(passphrase.getBytes(StandardCharsets.UTF_8), salt, rounds, output);
 		return output;
 	}
 
@@ -156,7 +158,7 @@ public class OpenSSHKeyEncoder {
 		TypesWriter tw = new TypesWriter();
 
 		// Magic header: "openssh-key-v1\0"
-		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(StandardCharsets.US_ASCII));
 
 		// Generate salt for encryption if needed
 		byte[] salt = null;
@@ -280,7 +282,7 @@ public class OpenSSHKeyEncoder {
 		TypesWriter tw = new TypesWriter();
 
 		// Magic header
-		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(StandardCharsets.US_ASCII));
 
 		// Generate salt for encryption if needed
 		byte[] salt = null;
@@ -395,7 +397,7 @@ public class OpenSSHKeyEncoder {
 		TypesWriter tw = new TypesWriter();
 
 		// Magic header
-		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(StandardCharsets.US_ASCII));
 
 		// Generate salt for encryption if needed
 		byte[] salt = null;
@@ -536,7 +538,7 @@ public class OpenSSHKeyEncoder {
 		}
 
 		// Magic header
-		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+		tw.writeBytes(OPENSSH_KEY_V1_MAGIC.getBytes(StandardCharsets.US_ASCII));
 
 		// Generate salt for encryption if needed
 		byte[] salt = null;
@@ -760,8 +762,8 @@ public class OpenSSHKeyEncoder {
 			// Calculate public key point using EC point multiplication
 			// This requires a helper method to multiply the generator point by the private
 			// scalar
-			java.security.spec.ECPoint generator = params.getGenerator();
-			java.security.spec.ECPoint w = multiplyECPoint(generator, ecPriv.getS(), params);
+			ECPoint generator = params.getGenerator();
+			ECPoint w = multiplyECPoint(generator, ecPriv.getS(), params);
 
 			return kf.generatePublic(new java.security.spec.ECPublicKeySpec(w, params));
 		} else {
@@ -848,16 +850,16 @@ public class OpenSSHKeyEncoder {
 	 * @param params The EC parameters
 	 * @return The resulting EC point
 	 */
-	private static java.security.spec.ECPoint multiplyECPoint(
-			java.security.spec.ECPoint point,
+	private static ECPoint multiplyECPoint(
+			ECPoint point,
 			BigInteger scalar,
 			java.security.spec.ECParameterSpec params) {
 		java.security.spec.EllipticCurve curve = params.getCurve();
 		BigInteger p = ((java.security.spec.ECFieldFp) curve.getField()).getP();
 		BigInteger a = curve.getA();
 
-		java.security.spec.ECPoint result = java.security.spec.ECPoint.POINT_INFINITY;
-		java.security.spec.ECPoint addend = point;
+		ECPoint result = ECPoint.POINT_INFINITY;
+		ECPoint addend = point;
 
 		while (scalar.signum() > 0) {
 			if (scalar.testBit(0)) {
@@ -873,15 +875,15 @@ public class OpenSSHKeyEncoder {
 	/**
 	 * Adds two EC points.
 	 */
-	private static java.security.spec.ECPoint addECPoints(
-			java.security.spec.ECPoint p1,
-			java.security.spec.ECPoint p2,
+	private static ECPoint addECPoints(
+			ECPoint p1,
+			ECPoint p2,
 			BigInteger p,
 			BigInteger a) {
-		if (p1.equals(java.security.spec.ECPoint.POINT_INFINITY)) {
+		if (p1.equals(ECPoint.POINT_INFINITY)) {
 			return p2;
 		}
-		if (p2.equals(java.security.spec.ECPoint.POINT_INFINITY)) {
+		if (p2.equals(ECPoint.POINT_INFINITY)) {
 			return p1;
 		}
 
@@ -894,7 +896,7 @@ public class OpenSSHKeyEncoder {
 			if (y1.equals(y2)) {
 				return doubleECPoint(p1, p, a);
 			} else {
-				return java.security.spec.ECPoint.POINT_INFINITY;
+				return ECPoint.POINT_INFINITY;
 			}
 		}
 
@@ -902,17 +904,17 @@ public class OpenSSHKeyEncoder {
 		BigInteger x3 = slope.multiply(slope).subtract(x1).subtract(x2).mod(p);
 		BigInteger y3 = slope.multiply(x1.subtract(x3)).subtract(y1).mod(p);
 
-		return new java.security.spec.ECPoint(x3, y3);
+		return new ECPoint(x3, y3);
 	}
 
 	/**
 	 * Doubles an EC point.
 	 */
-	private static java.security.spec.ECPoint doubleECPoint(
-			java.security.spec.ECPoint point,
+	private static ECPoint doubleECPoint(
+			ECPoint point,
 			BigInteger p,
 			BigInteger a) {
-		if (point.equals(java.security.spec.ECPoint.POINT_INFINITY)) {
+		if (point.equals(ECPoint.POINT_INFINITY)) {
 			return point;
 		}
 
@@ -920,7 +922,7 @@ public class OpenSSHKeyEncoder {
 		BigInteger y = point.getAffineY();
 
 		if (y.signum() == 0) {
-			return java.security.spec.ECPoint.POINT_INFINITY;
+			return ECPoint.POINT_INFINITY;
 		}
 
 		BigInteger slope = x.multiply(x).multiply(BigInteger.valueOf(3)).add(a)
@@ -928,6 +930,6 @@ public class OpenSSHKeyEncoder {
 		BigInteger x3 = slope.multiply(slope).subtract(x.multiply(BigInteger.valueOf(2))).mod(p);
 		BigInteger y3 = slope.multiply(x.subtract(x3)).subtract(y).mod(p);
 
-		return new java.security.spec.ECPoint(x3, y3);
+		return new ECPoint(x3, y3);
 	}
 }
