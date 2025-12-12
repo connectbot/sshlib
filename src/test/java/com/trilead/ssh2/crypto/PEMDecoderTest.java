@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.security.KeyPair;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * @author Michael Clarke
@@ -59,5 +60,69 @@ public class PEMDecoderTest {
 
 		assertEquals(oldFormat.getPublic(), newFormat.getPublic());
 		assertEquals(oldFormat.getPrivate(), newFormat.getPrivate());
+	}
+
+	@Test
+	public void testRSATraditionalPEMUnencrypted() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_rsa_2048"), null);
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testRSATraditionalPEMAES256() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_rsa_2048_aes256"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testRSATraditionalPEMAES128() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_rsa_2048_aes128"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testRSATraditionalPEMDES3() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_rsa_2048_des3"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testECTraditionalPEMUnencrypted() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_ec_256"), null);
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testECTraditionalPEMAES256() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_ec_256_aes256"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testDSATraditionalPEMAES256() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_dsa_aes256"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
+	}
+
+	@Test
+	public void testDSATraditionalPEMDES3() throws IOException {
+		KeyPair kp = PEMDecoder.decode(getPem("/key-encoder-decoder-tests/pem_dsa_des3"), "testpassword");
+		assertNotNull(kp);
+		assertNotNull(kp.getPrivate());
+		assertNotNull(kp.getPublic());
 	}
 }
