@@ -6,10 +6,6 @@
 	<module name="TreeWalker">
 		<property name="fileExtensions" value="java" />
 		<module name="AvoidStarImport" />
-		<module name="IllegalImport">
-			<property name="illegalClasses"
-				value="java.nio.charset.StandardCharsets" />
-		</module>
 		<module name="RedundantImport" />
 		<module name="UnusedImports" />
 		<module name="NoWhitespaceAfter">
