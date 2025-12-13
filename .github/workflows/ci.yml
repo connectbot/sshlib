@@ -20,14 +20,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ matrix.java }}
-      - name: Cache Gradle Home files
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        continue-on-error: true
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@4d9f0ba0025fe599b4ebab900eb7f3a1d93ef4c2 # v5.0.0
         with:
-          path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-home-examples-check-${{ hashFiles('**/*.gradle') }}
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+          validate-wrappers: true
       - name: Build with Gradle
         run: ./gradlew build jacocoTestReport --info -PjdkVersion=${{ matrix.java }}
       - name: Upload to Sonatype
