@@ -349,7 +349,7 @@ public class PEMEncoder {
 			try {
 				md5.digest(tmp, 0, tmp.length);
 			} catch (DigestException e) {
-				throw new IOException("could not digest password", e);
+				throw new IOException("Could not digest password", e);
 			}
 
 			System.arraycopy(tmp, 0, key, key.length - keyLen, copy);
