@@ -155,7 +155,7 @@ public class PublicKeyUtils {
 			@SuppressWarnings("unused")
 			int numKeys = buffer.getInt(); // Skip number of keys field
 
-			@SuppressWarnings("unused")
+			// Skip pubKeyBlobLen (advance buffer position)
 			int pubKeyBlobLen = buffer.getInt();
 
 			int keyTypeLen = buffer.getInt();
