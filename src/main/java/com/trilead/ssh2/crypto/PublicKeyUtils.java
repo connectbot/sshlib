@@ -152,7 +152,8 @@ public class PublicKeyUtils {
 			int kdfOptionsLen = buffer.getInt();
 			buffer.position(buffer.position() + kdfOptionsLen);
 
-			buffer.getInt();
+			@SuppressWarnings("unused")
+			int numKeys = buffer.getInt(); // Skip number of keys field
 
 			@SuppressWarnings("unused")
 			int pubKeyBlobLen = buffer.getInt();
