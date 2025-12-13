@@ -76,12 +76,22 @@ public class SimpleDERWriter {
 
 		ByteArrayOutputStream oidBytes = new ByteArrayOutputStream();
 
-		int first = Integer.parseInt(parts[0]);
-		int second = Integer.parseInt(parts[1]);
+		int first, second;
+		try {
+			first = Integer.parseInt(parts[0]);
+			second = Integer.parseInt(parts[1]);
+		} catch (NumberFormatException e) {
+			throw new IOException("Invalid OID format: non-numeric component", e);
+		}
 		oidBytes.write(first * 40 + second);
 
 		for (int i = 2; i < parts.length; i++) {
-			long value = Long.parseLong(parts[i]);
+			long value;
+			try {
+				value = Long.parseLong(parts[i]);
+			} catch (NumberFormatException e) {
+				throw new IOException("Invalid OID format: non-numeric component at index " + i, e);
+			}
 			encodeOidComponent(oidBytes, value);
 		}
 
