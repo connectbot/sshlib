@@ -630,7 +630,7 @@ public class KexManager
 			kxs.np = mergeKexParameters(kxs.localKEX.getKexParameters(), kxs.remoteKEX.getKexParameters());
 
 			if (kxs.np == null)
-				throw new IOException("Cannot negotiate, proposals do not match.");
+				throw new NegotiateException(kxs.localKEX.getKexParameters(), kxs.remoteKEX.getKexParameters());
 
 			if (kxs.remoteKEX.isFirst_kex_packet_follows() && (!kxs.np.guessOK))
 			{
