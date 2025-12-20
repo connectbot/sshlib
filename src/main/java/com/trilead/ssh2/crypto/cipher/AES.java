@@ -44,6 +44,15 @@ public abstract class AES implements BlockCipher
 		}
 	}
 
+	@Override
+	public void transformBlocks(byte[] src, int srcoff, byte[] dst, int dstoff, int numBlocks) {
+		try {
+			cipher.update(src, srcoff, numBlocks * AES_BLOCK_SIZE, dst, dstoff);
+		} catch (ShortBufferException e) {
+			throw new AssertionError(e);
+		}
+	}
+
 	/**
 	 * AES in CBC (Cipher Block Chaining) mode for SSH.
 	 */

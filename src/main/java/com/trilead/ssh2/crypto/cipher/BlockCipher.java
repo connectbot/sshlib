@@ -13,4 +13,11 @@ public interface BlockCipher
 	int getBlockSize();
 
 	void transformBlock(byte[] src, int srcoff, byte[] dst, int dstoff);
+
+	default void transformBlocks(byte[] src, int srcoff, byte[] dst, int dstoff, int numBlocks) {
+		int blockSize = getBlockSize();
+		for (int i = 0; i < numBlocks; i++) {
+			transformBlock(src, srcoff + i * blockSize, dst, dstoff + i * blockSize);
+		}
+	}
 }
