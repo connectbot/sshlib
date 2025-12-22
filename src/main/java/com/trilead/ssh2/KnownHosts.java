@@ -368,6 +368,9 @@ public class KnownHosts extends ExtendedServerHostKeyVerifier
 		boolean isMatch = false;
 		boolean negate = false;
 
+		if (hostname == null)
+			return false;
+
 		hostname = hostname.toLowerCase(Locale.US);
 
 		for (int k = 0; k < hostpatterns.length; k++)
@@ -804,6 +807,9 @@ public class KnownHosts extends ExtendedServerHostKeyVerifier
 		synchronized (publicKeys) {
 			publicKeys.removeIf(entry -> {
 				if (!hostnameMatches(entry.patterns, hostname))
+					return false;
+
+				if (serverHostKeyAlgorithm == null)
 					return false;
 
 				String algo = publicKeyToAlgorithm(entry.key);

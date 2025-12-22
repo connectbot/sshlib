@@ -153,4 +153,25 @@ public class KnownHostsTest {
 		assertThat(obj.getPreferredServerHostkeyAlgorithmOrder("unknown"),
 			nullValue());
 	}
+
+	@Test
+	public void removeServerHostKey_NullHostname() throws Exception {
+		KnownHosts obj = new KnownHosts();
+		obj.addHostkeys(getKnownHosts("known_hosts"));
+		obj.removeServerHostKey(null, 22, "ssh-rsa", null);
+	}
+
+	@Test
+	public void removeServerHostKey_NullAlgorithm() throws Exception {
+		KnownHosts obj = new KnownHosts();
+		obj.addHostkeys(getKnownHosts("known_hosts"));
+		obj.removeServerHostKey("example.com", 22, null, null);
+	}
+
+	@Test
+	public void removeServerHostKey_BothNull() throws Exception {
+		KnownHosts obj = new KnownHosts();
+		obj.addHostkeys(getKnownHosts("known_hosts"));
+		obj.removeServerHostKey(null, 22, null, null);
+	}
 }
