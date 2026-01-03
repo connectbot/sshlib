@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.DSAPrivateKey;
@@ -12,6 +13,7 @@ import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.ECGenParameterSpec;
 
@@ -308,5 +310,102 @@ public class OpenSSHKeyEncoderTest {
 
 		assertEquals(kp.getPublic(), decoded.getPublic());
 		assertEquals(kp.getPrivate(), decoded.getPrivate());
+	}
+
+	/**
+	 * Tests that non-CRT RSA keys (like Conscrypt's OpenSSLRSAPrivateKey) can be exported.
+	 * This simulates the scenario where an RSAPrivateKey does not implement RSAPrivateCrtKey.
+	 */
+	@Test
+	public void testExportOpenSSHWithNonCrtRSAKey() throws Exception {
+		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+		kpg.initialize(2048);
+		KeyPair original = kpg.generateKeyPair();
+
+		// Wrap the RSA private key to simulate a non-CRT key (like OpenSSLRSAPrivateKey)
+		RSAPrivateKey nonCrtKey = new NonCrtRSAPrivateKeyWrapper((RSAPrivateCrtKey) original.getPrivate());
+
+		// Verify our wrapper is not an instance of RSAPrivateCrtKey
+		assertTrue(nonCrtKey instanceof RSAPrivateKey);
+		assertTrue(!(nonCrtKey instanceof RSAPrivateCrtKey));
+
+		// Export using the generic method which should handle non-CRT keys
+		String exported = OpenSSHKeyEncoder.exportOpenSSH(
+				nonCrtKey,
+				original.getPublic(),
+				"test-non-crt");
+
+		assertNotNull(exported);
+		assertTrue(exported.contains("-----BEGIN OPENSSH PRIVATE KEY-----"));
+		assertTrue(exported.contains("-----END OPENSSH PRIVATE KEY-----"));
+
+		// Verify round-trip
+		KeyPair decoded = PEMDecoder.decode(exported.toCharArray(), null);
+
+		assertEquals(original.getPublic(), decoded.getPublic());
+		assertEquals(original.getPrivate(), decoded.getPrivate());
+	}
+
+	/**
+	 * Tests that non-CRT RSA keys can be exported with encryption.
+	 */
+	@Test
+	public void testExportOpenSSHWithNonCrtRSAKeyEncrypted() throws Exception {
+		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+		kpg.initialize(2048);
+		KeyPair original = kpg.generateKeyPair();
+
+		RSAPrivateKey nonCrtKey = new NonCrtRSAPrivateKeyWrapper((RSAPrivateCrtKey) original.getPrivate());
+
+		String exported = OpenSSHKeyEncoder.exportOpenSSH(
+				nonCrtKey,
+				original.getPublic(),
+				"test-non-crt",
+				"testpassword");
+
+		assertNotNull(exported);
+		assertTrue(exported.contains("-----BEGIN OPENSSH PRIVATE KEY-----"));
+
+		KeyPair decoded = PEMDecoder.decode(exported.toCharArray(), "testpassword");
+
+		assertEquals(original.getPublic(), decoded.getPublic());
+		assertEquals(original.getPrivate(), decoded.getPrivate());
+	}
+
+	/**
+	 * A wrapper that implements RSAPrivateKey but NOT RSAPrivateCrtKey.
+	 * This simulates keys from providers like Conscrypt's OpenSSLRSAPrivateKey.
+	 */
+	private static class NonCrtRSAPrivateKeyWrapper implements RSAPrivateKey {
+		private final RSAPrivateCrtKey delegate;
+
+		NonCrtRSAPrivateKeyWrapper(RSAPrivateCrtKey delegate) {
+			this.delegate = delegate;
+		}
+
+		@Override
+		public BigInteger getPrivateExponent() {
+			return delegate.getPrivateExponent();
+		}
+
+		@Override
+		public String getAlgorithm() {
+			return delegate.getAlgorithm();
+		}
+
+		@Override
+		public String getFormat() {
+			return delegate.getFormat();
+		}
+
+		@Override
+		public byte[] getEncoded() {
+			return delegate.getEncoded();
+		}
+
+		@Override
+		public BigInteger getModulus() {
+			return delegate.getModulus();
+		}
 	}
 }
