@@ -4,6 +4,7 @@ import com.trilead.ssh2.crypto.cipher.AES;
 import com.trilead.ssh2.crypto.cipher.BlockCipher;
 import com.trilead.ssh2.crypto.cipher.DES;
 import com.trilead.ssh2.crypto.cipher.DESede;
+import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.signature.ECDSASHA2Verify;
 
 import java.io.IOException;
@@ -203,7 +204,7 @@ public class PEMEncoder {
 	/**
 	 * Encode private key to PEM format with auto-detected key type and specified algorithm.
 	 *
-	 * @param privateKey private key (RSA, DSA, or EC)
+	 * @param privateKey private key (RSA, DSA, EC, or Ed25519)
 	 * @param password password for encryption, or null for unencrypted
 	 * @param algorithm encryption algorithm
 	 * @return PEM-encoded private key
@@ -214,12 +215,98 @@ public class PEMEncoder {
 			throws IOException, InvalidKeyException {
 		if (privateKey instanceof RSAPrivateCrtKey) {
 			return encodeRSAPrivateKey((RSAPrivateCrtKey) privateKey, password, algorithm);
+		} else if (privateKey instanceof java.security.interfaces.RSAPrivateKey) {
+			// Handle non-CRT RSA keys (e.g., from Conscrypt's OpenSSLRSAPrivateKey)
+			try {
+				RSAPrivateCrtKey crtKey = convertToRSAPrivateCrtKey(
+						(java.security.interfaces.RSAPrivateKey) privateKey);
+				return encodeRSAPrivateKey(crtKey, password, algorithm);
+			} catch (java.security.spec.InvalidKeySpecException | java.security.NoSuchAlgorithmException e) {
+				throw new InvalidKeyException("Failed to convert RSA key to CRT format", e);
+			}
 		} else if (privateKey instanceof DSAPrivateKey) {
 			return encodeDSAPrivateKey((DSAPrivateKey) privateKey, password, algorithm);
 		} else if (privateKey instanceof ECPrivateKey) {
 			return encodeECPrivateKey((ECPrivateKey) privateKey, password, algorithm);
+		} else if (privateKey instanceof Ed25519PrivateKey) {
+			return encodeEd25519PrivateKey((Ed25519PrivateKey) privateKey, password, algorithm);
 		} else {
 			throw new InvalidKeyException("Unsupported key type: " + privateKey.getClass().getName());
+		}
+	}
+
+	/**
+	 * Encode Ed25519 private key to PEM format (PKCS#8).
+	 *
+	 * @param privateKey Ed25519 private key
+	 * @param password password for encryption, or null for unencrypted
+	 * @return PEM-encoded private key
+	 * @throws IOException if encoding fails
+	 */
+	public static String encodeEd25519PrivateKey(Ed25519PrivateKey privateKey, String password) throws IOException {
+		return encodeEd25519PrivateKey(privateKey, password, DEFAULT_ENCRYPTION);
+	}
+
+	/**
+	 * Encode Ed25519 private key to PEM format (PKCS#8) with specified encryption algorithm.
+	 *
+	 * @param privateKey Ed25519 private key
+	 * @param password password for encryption, or null for unencrypted
+	 * @param algorithm encryption algorithm
+	 * @return PEM-encoded private key
+	 * @throws IOException if encoding fails
+	 */
+	public static String encodeEd25519PrivateKey(Ed25519PrivateKey privateKey, String password, String algorithm)
+			throws IOException {
+		// Ed25519 uses PKCS#8 format (BEGIN PRIVATE KEY)
+		byte[] encoded = privateKey.getEncoded();
+		return formatPEM("PRIVATE KEY", encoded, password, algorithm);
+	}
+
+	/**
+	 * Converts an RSAPrivateKey to RSAPrivateCrtKey by parsing the PKCS#8 encoded form.
+	 * This is needed for keys from providers like Conscrypt that don't implement RSAPrivateCrtKey.
+	 *
+	 * @param privateKey The RSA private key to convert
+	 * @return The RSAPrivateCrtKey with CRT parameters
+	 * @throws java.security.spec.InvalidKeySpecException if the key cannot be parsed
+	 * @throws java.security.NoSuchAlgorithmException if RSA algorithm is not available
+	 */
+	private static RSAPrivateCrtKey convertToRSAPrivateCrtKey(java.security.interfaces.RSAPrivateKey privateKey)
+			throws java.security.spec.InvalidKeySpecException, java.security.NoSuchAlgorithmException {
+		byte[] encoded = privateKey.getEncoded();
+		try {
+			SimpleDERReader reader = new SimpleDERReader(encoded);
+			reader.resetInput(reader.readSequenceAsByteArray());
+			if (!reader.readInt().equals(BigInteger.ZERO)) {
+				throw new java.security.spec.InvalidKeySpecException("PKCS#8 is not version 0");
+			}
+
+			reader.readSequenceAsByteArray(); // OID sequence
+			reader.resetInput(reader.readOctetString()); // RSA key bytes
+			reader.resetInput(reader.readSequenceAsByteArray()); // RSA key sequence
+
+			if (!reader.readInt().equals(BigInteger.ZERO)) {
+				throw new java.security.spec.InvalidKeySpecException("RSA key is not version 0");
+			}
+
+			BigInteger modulus = reader.readInt();
+			BigInteger publicExponent = reader.readInt();
+			BigInteger privateExponent = reader.readInt();
+			BigInteger primeP = reader.readInt();
+			BigInteger primeQ = reader.readInt();
+			BigInteger primeExponentP = reader.readInt();
+			BigInteger primeExponentQ = reader.readInt();
+			BigInteger crtCoefficient = reader.readInt();
+
+			java.security.spec.RSAPrivateCrtKeySpec spec = new java.security.spec.RSAPrivateCrtKeySpec(
+					modulus, publicExponent, privateExponent,
+					primeP, primeQ, primeExponentP, primeExponentQ, crtCoefficient);
+
+			java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+			return (RSAPrivateCrtKey) kf.generatePrivate(spec);
+		} catch (IOException e) {
+			throw new java.security.spec.InvalidKeySpecException("Could not parse RSA key", e);
 		}
 	}
 
