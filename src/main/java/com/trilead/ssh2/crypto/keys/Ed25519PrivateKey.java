@@ -1,9 +1,10 @@
 package com.trilead.ssh2.crypto.keys;
 
-import com.trilead.ssh2.packets.TypesReader;
+import com.trilead.ssh2.crypto.SimpleDERReader;
 import com.trilead.ssh2.packets.TypesWriter;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -102,31 +103,42 @@ public class Ed25519PrivateKey implements PrivateKey {
 
 	private static byte[] decode(PKCS8EncodedKeySpec keySpec) throws InvalidKeySpecException {
 		byte[] encoded = keySpec.getEncoded();
-		if (encoded.length != ENCODED_SIZE) {
-			throw new InvalidKeySpecException("Key spec is of invalid size");
+
+		// Handle legacy RAW format (32 bytes) from commits f01a8b9 to 91bf5d0 (May-July 2020)
+		// Before commit 91bf5d0, getEncoded() returned just the raw 32-byte seed with format "RAW"
+		if (encoded.length == KEY_BYTES_LENGTH) {
+			return encoded;
 		}
+
+		// Handle standard PKCS#8 format (48+ bytes) from commit 91bf5d0 onwards
 		try {
-			TypesReader tr = new TypesReader(keySpec.getEncoded());
-			if (tr.readByte() != 0x30 || // ASN.1 sequence
-				tr.readByte() != ENCODED_SIZE - 2 || // Expected size
-				tr.readByte() != 0x02 || // ASN.1 Integer
-				tr.readByte() != 1 || // length
-				tr.readByte() != 0 || // v1
-				tr.readByte() != 0x30 || // ASN.1 Sequence
-				tr.readByte() != ED25519_OID.length + 2 || // OID length
-				tr.readByte() != 0x06 || // ASN.1 OID
-				tr.readByte() != ED25519_OID.length) {
-				throw new InvalidKeySpecException("Key was not encoded correctly");
+			SimpleDERReader reader = new SimpleDERReader(encoded);
+
+			byte[] sequenceData = reader.readSequenceAsByteArray();
+			SimpleDERReader sequenceReader = new SimpleDERReader(sequenceData);
+
+			BigInteger version = sequenceReader.readInt();
+			if (!version.equals(BigInteger.ZERO)) {
+				throw new InvalidKeySpecException("Unsupported PKCS#8 version: " + version);
 			}
-			byte[] oid = tr.readBytes(ED25519_OID.length);
-			if (!Arrays.equals(ED25519_OID, oid) ||
-				tr.readByte() != 0x04 || // ASN.1 octet string
-				tr.readByte() != KEY_BYTES_LENGTH + 2 || // length
-				tr.readByte() != 0x04 || // ASN.1 octet string
-				tr.readByte() != KEY_BYTES_LENGTH) {
-				throw new InvalidKeySpecException("Key was not encoded correctly");
+
+			int algType = sequenceReader.readConstructedType();
+			SimpleDERReader algReader = sequenceReader.readConstructed();
+
+			String oid = algReader.readOid();
+			if (!"1.3.101.112".equals(oid)) {
+				throw new InvalidKeySpecException("Expected Ed25519 OID (1.3.101.112), got: " + oid);
 			}
-			return tr.readBytes(KEY_BYTES_LENGTH);
+
+			byte[] privateKeyOctetString = sequenceReader.readOctetString();
+			SimpleDERReader privateKeyReader = new SimpleDERReader(privateKeyOctetString);
+			byte[] seed = privateKeyReader.readOctetString();
+
+			if (seed.length != KEY_BYTES_LENGTH) {
+				throw new InvalidKeySpecException("Expected " + KEY_BYTES_LENGTH + " byte seed, got " + seed.length);
+			}
+
+			return seed;
 		} catch (IOException e) {
 			throw new InvalidKeySpecException("Key was not encoded correctly", e);
 		}

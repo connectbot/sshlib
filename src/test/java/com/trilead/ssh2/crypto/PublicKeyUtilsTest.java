@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -198,6 +201,45 @@ class PublicKeyUtilsTest {
 		assertNotNull(formatted);
 		assertTrue(formatted.startsWith("ssh-rsa "));
 		assertTrue(formatted.endsWith(" test"));
+	}
+
+	@Test
+	void testExtractPublicKeyBlobWithNativeJDKEdDSAKey() throws Exception {
+		KeyPairGenerator kpg;
+		try {
+			kpg = KeyPairGenerator.getInstance("EdDSA");
+		} catch (NoSuchAlgorithmException e) {
+			System.err.println("Skipping test: EdDSA not supported by this JDK");
+			return;
+		}
+
+		KeyPair keyPair = kpg.generateKeyPair();
+		PublicKey nativePublicKey = keyPair.getPublic();
+
+		byte[] blob = PublicKeyUtils.extractPublicKeyBlob(nativePublicKey);
+
+		assertNotNull(blob);
+		assertTrue(blob.length > 0);
+	}
+
+	@Test
+	void testToAuthorizedKeysFormatWithNativeJDKEdDSAKey() throws Exception {
+		KeyPairGenerator kpg;
+		try {
+			kpg = KeyPairGenerator.getInstance("EdDSA");
+		} catch (NoSuchAlgorithmException e) {
+			System.err.println("Skipping test: EdDSA not supported by this JDK");
+			return;
+		}
+
+		KeyPair keyPair = kpg.generateKeyPair();
+		PublicKey nativePublicKey = keyPair.getPublic();
+
+		String result = PublicKeyUtils.toAuthorizedKeysFormat(nativePublicKey, "native-eddsa-key");
+
+		assertNotNull(result);
+		assertTrue(result.startsWith("ssh-ed25519 "));
+		assertTrue(result.endsWith(" native-eddsa-key"));
 	}
 
 	private KeyPair loadKeyPair(String path) throws Exception {

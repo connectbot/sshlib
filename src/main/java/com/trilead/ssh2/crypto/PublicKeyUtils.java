@@ -42,31 +42,32 @@ public class PublicKeyUtils {
 			comment = "";
 		}
 
+		String keyType;
+		byte[] encoded;
+
 		if (publicKey instanceof RSAPublicKey) {
 			RSAPublicKey rsaKey = (RSAPublicKey) publicKey;
-			byte[] encoded = RSASHA1Verify.get().encodePublicKey(rsaKey);
-			String data = "ssh-rsa " + new String(Base64.encode(encoded));
-			return comment.isEmpty() ? data : data + " " + comment;
+			keyType = "ssh-rsa";
+			encoded = RSASHA1Verify.get().encodePublicKey(rsaKey);
 		} else if (publicKey instanceof DSAPublicKey) {
 			DSAPublicKey dsaKey = (DSAPublicKey) publicKey;
-			byte[] encoded = DSASHA1Verify.get().encodePublicKey(dsaKey);
-			String data = "ssh-dss " + new String(Base64.encode(encoded));
-			return comment.isEmpty() ? data : data + " " + comment;
+			keyType = "ssh-dss";
+			encoded = DSASHA1Verify.get().encodePublicKey(dsaKey);
 		} else if (publicKey instanceof ECPublicKey) {
 			ECPublicKey ecKey = (ECPublicKey) publicKey;
-			String keyType = ECDSASHA2Verify.getSshKeyType(ecKey);
+			keyType = ECDSASHA2Verify.getSshKeyType(ecKey);
 			SSHSignature verifier = ECDSASHA2Verify.getVerifierForKey(ecKey);
-			byte[] encoded = verifier.encodePublicKey(ecKey);
-			String data = keyType + " " + new String(Base64.encode(encoded));
-			return comment.isEmpty() ? data : data + " " + comment;
-		} else if (publicKey instanceof Ed25519PublicKey) {
-			Ed25519PublicKey ed25519Key = (Ed25519PublicKey) publicKey;
-			byte[] encoded = Ed25519Verify.get().encodePublicKey(ed25519Key);
-			String data = Ed25519Verify.ED25519_ID + " " + new String(Base64.encode(encoded));
-			return comment.isEmpty() ? data : data + " " + comment;
+			encoded = verifier.encodePublicKey(ecKey);
+		} else if ("EdDSA".equals(publicKey.getAlgorithm()) || "Ed25519".equals(publicKey.getAlgorithm())) {
+			Ed25519PublicKey ed25519Key = Ed25519Verify.convertPublicKey(publicKey);
+			keyType = Ed25519Verify.ED25519_ID;
+			encoded = Ed25519Verify.get().encodePublicKey(ed25519Key);
 		} else {
 			throw new InvalidKeyException("Unknown key type: " + publicKey.getClass().getName());
 		}
+
+		String data = keyType + " " + new String(Base64.encode(encoded));
+		return comment.isEmpty() ? data : data + " " + comment;
 	}
 
 	/**
@@ -87,8 +88,9 @@ public class PublicKeyUtils {
 			ECPublicKey ecKey = (ECPublicKey) publicKey;
 			SSHSignature verifier = ECDSASHA2Verify.getVerifierForKey(ecKey);
 			return verifier.encodePublicKey(ecKey);
-		} else if (publicKey instanceof Ed25519PublicKey) {
-			return Ed25519Verify.get().encodePublicKey((Ed25519PublicKey) publicKey);
+		} else if ("EdDSA".equals(publicKey.getAlgorithm()) || "Ed25519".equals(publicKey.getAlgorithm())) {
+			Ed25519PublicKey ed25519Key = Ed25519Verify.convertPublicKey(publicKey);
+			return Ed25519Verify.get().encodePublicKey(ed25519Key);
 		} else {
 			throw new InvalidKeyException("Unknown key type: " + publicKey.getClass().getName());
 		}
