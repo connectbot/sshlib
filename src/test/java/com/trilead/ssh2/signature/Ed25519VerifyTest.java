@@ -223,4 +223,44 @@ public class Ed25519VerifyTest {
 		Ed25519PrivateKey convertedPrivKey = new Ed25519PrivateKey(privKeySpec);
 		assertArrayEquals(nativePrivKey.getEncoded(), convertedPrivKey.getEncoded());
 	}
+
+	@Test
+	public void opensslGeneratedKeySignAndVerify() throws Exception {
+		byte[] opensslPrivate = toByteArray("302e020100300506032b657004220420afd211ae1c8a61e212ddfc5cc59949f6c37ef2f683772c14088a2f8e7b54baf7");
+		byte[] opensslPublic = toByteArray("302a300506032b657003210006e59c37d4b0567863eb56397f7a2cfb78ae26a53dbd2206d83fb2c9cf1cbaea");
+
+		Ed25519PrivateKey privateKey = new Ed25519PrivateKey(new PKCS8EncodedKeySpec(opensslPrivate));
+		Ed25519PublicKey publicKey = new Ed25519PublicKey(new X509EncodedKeySpec(opensslPublic));
+
+		byte[] message = "Test message for OpenSSL-generated Ed25519 key".getBytes();
+
+		Ed25519Verify verifier = Ed25519Verify.get();
+		byte[] signature = verifier.generateSignature(message, privateKey, new SecureRandom());
+
+		assertTrue(verifier.verifySignature(message, signature, publicKey));
+
+		byte[] tampered = Arrays.copyOf(message, message.length);
+		tampered[0] ^= 1;
+		assertFalse(verifier.verifySignature(tampered, signature, publicKey));
+	}
+
+	@Test
+	public void oldLibraryGeneratedKeySignAndVerify() throws Exception {
+		byte[] oldLibPrivate = toByteArray("302e020100300506032b6570042204208fbad2fd15d27ca0a7b13c877d31b48e4a53ea55d9afc795f49696a50c389a77");
+		byte[] oldLibPublic = toByteArray("302a300506032b6570032100b018a2d34b081be789c9f1af3896dcc14f7c963d3ce9dd38f7d805865f09ca88");
+
+		Ed25519PrivateKey privateKey = new Ed25519PrivateKey(new PKCS8EncodedKeySpec(oldLibPrivate));
+		Ed25519PublicKey publicKey = new Ed25519PublicKey(new X509EncodedKeySpec(oldLibPublic));
+
+		byte[] message = "Test message for old library-generated Ed25519 key".getBytes();
+
+		Ed25519Verify verifier = Ed25519Verify.get();
+		byte[] signature = verifier.generateSignature(message, privateKey, new SecureRandom());
+
+		assertTrue(verifier.verifySignature(message, signature, publicKey));
+
+		byte[] tampered = Arrays.copyOf(message, message.length);
+		tampered[0] ^= 1;
+		assertFalse(verifier.verifySignature(tampered, signature, publicKey));
+	}
 }

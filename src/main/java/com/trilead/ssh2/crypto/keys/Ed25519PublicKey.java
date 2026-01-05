@@ -1,6 +1,6 @@
 package com.trilead.ssh2.crypto.keys;
 
-import com.trilead.ssh2.packets.TypesReader;
+import com.trilead.ssh2.crypto.SimpleDERReader;
 import com.trilead.ssh2.packets.TypesWriter;
 
 import java.io.IOException;
@@ -81,30 +81,40 @@ public class Ed25519PublicKey implements PublicKey {
 	}
 
 	private static byte[] decode(byte[] input) throws InvalidKeySpecException {
-		if (input.length != ENCODED_SIZE) {
-			throw new InvalidKeySpecException("Key is not of correct size");
+		// Handle legacy RAW format (32 bytes) from commits f01a8b9 to 91bf5d0 (May-July 2020)
+		// Before commit 91bf5d0, getEncoded() returned just the raw 32-byte public key with format "RAW"
+		if (input.length == KEY_BYTES_LENGTH) {
+			return input;
 		}
 
+		// Handle standard X.509 format (44 bytes) from commit 91bf5d0 onwards
 		try {
-			TypesReader tr = new TypesReader(input);
-			if (tr.readByte() != 0x30 ||
-				tr.readByte() != 7 + ED25519_OID.length + KEY_BYTES_LENGTH ||
-				tr.readByte() != 0x30 ||
-				tr.readByte() != 2 + ED25519_OID.length ||
-				tr.readByte() != 0x06 ||
-				tr.readByte() != ED25519_OID.length) {
-				throw new InvalidKeySpecException("Key was not encoded correctly");
+			SimpleDERReader reader = new SimpleDERReader(input);
+
+			byte[] sequenceData = reader.readSequenceAsByteArray();
+			SimpleDERReader sequenceReader = new SimpleDERReader(sequenceData);
+
+			int algType = sequenceReader.readConstructedType();
+			SimpleDERReader algReader = sequenceReader.readConstructed();
+
+			String oid = algReader.readOid();
+			if (!"1.3.101.112".equals(oid)) {
+				throw new InvalidKeySpecException("Expected Ed25519 OID (1.3.101.112), got: " + oid);
 			}
-			byte[] oid = tr.readBytes(ED25519_OID.length);
-			if (!Arrays.equals(oid, ED25519_OID) ||
-				tr.readByte() != 0x03 ||
-				tr.readByte() != KEY_BYTES_LENGTH + 1 ||
-				tr.readByte() != 0) {
-				throw new InvalidKeySpecException("Key was not encoded correctly");
+
+			byte[] publicKeyBitString = sequenceReader.readOctetString();
+
+			if (publicKeyBitString.length == KEY_BYTES_LENGTH + 1 && publicKeyBitString[0] == 0) {
+				byte[] result = new byte[KEY_BYTES_LENGTH];
+				System.arraycopy(publicKeyBitString, 1, result, 0, KEY_BYTES_LENGTH);
+				return result;
+			} else if (publicKeyBitString.length == KEY_BYTES_LENGTH) {
+				return publicKeyBitString;
+			} else {
+				throw new InvalidKeySpecException("Expected " + KEY_BYTES_LENGTH + " byte public key, got " + publicKeyBitString.length);
 			}
-			return tr.readBytes(KEY_BYTES_LENGTH);
 		} catch (IOException e) {
-			throw new InvalidKeySpecException("Key was not encoded correctly");
+			throw new InvalidKeySpecException("Key was not encoded correctly", e);
 		}
 	}
 
