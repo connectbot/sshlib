@@ -272,7 +272,7 @@ public class PEMEncoder {
 	 * @throws java.security.spec.InvalidKeySpecException if the key cannot be parsed
 	 * @throws java.security.NoSuchAlgorithmException if RSA algorithm is not available
 	 */
-	private static RSAPrivateCrtKey convertToRSAPrivateCrtKey(java.security.interfaces.RSAPrivateKey privateKey)
+	static RSAPrivateCrtKey convertToRSAPrivateCrtKey(java.security.interfaces.RSAPrivateKey privateKey)
 			throws java.security.spec.InvalidKeySpecException, java.security.NoSuchAlgorithmException {
 		byte[] encoded = privateKey.getEncoded();
 		try {

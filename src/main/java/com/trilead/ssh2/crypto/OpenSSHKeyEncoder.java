@@ -651,7 +651,7 @@ public class OpenSSHKeyEncoder {
 		} else if (privateKey instanceof java.security.interfaces.RSAPrivateKey && publicKey instanceof RSAPublicKey) {
 			// Handle non-CRT RSA keys (e.g., from Conscrypt's OpenSSLRSAPrivateKey)
 			try {
-				RSAPrivateCrtKey crtKey = convertToRSAPrivateCrtKey(
+				RSAPrivateCrtKey crtKey = PEMEncoder.convertToRSAPrivateCrtKey(
 						(java.security.interfaces.RSAPrivateKey) privateKey);
 				return exportOpenSSHRSA(crtKey, (RSAPublicKey) publicKey, comment, passphrase);
 			} catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
@@ -667,53 +667,6 @@ public class OpenSSHKeyEncoder {
 		}
 		throw new InvalidKeyException(
 				"Unsupported key type: " + privateKey.getClass().getName() + " / " + publicKey.getClass().getName());
-	}
-
-	/**
-	 * Converts an RSAPrivateKey to RSAPrivateCrtKey by parsing the PKCS#8 encoded form.
-	 * This is needed for keys from providers like Conscrypt that don't implement RSAPrivateCrtKey.
-	 *
-	 * @param privateKey The RSA private key to convert
-	 * @return The RSAPrivateCrtKey with CRT parameters
-	 * @throws InvalidKeySpecException if the key cannot be parsed
-	 * @throws NoSuchAlgorithmException if RSA algorithm is not available
-	 */
-	private static RSAPrivateCrtKey convertToRSAPrivateCrtKey(java.security.interfaces.RSAPrivateKey privateKey)
-			throws InvalidKeySpecException, NoSuchAlgorithmException {
-		byte[] encoded = privateKey.getEncoded();
-		try {
-			SimpleDERReader reader = new SimpleDERReader(encoded);
-			reader.resetInput(reader.readSequenceAsByteArray());
-			if (!reader.readInt().equals(BigInteger.ZERO)) {
-				throw new InvalidKeySpecException("PKCS#8 is not version 0");
-			}
-
-			reader.readSequenceAsByteArray(); // OID sequence
-			reader.resetInput(reader.readOctetString()); // RSA key bytes
-			reader.resetInput(reader.readSequenceAsByteArray()); // RSA key sequence
-
-			if (!reader.readInt().equals(BigInteger.ZERO)) {
-				throw new InvalidKeySpecException("RSA key is not version 0");
-			}
-
-			BigInteger modulus = reader.readInt();
-			BigInteger publicExponent = reader.readInt();
-			BigInteger privateExponent = reader.readInt();
-			BigInteger primeP = reader.readInt();
-			BigInteger primeQ = reader.readInt();
-			BigInteger primeExponentP = reader.readInt();
-			BigInteger primeExponentQ = reader.readInt();
-			BigInteger crtCoefficient = reader.readInt();
-
-			java.security.spec.RSAPrivateCrtKeySpec spec = new java.security.spec.RSAPrivateCrtKeySpec(
-					modulus, publicExponent, privateExponent,
-					primeP, primeQ, primeExponentP, primeExponentQ, crtCoefficient);
-
-			KeyFactory kf = KeyFactory.getInstance("RSA");
-			return (RSAPrivateCrtKey) kf.generatePrivate(spec);
-		} catch (IOException e) {
-			throw new InvalidKeySpecException("Could not parse RSA key", e);
-		}
 	}
 
 	/**
