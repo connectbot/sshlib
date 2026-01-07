@@ -92,7 +92,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")  // For CaptureTest (JUnit 4)
     testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.3")
     testImplementation("org.testcontainers:testcontainers:2.0.3")
-    testImplementation("ch.qos.logback:logback-classic:1.5.23")
+    testImplementation("ch.qos.logback:logback-classic:1.5.24")
     testImplementation(kotlin("test"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.0.2")
