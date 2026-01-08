@@ -16,10 +16,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.KeyFactory;
 import java.security.interfaces.DSAPrivateKey;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.ECFieldFp;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.util.Locale;
@@ -215,13 +219,12 @@ public class PEMEncoder {
 			throws IOException, InvalidKeyException {
 		if (privateKey instanceof RSAPrivateCrtKey) {
 			return encodeRSAPrivateKey((RSAPrivateCrtKey) privateKey, password, algorithm);
-		} else if (privateKey instanceof java.security.interfaces.RSAPrivateKey) {
+		} else if (privateKey instanceof RSAPrivateKey) {
 			// Handle non-CRT RSA keys (e.g., from Conscrypt's OpenSSLRSAPrivateKey)
 			try {
-				RSAPrivateCrtKey crtKey = convertToRSAPrivateCrtKey(
-						(java.security.interfaces.RSAPrivateKey) privateKey);
+				RSAPrivateCrtKey crtKey = convertToRSAPrivateCrtKey((RSAPrivateKey) privateKey);
 				return encodeRSAPrivateKey(crtKey, password, algorithm);
-			} catch (java.security.spec.InvalidKeySpecException | java.security.NoSuchAlgorithmException e) {
+			} catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
 				throw new InvalidKeyException("Failed to convert RSA key to CRT format", e);
 			}
 		} else if (privateKey instanceof DSAPrivateKey) {
@@ -269,17 +272,17 @@ public class PEMEncoder {
 	 *
 	 * @param privateKey The RSA private key to convert
 	 * @return The RSAPrivateCrtKey with CRT parameters
-	 * @throws java.security.spec.InvalidKeySpecException if the key cannot be parsed
-	 * @throws java.security.NoSuchAlgorithmException if RSA algorithm is not available
+	 * @throws InvalidKeySpecException if the key cannot be parsed
+	 * @throws NoSuchAlgorithmException if RSA algorithm is not available
 	 */
-	static RSAPrivateCrtKey convertToRSAPrivateCrtKey(java.security.interfaces.RSAPrivateKey privateKey)
-			throws java.security.spec.InvalidKeySpecException, java.security.NoSuchAlgorithmException {
+	static RSAPrivateCrtKey convertToRSAPrivateCrtKey(RSAPrivateKey privateKey)
+			throws InvalidKeySpecException, NoSuchAlgorithmException {
 		byte[] encoded = privateKey.getEncoded();
 		try {
 			SimpleDERReader reader = new SimpleDERReader(encoded);
 			reader.resetInput(reader.readSequenceAsByteArray());
 			if (!reader.readInt().equals(BigInteger.ZERO)) {
-				throw new java.security.spec.InvalidKeySpecException("PKCS#8 is not version 0");
+				throw new InvalidKeySpecException("PKCS#8 is not version 0");
 			}
 
 			reader.readSequenceAsByteArray(); // OID sequence
@@ -287,7 +290,7 @@ public class PEMEncoder {
 			reader.resetInput(reader.readSequenceAsByteArray()); // RSA key sequence
 
 			if (!reader.readInt().equals(BigInteger.ZERO)) {
-				throw new java.security.spec.InvalidKeySpecException("RSA key is not version 0");
+				throw new InvalidKeySpecException("RSA key is not version 0");
 			}
 
 			BigInteger modulus = reader.readInt();
@@ -299,14 +302,14 @@ public class PEMEncoder {
 			BigInteger primeExponentQ = reader.readInt();
 			BigInteger crtCoefficient = reader.readInt();
 
-			java.security.spec.RSAPrivateCrtKeySpec spec = new java.security.spec.RSAPrivateCrtKeySpec(
+			RSAPrivateCrtKeySpec spec = new RSAPrivateCrtKeySpec(
 					modulus, publicExponent, privateExponent,
 					primeP, primeQ, primeExponentP, primeExponentQ, crtCoefficient);
 
-			java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+			KeyFactory kf = KeyFactory.getInstance("RSA");
 			return (RSAPrivateCrtKey) kf.generatePrivate(spec);
 		} catch (IOException e) {
-			throw new java.security.spec.InvalidKeySpecException("Could not parse RSA key", e);
+			throw new InvalidKeySpecException("Could not parse RSA key", e);
 		}
 	}
 

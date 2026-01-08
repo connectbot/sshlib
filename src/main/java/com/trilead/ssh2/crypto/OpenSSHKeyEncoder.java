@@ -34,6 +34,7 @@ import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.ECPoint;
 import java.security.spec.InvalidKeySpecException;
@@ -648,11 +649,10 @@ public class OpenSSHKeyEncoder {
 			throws InvalidKeyException {
 		if (privateKey instanceof RSAPrivateCrtKey && publicKey instanceof RSAPublicKey) {
 			return exportOpenSSHRSA((RSAPrivateCrtKey) privateKey, (RSAPublicKey) publicKey, comment, passphrase);
-		} else if (privateKey instanceof java.security.interfaces.RSAPrivateKey && publicKey instanceof RSAPublicKey) {
+		} else if (privateKey instanceof RSAPrivateKey && publicKey instanceof RSAPublicKey) {
 			// Handle non-CRT RSA keys (e.g., from Conscrypt's OpenSSLRSAPrivateKey)
 			try {
-				RSAPrivateCrtKey crtKey = PEMEncoder.convertToRSAPrivateCrtKey(
-						(java.security.interfaces.RSAPrivateKey) privateKey);
+				RSAPrivateCrtKey crtKey = PEMEncoder.convertToRSAPrivateCrtKey((RSAPrivateKey) privateKey);
 				return exportOpenSSHRSA(crtKey, (RSAPublicKey) publicKey, comment, passphrase);
 			} catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
 				throw new InvalidKeyException("Failed to convert RSA key to CRT format", e);
