@@ -1,7 +1,5 @@
 package com.trilead.ssh2.crypto.dh;
 
-import com.google.crypto.tink.subtle.X25519;
-
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.InvalidKeyException;
@@ -14,18 +12,33 @@ public class Curve25519Exchange extends GenericDhExchange {
 	public static final String ALT_NAME = "curve25519-sha256@libssh.org";
 	public static final int KEY_SIZE = 32;
 
+	private final X25519Provider x25519Provider;
 	private byte[] clientPublic;
 	private byte[] clientPrivate;
 	private byte[] serverPublic;
 
 	public Curve25519Exchange() {
-		super();
+		this(X25519ProviderFactory.getProvider());
 	}
 
-	/*
+	public Curve25519Exchange(X25519Provider provider) {
+		super();
+		this.x25519Provider = provider;
+	}
+
+	/**
 	 * Used to test known vectors.
 	 */
 	public Curve25519Exchange(byte[] secret) throws InvalidKeyException {
+		this(X25519ProviderFactory.getProvider(), secret);
+	}
+
+	/**
+	 * Used to test known vectors with a specific provider.
+	 */
+	public Curve25519Exchange(X25519Provider provider, byte[] secret) throws InvalidKeyException {
+		super();
+		this.x25519Provider = provider;
 		if (secret.length != KEY_SIZE) {
 			throw new AssertionError("secret must be key size");
 		}
@@ -38,9 +51,9 @@ public class Curve25519Exchange extends GenericDhExchange {
 			throw new IOException("Invalid name " + name);
 		}
 
-		clientPrivate = X25519.generatePrivateKey();
+		clientPrivate = x25519Provider.generatePrivateKey();
 		try {
-			clientPublic = X25519.publicFromPrivate(clientPrivate);
+			clientPublic = x25519Provider.publicFromPrivate(clientPrivate);
 		} catch (InvalidKeyException e) {
 			throw new IOException(e);
 		}
@@ -64,7 +77,7 @@ public class Curve25519Exchange extends GenericDhExchange {
 		}
 		serverPublic = f.clone();
 		try {
-			byte[] sharedSecretBytes = X25519.computeSharedSecret(clientPrivate, serverPublic);
+			byte[] sharedSecretBytes = x25519Provider.computeSharedSecret(clientPrivate, serverPublic);
 			int allBytes = 0;
 			for (int i = 0; i < sharedSecretBytes.length; i++) {
 				allBytes |= sharedSecretBytes[i];

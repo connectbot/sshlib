@@ -1,10 +1,11 @@
 package com.trilead.ssh2.crypto.dh;
 
-import com.google.crypto.tink.subtle.X25519;
-
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigInteger;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,47 +34,86 @@ public class Curve25519ExchangeTest {
 		return b;
 	}
 
-	@Test
-	public void selfAgreement() throws Exception {
-		byte[] alicePrivKey = X25519.generatePrivateKey();
-		byte[] alicePubKey = X25519.publicFromPrivate(alicePrivKey);
+	static Stream<X25519Provider> providers() {
+		Stream.Builder<X25519Provider> builder = Stream.builder();
+		builder.add(X25519ProviderFactory.getTinkProvider());
+		if (X25519ProviderFactory.isPlatformNative()) {
+			builder.add(X25519ProviderFactory.getPlatformProvider());
+		}
+		return builder.build();
+	}
 
-		byte[] bobPrivKey = X25519.generatePrivateKey();
-		byte[] bobPubKey = X25519.publicFromPrivate(bobPrivKey);
+	@ParameterizedTest
+	@MethodSource("providers")
+	public void selfAgreement(X25519Provider provider) throws Exception {
+		byte[] alicePrivKey = provider.generatePrivateKey();
+		byte[] alicePubKey = provider.publicFromPrivate(alicePrivKey);
 
-		Curve25519Exchange alice = new Curve25519Exchange(alicePrivKey);
+		byte[] bobPrivKey = provider.generatePrivateKey();
+		byte[] bobPubKey = provider.publicFromPrivate(bobPrivKey);
+
+		Curve25519Exchange alice = new Curve25519Exchange(provider, alicePrivKey);
 		alice.setF(bobPubKey);
 
-		Curve25519Exchange bob = new Curve25519Exchange(bobPrivKey);
+		Curve25519Exchange bob = new Curve25519Exchange(provider, bobPrivKey);
 		bob.setF(alicePubKey);
 
 		assertNotNull(alice.sharedSecret);
 		assertEquals(alice.sharedSecret, bob.sharedSecret);
 	}
 
-	@Test
-	public void deriveAlicePublicKey() throws Exception {
-		byte[] pubKey = X25519.publicFromPrivate(ALICE_PRIVATE);
+	@ParameterizedTest
+	@MethodSource("providers")
+	public void deriveAlicePublicKey(X25519Provider provider) throws Exception {
+		byte[] pubKey = provider.publicFromPrivate(ALICE_PRIVATE);
 		assertArrayEquals(ALICE_PUBLIC, pubKey);
 	}
 
-	@Test
-	public void deriveBobPublicKey() throws Exception {
-		byte[] pubKey = X25519.publicFromPrivate(BOB_PRIVATE);
+	@ParameterizedTest
+	@MethodSource("providers")
+	public void deriveBobPublicKey(X25519Provider provider) throws Exception {
+		byte[] pubKey = provider.publicFromPrivate(BOB_PRIVATE);
 		assertArrayEquals(BOB_PUBLIC, pubKey);
 	}
 
-	@Test
-	public void knownValues_Alice() throws Exception {
-		Curve25519Exchange ex = new Curve25519Exchange(ALICE_PRIVATE);
+	@ParameterizedTest
+	@MethodSource("providers")
+	public void knownValues_Alice(X25519Provider provider) throws Exception {
+		Curve25519Exchange ex = new Curve25519Exchange(provider, ALICE_PRIVATE);
 		ex.setF(BOB_PUBLIC);
 		assertEquals(KNOWN_SHARED_SECRET_BI, ex.sharedSecret);
 	}
 
-	@Test
-	public void knownValues_Bob() throws Exception {
-		Curve25519Exchange ex = new Curve25519Exchange(BOB_PRIVATE);
+	@ParameterizedTest
+	@MethodSource("providers")
+	public void knownValues_Bob(X25519Provider provider) throws Exception {
+		Curve25519Exchange ex = new Curve25519Exchange(provider, BOB_PRIVATE);
 		ex.setF(ALICE_PUBLIC);
 		assertEquals(KNOWN_SHARED_SECRET_BI, ex.sharedSecret);
+	}
+
+	@Test
+	public void crossProviderAgreement() throws Exception {
+		if (!X25519ProviderFactory.isPlatformNative()) {
+			return;
+		}
+
+		X25519Provider tink = X25519ProviderFactory.getTinkProvider();
+		X25519Provider platform = X25519ProviderFactory.getPlatformProvider();
+
+		byte[] alicePrivKey = tink.generatePrivateKey();
+		byte[] alicePubKey = tink.publicFromPrivate(alicePrivKey);
+
+		byte[] bobPrivKey = platform.generatePrivateKey();
+		byte[] bobPubKey = platform.publicFromPrivate(bobPrivKey);
+
+		Curve25519Exchange alice = new Curve25519Exchange(tink, alicePrivKey);
+		alice.setF(bobPubKey);
+
+		Curve25519Exchange bob = new Curve25519Exchange(platform, bobPrivKey);
+		bob.setF(alicePubKey);
+
+		assertNotNull(alice.sharedSecret);
+		assertEquals(alice.sharedSecret, bob.sharedSecret);
 	}
 }
