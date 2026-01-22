@@ -81,7 +81,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     // Ktor for networking (lightweight TCP transport)
-    implementation("io.ktor:ktor-network:3.3.3")
+    implementation("io.ktor:ktor-network:3.4.0")
 
     // SLF4J API for logging
     implementation("org.slf4j:slf4j-api:2.0.17")
