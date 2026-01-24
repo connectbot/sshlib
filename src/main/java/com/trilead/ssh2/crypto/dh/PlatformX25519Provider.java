@@ -10,6 +10,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.NamedParameterSpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.XECPrivateKeySpec;
 import java.security.spec.XECPublicKeySpec;
 
@@ -79,9 +80,21 @@ public class PlatformX25519Provider implements X25519Provider {
 		}
 	}
 
+	private static final byte[] PKCS8_PREFIX = {
+		0x30, 0x2e,             // SEQUENCE (46 bytes)
+		0x02, 0x01, 0x00,       // INTEGER 0 (version)
+		0x30, 0x05,             // SEQUENCE (5 bytes)
+		0x06, 0x03, 0x2b, 0x65, 0x6e,  // OID 1.3.101.110 (X25519)
+		0x04, 0x22,             // OCTET STRING (34 bytes)
+		0x04, 0x20              // OCTET STRING (32 bytes) - key follows
+	};
+
 	private PrivateKey createPrivateKey(byte[] keyBytes) throws InvalidKeyException {
 		try {
-			XECPrivateKeySpec spec = new XECPrivateKeySpec(X25519_SPEC, keyBytes.clone());
+			byte[] pkcs8 = new byte[PKCS8_PREFIX.length + KEY_SIZE];
+			System.arraycopy(PKCS8_PREFIX, 0, pkcs8, 0, PKCS8_PREFIX.length);
+			System.arraycopy(keyBytes, 0, pkcs8, PKCS8_PREFIX.length, KEY_SIZE);
+			PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(pkcs8);
 			return keyFactory.generatePrivate(spec);
 		} catch (InvalidKeySpecException e) {
 			throw new InvalidKeyException("Invalid private key", e);
