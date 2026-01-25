@@ -4,9 +4,6 @@ package com.trilead.ssh2.transport;
 import com.trilead.ssh2.ExtensionInfo;
 import com.trilead.ssh2.packets.PacketExtInfo;
 import java.io.IOException;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.util.Vector;
@@ -282,22 +279,6 @@ public class TransportManager implements ITransportConnection
 		}
 	}
 
-	private static InetAddress getIPv4Address(InetAddress[] addresses) {
-		for (InetAddress address : addresses) {
-			if (! (address instanceof Inet6Address)) {
-				return address;
-			}
-		}
-		return null;
-	}
-	private static Inet6Address getIPv6Address(InetAddress[] addresses) {
-		for (InetAddress address : addresses) {
-			if (address instanceof Inet6Address) {
-				return (Inet6Address) address;
-			}
-		}
-		return null;
-	}
 
 	private void establishConnection(ProxyData proxyData, int connectTimeout, IpVersion ipVersion) throws IOException
 	{
@@ -310,23 +291,7 @@ public class TransportManager implements ITransportConnection
 	private static Socket connectDirect(String hostname, int port, int connectTimeout, IpVersion ipVersion)
 			throws IOException
 	{
-		Socket sock = new Socket();
-		InetAddress addr;
-		if (ipVersion == IpVersion.IPV4_ONLY)
-		{
-			addr = getIPv4Address(InetAddress.getAllByName(hostname));
-		}
-		else if (ipVersion == IpVersion.IPV6_ONLY)
-		{
-			addr = getIPv6Address(InetAddress.getAllByName(hostname));
-		}
-		else // Assume (ipVersion == IpVersion.IPV4_AND_IPV6), the default.
-		{
-			addr = InetAddress.getByName(hostname);
-		}
-		sock.connect(new InetSocketAddress(addr, port), connectTimeout);
-		sock.setSoTimeout(0);
-		return sock;
+		return new HappyEyeballsConnector().connect(hostname, port, connectTimeout, ipVersion);
 	}
 
 	public void initialize(CryptoWishList cwl, ServerHostKeyVerifier verifier, DHGexParameters dhgex,
