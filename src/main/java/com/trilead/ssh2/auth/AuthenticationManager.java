@@ -35,6 +35,7 @@ import com.trilead.ssh2.signature.ECDSASHA2Verify;
 import com.trilead.ssh2.signature.Ed25519Verify;
 import com.trilead.ssh2.signature.RSASHA1Verify;
 import com.trilead.ssh2.signature.SSHSignature;
+import com.trilead.ssh2.signature.SkPublicKey;
 import com.trilead.ssh2.transport.MessageHandler;
 import com.trilead.ssh2.transport.TransportManager;
 
@@ -336,6 +337,45 @@ public class AuthenticationManager implements MessageHandler
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
 						algo, pk_enc, ed_sig_enc);
+
+				tm.sendMessage(ua.getPayload());
+			}
+			else if (publicKey instanceof SkPublicKey)
+			{
+				// FIDO2 Security Key (SK) authentication
+				// SK keys require external signing via SignatureProxy
+				if (signatureProxy == null)
+				{
+					throw new IOException("SK key authentication requires a SignatureProxy for signing.");
+				}
+
+				SkPublicKey skPublicKey = (SkPublicKey) publicKey;
+				final String algo = skPublicKey.getSshKeyType();
+
+				// Get the encoded public key (includes key type, key data, and application)
+				byte[] pk_enc = skPublicKey.getEncoded();
+
+				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
+
+				// Determine the hash algorithm based on key type
+				// sk-ssh-ed25519@openssh.com uses SHA512 (same as Ed25519)
+				// sk-ecdsa-sha2-nistp256@openssh.com uses SHA256
+				String hashAlgorithm;
+				if (algo.contains("ed25519"))
+				{
+					hashAlgorithm = SignatureProxy.SHA512;
+				}
+				else
+				{
+					hashAlgorithm = SignatureProxy.SHA256;
+				}
+
+				// The SignatureProxy.sign() for SK keys must return the complete
+				// signature blob including flags and counter, not just the raw signature
+				byte[] sk_sig_enc = signatureProxy.sign(msg, hashAlgorithm);
+
+				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
+						algo, pk_enc, sk_sig_enc);
 
 				tm.sendMessage(ua.getPayload());
 			}
