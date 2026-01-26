@@ -16,9 +16,10 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.Disabled
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
@@ -26,7 +27,6 @@ import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.nio.file.Paths
 
 /**
  * Integration tests for SSH client using testcontainers with real SSH servers.
@@ -77,7 +77,7 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(host, port)
+        val client = BlockingSshClient(host, port)
 
         try {
             val connected = client.connect()
@@ -92,7 +92,7 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(host, port)
+        val client = BlockingSshClient(host, port)
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
@@ -110,7 +110,7 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(host, port)
+        val client = BlockingSshClient(host, port)
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
@@ -128,7 +128,7 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(host, port)
+        val client = BlockingSshClient(host, port)
 
         // Initial state
         assertFalse(client.isAuthenticated, "Should not be authenticated initially")
@@ -153,7 +153,7 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(host, port)
+        val client = BlockingSshClient(host, port)
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
@@ -162,11 +162,11 @@ class SshClientIntegrationTest {
                 "Should authenticate successfully"
             )
 
-            val session = client.openSessionChannel()
+            val session = client.openSession()
             assertNotNull(session, "Should successfully open session channel")
             assertTrue(session!!.isOpen, "Channel should be open")
 
-            val shellRequested = session.requestShell()
+            val shellRequested = runBlocking { session.requestShell() }
             assertTrue(shellRequested, "Should successfully request shell")
 
             session.close()

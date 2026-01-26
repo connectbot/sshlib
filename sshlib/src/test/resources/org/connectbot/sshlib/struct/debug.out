@@ -1,0 +1,264 @@
+debug1: sshd version OpenSSH_8.3, OpenSSL 1.1.1d  10 Sep 2019
+debug1: private host key #0: ssh-ed25519 SHA256:TH/MKhJz+iEOXyiPI3CWT3QGhclILpmpc0j6IiSJe94
+debug1: rexec_argv[0]='/foo/sshd'
+debug1: rexec_argv[1]='-d'
+debug1: rexec_argv[2]='-p'
+debug1: rexec_argv[3]='2222'
+debug1: rexec_argv[4]='-h'
+debug1: rexec_argv[5]='/foo/test_hostkey'
+debug1: rexec_argv[6]='-f'
+debug1: rexec_argv[7]='sshd_config'
+debug1: rexec_argv[8]='-oCiphers=aes128-ctr'
+debug1: rexec_argv[9]='-oMACs=hmac-sha2-256-etm@openssh.com'
+debug1: Set /proc/self/oom_score_adj from 0 to -1000
+debug1: Bind to port 2222 on 0.0.0.0.
+Server listening on 0.0.0.0 port 2222.
+debug1: Bind to port 2222 on ::.
+Server listening on :: port 2222.
+debug1: Server will not fork when running in debugging mode.
+debug1: rexec start in 5 out 5 newsock 5 pipe -1 sock 8
+debug1: sshd version OpenSSH_8.3, OpenSSL 1.1.1d  10 Sep 2019
+debug1: private host key #0: ssh-ed25519 SHA256:TH/MKhJz+iEOXyiPI3CWT3QGhclILpmpc0j6IiSJe94
+debug1: inetd sockets after dupping: 3, 3
+Connection from 127.0.0.1 port 37410 on 127.0.0.1 port 2222 rdomain ""
+debug1: Local version string SSH-2.0-OpenSSH_8.3
+debug1: Remote protocol version 2.0, remote software version OpenSSH_8.3
+debug1: match: OpenSSH_8.3 pat OpenSSH* compat 0x04000000
+debug1: permanently_set_uid: 1000/1000 [preauth]
+debug1: list_hostkey_types: ssh-ed25519 [preauth]
+debug1: SSH2_MSG_KEXINIT sent [preauth]
+debug1: SSH2_MSG_KEXINIT received [preauth]
+debug1: kex: algorithm: curve25519-sha256 [preauth]
+debug1: kex: host key algorithm: ssh-ed25519 [preauth]
+debug1: kex: client->server cipher: aes128-ctr MAC: hmac-sha2-256-etm@openssh.com compression: none [preauth]
+debug1: kex: server->client cipher: aes128-ctr MAC: hmac-sha2-256-etm@openssh.com compression: none [preauth]
+debug1: expecting SSH2_MSG_KEX_ECDH_INIT [preauth]
+client public key 25519:
+0000: ea d8 4c 6d 33 cd f6 ab ae fc db 66 17 18 74 1a  ..Lm3......f..t.
+0016: 29 72 ac 7c 23 c8 f7 29 d3 83 f9 c3 50 f2 13 1a  )r.|#..)....P...
+shared secret
+0000: 0c fe 67 be a5 7d 61 dc e1 53 9b 1e ba a3 00 9c  ..g..}a..S......
+0016: 13 79 fe 89 80 94 9d 12 13 5b 7e bd 57 ff d2 0b  .y.......[~.W...
+server public key 25519:
+0000: 30 2a 46 31 90 b0 0e 76 30 b9 cd 95 1e e3 6c 3e  0*F1...v0.....l>
+0016: a1 4c ed 83 51 fd f2 8c a1 57 2f 1d f4 7c 0b 02  .L..Q....W/..|..
+encoded shared secret:
+0000: 00 00 00 20 0c fe 67 be a5 7d 61 dc e1 53 9b 1e  ... ..g..}a..S..
+0016: ba a3 00 9c 13 79 fe 89 80 94 9d 12 13 5b 7e bd  .....y.......[~.
+0032: 57 ff d2 0b                                      W...
+buffer 0x55e98f4e3d20 len = 2137
+0000: 00 00 00 13 53 53 48 2d 32 2e 30 2d 4f 70 65 6e  ....SSH-2.0-Open
+0016: 53 53 48 5f 38 2e 33 00 00 00 13 53 53 48 2d 32  SSH_8.3....SSH-2
+0032: 2e 30 2d 4f 70 65 6e 53 53 48 5f 38 2e 33 00 00  .0-OpenSSH_8.3..
+0048: 05 d9 14 6f 08 3f cf cb 39 65 29 08 74 fa c8 78  ...o.?..9e).t..x
+0064: 80 d2 d9 00 00 00 f1 63 75 72 76 65 32 35 35 31  .......curve2551
+0080: 39 2d 73 68 61 32 35 36 2c 63 75 72 76 65 32 35  9-sha256,curve25
+0096: 35 31 39 2d 73 68 61 32 35 36 40 6c 69 62 73 73  519-sha256@libss
+0112: 68 2e 6f 72 67 2c 65 63 64 68 2d 73 68 61 32 2d  h.org,ecdh-sha2-
+0128: 6e 69 73 74 70 32 35 36 2c 65 63 64 68 2d 73 68  nistp256,ecdh-sh
+0144: 61 32 2d 6e 69 73 74 70 33 38 34 2c 65 63 64 68  a2-nistp384,ecdh
+0160: 2d 73 68 61 32 2d 6e 69 73 74 70 35 32 31 2c 64  -sha2-nistp521,d
+0176: 69 66 66 69 65 2d 68 65 6c 6c 6d 61 6e 2d 67 72  iffie-hellman-gr
+0192: 6f 75 70 2d 65 78 63 68 61 6e 67 65 2d 73 68 61  oup-exchange-sha
+0208: 32 35 36 2c 64 69 66 66 69 65 2d 68 65 6c 6c 6d  256,diffie-hellm
+0224: 61 6e 2d 67 72 6f 75 70 31 36 2d 73 68 61 35 31  an-group16-sha51
+0240: 32 2c 64 69 66 66 69 65 2d 68 65 6c 6c 6d 61 6e  2,diffie-hellman
+0256: 2d 67 72 6f 75 70 31 38 2d 73 68 61 35 31 32 2c  -group18-sha512,
+0272: 64 69 66 66 69 65 2d 68 65 6c 6c 6d 61 6e 2d 67  diffie-hellman-g
+0288: 72 6f 75 70 31 34 2d 73 68 61 32 35 36 2c 65 78  roup14-sha256,ex
+0304: 74 2d 69 6e 66 6f 2d 63 00 00 01 f4 73 73 68 2d  t-info-c....ssh-
+0320: 65 64 32 35 35 31 39 2d 63 65 72 74 2d 76 30 31  ed25519-cert-v01
+0336: 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 73 73 68  @openssh.com,ssh
+0352: 2d 65 64 32 35 35 31 39 2c 65 63 64 73 61 2d 73  -ed25519,ecdsa-s
+0368: 68 61 32 2d 6e 69 73 74 70 32 35 36 2d 63 65 72  ha2-nistp256-cer
+0384: 74 2d 76 30 31 40 6f 70 65 6e 73 73 68 2e 63 6f  t-v01@openssh.co
+0400: 6d 2c 65 63 64 73 61 2d 73 68 61 32 2d 6e 69 73  m,ecdsa-sha2-nis
+0416: 74 70 33 38 34 2d 63 65 72 74 2d 76 30 31 40 6f  tp384-cert-v01@o
+0432: 70 65 6e 73 73 68 2e 63 6f 6d 2c 65 63 64 73 61  penssh.com,ecdsa
+0448: 2d 73 68 61 32 2d 6e 69 73 74 70 35 32 31 2d 63  -sha2-nistp521-c
+0464: 65 72 74 2d 76 30 31 40 6f 70 65 6e 73 73 68 2e  ert-v01@openssh.
+0480: 63 6f 6d 2c 73 6b 2d 65 63 64 73 61 2d 73 68 61  com,sk-ecdsa-sha
+0496: 32 2d 6e 69 73 74 70 32 35 36 2d 63 65 72 74 2d  2-nistp256-cert-
+0512: 76 30 31 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c  v01@openssh.com,
+0528: 73 6b 2d 73 73 68 2d 65 64 32 35 35 31 39 2d 63  sk-ssh-ed25519-c
+0544: 65 72 74 2d 76 30 31 40 6f 70 65 6e 73 73 68 2e  ert-v01@openssh.
+0560: 63 6f 6d 2c 72 73 61 2d 73 68 61 32 2d 35 31 32  com,rsa-sha2-512
+0576: 2d 63 65 72 74 2d 76 30 31 40 6f 70 65 6e 73 73  -cert-v01@openss
+0592: 68 2e 63 6f 6d 2c 72 73 61 2d 73 68 61 32 2d 32  h.com,rsa-sha2-2
+0608: 35 36 2d 63 65 72 74 2d 76 30 31 40 6f 70 65 6e  56-cert-v01@open
+0624: 73 73 68 2e 63 6f 6d 2c 73 73 68 2d 72 73 61 2d  ssh.com,ssh-rsa-
+0640: 63 65 72 74 2d 76 30 31 40 6f 70 65 6e 73 73 68  cert-v01@openssh
+0656: 2e 63 6f 6d 2c 65 63 64 73 61 2d 73 68 61 32 2d  .com,ecdsa-sha2-
+0672: 6e 69 73 74 70 32 35 36 2c 65 63 64 73 61 2d 73  nistp256,ecdsa-s
+0688: 68 61 32 2d 6e 69 73 74 70 33 38 34 2c 65 63 64  ha2-nistp384,ecd
+0704: 73 61 2d 73 68 61 32 2d 6e 69 73 74 70 35 32 31  sa-sha2-nistp521
+0720: 2c 73 6b 2d 65 63 64 73 61 2d 73 68 61 32 2d 6e  ,sk-ecdsa-sha2-n
+0736: 69 73 74 70 32 35 36 40 6f 70 65 6e 73 73 68 2e  istp256@openssh.
+0752: 63 6f 6d 2c 73 6b 2d 73 73 68 2d 65 64 32 35 35  com,sk-ssh-ed255
+0768: 31 39 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 72  19@openssh.com,r
+0784: 73 61 2d 73 68 61 32 2d 35 31 32 2c 72 73 61 2d  sa-sha2-512,rsa-
+0800: 73 68 61 32 2d 32 35 36 2c 73 73 68 2d 72 73 61  sha2-256,ssh-rsa
+0816: 00 00 00 6c 63 68 61 63 68 61 32 30 2d 70 6f 6c  ...lchacha20-pol
+0832: 79 31 33 30 35 40 6f 70 65 6e 73 73 68 2e 63 6f  y1305@openssh.co
+0848: 6d 2c 61 65 73 31 32 38 2d 63 74 72 2c 61 65 73  m,aes128-ctr,aes
+0864: 31 39 32 2d 63 74 72 2c 61 65 73 32 35 36 2d 63  192-ctr,aes256-c
+0880: 74 72 2c 61 65 73 31 32 38 2d 67 63 6d 40 6f 70  tr,aes128-gcm@op
+0896: 65 6e 73 73 68 2e 63 6f 6d 2c 61 65 73 32 35 36  enssh.com,aes256
+0912: 2d 67 63 6d 40 6f 70 65 6e 73 73 68 2e 63 6f 6d  -gcm@openssh.com
+0928: 00 00 00 6c 63 68 61 63 68 61 32 30 2d 70 6f 6c  ...lchacha20-pol
+0944: 79 31 33 30 35 40 6f 70 65 6e 73 73 68 2e 63 6f  y1305@openssh.co
+0960: 6d 2c 61 65 73 31 32 38 2d 63 74 72 2c 61 65 73  m,aes128-ctr,aes
+0976: 31 39 32 2d 63 74 72 2c 61 65 73 32 35 36 2d 63  192-ctr,aes256-c
+0992: 74 72 2c 61 65 73 31 32 38 2d 67 63 6d 40 6f 70  tr,aes128-gcm@op
+1008: 65 6e 73 73 68 2e 63 6f 6d 2c 61 65 73 32 35 36  enssh.com,aes256
+1024: 2d 67 63 6d 40 6f 70 65 6e 73 73 68 2e 63 6f 6d  -gcm@openssh.com
+1040: 00 00 00 d5 75 6d 61 63 2d 36 34 2d 65 74 6d 40  ....umac-64-etm@
+1056: 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 75 6d 61 63  openssh.com,umac
+1072: 2d 31 32 38 2d 65 74 6d 40 6f 70 65 6e 73 73 68  -128-etm@openssh
+1088: 2e 63 6f 6d 2c 68 6d 61 63 2d 73 68 61 32 2d 32  .com,hmac-sha2-2
+1104: 35 36 2d 65 74 6d 40 6f 70 65 6e 73 73 68 2e 63  56-etm@openssh.c
+1120: 6f 6d 2c 68 6d 61 63 2d 73 68 61 32 2d 35 31 32  om,hmac-sha2-512
+1136: 2d 65 74 6d 40 6f 70 65 6e 73 73 68 2e 63 6f 6d  -etm@openssh.com
+1152: 2c 68 6d 61 63 2d 73 68 61 31 2d 65 74 6d 40 6f  ,hmac-sha1-etm@o
+1168: 70 65 6e 73 73 68 2e 63 6f 6d 2c 75 6d 61 63 2d  penssh.com,umac-
+1184: 36 34 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 75  64@openssh.com,u
+1200: 6d 61 63 2d 31 32 38 40 6f 70 65 6e 73 73 68 2e  mac-128@openssh.
+1216: 63 6f 6d 2c 68 6d 61 63 2d 73 68 61 32 2d 32 35  com,hmac-sha2-25
+1232: 36 2c 68 6d 61 63 2d 73 68 61 32 2d 35 31 32 2c  6,hmac-sha2-512,
+1248: 68 6d 61 63 2d 73 68 61 31 00 00 00 d5 75 6d 61  hmac-sha1....uma
+1264: 63 2d 36 34 2d 65 74 6d 40 6f 70 65 6e 73 73 68  c-64-etm@openssh
+1280: 2e 63 6f 6d 2c 75 6d 61 63 2d 31 32 38 2d 65 74  .com,umac-128-et
+1296: 6d 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 68 6d  m@openssh.com,hm
+1312: 61 63 2d 73 68 61 32 2d 32 35 36 2d 65 74 6d 40  ac-sha2-256-etm@
+1328: 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 68 6d 61 63  openssh.com,hmac
+1344: 2d 73 68 61 32 2d 35 31 32 2d 65 74 6d 40 6f 70  -sha2-512-etm@op
+1360: 65 6e 73 73 68 2e 63 6f 6d 2c 68 6d 61 63 2d 73  enssh.com,hmac-s
+1376: 68 61 31 2d 65 74 6d 40 6f 70 65 6e 73 73 68 2e  ha1-etm@openssh.
+1392: 63 6f 6d 2c 75 6d 61 63 2d 36 34 40 6f 70 65 6e  com,umac-64@open
+1408: 73 73 68 2e 63 6f 6d 2c 75 6d 61 63 2d 31 32 38  ssh.com,umac-128
+1424: 40 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 68 6d 61  @openssh.com,hma
+1440: 63 2d 73 68 61 32 2d 32 35 36 2c 68 6d 61 63 2d  c-sha2-256,hmac-
+1456: 73 68 61 32 2d 35 31 32 2c 68 6d 61 63 2d 73 68  sha2-512,hmac-sh
+1472: 61 31 00 00 00 1a 6e 6f 6e 65 2c 7a 6c 69 62 40  a1....none,zlib@
+1488: 6f 70 65 6e 73 73 68 2e 63 6f 6d 2c 7a 6c 69 62  openssh.com,zlib
+1504: 00 00 00 1a 6e 6f 6e 65 2c 7a 6c 69 62 40 6f 70  ....none,zlib@op
+1520: 65 6e 73 73 68 2e 63 6f 6d 2c 7a 6c 69 62 00 00  enssh.com,zlib..
+1536: 00 00 00 00 00 00 00 00 00 00 00 00 00 01 a7 14  ................
+1552: eb ca b1 42 5d 38 48 89 e0 f9 1c 77 9c a7 a4 8a  ...B]8H....w....
+1568: 00 00 00 e6 63 75 72 76 65 32 35 35 31 39 2d 73  ....curve25519-s
+1584: 68 61 32 35 36 2c 63 75 72 76 65 32 35 35 31 39  ha256,curve25519
+1600: 2d 73 68 61 32 35 36 40 6c 69 62 73 73 68 2e 6f  -sha256@libssh.o
+1616: 72 67 2c 65 63 64 68 2d 73 68 61 32 2d 6e 69 73  rg,ecdh-sha2-nis
+1632: 74 70 32 35 36 2c 65 63 64 68 2d 73 68 61 32 2d  tp256,ecdh-sha2-
+1648: 6e 69 73 74 70 33 38 34 2c 65 63 64 68 2d 73 68  nistp384,ecdh-sh
+1664: 61 32 2d 6e 69 73 74 70 35 32 31 2c 64 69 66 66  a2-nistp521,diff
+1680: 69 65 2d 68 65 6c 6c 6d 61 6e 2d 67 72 6f 75 70  ie-hellman-group
+1696: 2d 65 78 63 68 61 6e 67 65 2d 73 68 61 32 35 36  -exchange-sha256
+1712: 2c 64 69 66 66 69 65 2d 68 65 6c 6c 6d 61 6e 2d  ,diffie-hellman-
+1728: 67 72 6f 75 70 31 36 2d 73 68 61 35 31 32 2c 64  group16-sha512,d
+1744: 69 66 66 69 65 2d 68 65 6c 6c 6d 61 6e 2d 67 72  iffie-hellman-gr
+1760: 6f 75 70 31 38 2d 73 68 61 35 31 32 2c 64 69 66  oup18-sha512,dif
+1776: 66 69 65 2d 68 65 6c 6c 6d 61 6e 2d 67 72 6f 75  fie-hellman-grou
+1792: 70 31 34 2d 73 68 61 32 35 36 00 00 00 0b 73 73  p14-sha256....ss
+1808: 68 2d 65 64 32 35 35 31 39 00 00 00 0a 61 65 73  h-ed25519....aes
+1824: 31 32 38 2d 63 74 72 00 00 00 0a 61 65 73 31 32  128-ctr....aes12
+1840: 38 2d 63 74 72 00 00 00 1d 68 6d 61 63 2d 73 68  8-ctr....hmac-sh
+1856: 61 32 2d 32 35 36 2d 65 74 6d 40 6f 70 65 6e 73  a2-256-etm@opens
+1872: 73 68 2e 63 6f 6d 00 00 00 1d 68 6d 61 63 2d 73  sh.com....hmac-s
+1888: 68 61 32 2d 32 35 36 2d 65 74 6d 40 6f 70 65 6e  ha2-256-etm@open
+1904: 73 73 68 2e 63 6f 6d 00 00 00 15 6e 6f 6e 65 2c  ssh.com....none,
+1920: 7a 6c 69 62 40 6f 70 65 6e 73 73 68 2e 63 6f 6d  zlib@openssh.com
+1936: 00 00 00 15 6e 6f 6e 65 2c 7a 6c 69 62 40 6f 70  ....none,zlib@op
+1952: 65 6e 73 73 68 2e 63 6f 6d 00 00 00 00 00 00 00  enssh.com.......
+1968: 00 00 00 00 00 00 00 00 00 33 00 00 00 0b 73 73  .........3....ss
+1984: 68 2d 65 64 32 35 35 31 39 00 00 00 20 19 1d d8  h-ed25519... ...
+2000: 1a 11 cc b4 03 8d 5a 66 67 8b c3 16 19 f1 ce 26  ......Zfg......&
+2016: 52 75 b8 fa 34 cd 85 c1 bb 7b 07 f4 ef 00 00 00  Ru..4....{......
+2032: 20 ea d8 4c 6d 33 cd f6 ab ae fc db 66 17 18 74   ..Lm3......f..t
+2048: 1a 29 72 ac 7c 23 c8 f7 29 d3 83 f9 c3 50 f2 13  .)r.|#..)....P..
+2064: 1a 00 00 00 20 30 2a 46 31 90 b0 0e 76 30 b9 cd  .... 0*F1...v0..
+2080: 95 1e e3 6c 3e a1 4c ed 83 51 fd f2 8c a1 57 2f  ...l>.L..Q....W/
+2096: 1d f4 7c 0b 02 00 00 00 20 0c fe 67 be a5 7d 61  ..|..... ..g..}a
+2112: dc e1 53 9b 1e ba a3 00 9c 13 79 fe 89 80 94 9d  ..S.......y.....
+2128: 12 13 5b 7e bd 57 ff d2 0b                       ..[~.W...
+hash
+0000: 9e f5 c8 c3 7c 33 75 d9 46 65 53 a3 e9 44 16 22  ....|3u.FeS..D."
+0016: 14 b8 1b b8 0a 1e 39 32 b2 89 96 57 14 13 7b c1  ......92...W..{.
+key 'A'== key
+0000: 76 20 6e 50 ff 17 43 9c 50 5d 2b 1a 96 52 42 8c  v nP..C.P]+..RB.
+0016: 55 af d8 31 0f 86 52 75 d5 fc 9f 70 ab d2 ce 45  U..1..Ru...p...E
+key 'B'== key
+0000: 4a d0 83 35 66 c6 2e da 2b f4 5b 44 79 da cb c2  J..5f...+.[Dy...
+0016: 3f b7 ac 4a 2d 5d b8 73 55 fa 81 1b 7b 46 fc c4  ?..J-].sU...{F..
+key 'C'== key
+0000: 9d 53 e1 10 b6 62 41 2c 06 a5 b7 6d ba 98 b1 23  .S...bA,...m...#
+0016: 7d 37 74 4e 15 9c f7 fd 59 e8 4e 12 aa aa f0 40  }7tN....Y.N....@
+key 'D'== key
+0000: f0 6f c5 74 24 38 6c 6c 53 53 a0 2b a2 c0 45 82  .o.t$8llSS.+..E.
+0016: de 61 50 f2 41 b1 f8 4f 97 a5 d2 22 e4 d6 96 eb  .aP.A..O..."....
+key 'E'== key
+0000: 26 4f 54 6a c7 64 f9 96 2c 62 08 c0 6d ce 50 93  &OTj.d..,b..m.P.
+0016: 26 ae d9 31 7e 8c 2b b6 11 8c b1 f9 2b 32 14 24  &..1~.+.....+2.$
+key 'F'== key
+0000: e0 03 a2 02 7d 34 06 f0 6c 9f e4 45 3d f0 e1 e0  ....}4..l..E=...
+0016: b6 fb 21 0d 6d a6 fc 5a e4 86 61 ac 00 33 c4 ce  ..!.m..Z..a..3..
+debug1: rekey out after 4294967296 blocks [preauth]
+debug1: SSH2_MSG_NEWKEYS sent [preauth]
+debug1: Sending SSH2_MSG_EXT_INFO [preauth]
+debug1: expecting SSH2_MSG_NEWKEYS [preauth]
+debug1: SSH2_MSG_NEWKEYS received [preauth]
+debug1: rekey in after 4294967296 blocks [preauth]
+debug1: KEX done [preauth]
+debug1: userauth-request for user testuser service ssh-connection method none [preauth]
+debug1: attempt 0 failures 0 [preauth]
+debug1: userauth-request for user testuser service ssh-connection method keyboard-interactive [preauth]
+debug1: attempt 1 failures 0 [preauth]
+debug1: keyboard-interactive devs  [preauth]
+debug1: auth2_challenge: user=testuser devs= [preauth]
+debug1: kbdint_alloc: devices '' [preauth]
+debug1: userauth-request for user testuser service ssh-connection method password [preauth]
+debug1: attempt 2 failures 1 [preauth]
+Accepted password for testuser from 127.0.0.1 port 37410 ssh2
+debug1: monitor_child_preauth: testuser has been authenticated by privileged process
+debug1: monitor_read_log: child log fd closed
+User child is on pid 38766
+debug1: permanently_set_uid: 1001/1001
+debug1: rekey in after 4294967296 blocks
+debug1: rekey out after 4294967296 blocks
+debug1: ssh_packet_set_postauth: called
+debug1: active: key options: agent-forwarding port-forwarding pty user-rc x11-forwarding
+debug1: Entering interactive session for SSH2.
+debug1: server_init_dispatch
+debug1: server_input_channel_open: ctype session rchan 0 win 1048576 max 16384
+debug1: input_session_request
+debug1: channel 0: new [server-session]
+debug1: session_new: session 0
+debug1: session_open: channel 0
+debug1: session_open: session 0: link with channel 0
+debug1: server_input_channel_open: confirm session
+debug1: server_input_global_request: rtype no-more-sessions@openssh.com want_reply 0
+debug1: server_input_channel_req: channel 0 request pty-req reply 1
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req pty-req
+debug1: Allocating pty.
+debug1: session_new: session 0
+debug1: session_pty_req: session 0 alloc /dev/pts/3
+debug1: server_input_channel_req: channel 0 request shell reply 1
+debug1: session_by_channel: session 0 channel 0
+debug1: session_input_channel_req: session 0 req shell
+Starting session: shell on pts/3 for testuser from 127.0.0.1 port 37410 id 0
+debug1: Setting controlling tty using TIOCSCTTY.
+debug1: Received SIGCHLD.
+debug1: session_by_pid: pid 38767
+debug1: session_exit_message: session 0 channel 0 pid 38767
+debug1: session_exit_message: release channel 0
+debug1: session_by_tty: session 0 tty /dev/pts/3
+debug1: session_pty_cleanup2: session 0 release /dev/pts/3
+debug1: session_by_channel: session 0 channel 0
+debug1: session_close_by_channel: channel 0 child 0
+Close session: user testuser from 127.0.0.1 port 37410 id 0
+debug1: channel 0: free: server-session, nchannels 1
+Received disconnect from 127.0.0.1 port 37410:11: disconnected by user
+Disconnected from user testuser 127.0.0.1 port 37410
+debug1: do_cleanup
+debug1: do_cleanup
