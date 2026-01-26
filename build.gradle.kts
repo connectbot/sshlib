@@ -15,109 +15,11 @@
  */
 
 plugins {
-    java
-    kotlin("jvm") version "2.3.0"
+    kotlin("jvm") version "2.3.0" apply false
 }
 
-val kaitaiInputDir = file("src/main/resources/kaitai")
-val kaitaiOutputDir = file("build/generated/kaitai")
-val kaitaiCompilerZip = file("prebuilts/kaitai-struct-compiler-0.11.zip")
-val kaitaiCompilerDir = file("build/kaitai-compiler")
-
-tasks.register<Copy>("unzipKaitaiCompiler") {
-    from(zipTree(kaitaiCompilerZip))
-    into(kaitaiCompilerDir)
-}
-
-abstract class KaitaiTask : Exec() {
-    @get:InputFiles
-    abstract val ksyFiles: ConfigurableFileCollection
-
-    @get:Input
-    abstract val compilerPath: Property<String>
-
-    @get:Input
-    abstract val outputDirPath: Property<String>
-
-    @get:Input
-    abstract val javaPackage: Property<String>
-
-    @TaskAction
-    override fun exec() {
-        File(outputDirPath.get()).mkdirs()
-        commandLine(
-            listOf(
-                compilerPath.get(),
-                "--read-write",
-                "--target", "java",
-                "--outdir", outputDirPath.get(),
-                "--java-package", javaPackage.get()
-            ) + ksyFiles.files.map { it.absolutePath }
-        )
-        super.exec()
+subprojects {
+    repositories {
+        mavenCentral()
     }
-}
-
-tasks.register<KaitaiTask>("kaitai") {
-    dependsOn("unzipKaitaiCompiler")
-
-    ksyFiles.from(fileTree(kaitaiInputDir) { include("*.ksy") })
-    compilerPath.set(kaitaiCompilerDir.resolve("kaitai-struct-compiler-0.11/bin/kaitai-struct-compiler").absolutePath)
-    outputDirPath.set(kaitaiOutputDir.absolutePath)
-    javaPackage.set("org.connectbot.sshlib.struct")
-
-    outputs.dir(kaitaiOutputDir)
-}
-
-tasks.named("compileJava") {
-    dependsOn("kaitai")
-}
-
-tasks.named("compileKotlin") {
-    dependsOn("kaitai")
-}
-
-sourceSets {
-    main {
-        java {
-            srcDir(kaitaiOutputDir)
-        }
-    }
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    // Kaitai Struct runtime
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("kaitai-struct-runtime-*.jar"))))
-
-    // KStateMachine for state machine implementation (JVM/Android artifact)
-    implementation("io.github.nsk90:kstatemachine-jvm:0.36.0")
-
-    // Kotlin standard library
-    implementation(kotlin("stdlib"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-
-    // Ktor for networking (lightweight TCP transport)
-    implementation("io.ktor:ktor-network:3.4.0")
-
-    // SLF4J API for logging
-    implementation("org.slf4j:slf4j-api:2.0.17")
-
-    // Testing dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.0.2")
-    testImplementation("junit:junit:4.13.2")  // For CaptureTest (JUnit 4)
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.3")
-    testImplementation("org.testcontainers:testcontainers:2.0.3")
-    testImplementation("ch.qos.logback:logback-classic:1.5.26")
-    testImplementation(kotlin("test"))
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.2")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.0.2")
-}
-
-tasks.test {
-    useJUnitPlatform()
 }

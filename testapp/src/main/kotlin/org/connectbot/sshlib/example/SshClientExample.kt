@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.client
+package org.connectbot.sshlib.example
+
+import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.SshClient
+import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.blocking.BlockingSshClient
 
 /**
  * Example usage of the SSH client.
@@ -22,7 +27,8 @@ package org.connectbot.sshlib.client
  * This example demonstrates the basic usage pattern for connecting
  * to an SSH server and authenticating with password.
  */
-fun main() {
+fun main() = runBlocking {
+    // Using the async API with coroutines
     val client = SshClient(
         host = "example.com",
         port = 22
@@ -32,7 +38,7 @@ fun main() {
         // Connect and perform key exchange
         if (!client.connect()) {
             println("Failed to connect to SSH server")
-            return
+            return@runBlocking
         }
 
         println("Connected to SSH server")
@@ -40,14 +46,28 @@ fun main() {
         // Authenticate with password
         if (!client.authenticatePassword("username", "password")) {
             println("Authentication failed")
-            return
+            return@runBlocking
         }
 
         println("Successfully authenticated!")
 
-        // At this point, the connection is established and authenticated
-        // You can now use channels for executing commands, port forwarding, etc.
-        // (Channel support not yet implemented in this minimal version)
+        // Open a session and request a shell
+        val session = client.openSession()
+        if (session != null) {
+            println("Session opened: local=${session.localChannelNumber}, remote=${session.remoteChannelNumber}")
+
+            // Request a PTY
+            if (session.requestPty()) {
+                println("PTY allocated")
+            }
+
+            // Request a shell
+            if (session.requestShell()) {
+                println("Shell started")
+            }
+
+            session.close()
+        }
 
     } finally {
         client.disconnect()
@@ -56,10 +76,10 @@ fun main() {
 }
 
 /**
- * Example with explicit error handling.
+ * Example using the blocking API for Java compatibility.
  */
-fun robustExample() {
-    val client = SshClient("example.com")
+fun blockingExample() {
+    val client = BlockingSshClient("example.com")
 
     try {
         when {
@@ -77,12 +97,43 @@ fun robustExample() {
             }
             else -> {
                 println("SUCCESS: Connected and authenticated")
-                // Perform SSH operations here
+
+                // Open a session using the blocking API
+                val session = client.openSession()
+                if (session != null) {
+                    // Note: session methods are suspend, so wrap in runBlocking
+                    runBlocking {
+                        session.requestPty()
+                        session.requestShell()
+                    }
+                    session.close()
+                }
             }
         }
     } catch (e: Exception) {
         println("ERROR: Unexpected exception: ${e.message}")
         e.printStackTrace()
+    } finally {
+        client.disconnect()
+    }
+}
+
+/**
+ * Example using the configuration DSL.
+ */
+fun configExample() = runBlocking {
+    val config = SshClientConfig {
+        host = "example.com"
+        port = 22
+        clientVersion = "SSH-2.0-MyCustomClient_1.0"
+    }
+
+    val client = SshClient(config)
+
+    try {
+        if (client.connect()) {
+            println("Connected with custom config")
+        }
     } finally {
         client.disconnect()
     }

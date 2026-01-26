@@ -1,0 +1,61 @@
+/*
+ * Copyright 2025 Kenny Root
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.connectbot.sshlib
+
+/**
+ * Represents an SSH session channel (RFC 4254 section 6).
+ *
+ * Session channels are used for interactive shells, command execution,
+ * and subsystem invocation (like SFTP).
+ */
+interface SshSession : AutoCloseable {
+    val localChannelNumber: Int
+    val remoteChannelNumber: Int
+    val isOpen: Boolean
+
+    /**
+     * Request a PTY (pseudo-terminal) for this session (RFC 4254 section 6.2).
+     *
+     * @param terminalType Terminal type (e.g., "xterm", "vt100")
+     * @param widthChars Terminal width in characters
+     * @param heightRows Terminal height in rows
+     * @param widthPixels Terminal width in pixels (usually 0)
+     * @param heightPixels Terminal height in pixels (usually 0)
+     * @param terminalModes Encoded terminal modes (empty for defaults)
+     * @return true if PTY request was accepted
+     */
+    suspend fun requestPty(
+        terminalType: String = "xterm",
+        widthChars: Int = 80,
+        heightRows: Int = 24,
+        widthPixels: Int = 0,
+        heightPixels: Int = 0,
+        terminalModes: ByteArray = byteArrayOf(0)
+    ): Boolean
+
+    /**
+     * Request a shell for this session (RFC 4254 section 6.5).
+     *
+     * @return true if shell request was accepted
+     */
+    suspend fun requestShell(): Boolean
+
+    /**
+     * Close this channel (RFC 4254 section 5.3).
+     */
+    override fun close()
+}

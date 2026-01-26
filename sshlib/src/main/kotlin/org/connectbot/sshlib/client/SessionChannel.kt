@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.struct.*
 import org.slf4j.LoggerFactory
 
@@ -33,41 +34,33 @@ import org.slf4j.LoggerFactory
  */
 class SessionChannel internal constructor(
     private val connection: SshConnection,
-    val localChannelNumber: Int,
-    private var remoteChannelNumber: Int,
+    override val localChannelNumber: Int,
+    private var _remoteChannelNumber: Int,
     private val maxPacketSize: Int
-) {
+) : SshSession {
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
     }
 
     private var _isOpen = true
 
-    val isOpen: Boolean
+    override val isOpen: Boolean
         get() = _isOpen
 
-    /**
-     * Request a PTY (pseudo-terminal) for this session (RFC 4254 section 6.2).
-     *
-     * @param terminalType Terminal type (e.g., "xterm", "vt100")
-     * @param widthChars Terminal width in characters
-     * @param heightRows Terminal height in rows
-     * @param widthPixels Terminal width in pixels (usually 0)
-     * @param heightPixels Terminal height in pixels (usually 0)
-     * @param terminalModes Encoded terminal modes (empty for defaults)
-     * @return true if PTY request was accepted
-     */
-    fun requestPty(
-        terminalType: String = "xterm",
-        widthChars: Int = 80,
-        heightRows: Int = 24,
-        widthPixels: Int = 0,
-        heightPixels: Int = 0,
-        terminalModes: ByteArray = byteArrayOf(0) // TTY_OP_END
-    ): Boolean = runBlocking {
+    override val remoteChannelNumber: Int
+        get() = _remoteChannelNumber
+
+    override suspend fun requestPty(
+        terminalType: String,
+        widthChars: Int,
+        heightRows: Int,
+        widthPixels: Int,
+        heightPixels: Int,
+        terminalModes: ByteArray
+    ): Boolean {
         logger.debug("Requesting PTY: $terminalType ${widthChars}x$heightRows")
-        connection.sendChannelRequest(
-            remoteChannelNumber,
+        return connection.sendChannelRequest(
+            _remoteChannelNumber,
             "pty-req",
             wantReply = true
         ) { msg ->
@@ -92,15 +85,10 @@ class SessionChannel internal constructor(
         }
     }
 
-    /**
-     * Request a shell for this session (RFC 4254 section 6.5).
-     *
-     * @return true if shell request was accepted
-     */
-    fun requestShell(): Boolean = runBlocking {
+    override suspend fun requestShell(): Boolean {
         logger.debug("Requesting shell on channel $localChannelNumber")
-        connection.sendChannelRequest(
-            remoteChannelNumber,
+        return connection.sendChannelRequest(
+            _remoteChannelNumber,
             "shell",
             wantReply = true
         ) { msg ->
@@ -110,17 +98,16 @@ class SessionChannel internal constructor(
         }
     }
 
-    /**
-     * Close this channel (RFC 4254 section 5.3).
-     */
-    fun close() = runBlocking {
+    override fun close() {
         if (!_isOpen) {
             logger.debug("Channel $localChannelNumber already closed")
-            return@runBlocking
+            return
         }
 
         logger.debug("Closing channel $localChannelNumber")
-        connection.sendChannelClose(remoteChannelNumber)
+        runBlocking {
+            connection.sendChannelClose(_remoteChannelNumber)
+        }
         _isOpen = false
     }
 }

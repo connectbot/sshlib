@@ -14,25 +14,37 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.client
+package org.connectbot.sshlib
 
-import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.transport.KtorTcpTransport
 import org.slf4j.LoggerFactory
 
 /**
- * High-level SSH client API.
+ * High-level async SSH client API.
  *
- * This is the main entry point for establishing SSH connections.
+ * This is the main entry point for establishing SSH connections. All methods
+ * are suspend functions for use with Kotlin coroutines.
  *
  * Usage:
  * ```kotlin
  * val client = SshClient("example.com")
- * if (client.connect() && client.authenticatePassword("user", "password")) {
- *     // Connection established and authenticated
- *     client.disconnect()
+ * client.connect()
+ * if (client.authenticatePassword("user", "password")) {
+ *     val session = client.openSession()
+ *     session.requestPty()
+ *     session.requestShell()
+ *     // ...
+ *     session.close()
  * }
+ * client.disconnect()
  * ```
+ *
+ * For blocking Java compatibility, use [org.connectbot.sshlib.blocking.BlockingSshClient].
+ *
+ * @param host SSH server hostname
+ * @param port SSH server port (default 22)
+ * @param clientVersion Client version string for the SSH handshake
  */
 class SshClient(
     private val host: String,
@@ -41,6 +53,13 @@ class SshClient(
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(SshClient::class.java)
+
+        /**
+         * Create an SshClient from a configuration.
+         */
+        operator fun invoke(config: SshClientConfig): SshClient {
+            return SshClient(config.host, config.port, config.clientVersion)
+        }
     }
 
     private var transport: KtorTcpTransport? = null
@@ -52,18 +71,14 @@ class SshClient(
      *
      * @return true if connection succeeded
      */
-    fun connect(): Boolean {
+    suspend fun connect(): Boolean {
         try {
             logger.info("Connecting to $host:$port")
 
-            // Create transport and connect
             val ktorTransport = KtorTcpTransport(host, port)
-            runBlocking {
-                ktorTransport.connect()
-            }
+            ktorTransport.connect()
             transport = ktorTransport
 
-            // Create SSH connection and perform handshake
             val sshConnection = SshConnection(ktorTransport, clientVersion)
             val success = sshConnection.connect()
 
@@ -90,7 +105,7 @@ class SshClient(
      * @param password SSH password
      * @return true if authentication succeeded
      */
-    fun authenticatePassword(username: String, password: String): Boolean {
+    suspend fun authenticatePassword(username: String, password: String): Boolean {
         val conn = connection
         if (conn == null) {
             logger.error("Not connected - call connect() first")
@@ -99,9 +114,7 @@ class SshClient(
 
         return try {
             logger.info("Authenticating as $username")
-            val success = runBlocking {
-                conn.authenticatePassword(username, password)
-            }
+            val success = conn.authenticatePassword(username, password)
 
             if (success) {
                 authenticated = true
@@ -126,9 +139,9 @@ class SshClient(
     /**
      * Open a session channel (RFC 4254 section 6.1).
      *
-     * @return SessionChannel instance if successful, null otherwise
+     * @return SshSession instance if successful, null otherwise
      */
-    fun openSessionChannel(): SessionChannel? {
+    suspend fun openSession(): SshSession? {
         val conn = connection
         if (conn == null || !authenticated) {
             logger.error("Not authenticated - call connect() and authenticatePassword() first")
@@ -137,9 +150,7 @@ class SshClient(
 
         return try {
             logger.info("Opening session channel")
-            runBlocking {
-                conn.openSessionChannel()
-            }
+            conn.openSessionChannel()
         } catch (e: Exception) {
             logger.error("Failed to open session channel", e)
             null
@@ -149,15 +160,13 @@ class SshClient(
     /**
      * Disconnect from the SSH server.
      */
-    fun disconnect() {
+    suspend fun disconnect() {
         logger.info("Disconnecting from $host:$port")
 
         connection?.disconnect()
         connection = null
 
-        runBlocking {
-            transport?.close()
-        }
+        transport?.close()
         transport = null
 
         authenticated = false
