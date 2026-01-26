@@ -17,7 +17,9 @@
 package org.connectbot.sshlib
 
 import org.connectbot.sshlib.client.SshConnection
-import org.connectbot.sshlib.transport.KtorTcpTransport
+import org.connectbot.sshlib.transport.KtorTcpTransportFactory
+import org.connectbot.sshlib.transport.Transport
+import org.connectbot.sshlib.transport.TransportFactory
 import org.slf4j.LoggerFactory
 
 /**
@@ -26,7 +28,7 @@ import org.slf4j.LoggerFactory
  * This is the main entry point for establishing SSH connections. All methods
  * are suspend functions for use with Kotlin coroutines.
  *
- * Usage:
+ * Usage with TCP (default):
  * ```kotlin
  * val client = SshClient("example.com")
  * client.connect()
@@ -40,29 +42,70 @@ import org.slf4j.LoggerFactory
  * client.disconnect()
  * ```
  *
- * For blocking Java compatibility, use [org.connectbot.sshlib.blocking.BlockingSshClient].
+ * Usage with custom transport:
+ * ```kotlin
+ * val config = SshClientConfig {
+ *     transportFactory = MyCustomTransportFactory()
+ * }
+ * val client = SshClient(config)
+ * client.connect()
+ * // ...
+ * ```
  *
- * @param host SSH server hostname
- * @param port SSH server port (default 22)
- * @param clientVersion Client version string for the SSH handshake
+ * For blocking Java compatibility, use [org.connectbot.sshlib.blocking.BlockingSshClient].
  */
-class SshClient(
-    private val host: String,
-    private val port: Int = 22,
-    private val clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+class SshClient private constructor(
+    private val config: SshClientConfig
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(SshClient::class.java)
 
         /**
+         * Create an SshClient for TCP connection to the specified host.
+         *
+         * @param host SSH server hostname
+         * @param port SSH server port (default 22)
+         * @param clientVersion Client version string for the SSH handshake
+         */
+        operator fun invoke(
+            host: String,
+            port: Int = 22,
+            clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+        ): SshClient {
+            val config = SshClientConfig {
+                this.host = host
+                this.port = port
+                this.clientVersion = clientVersion
+            }
+            return SshClient(config)
+        }
+
+        /**
          * Create an SshClient from a configuration.
          */
         operator fun invoke(config: SshClientConfig): SshClient {
-            return SshClient(config.host, config.port, config.clientVersion)
+            return SshClient(config)
+        }
+
+        /**
+         * Create an SshClient with a custom transport factory.
+         *
+         * @param transportFactory Factory to create the transport
+         * @param clientVersion Client version string for the SSH handshake
+         */
+        operator fun invoke(
+            transportFactory: TransportFactory,
+            clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+        ): SshClient {
+            val config = SshClientConfig {
+                this.transportFactory = transportFactory
+                this.clientVersion = clientVersion
+            }
+            return SshClient(config)
         }
     }
 
-    private var transport: KtorTcpTransport? = null
+    private var transport: Transport? = null
     private var connection: SshConnection? = null
     private var authenticated = false
 
@@ -73,21 +116,20 @@ class SshClient(
      */
     suspend fun connect(): Boolean {
         try {
-            logger.info("Connecting to $host:$port")
+            logger.info("Connecting via transport factory")
 
-            val ktorTransport = KtorTcpTransport(host, port)
-            ktorTransport.connect()
-            transport = ktorTransport
+            val newTransport = config.transportFactory.create()
+            transport = newTransport
 
-            val sshConnection = SshConnection(ktorTransport, clientVersion)
+            val sshConnection = SshConnection(newTransport, config.clientVersion)
             val success = sshConnection.connect()
 
             if (success) {
                 connection = sshConnection
-                logger.info("Successfully connected to $host:$port")
+                logger.info("Successfully connected")
             } else {
                 disconnect()
-                logger.error("Failed to connect to $host:$port")
+                logger.error("Connection failed")
             }
 
             return success
@@ -161,7 +203,7 @@ class SshClient(
      * Disconnect from the SSH server.
      */
     suspend fun disconnect() {
-        logger.info("Disconnecting from $host:$port")
+        logger.info("Disconnecting")
 
         connection?.disconnect()
         connection = null

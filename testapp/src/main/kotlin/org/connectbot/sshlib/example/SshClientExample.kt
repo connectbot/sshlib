@@ -20,6 +20,8 @@ import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.blocking.BlockingSshClient
+import org.connectbot.sshlib.transport.Transport
+import org.connectbot.sshlib.transport.TransportFactory
 
 /**
  * Example usage of the SSH client.
@@ -133,6 +135,77 @@ fun configExample() = runBlocking {
     try {
         if (client.connect()) {
             println("Connected with custom config")
+        }
+    } finally {
+        client.disconnect()
+    }
+}
+
+/**
+ * Example using a custom transport factory.
+ *
+ * This demonstrates how to use the library with any byte stream transport,
+ * not just TCP sockets.
+ */
+fun customTransportExample() = runBlocking {
+    // Example: Create a custom transport factory
+    val customFactory = TransportFactory {
+        // Return your custom Transport implementation
+        // This could be:
+        // - Unix domain sockets
+        // - Serial port
+        // - WebSocket
+        // - In-memory transport for testing
+        // - Wrapper around existing InputStream/OutputStream
+        object : Transport {
+            override suspend fun read(count: Int): ByteArray {
+                // Read from your custom source
+                TODO("Implement read from your transport")
+            }
+
+            override suspend fun write(data: ByteArray) {
+                // Write to your custom destination
+                TODO("Implement write to your transport")
+            }
+
+            override suspend fun close() {
+                // Clean up resources
+            }
+
+            override val isConnected: Boolean = true
+        }
+    }
+
+    // Use the custom transport with SshClient
+    val client = SshClient(customFactory)
+
+    try {
+        if (client.connect()) {
+            println("Connected via custom transport")
+        }
+    } finally {
+        client.disconnect()
+    }
+}
+
+/**
+ * Example using configuration with custom transport.
+ */
+fun configWithCustomTransportExample() = runBlocking {
+    val config = SshClientConfig {
+        // Set a custom transport factory instead of host/port
+        transportFactory = TransportFactory {
+            // Your custom transport
+            TODO("Return your Transport implementation")
+        }
+        clientVersion = "SSH-2.0-CustomTransport_1.0"
+    }
+
+    val client = SshClient(config)
+
+    try {
+        if (client.connect()) {
+            println("Connected via custom transport from config")
         }
     } finally {
         client.disconnect()
