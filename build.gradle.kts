@@ -29,24 +29,44 @@ tasks.register<Copy>("unzipKaitaiCompiler") {
     into(kaitaiCompilerDir)
 }
 
-tasks.register<Exec>("kaitai") {
+abstract class KaitaiTask : Exec() {
+    @get:InputFiles
+    abstract val ksyFiles: ConfigurableFileCollection
+
+    @get:Input
+    abstract val compilerPath: Property<String>
+
+    @get:Input
+    abstract val outputDirPath: Property<String>
+
+    @get:Input
+    abstract val javaPackage: Property<String>
+
+    @TaskAction
+    override fun exec() {
+        File(outputDirPath.get()).mkdirs()
+        commandLine(
+            listOf(
+                compilerPath.get(),
+                "--read-write",
+                "--target", "java",
+                "--outdir", outputDirPath.get(),
+                "--java-package", javaPackage.get()
+            ) + ksyFiles.files.map { it.absolutePath }
+        )
+        super.exec()
+    }
+}
+
+tasks.register<KaitaiTask>("kaitai") {
     dependsOn("unzipKaitaiCompiler")
 
-    inputs.dir(kaitaiInputDir)
+    ksyFiles.from(fileTree(kaitaiInputDir) { include("*.ksy") })
+    compilerPath.set(kaitaiCompilerDir.resolve("kaitai-struct-compiler-0.11/bin/kaitai-struct-compiler").absolutePath)
+    outputDirPath.set(kaitaiOutputDir.absolutePath)
+    javaPackage.set("org.connectbot.sshlib.struct")
+
     outputs.dir(kaitaiOutputDir)
-
-    doFirst {
-        kaitaiOutputDir.mkdirs()
-    }
-
-    commandLine(
-        "${kaitaiCompilerDir}/kaitai-struct-compiler-0.11/bin/kaitai-struct-compiler",
-        "--read-write",
-        "--target", "java",
-        "--outdir", kaitaiOutputDir.absolutePath,
-        "--java-package", "org.connectbot.sshlib.struct",
-        *fileTree(kaitaiInputDir).filter { it.extension == "ksy" }.map { it.absolutePath }.toTypedArray()
-    )
 }
 
 tasks.named("compileJava") {
