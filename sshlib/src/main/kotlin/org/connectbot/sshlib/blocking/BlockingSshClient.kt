@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
+import org.connectbot.sshlib.transport.TransportFactory
 
 /**
  * Blocking wrapper for SshClient for Java compatibility.
@@ -40,15 +41,36 @@ import org.connectbot.sshlib.SshSession
  *     client.disconnect();
  * }
  * ```
+ *
+ * With custom transport:
+ * ```java
+ * BlockingSshClient client = new BlockingSshClient(myTransportFactory);
+ * ```
  */
-class BlockingSshClient(
-    host: String,
-    port: Int = 22,
-    clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+class BlockingSshClient private constructor(
+    private val client: SshClient
 ) {
-    private val client = SshClient(host, port, clientVersion)
+    /**
+     * Create a blocking SSH client for TCP connection.
+     */
+    constructor(
+        host: String,
+        port: Int = 22,
+        clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+    ) : this(SshClient(host, port, clientVersion))
 
-    constructor(config: SshClientConfig) : this(config.host, config.port, config.clientVersion)
+    /**
+     * Create a blocking SSH client from configuration.
+     */
+    constructor(config: SshClientConfig) : this(SshClient(config))
+
+    /**
+     * Create a blocking SSH client with custom transport factory.
+     */
+    constructor(
+        transportFactory: TransportFactory,
+        clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+    ) : this(SshClient(transportFactory, clientVersion))
 
     /**
      * Connect to the SSH server and perform key exchange.

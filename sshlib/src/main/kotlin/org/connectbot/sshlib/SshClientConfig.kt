@@ -16,32 +16,63 @@
 
 package org.connectbot.sshlib
 
+import org.connectbot.sshlib.transport.KtorTcpTransportFactory
+import org.connectbot.sshlib.transport.TransportFactory
+
 /**
  * Configuration for SSH client connections.
  *
  * Use the builder DSL to create a configuration:
  * ```kotlin
+ * // Simple TCP connection (uses KtorTcpTransport by default)
  * val config = SshClientConfig {
  *     host = "example.com"
  *     port = 22
  *     clientVersion = "SSH-2.0-MyClient_1.0"
  * }
+ *
+ * // Custom transport
+ * val config = SshClientConfig {
+ *     transportFactory = MyCustomTransportFactory()
+ *     clientVersion = "SSH-2.0-MyClient_1.0"
+ * }
  * ```
  */
 class SshClientConfig private constructor(
-    val host: String,
-    val port: Int,
+    val transportFactory: TransportFactory,
     val clientVersion: String
 ) {
     class Builder {
+        /**
+         * Hostname for TCP connections. Used with default KtorTcpTransport.
+         * Ignored if [transportFactory] is set explicitly.
+         */
         var host: String = ""
+
+        /**
+         * Port for TCP connections. Used with default KtorTcpTransport.
+         * Ignored if [transportFactory] is set explicitly.
+         */
         var port: Int = 22
+
+        /**
+         * Client version string sent during SSH handshake.
+         */
         var clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
 
+        /**
+         * Custom transport factory. If not set, uses [KtorTcpTransportFactory]
+         * with [host] and [port].
+         */
+        var transportFactory: TransportFactory? = null
+
         fun build(): SshClientConfig {
-            require(host.isNotBlank()) { "Host must be specified" }
-            require(port in 1..65535) { "Port must be between 1 and 65535" }
-            return SshClientConfig(host, port, clientVersion)
+            val factory = transportFactory ?: run {
+                require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
+                require(port in 1..65535) { "Port must be between 1 and 65535" }
+                KtorTcpTransportFactory(host, port)
+            }
+            return SshClientConfig(factory, clientVersion)
         }
     }
 
