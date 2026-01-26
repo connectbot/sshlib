@@ -74,7 +74,7 @@ dependencies {
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("kaitai-struct-runtime-*.jar"))))
 
     // KStateMachine for state machine implementation (JVM/Android artifact)
-    implementation("io.github.nsk90:kstatemachine-jvm:0.35.0")
+    implementation("io.github.nsk90:kstatemachine-jvm:0.36.0")
 
     // Kotlin standard library
     implementation(kotlin("stdlib"))
