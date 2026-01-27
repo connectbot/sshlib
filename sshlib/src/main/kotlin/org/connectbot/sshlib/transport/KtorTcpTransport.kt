@@ -86,7 +86,7 @@ class KtorTcpTransport(
 
     override suspend fun close() {
         try {
-            writeChannel?.close()
+            writeChannel?.flushAndClose()
             readChannel?.cancel()
             socket?.close()
         } finally {
