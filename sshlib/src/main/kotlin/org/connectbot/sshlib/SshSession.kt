@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib
 
+import kotlinx.coroutines.channels.ReceiveChannel
+
 /**
  * Represents an SSH session channel (RFC 4254 section 6).
  *
@@ -27,17 +29,9 @@ interface SshSession : AutoCloseable {
     val remoteChannelNumber: Int
     val isOpen: Boolean
 
-    /**
-     * Request a PTY (pseudo-terminal) for this session (RFC 4254 section 6.2).
-     *
-     * @param terminalType Terminal type (e.g., "xterm", "vt100")
-     * @param widthChars Terminal width in characters
-     * @param heightRows Terminal height in rows
-     * @param widthPixels Terminal width in pixels (usually 0)
-     * @param heightPixels Terminal height in pixels (usually 0)
-     * @param terminalModes Encoded terminal modes (empty for defaults)
-     * @return true if PTY request was accepted
-     */
+    val stdout: ReceiveChannel<ByteArray>
+    val stderr: ReceiveChannel<ByteArray>
+
     suspend fun requestPty(
         terminalType: String = "xterm",
         widthChars: Int = 80,
@@ -47,15 +41,15 @@ interface SshSession : AutoCloseable {
         terminalModes: ByteArray = byteArrayOf(0)
     ): Boolean
 
-    /**
-     * Request a shell for this session (RFC 4254 section 6.5).
-     *
-     * @return true if shell request was accepted
-     */
     suspend fun requestShell(): Boolean
 
-    /**
-     * Close this channel (RFC 4254 section 5.3).
-     */
+    suspend fun write(data: ByteArray)
+
+    suspend fun read(): ByteArray?
+
+    suspend fun readExtended(): Pair<Int, ByteArray>?
+
+    suspend fun sendEof()
+
     override fun close()
 }

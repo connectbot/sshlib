@@ -16,198 +16,199 @@
 
 package org.connectbot.sshlib.example
 
-import kotlinx.coroutines.runBlocking
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import kotlinx.coroutines.*
 import org.connectbot.sshlib.SshClient
-import org.connectbot.sshlib.SshClientConfig
-import org.connectbot.sshlib.blocking.BlockingSshClient
-import org.connectbot.sshlib.transport.Transport
-import org.connectbot.sshlib.transport.TransportFactory
+import org.slf4j.LoggerFactory
 
-/**
- * Example usage of the SSH client.
- *
- * This example demonstrates the basic usage pattern for connecting
- * to an SSH server and authenticating with password.
- */
-fun main() = runBlocking {
-    // Using the async API with coroutines
-    val client = SshClient(
-        host = "example.com",
-        port = 22
-    )
-
-    try {
-        // Connect and perform key exchange
-        if (!client.connect()) {
-            println("Failed to connect to SSH server")
+fun main(args: Array<String>) =
+    runBlocking {
+        val parsed = parseArgs(args)
+        if (parsed == null) {
+            System.err.println("Usage: ssh [-d] <user>@<host> [-p port]")
             return@runBlocking
         }
 
-        println("Connected to SSH server")
-
-        // Authenticate with password
-        if (!client.authenticatePassword("username", "password")) {
-            println("Authentication failed")
-            return@runBlocking
+        if (parsed.debug) {
+            val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+            root.level = Level.DEBUG
         }
 
-        println("Successfully authenticated!")
+        val (user, host, port) = parsed
 
-        // Open a session and request a shell
-        val session = client.openSession()
-        if (session != null) {
-            println("Session opened: local=${session.localChannelNumber}, remote=${session.remoteChannelNumber}")
-
-            // Request a PTY
-            if (session.requestPty()) {
-                println("PTY allocated")
-            }
-
-            // Request a shell
-            if (session.requestShell()) {
-                println("Shell started")
-            }
-
-            session.close()
-        }
-
-    } finally {
-        client.disconnect()
-        println("Disconnected from SSH server")
-    }
-}
-
-/**
- * Example using the blocking API for Java compatibility.
- */
-fun blockingExample() {
-    val client = BlockingSshClient("example.com")
-
-    try {
-        when {
-            !client.connect() -> {
-                println("ERROR: Failed to connect to SSH server")
-                return
-            }
-            !client.authenticatePassword("user", "pass") -> {
-                println("ERROR: Authentication failed")
-                return
-            }
-            !client.isAuthenticated -> {
-                println("ERROR: Client not authenticated")
-                return
-            }
-            else -> {
-                println("SUCCESS: Connected and authenticated")
-
-                // Open a session using the blocking API
-                val session = client.openSession()
-                if (session != null) {
-                    // Note: session methods are suspend, so wrap in runBlocking
-                    runBlocking {
-                        session.requestPty()
-                        session.requestShell()
-                    }
-                    session.close()
+        val console = System.console()
+        val password =
+            if (console != null) {
+                String(console.readPassword("Password: "))
+            } else {
+                System.err.println("Warning: no console available, reading password from stdin")
+                print("Password: ")
+                readlnOrNull() ?: run {
+                    System.err.println("No password provided")
+                    return@runBlocking
                 }
             }
+
+        val client = SshClient(host, port)
+        try {
+            if (!client.connect()) {
+                System.err.println("Failed to connect to $host:$port")
+                return@runBlocking
+            }
+
+            if (!client.authenticatePassword(user, password)) {
+                System.err.println("Authentication failed")
+                return@runBlocking
+            }
+
+            val session = client.openSession()
+            if (session == null) {
+                System.err.println("Failed to open session")
+                return@runBlocking
+            }
+
+            session.requestPty()
+            session.requestShell()
+
+            client.startPacketLoop(this)
+
+            setRawMode()
+            Runtime.getRuntime().addShutdownHook(Thread { restoreTerminal() })
+
+            val stdinJob =
+                launch(Dispatchers.IO) {
+                    try {
+                        val buf = ByteArray(1024)
+                        while (isActive) {
+                            if (System.`in`.available() > 0) {
+                                val n = System.`in`.read(buf)
+                                if (n < 0) {
+                                    session.sendEof()
+                                    break
+                                }
+                                session.write(buf.copyOf(n))
+                            } else {
+                                // We could make an FFI call to poll/select here,
+                                // but this is good enough for an example
+                                delay(10)
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+
+            val stdoutJob =
+                launch(Dispatchers.IO) {
+                    try {
+                        while (isActive) {
+                            val data = session.read() ?: break
+                            System.out.write(data)
+                            System.out.flush()
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+
+            val stderrJob =
+                launch(Dispatchers.IO) {
+                    try {
+                        while (isActive) {
+                            val (_, data) = session.readExtended() ?: break
+                            System.err.write(data)
+                            System.err.flush()
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
+
+            stdoutJob.join()
+            stdinJob.cancel()
+            stderrJob.cancel()
+
+            session.close()
+        } catch (e: Exception) {
+            System.err.println("Error: ${e.message}")
+        } finally {
+            restoreTerminal()
+            client.stopPacketLoop()
+            client.disconnect()
         }
-    } catch (e: Exception) {
-        println("ERROR: Unexpected exception: ${e.message}")
-        e.printStackTrace()
-    } finally {
-        client.disconnect()
+    }
+
+private var savedStty: String? = null
+
+private fun setRawMode() {
+    try {
+        savedStty =
+            String(
+                ProcessBuilder("stty", "-g")
+                    .redirectInput(ProcessBuilder.Redirect.INHERIT)
+                    .start()
+                    .inputStream
+                    .readAllBytes(),
+            ).trim()
+        ProcessBuilder("stty", "-icanon", "-echo", "min", "1")
+            .redirectInput(ProcessBuilder.Redirect.INHERIT)
+            .start()
+            .waitFor()
+    } catch (_: Exception) {
     }
 }
 
-/**
- * Example using the configuration DSL.
- */
-fun configExample() = runBlocking {
-    val config = SshClientConfig {
-        host = "example.com"
-        port = 22
-        clientVersion = "SSH-2.0-MyCustomClient_1.0"
-    }
-
-    val client = SshClient(config)
-
+private fun restoreTerminal() {
+    val stty = savedStty ?: return
+    savedStty = null
     try {
-        if (client.connect()) {
-            println("Connected with custom config")
-        }
-    } finally {
-        client.disconnect()
+        ProcessBuilder("stty", stty)
+            .redirectInput(ProcessBuilder.Redirect.INHERIT)
+            .start()
+            .waitFor()
+    } catch (_: Exception) {
     }
 }
 
-/**
- * Example using a custom transport factory.
- *
- * This demonstrates how to use the library with any byte stream transport,
- * not just TCP sockets.
- */
-fun customTransportExample() = runBlocking {
-    // Example: Create a custom transport factory
-    val customFactory = TransportFactory {
-        // Return your custom Transport implementation
-        // This could be:
-        // - Unix domain sockets
-        // - Serial port
-        // - WebSocket
-        // - In-memory transport for testing
-        // - Wrapper around existing InputStream/OutputStream
-        object : Transport {
-            override suspend fun read(count: Int): ByteArray {
-                // Read from your custom source
-                TODO("Implement read from your transport")
+private data class ParsedArgs(
+    val user: String,
+    val host: String,
+    val port: Int,
+    val debug: Boolean,
+)
+
+private fun parseArgs(args: Array<String>): ParsedArgs? {
+    if (args.isEmpty()) return null
+
+    var port = 22
+    var debug = false
+    var target: String? = null
+
+    var i = 0
+    while (i < args.size) {
+        when (args[i]) {
+            "-p" -> {
+                if (i + 1 >= args.size) return null
+                port = args[++i].toIntOrNull() ?: return null
             }
 
-            override suspend fun write(data: ByteArray) {
-                // Write to your custom destination
-                TODO("Implement write to your transport")
+            "-d" -> {
+                debug = true
             }
 
-            override suspend fun close() {
-                // Clean up resources
+            else -> {
+                target = args[i]
             }
-
-            override val isConnected: Boolean = true
         }
+        i++
     }
 
-    // Use the custom transport with SshClient
-    val client = SshClient(customFactory)
+    if (target == null) return null
+    val atIndex = target.indexOf('@')
+    if (atIndex < 0) return null
 
-    try {
-        if (client.connect()) {
-            println("Connected via custom transport")
-        }
-    } finally {
-        client.disconnect()
-    }
-}
-
-/**
- * Example using configuration with custom transport.
- */
-fun configWithCustomTransportExample() = runBlocking {
-    val config = SshClientConfig {
-        // Set a custom transport factory instead of host/port
-        transportFactory = TransportFactory {
-            // Your custom transport
-            TODO("Return your Transport implementation")
-        }
-        clientVersion = "SSH-2.0-CustomTransport_1.0"
-    }
-
-    val client = SshClient(config)
-
-    try {
-        if (client.connect()) {
-            println("Connected via custom transport from config")
-        }
-    } finally {
-        client.disconnect()
-    }
+    return ParsedArgs(
+        user = target.substring(0, atIndex),
+        host = target.substring(atIndex + 1),
+        port = port,
+        debug = debug,
+    )
 }

@@ -25,6 +25,7 @@ application {
 
 dependencies {
     implementation(project(":sshlib"))
+    implementation("ch.qos.logback:logback-classic:1.5.26")
 
     // Integration test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")

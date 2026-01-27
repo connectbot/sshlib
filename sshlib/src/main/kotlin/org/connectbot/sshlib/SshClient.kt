@@ -16,6 +16,7 @@
 
 package org.connectbot.sshlib
 
+import kotlinx.coroutines.CoroutineScope
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
@@ -197,6 +198,14 @@ class SshClient private constructor(
             logger.error("Failed to open session channel", e)
             null
         }
+    }
+
+    fun startPacketLoop(scope: CoroutineScope) {
+        connection?.startPacketLoop(scope)
+    }
+
+    suspend fun stopPacketLoop() {
+        connection?.stopPacketLoop()
     }
 
     /**
