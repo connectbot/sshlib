@@ -1,72 +1,77 @@
-# SSH Protocol Parsing with Kaitai Struct
+# SSH Client Library & Protocol Parser
 
-A comprehensive SSH protocol parser implemented using declarative Kaitai
-Struct specifications. This project auto-generates protocol parsing and
-serialization code for the SSH wire protocol.
+An SSH client library built with Kotlin coroutines and Kaitai Struct. Connects
+to SSH servers, authenticates, and provides interactive shell sessions with
+channel data I/O. Protocol parsing uses declarative Kaitai Struct specifications
+that auto-generate code from `.ksy` definitions. The internal state machine is
+defined in KStateMachine for easier reasoning of possible state transitions.
 
-## Project Status: Protocol Parsing
+## Features
 
-This implementation provides SSH wire protocol parsing for all major RFCs
-and modern algorithms:
-
-- **Core RFCs**: 4250-4256, 4419, 5656, 8308, 8709, 8731, 9142
-- **Key Exchange**: DH, ECDH (all others use these same messages)
-- **Ciphers**: AES (CBC/CTR/GCM), ChaCha20-Poly1305, 3DES
-- **Signatures**: RSA, DSS, ECDSA, Ed25519, Ed448 (with component parsing)
-- **Authentication**: publickey, password, keyboard-interactive, hostbased,
-  GSSAPI
-- **OpenSSH Extensions**: Unix socket forwarding, host key rotation, VPN
-  tunneling
-- **Channel Types**: session, exec, shell, port forwarding, X11, SFTP,
-  subsystems
-
-
-## What This Project Provides
-
-### Protocol Parser
-- Parse SSH messages from binary streams
-- Serialize SSH messages to binary format
-- Extract all message fields and components
-- Support for all modern and legacy algorithms
-
-### Message Structures
-- SSH message types defined
-- Signature and public key component extraction
-- Algorithm-specific payload parsing
-- Comprehensive enums for all protocol constants
-
-### State Machine
-- SSH client state machine using KStateMachine
-- Complete state transitions for SSH client connection lifecycle
-- Event-driven architecture with strongly-typed callback interface
-- Client-only (server would require separate state machine)
-
-## What This Project Does NOT Provide
-
-This is a protocol parser, not a complete SSH library. It does NOT include:
-
-- Cryptographic operations (key exchange, encryption, signing)
-- Network I/O and socket management
-- Authentication logic
-- Channel management and flow control
-- High-level features (shell, port forwarding, SFTP client)
+- **SSH Client**: Connect, authenticate, open shell sessions, read/write data
+- **Protocol Parsing**: Complete SSH wire protocol coverage (RFCs 4250-4256,
+  4419, 5656, 8308, 8709, 8731, 9142)
+- **Key Exchange**: diffie-hellman-group14-sha256, diffie-hellman-group14-sha1
+- **Encryption**: AES-128-CTR, AES-256-CTR with HMAC-SHA2-256/512
+- **Authentication**: Password
+- **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
+  control
+- **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
+- **CLI Client**: Interactive terminal client included in testapp module
 
 ## Quick Start
 
 ### Build
+
 ```bash
 ./gradlew build
 ```
 
+### Use the CLI Client
+
+```bash
+./gradlew :testapp:installDist
+./testapp/build/install/testapp/bin/testapp user@host
+./testapp/build/install/testapp/bin/testapp user@host -p 2222
+./testapp/build/install/testapp/bin/testapp -d user@host  # debug logging
+```
+
+### Library API
+
+```kotlin
+val client = SshClient("example.com", 22)
+client.connect()
+client.authenticatePassword("user", "pass")
+
+val session = client.openSession()
+session.requestPty()
+session.requestShell()
+
+// Start background packet dispatch for channel I/O
+client.startPacketLoop(coroutineScope)
+
+// Read/write
+session.write("ls\n".toByteArray())
+val output = session.read()  // ByteArray? (null on EOF)
+
+// Or use coroutine channels directly
+session.stdout  // ReceiveChannel<ByteArray>
+session.stderr  // ReceiveChannel<ByteArray>
+
+// Clean up
+session.close()
+client.stopPacketLoop()
+client.disconnect()
+```
+
 ### Parse SSH Messages
+
 ```java
-// Parse SSH banner
 ByteBufferKaitaiStream stream = new ByteBufferKaitaiStream(bytes);
 Ssh.IdBanner banner = new Ssh.IdBanner(stream);
 banner._read();
 System.out.println("Version: " + banner.protoVersion());
 
-// Parse unencrypted packet
 Ssh.UnencryptedPacket packet = new Ssh.UnencryptedPacket(stream);
 packet._read();
 switch (packet.payload().messageType()) {
@@ -75,25 +80,35 @@ switch (packet.payload().messageType()) {
         System.out.println("KEX algorithms: " + kexinit.kexAlgorithms());
         break;
 }
-
-// Parse signature
-Ssh.SshSignature sig = new Ssh.SshSignature(sigStream);
-sig._read();
-if (sig.algorithmName().equals("ssh-ed25519")) {
-    Ssh.SshEd25519SignatureBlob blob =
-        (Ssh.SshEd25519SignatureBlob) sig.signatureBlob();
-    byte[] signature = blob.signature().data();
-}
 ```
 
-See [src/test/java/org/connectbot/sshlib/struct/CaptureTest.java](src/test/java/org/connectbot/sshlib/struct/CaptureTest.java) for more examples.
+## Project Structure
 
-## Key Files
+```
+ssh-proto/
+├── sshlib/                      # SSH library module
+│   └── src/main/
+│       ├── kotlin/org/connectbot/sshlib/
+│       │   ├── SshClient.kt           # Public async API
+│       │   ├── SshSession.kt          # Session interface (read/write/PTY)
+│       │   ├── SshClientConfig.kt     # Configuration DSL
+│       │   ├── blocking/              # Java-compatible blocking wrapper
+│       │   ├── client/                # SshConnection, SessionChannel
+│       │   ├── crypto/                # AES-CTR, HMAC, DH, key derivation
+│       │   ├── transport/             # Transport interface, Ktor TCP, PacketIO
+│       │   └── struct/                # State machine (KStateMachine)
+│       └── resources/kaitai/          # .ksy protocol definitions
+└── testapp/                     # CLI client and integration tests
+    └── src/main/kotlin/               # Interactive SSH CLI
+```
 
-- `src/main/resources/kaitai/ssh.ksy` - Main SSH protocol specification
-- `src/main/resources/kaitai/*.ksy` - Supporting type definitions
-- `src/main/sm/SshConnection.sm` - State machine framework (incomplete)
-- `src/test/java/CaptureTest.java` - Example usage and testing
+## Current Limitations
+
+- No public key authentication
+- No host key verification
+- No ECDH/Curve25519 key exchange
+- No SFTP, port forwarding, or agent forwarding
+- Client-only (no server implementation)
 
 ## License
 
