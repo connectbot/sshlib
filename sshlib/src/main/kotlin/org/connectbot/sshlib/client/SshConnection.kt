@@ -54,7 +54,10 @@ class SshConnection(
     }
 
     private val packetIO = PacketIO(transport)
+    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
+    private val stateMachineDispatcher = newSingleThreadContext("ssh-state-machine")
     private val stateMachine = SshClientStateMachine(this)
+    private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var serverVersion: String? = null
     private var clientKexInit: ByteArray? = null
@@ -71,10 +74,17 @@ class SshConnection(
     private val channelsByRemote = mutableMapOf<Int, SessionChannel>()
 
     // Pending async operations - completed by callbacks
+    private var pendingAuth: CompletableDeferred<Boolean>? = null
     private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
     private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
 
     private var packetLoopJob: Job? = null
+
+    private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
+        withContext(stateMachineDispatcher) {
+            stateMachine.processEvent(event)
+        }
+    }
 
     /**
      * Initiate SSH connection.
@@ -82,12 +92,12 @@ class SshConnection(
      */
     fun connect(): Boolean = runBlocking {
         try {
-            stateMachine.processEvent(SshClientStateMachine.SshEvent.Connect)
+            dispatchEvent(SshClientStateMachine.SshEvent.Connect)
 
             // Version exchange
             packetIO.writeBanner(clientVersion)
             val banner = packetIO.readBanner()
-            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveVersion(banner))
+            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveVersion(banner))
 
             // Key exchange initialization - read server's KEXINIT
             val kexInitPacket = packetIO.readPacket()
@@ -97,7 +107,7 @@ class SshConnection(
             val kexInitMsgType = kexInitPacket.messageType().id().toByte()
             serverKexInit = byteArrayOf(kexInitMsgType) + kexInitPacket._raw_body()
 
-            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
+            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
             // Note: ReceiveKexInit transition triggers sendKexDhInit() via state machine
 
             // Diffie-Hellman key exchange - read server's DH_REPLY
@@ -113,23 +123,24 @@ class SshConnection(
             kexdhPayload._read()
             val dhReply = kexdhPayload.body() as SshMsgKexdhReply
 
-            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
             // Note: ReceiveKex.DhReply transition triggers sendNewKeys() via state machine
 
             // New keys - read server's NEWKEYS
             val newKeysPacket = packetIO.readPacket()
-            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveNewKeys)
+            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveNewKeys)
 
             // Service request (ssh-userauth)
             // Loop until we get SERVICE_ACCEPT (skip IGNORE/DEBUG messages)
             val serviceAccept = readExpectedMessage<SshMsgServiceAccept>(
                 SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT
             )
-            stateMachine.processEvent(
+            dispatchEvent(
                 SshClientStateMachine.SshEvent.ReceiveServiceAccept(serviceAccept.serviceName().value())
             )
 
             logger.info("SSH connection established successfully")
+            startPacketLoop()
             return@runBlocking true
         } catch (e: Exception) {
             logger.error("SSH connection failed", e)
@@ -159,29 +170,15 @@ class SshConnection(
 
             req.setMethodSpecificFields(passAuth)
 
+            val deferred = CompletableDeferred<Boolean>()
+            pendingAuth = deferred
+
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
                 toByteArray(req)
             )
 
-            // Wait for response
-            val response = packetIO.readPacket()
-            return when (response.messageType()) {
-                SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
-                    logger.info("Authentication successful")
-                    true
-                }
-                SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
-                    logger.warn("Authentication failed")
-                    false
-                }
-                else -> {
-                    logger.warn("Unexpected message type during auth: ${response.messageType()}")
-                    false
-                }
-            }
+            return deferred.await()
         } catch (e: Exception) {
             logger.error("Authentication error", e)
             return false
@@ -382,10 +379,14 @@ class SshConnection(
 
     override fun authenticationSuccess() {
         logger.info("Authentication successful")
+        pendingAuth?.complete(true)
+        pendingAuth = null
     }
 
     override fun authenticationFailure() {
         logger.warn("Authentication failed")
+        pendingAuth?.complete(false)
+        pendingAuth = null
     }
 
     override fun debug(msg: SshMsgDebug) {
@@ -401,6 +402,15 @@ class SshConnection(
         runBlocking {
             transport.close()
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    suspend fun close() {
+        connectionScope.cancel()
+        transport.close()
+        packetLoopJob?.join()
+        packetLoopJob = null
+        stateMachineDispatcher.close()
     }
 
     override fun onStateEnter(stateName: String) {
@@ -493,10 +503,10 @@ class SshConnection(
 
         when (packet.messageType()) {
             SshEnums.MessageType.SSH_MSG_IGNORE -> {
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
             }
             SshEnums.MessageType.SSH_MSG_DEBUG -> {
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveDebug(packet.body() as SshMsgDebug))
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveDebug(packet.body() as SshMsgDebug))
             }
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
                 try {
@@ -504,7 +514,7 @@ class SshConnection(
                     val stream = ByteBufferKaitaiStream(rawBody)
                     val globalRequestMsg = SshMsgGlobalRequest(stream)
                     globalRequestMsg._read()
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveGlobalRequest(globalRequestMsg))
+                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveGlobalRequest(globalRequestMsg))
                 } catch (e: Exception) {
                     logger.error("Failed to parse SSH_MSG_GLOBAL_REQUEST", e)
                 }
@@ -515,7 +525,7 @@ class SshConnection(
                 val stream = ByteBufferKaitaiStream(rawBody)
                 val confirmationMsg = SshMsgChannelOpenConfirmation(stream)
                 confirmationMsg._read()
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
                 val messageTypeByte = packet.messageType().id().toByte()
@@ -523,7 +533,7 @@ class SshConnection(
                 val stream = ByteBufferKaitaiStream(rawBody)
                 val failureMsg = SshMsgChannelOpenFailure(stream)
                 failureMsg._read()
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
                 val msg = parseBody<SshMsgChannelData>(packet)
@@ -578,13 +588,19 @@ class SshConnection(
                 logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE -> {
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
+            }
+            SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
+                dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
+            }
+            SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
+                dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
             }
             SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
-                stateMachine.processEvent(SshClientStateMachine.SshEvent.Disconnect)
+                dispatchEvent(SshClientStateMachine.SshEvent.Disconnect)
             }
             else -> {
                 logger.warn("Unhandled message type: ${packet.messageType()}")
@@ -769,9 +785,9 @@ class SshConnection(
         )
     }
 
-    fun startPacketLoop(scope: CoroutineScope) {
+    private fun startPacketLoop() {
         if (packetLoopJob != null) return
-        packetLoopJob = scope.launch {
+        packetLoopJob = connectionScope.launch {
             try {
                 while (isActive) {
                     processNextPacket()
@@ -791,7 +807,7 @@ class SshConnection(
         }
     }
 
-    suspend fun stopPacketLoop() {
+    private suspend fun stopPacketLoop() {
         packetLoopJob?.cancelAndJoin()
         packetLoopJob = null
     }
@@ -814,17 +830,12 @@ class SshConnection(
         val deferred = CompletableDeferred<SshMsgChannelOpenConfirmation?>()
         pendingChannelOpen = deferred
 
-        stateMachine.processEvent(SshClientStateMachine.SshEvent.OpenChannel(
+        dispatchEvent(SshClientStateMachine.SshEvent.OpenChannel(
             channelType = "session",
             localChannelNumber = localChannelNumber,
             initialWindowSize = initialWindowSize,
             maxPacketSize = maxPacketSize
         ))
-
-        // Process packets until the pending operation completes
-        while (!deferred.isCompleted) {
-            processNextPacket()
-        }
 
         val confirmationMsg = deferred.await() ?: return null
 
@@ -842,6 +853,7 @@ class SshConnection(
         )
         channels[localChannelNumber] = channel
         channelsByRemote[localChannelNumber] = channel
+
         return channel
     }
 
@@ -871,7 +883,7 @@ class SshConnection(
             CompletableDeferred<Boolean>().also { pendingChannelRequest = it }
         } else null
 
-        stateMachine.processEvent(SshClientStateMachine.SshEvent.SendChannelRequest(
+        dispatchEvent(SshClientStateMachine.SshEvent.SendChannelRequest(
             recipientChannel = recipientChannel,
             requestType = requestType,
             wantReply = wantReply,
@@ -880,11 +892,6 @@ class SshConnection(
 
         if (deferred == null) {
             return true
-        }
-
-        // Process packets until the pending operation completes
-        while (!deferred.isCompleted) {
-            processNextPacket()
         }
 
         return deferred.await()
