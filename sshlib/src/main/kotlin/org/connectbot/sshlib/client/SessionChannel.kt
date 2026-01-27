@@ -16,39 +16,115 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.struct.*
 import org.slf4j.LoggerFactory
 
-/**
- * Represents an SSH session channel (RFC 4254 section 6).
- *
- * Session channels are used for interactive shells, command execution,
- * and subsystem invocation (like SFTP).
- *
- * @param connection The SSH connection managing this channel
- * @param localChannelNumber The local channel number
- * @param remoteChannelNumber The remote channel number assigned by server
- * @param maxPacketSize Maximum packet size for this channel
- */
 class SessionChannel internal constructor(
     private val connection: SshConnection,
     override val localChannelNumber: Int,
     private var _remoteChannelNumber: Int,
-    private val maxPacketSize: Int
+    private val maxPacketSize: Int,
+    private var remoteWindowSize: Long = 0,
+    private val initialWindowSize: Int = 64 * 1024
 ) : SshSession {
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
+        private const val WINDOW_ADJUST_THRESHOLD = 16 * 1024
     }
 
     private var _isOpen = true
+    private var localWindowSize: Long = initialWindowSize.toLong()
 
-    override val isOpen: Boolean
-        get() = _isOpen
+    private val _stdout = Channel<ByteArray>(Channel.UNLIMITED)
+    private val _stderr = Channel<ByteArray>(Channel.UNLIMITED)
+    private val _extendedData = Channel<Pair<Int, ByteArray>>(Channel.UNLIMITED)
 
-    override val remoteChannelNumber: Int
-        get() = _remoteChannelNumber
+    override val isOpen: Boolean get() = _isOpen
+    override val remoteChannelNumber: Int get() = _remoteChannelNumber
+    override val stdout: ReceiveChannel<ByteArray> get() = _stdout
+    override val stderr: ReceiveChannel<ByteArray> get() = _stderr
+
+    internal fun onData(data: ByteArray) {
+        _stdout.trySend(data)
+        localWindowSize -= data.size
+        if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
+            val adjust = initialWindowSize - localWindowSize.toInt()
+            localWindowSize += adjust
+            runBlocking {
+                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+            }
+        }
+    }
+
+    internal fun onExtendedData(dataType: Int, data: ByteArray) {
+        _extendedData.trySend(dataType to data)
+        if (dataType == 1) {
+            _stderr.trySend(data)
+        }
+        localWindowSize -= data.size
+        if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
+            val adjust = initialWindowSize - localWindowSize.toInt()
+            localWindowSize += adjust
+            runBlocking {
+                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+            }
+        }
+    }
+
+    internal fun onWindowAdjust(bytesToAdd: Long) {
+        remoteWindowSize += bytesToAdd
+        logger.debug("Window adjust +$bytesToAdd, remote window now $remoteWindowSize")
+    }
+
+    internal fun onEof() {
+        logger.debug("Received EOF on channel $localChannelNumber")
+        _stdout.close()
+        _stderr.close()
+        _extendedData.close()
+    }
+
+    internal fun onClose() {
+        logger.debug("Received CLOSE on channel $localChannelNumber")
+        _isOpen = false
+        _stdout.close()
+        _stderr.close()
+        _extendedData.close()
+    }
+
+    override suspend fun write(data: ByteArray) {
+        var offset = 0
+        while (offset < data.size) {
+            // Wait for remote window to have space
+            while (remoteWindowSize <= 0) {
+                kotlinx.coroutines.delay(10)
+            }
+            val chunkSize = minOf(
+                data.size - offset,
+                remoteWindowSize.toInt(),
+                maxPacketSize
+            )
+            val chunk = data.copyOfRange(offset, offset + chunkSize)
+            connection.sendChannelData(_remoteChannelNumber, chunk)
+            remoteWindowSize -= chunkSize
+            offset += chunkSize
+        }
+    }
+
+    override suspend fun read(): ByteArray? {
+        return _stdout.receiveCatching().getOrNull()
+    }
+
+    override suspend fun readExtended(): Pair<Int, ByteArray>? {
+        return _extendedData.receiveCatching().getOrNull()
+    }
+
+    override suspend fun sendEof() {
+        connection.sendChannelEof(_remoteChannelNumber)
+    }
 
     override suspend fun requestPty(
         terminalType: String,
@@ -69,6 +145,7 @@ class SessionChannel internal constructor(
             val termBytes = ByteString()
             termBytes.setLenData(terminalType.length.toLong())
             termBytes.setData(terminalType.toByteArray(Charsets.US_ASCII))
+            termBytes._check()
             ptyReq.setTerm(termBytes)
 
             ptyReq.setTerminalWidth(widthChars.toLong())
@@ -79,8 +156,10 @@ class SessionChannel internal constructor(
             val modeString = ByteString()
             modeString.setLenData(terminalModes.size.toLong())
             modeString.setData(terminalModes)
+            modeString._check()
             ptyReq.setTerminalModes(modeString)
 
+            ptyReq._check()
             msg.setRequestSpecificFields(ptyReq)
         }
     }
@@ -99,15 +178,15 @@ class SessionChannel internal constructor(
     }
 
     override fun close() {
-        if (!_isOpen) {
-            logger.debug("Channel $localChannelNumber already closed")
-            return
-        }
+        if (!_isOpen) return
 
         logger.debug("Closing channel $localChannelNumber")
         runBlocking {
             connection.sendChannelClose(_remoteChannelNumber)
         }
         _isOpen = false
+        _stdout.close()
+        _stderr.close()
+        _extendedData.close()
     }
 }

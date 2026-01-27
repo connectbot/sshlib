@@ -18,8 +18,7 @@ package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.connectbot.sshlib.crypto.*
 import org.connectbot.sshlib.struct.*
 import org.connectbot.sshlib.struct.SshClientCallbacks
@@ -69,10 +68,13 @@ class SshConnection(
 
     private var nextLocalChannelNumber = 0
     private val channels = mutableMapOf<Int, SessionChannel>()
+    private val channelsByRemote = mutableMapOf<Int, SessionChannel>()
 
     // Pending async operations - completed by callbacks
     private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
     private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
+
+    private var packetLoopJob: Job? = null
 
     /**
      * Initiate SSH connection.
@@ -523,9 +525,57 @@ class SshConnection(
                 failureMsg._read()
                 stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
             }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
+                val msg = parseBody<SshMsgChannelData>(packet)
+                val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                if (channel != null) {
+                    channel.onData(msg.data().data())
+                } else {
+                    logger.warn("Data for unknown channel ${msg.recipientChannel()}")
+                }
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA -> {
+                val msg = parseBody<SshMsgChannelExtendedData>(packet)
+                val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                if (channel != null) {
+                    channel.onExtendedData(msg.dataTypeCode().toInt(), msg.data().data())
+                } else {
+                    logger.warn("Extended data for unknown channel ${msg.recipientChannel()}")
+                }
+            }
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
-                logger.debug("Received SSH_MSG_CHANNEL_WINDOW_ADJUST")
-                // TODO: Update channel window size
+                val msg = parseBody<SshMsgChannelWindowAdjust>(packet)
+                val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                if (channel != null) {
+                    channel.onWindowAdjust(msg.bytesToAdd())
+                } else {
+                    logger.warn("Window adjust for unknown channel ${msg.recipientChannel()}")
+                }
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_EOF -> {
+                val msg = parseBody<SshMsgChannelEof>(packet)
+                val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                if (channel != null) {
+                    channel.onEof()
+                } else {
+                    logger.warn("EOF for unknown channel ${msg.recipientChannel()}")
+                }
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
+                val msg = parseBody<SshMsgChannelClose>(packet)
+                val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                if (channel != null) {
+                    channel.onClose()
+                } else {
+                    logger.warn("Close for unknown channel ${msg.recipientChannel()}")
+                }
+            }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
+                val rawBody = packet._raw_body()
+                val stream = ByteBufferKaitaiStream(rawBody)
+                val msg = SshMsgChannelRequest(stream)
+                msg._read()
+                logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
                 stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
@@ -679,6 +729,73 @@ class SshConnection(
         return bs
     }
 
+    private inline fun <reified T : KaitaiStruct.ReadWrite> parseBody(packet: UnencryptedPacket.UnencryptedPayload): T {
+        val rawBody = packet._raw_body()
+        val stream = ByteBufferKaitaiStream(rawBody)
+        val msg = T::class.java.getConstructor(io.kaitai.struct.KaitaiStream::class.java).newInstance(stream)
+        msg._read()
+        return msg
+    }
+
+    internal suspend fun sendChannelData(recipientChannel: Int, data: ByteArray) {
+        val msg = SshMsgChannelData()
+        msg.setRecipientChannel(recipientChannel.toLong())
+        msg.setData(createByteString(data))
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(),
+            toByteArray(msg)
+        )
+    }
+
+    internal suspend fun sendWindowAdjust(recipientChannel: Int, bytesToAdd: Int) {
+        val msg = SshMsgChannelWindowAdjust()
+        msg.setRecipientChannel(recipientChannel.toLong())
+        msg.setBytesToAdd(bytesToAdd.toLong())
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(),
+            toByteArray(msg)
+        )
+    }
+
+    internal suspend fun sendChannelEof(recipientChannel: Int) {
+        val msg = SshMsgChannelEof()
+        msg.setRecipientChannel(recipientChannel.toLong())
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(),
+            toByteArray(msg)
+        )
+    }
+
+    fun startPacketLoop(scope: CoroutineScope) {
+        if (packetLoopJob != null) return
+        packetLoopJob = scope.launch {
+            try {
+                while (isActive) {
+                    processNextPacket()
+                }
+            } catch (_: CancellationException) {
+                logger.debug("Packet loop cancelled")
+            } catch (e: Exception) {
+                val allClosed = channels.values.all { !it.isOpen }
+                if (allClosed) {
+                    logger.debug("Packet loop ended (all channels closed)")
+                } else {
+                    logger.warn("Packet loop ended unexpectedly", e)
+                }
+            } finally {
+                channels.values.forEach { it.onClose() }
+            }
+        }
+    }
+
+    suspend fun stopPacketLoop() {
+        packetLoopJob?.cancelAndJoin()
+        packetLoopJob = null
+    }
+
     // Channel management methods
 
     /**
@@ -712,15 +829,19 @@ class SshConnection(
         val confirmationMsg = deferred.await() ?: return null
 
         val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
-        logger.info("Channel opened: local=$localChannelNumber, remote=$remoteChannelNumber")
+        val remoteWindow = confirmationMsg.initialWindowSize()
+        logger.info("Channel opened: local=$localChannelNumber, remote=$remoteChannelNumber, remoteWindow=$remoteWindow")
 
         val channel = SessionChannel(
             this,
             localChannelNumber,
             remoteChannelNumber,
-            maxPacketSize
+            maxPacketSize,
+            remoteWindowSize = remoteWindow,
+            initialWindowSize = initialWindowSize
         )
         channels[localChannelNumber] = channel
+        channelsByRemote[localChannelNumber] = channel
         return channel
     }
 
