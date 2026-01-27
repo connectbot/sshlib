@@ -19,7 +19,13 @@ package org.connectbot.sshlib.transport
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
+import java.util.Collections
 
 /**
  * TCP socket transport implementation using Ktor.
@@ -30,13 +36,24 @@ import kotlinx.coroutines.Dispatchers
  * @param host Remote host to connect to
  * @param port Remote port (default 22 for SSH)
  */
-class KtorTcpTransport(
+class KtorTcpTransport internal constructor(
     private val host: String,
-    private val port: Int = 22
+    private val port: Int,
+    private val addressResolver: AddressResolver,
+    private val socketFactory: TcpSocketFactory? = null
 ) : Transport {
-    private var socket: Socket? = null
+
+    constructor(host: String, port: Int = 22) : this(
+        host,
+        port,
+        DefaultAddressResolver(),
+        null
+    )
+
+    private var socket: TransportSocket? = null
     private var readChannel: ByteReadChannel? = null
     private var writeChannel: ByteWriteChannel? = null
+    private var selectorManager: SelectorManager? = null
 
     override val isConnected: Boolean
         get() = socket?.isClosed == false
@@ -51,13 +68,109 @@ class KtorTcpTransport(
         }
 
         try {
-            val selectorManager = SelectorManager(Dispatchers.IO)
-            socket = aSocket(selectorManager).tcp().connect(host, port)
+            // Initialize selector manager if we don't have a provided factory
+            val factory = if (socketFactory == null) {
+                val mgr = SelectorManager(Dispatchers.IO)
+                selectorManager = mgr
+                KtorTcpSocketFactory(mgr)
+            } else {
+                socketFactory
+            }
+
+            // Happy Eyeballs (RFC 8305) implementation
+            val addresses = addressResolver.resolve(host)
+
+            if (addresses.isEmpty()) {
+                throw TransportException("Could not resolve host: $host")
+            }
+
+            // Sort addresses: IPv6 first, then IPv4, interleaved
+            val ipv6 = addresses.filterIsInstance<Inet6Address>()
+            val ipv4 = addresses.filterIsInstance<Inet4Address>()
+            val other = addresses.filter { it !is Inet4Address && it !is Inet6Address }
+
+            val sortedAddresses = mutableListOf<InetAddress>()
+            var v6Index = 0
+            var v4Index = 0
+
+            while (v6Index < ipv6.size || v4Index < ipv4.size) {
+                if (v6Index < ipv6.size) sortedAddresses.add(ipv6[v6Index++])
+                if (v4Index < ipv4.size) sortedAddresses.add(ipv4[v4Index++])
+            }
+            sortedAddresses.addAll(other)
+
+            socket = connectHappyEyeballs(factory, sortedAddresses)
 
             readChannel = socket!!.openReadChannel()
             writeChannel = socket!!.openWriteChannel(autoFlush = false)
+        } catch (e: TransportException) {
+            selectorManager?.close()
+            selectorManager = null
+            throw e
         } catch (e: Exception) {
+            selectorManager?.close()
+            selectorManager = null
             throw TransportException("Failed to connect to $host:$port", e)
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun connectHappyEyeballs(
+        factory: TcpSocketFactory,
+        addresses: List<InetAddress>
+    ): TransportSocket = supervisorScope {
+        val resultChannel = Channel<TransportSocket>(capacity = 1)
+        val failures = Collections.synchronizedList(mutableListOf<Throwable>())
+        val attempts = Collections.synchronizedList(mutableListOf<Job>())
+
+        val launcherJob = launch {
+            for ((index, address) in addresses.withIndex()) {
+                if (!resultChannel.isEmpty) break
+
+                // Happy Eyeballs delay (e.g. 250ms) before starting next attempt
+                if (index > 0) {
+                    delay(250)
+                    if (!resultChannel.isEmpty) break
+                }
+
+                val job = launch {
+                    try {
+                        val s = factory.connect(address, port)
+
+                        if (resultChannel.trySend(s).isSuccess) {
+                            // Winner
+                        } else {
+                            // Lost the race
+                            s.close()
+                        }
+                    } catch (e: Throwable) {
+                        failures.add(e)
+                    }
+                }
+                attempts.add(job)
+            }
+        }
+
+        // Watcher to close channel if all fail
+        launch {
+            launcherJob.join()
+            // Wait for all initiated attempts to finish
+            attempts.toList().joinAll()
+            resultChannel.close()
+        }
+
+        try {
+            val winner = resultChannel.receive()
+            launcherJob.cancel()
+            attempts.forEach { it.cancel() }
+            return@supervisorScope winner
+        } catch (e: ClosedReceiveChannelException) {
+            val failureMsg = if (failures.isNotEmpty()) {
+                failures.joinToString("; ") { it.message ?: it.toString() }
+            } else {
+                "Unknown error"
+            }
+            throw TransportException("Failed to connect to $host:$port. Tried ${addresses.size} addresses. Errors: $failureMsg")
         }
     }
 
@@ -89,10 +202,12 @@ class KtorTcpTransport(
             writeChannel?.flushAndClose()
             readChannel?.cancel()
             socket?.close()
+            selectorManager?.close()
         } finally {
             writeChannel = null
             readChannel = null
             socket = null
+            selectorManager = null
         }
     }
 }
