@@ -16,7 +16,6 @@
 
 package org.connectbot.sshlib
 
-import kotlinx.coroutines.CoroutineScope
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
@@ -37,7 +36,7 @@ import org.slf4j.LoggerFactory
  *     val session = client.openSession()
  *     session.requestPty()
  *     session.requestShell()
- *     // ...
+ *     // read/write
  *     session.close()
  * }
  * client.disconnect()
@@ -200,21 +199,13 @@ class SshClient private constructor(
         }
     }
 
-    fun startPacketLoop(scope: CoroutineScope) {
-        connection?.startPacketLoop(scope)
-    }
-
-    suspend fun stopPacketLoop() {
-        connection?.stopPacketLoop()
-    }
-
     /**
      * Disconnect from the SSH server.
      */
     suspend fun disconnect() {
         logger.info("Disconnecting")
 
-        connection?.disconnect()
+        connection?.close()
         connection = null
 
         transport?.close()

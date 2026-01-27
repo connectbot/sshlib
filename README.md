@@ -47,9 +47,6 @@ val session = client.openSession()
 session.requestPty()
 session.requestShell()
 
-// Start background packet dispatch for channel I/O
-client.startPacketLoop(coroutineScope)
-
 // Read/write
 session.write("ls\n".toByteArray())
 val output = session.read()  // ByteArray? (null on EOF)
@@ -60,7 +57,6 @@ session.stderr  // ReceiveChannel<ByteArray>
 
 // Clean up
 session.close()
-client.stopPacketLoop()
 client.disconnect()
 ```
 

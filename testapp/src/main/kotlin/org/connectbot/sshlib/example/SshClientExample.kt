@@ -71,8 +71,6 @@ fun main(args: Array<String>) =
             session.requestPty()
             session.requestShell()
 
-            client.startPacketLoop(this)
-
             setRawMode()
             Runtime.getRuntime().addShutdownHook(Thread { restoreTerminal() })
 
@@ -131,7 +129,6 @@ fun main(args: Array<String>) =
             System.err.println("Error: ${e.message}")
         } finally {
             restoreTerminal()
-            client.stopPacketLoop()
             client.disconnect()
         }
     }
