@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.struct.EtmMac
+import org.connectbot.sshlib.struct.toByteArray
 import java.nio.ByteBuffer
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -51,6 +53,18 @@ class HmacSha256(private val key: ByteArray) : PacketMac {
         mac.update(buffer.array())
         mac.update(packet)
 
+        return mac.doFinal()
+    }
+
+    override fun computeEtm(sequenceNumber: Long, packetLength: Int, encryptedPayload: ByteArray): ByteArray {
+        mac.reset()
+
+        val etmMac = EtmMac()
+        etmMac.setSequenceNumber(sequenceNumber)
+        etmMac.setLenEncryptedPacket(packetLength.toLong())
+        etmMac.setEncryptedPacket(encryptedPayload)
+
+        mac.update(etmMac.toByteArray())
         return mac.doFinal()
     }
 }

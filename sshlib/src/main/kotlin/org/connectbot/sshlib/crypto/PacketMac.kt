@@ -26,11 +26,24 @@ interface PacketMac {
     val macLength: Int
 
     /**
-     * Compute MAC for packet.
+     * Compute MAC for packet (encrypt-and-MAC mode).
      *
      * @param sequenceNumber Packet sequence number
      * @param packet Complete packet data (including length, padding, etc.)
      * @return MAC bytes
      */
     fun compute(sequenceNumber: Long, packet: ByteArray): ByteArray
+
+    /**
+     * Compute MAC for ETM (Encrypt-then-MAC) mode.
+     *
+     * In ETM mode, the MAC is computed over: sequence_number || packet_length || encrypted_payload
+     * where packet_length is the unencrypted 4-byte length field.
+     *
+     * @param sequenceNumber Packet sequence number
+     * @param packetLength The packet length (from unencrypted length field)
+     * @param encryptedPayload The encrypted payload (excluding length field)
+     * @return MAC bytes
+     */
+    fun computeEtm(sequenceNumber: Long, packetLength: Int, encryptedPayload: ByteArray): ByteArray
 }

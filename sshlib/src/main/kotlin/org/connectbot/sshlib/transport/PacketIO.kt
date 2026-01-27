@@ -17,9 +17,10 @@
 package org.connectbot.sshlib.transport
 
 import io.kaitai.struct.ByteBufferKaitaiStream
-import org.connectbot.sshlib.struct.*
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketMac
+import org.connectbot.sshlib.struct.*
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import kotlin.random.Random
@@ -39,11 +40,18 @@ import kotlin.random.Random
  * @param transport Underlying transport layer
  */
 class PacketIO(private val transport: Transport) {
+    companion object {
+        private val logger = LoggerFactory.getLogger(PacketIO::class.java)
+    }
+
     // Separate ciphers and MACs for each direction
     private var sendCipher: PacketCipher? = null
     private var sendMac: PacketMac? = null
     private var receiveCipher: PacketCipher? = null
     private var receiveMac: PacketMac? = null
+
+    // Whether to use ETM (Encrypt-then-MAC) mode
+    private var useEtm: Boolean = false
 
     // Separate sequence numbers for each direction (client->server and server->client)
     private var sendSequenceNumber: Long = 0
@@ -56,17 +64,20 @@ class PacketIO(private val transport: Transport) {
      * @param clientToServerMac MAC for outgoing packets
      * @param serverToClientCipher Cipher for incoming packets
      * @param serverToClientMac MAC for incoming packets
+     * @param etm Whether to use ETM (Encrypt-then-MAC) mode. Default is false (encrypt-and-MAC).
      */
     fun enableEncryption(
         clientToServerCipher: PacketCipher,
         clientToServerMac: PacketMac,
         serverToClientCipher: PacketCipher,
-        serverToClientMac: PacketMac
+        serverToClientMac: PacketMac,
+        etm: Boolean = false
     ) {
         this.sendCipher = clientToServerCipher
         this.sendMac = clientToServerMac
         this.receiveCipher = serverToClientCipher
         this.receiveMac = serverToClientMac
+        this.useEtm = etm
     }
 
     /**
@@ -97,6 +108,8 @@ class PacketIO(private val transport: Transport) {
 
         if (currentCipher == null || currentMac == null) {
             return readUnencryptedPacket()
+        } else if (useEtm) {
+            return readEtmPacket(currentCipher, currentMac)
         } else {
             return readEncryptedPacket(currentCipher, currentMac)
         }
@@ -162,10 +175,9 @@ class PacketIO(private val transport: Transport) {
         // Combine decrypted blocks
         val decryptedPacket = decryptedFirst + decryptedRemaining
 
-        // Verify MAC
+        // Verify MAC (over plaintext for encrypt-and-MAC)
         val expectedMac = mac.compute(receiveSequenceNumber, decryptedPacket)
         if (!receivedMac.contentEquals(expectedMac)) {
-            val logger = org.slf4j.LoggerFactory.getLogger(PacketIO::class.java)
             logger.error("MAC verification failed for seq=$receiveSequenceNumber")
             logger.error("  Received MAC: ${receivedMac.joinToString("") { "%02x".format(it) }}")
             logger.error("  Expected MAC: ${expectedMac.joinToString("") { "%02x".format(it) }}")
@@ -175,6 +187,49 @@ class PacketIO(private val transport: Transport) {
 
         // Parse payload
         val stream = ByteBufferKaitaiStream(decryptedPacket)
+        val packet = UnencryptedPacket(stream)
+        packet._read()
+
+        receiveSequenceNumber++
+        return packet.payload()
+    }
+
+    /**
+     * Read an ETM (Encrypt-then-MAC) packet.
+     *
+     * In ETM mode, the MAC is computed over (sequence_number || encrypted_length || encrypted_payload).
+     * The length field is NOT encrypted.
+     */
+    private suspend fun readEtmPacket(cipher: PacketCipher, mac: PacketMac): UnencryptedPacket.UnencryptedPayload {
+        val macLength = mac.macLength
+
+        // In ETM mode, length is NOT encrypted
+        val lengthBytes = transport.read(4)
+        val encryptedLength = ByteBuffer.wrap(lengthBytes).int
+
+        if (encryptedLength < 12 || encryptedLength > 35000) {
+            throw TransportException("Invalid ETM packet length: $encryptedLength")
+        }
+
+        // Read encrypted payload
+        val encryptedPayload = transport.read(encryptedLength)
+
+        // Read MAC
+        val receivedMac = transport.read(macLength)
+
+        // Verify MAC (over sequence_number || length || encrypted_payload)
+        val expectedMac = mac.computeEtm(receiveSequenceNumber, encryptedLength, encryptedPayload)
+        if (!receivedMac.contentEquals(expectedMac)) {
+            logger.error("ETM MAC verification failed for seq=$receiveSequenceNumber")
+            throw TransportException("ETM MAC verification failed")
+        }
+
+        // Decrypt
+        val decryptedPayload = cipher.decrypt(encryptedPayload)
+
+        // Rebuild full packet structure (length + decrypted payload) for parsing
+        val fullPacket = lengthBytes + decryptedPayload
+        val stream = ByteBufferKaitaiStream(fullPacket)
         val packet = UnencryptedPacket(stream)
         packet._read()
 
@@ -194,6 +249,8 @@ class PacketIO(private val transport: Transport) {
 
         if (currentCipher == null || currentMac == null) {
             writeUnencryptedPacket(messageType, payload)
+        } else if (useEtm) {
+            writeEtmPacket(messageType, payload, currentCipher, currentMac)
         } else {
             writeEncryptedPacket(messageType, payload, currentCipher, currentMac)
         }
@@ -272,6 +329,47 @@ class PacketIO(private val transport: Transport) {
 
         // Send encrypted packet + MAC
         transport.write(encryptedPacket + macBytes)
+        sendSequenceNumber++
+    }
+
+    /**
+     * Write an ETM (Encrypt-then-MAC) packet.
+     *
+     * In ETM mode, the length field is NOT encrypted, and MAC is computed over
+     * (sequence_number || packet_length || encrypted_payload).
+     */
+    private suspend fun writeEtmPacket(
+        messageType: Int,
+        payload: ByteArray,
+        cipher: PacketCipher,
+        mac: PacketMac
+    ) {
+        val payloadLength = 1 + payload.size
+        val blockSize = cipher.blockSize
+
+        // Calculate padding
+        val paddingLength = calculatePaddingLength(payloadLength, blockSize)
+        val packetLength = 1 + payloadLength + paddingLength
+
+        // Build the payload to encrypt (padding_length + message type + payload + padding)
+        val payloadBuffer = ByteArrayOutputStream()
+        payloadBuffer.write(paddingLength)
+        payloadBuffer.write(messageType)
+        payloadBuffer.write(payload)
+        val padding = Random.nextBytes(paddingLength)
+        payloadBuffer.write(padding)
+
+        val payloadToEncrypt = payloadBuffer.toByteArray()
+
+        // Encrypt payload (NOT including length)
+        val encryptedPayload = cipher.encrypt(payloadToEncrypt)
+
+        // Compute MAC over sequence_number || packet_length || encrypted_payload
+        val macBytes = mac.computeEtm(sendSequenceNumber, packetLength, encryptedPayload)
+
+        // Build final packet: length (unencrypted) + encrypted_payload + MAC
+        val lengthBytes = ByteBuffer.allocate(4).putInt(packetLength).array()
+        transport.write(lengthBytes + encryptedPayload + macBytes)
         sendSequenceNumber++
     }
 
