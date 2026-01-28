@@ -21,20 +21,11 @@ plugins {
 
 val kaitaiInputDir = file("src/main/resources/kaitai")
 val kaitaiOutputDir = file("build/generated/kaitai")
-val kaitaiCompilerZip = rootProject.file("prebuilts/kaitai-struct-compiler-0.11.zip")
-val kaitaiCompilerDir = file("build/kaitai-compiler")
+val kaitaiCompiler by configurations.creating
 
-tasks.register<Copy>("unzipKaitaiCompiler") {
-    from(zipTree(kaitaiCompilerZip))
-    into(kaitaiCompilerDir)
-}
-
-abstract class KaitaiTask : Exec() {
+abstract class KaitaiTask : JavaExec() {
     @get:InputFiles
     abstract val ksyFiles: ConfigurableFileCollection
-
-    @get:Input
-    abstract val compilerPath: Property<String>
 
     @get:Input
     abstract val outputDirPath: Property<String>
@@ -45,24 +36,20 @@ abstract class KaitaiTask : Exec() {
     @TaskAction
     override fun exec() {
         File(outputDirPath.get()).mkdirs()
-        commandLine(
-            listOf(
-                compilerPath.get(),
-                "--read-write",
-                "--target", "java",
-                "--outdir", outputDirPath.get(),
-                "--java-package", javaPackage.get()
-            ) + ksyFiles.files.map { it.absolutePath }
-        )
+        args = listOf(
+            "--read-write",
+            "--target", "java",
+            "--outdir", outputDirPath.get(),
+            "--java-package", javaPackage.get()
+        ) + ksyFiles.files.map { it.absolutePath }
         super.exec()
     }
 }
 
 tasks.register<KaitaiTask>("kaitai") {
-    dependsOn("unzipKaitaiCompiler")
-
     ksyFiles.from(fileTree(kaitaiInputDir) { include("*.ksy") })
-    compilerPath.set(kaitaiCompilerDir.resolve("kaitai-struct-compiler-0.11/bin/kaitai-struct-compiler").absolutePath)
+    classpath = kaitaiCompiler
+    mainClass.set("io.kaitai.struct.JavaMain")
     outputDirPath.set(kaitaiOutputDir.absolutePath)
     javaPackage.set("org.connectbot.sshlib.struct")
 
@@ -87,8 +74,11 @@ sourceSets {
 
 dependencies {
     // Public API dependencies
-    api(fileTree(rootProject.file("libs")) { include("kaitai-struct-runtime-*.jar") })
+    api("io.kaitai:kaitai-struct-runtime:0.11")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+
+    // Kaitai compiler
+    kaitaiCompiler("io.kaitai:kaitai-struct-compiler_2.13:0.11")
 
     // Internal dependencies
     implementation(kotlin("stdlib"))
