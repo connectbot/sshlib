@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.transport
 
+import org.connectbot.sshlib.SshException
+
 /**
  * Transport abstraction for SSH connections.
  *
@@ -58,4 +60,4 @@ interface Transport {
 /**
  * Exception thrown when transport operations fail.
  */
-class TransportException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class TransportException(message: String, cause: Throwable? = null) : SshException(message, cause)
