@@ -40,7 +40,8 @@ import org.connectbot.sshlib.transport.TransportFactory
  */
 class SshClientConfig private constructor(
     val transportFactory: TransportFactory,
-    val clientVersion: String
+    val clientVersion: String,
+    val hostKeyVerifier: HostKeyVerifier
 ) {
     class Builder {
         /**
@@ -61,6 +62,11 @@ class SshClientConfig private constructor(
         var clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
 
         /**
+         * Host key verifier.
+         */
+        var hostKeyVerifier: HostKeyVerifier? = null
+
+        /**
          * Custom transport factory. If not set, uses [KtorTcpTransportFactory]
          * with [host] and [port].
          */
@@ -72,7 +78,10 @@ class SshClientConfig private constructor(
                 require(port in 1..65535) { "Port must be between 1 and 65535" }
                 KtorTcpTransportFactory(host, port)
             }
-            return SshClientConfig(factory, clientVersion)
+
+            val verifier = hostKeyVerifier
+            requireNotNull(verifier) { "hostKeyVerifier must be set" }
+            return SshClientConfig(factory, clientVersion, verifier)
         }
     }
 

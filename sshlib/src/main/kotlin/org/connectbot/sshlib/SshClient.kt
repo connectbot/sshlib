@@ -121,7 +121,11 @@ class SshClient private constructor(
             val newTransport = config.transportFactory.create()
             transport = newTransport
 
-            val sshConnection = SshConnection(newTransport, config.clientVersion)
+            val sshConnection = SshConnection(
+                transport = newTransport,
+                clientVersion = config.clientVersion,
+                hostKeyVerifier = config.hostKeyVerifier
+            )
             val success = sshConnection.connect()
 
             if (success) {

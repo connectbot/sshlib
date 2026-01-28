@@ -25,6 +25,8 @@ import org.connectbot.sshlib.struct.SshClientCallbacks
 import org.connectbot.sshlib.struct.SshClientStateMachine
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
+import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.PublicKey
 import org.slf4j.LoggerFactory
 
 /**
@@ -38,7 +40,8 @@ import org.slf4j.LoggerFactory
  */
 class SshConnection(
     private val transport: Transport,
-    private val clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+    private val clientVersion: String = "SSH-2.0-SshProtoClient_1.0",
+    private val hostKeyVerifier: HostKeyVerifier
 ) : SshClientCallbacks {
 
     companion object {
@@ -80,6 +83,7 @@ class SshConnection(
 
     private var packetLoopJob: Job? = null
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
         withContext(stateMachineDispatcher) {
             stateMachine.processEvent(event)
@@ -296,9 +300,37 @@ class SshConnection(
             sessionId = exchangeHash
         }
 
-        // TODO: Verify server's signature over exchange hash
-        logger.debug("Shared secret computed, exchange hash calculated")
+        // Verify server host key
+        val keyType = try {
+            val stream = ByteBufferKaitaiStream(serverHostKey)
+            val str = AsciiString(stream)
+            str._read()
+            str.value()
+        } catch (e: Exception) {
+            logger.error("Failed to parse server host key type", e)
+            throw SshException("Invalid host key format")
+        }
+
+        val publicKey = PublicKey(keyType, serverHostKey)
+
+        val trusted = runBlocking {
+            hostKeyVerifier.verify(publicKey)
+        }
+
+        if (!trusted) {
+            logger.error("Host key verification failed")
+            throw SshException("Host key verification failed")
+        }
+        logger.info("Host key verified")
+
+        if (!SignatureVerifier.verify(serverHostKey, signature, exchangeHash!!)) {
+            logger.error("Server signature verification failed")
+            throw SshException("Server signature verification failed")
+        }
+        logger.info("Server signature verified")
     }
+
+    class SshException(message: String) : RuntimeException(message)
 
     override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
         logger.warn("ECDH not implemented yet")
