@@ -1,0 +1,45 @@
+/*
+ * Copyright 2025 Kenny Root
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.connectbot.sshlib.crypto
+
+import org.connectbot.sshlib.struct.SshEd25519PublicKeyBlob
+import org.connectbot.sshlib.struct.SshEd25519SignatureBlob
+import org.connectbot.sshlib.struct.SshPublicKey
+import org.connectbot.sshlib.struct.SshSignature
+import java.security.KeyFactory
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
+
+object Ed25519SignatureAlgorithm : SshSignatureAlgorithm {
+    override fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean {
+        val keyBlob = pubKey.keyBlob() as SshEd25519PublicKeyBlob
+        val rawKey = keyBlob.key().data()
+
+        val x509Prefix = byteArrayOf(
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
+        )
+        val x509Key = x509Prefix + rawKey
+        val keySpec = X509EncodedKeySpec(x509Key)
+        val jcaKey = KeyFactory.getInstance("Ed25519").generatePublic(keySpec)
+
+        val sigBlob = sig.signatureBlob() as SshEd25519SignatureBlob
+        val verifier = Signature.getInstance("Ed25519")
+        verifier.initVerify(jcaKey)
+        verifier.update(data)
+        return verifier.verify(sigBlob.signature().data())
+    }
+}

@@ -101,7 +101,6 @@ ssh-proto/
 ## Current Limitations
 
 - No public key authentication
-- No host key verification
 - No ECDH/Curve25519 key exchange
 - No SFTP, port forwarding, or agent forwarding
 - Client-only (no server implementation)

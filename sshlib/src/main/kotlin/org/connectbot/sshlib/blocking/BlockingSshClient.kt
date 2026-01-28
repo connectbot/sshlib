@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.blocking
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
@@ -31,7 +32,7 @@ import org.connectbot.sshlib.transport.TransportFactory
  *
  * Usage from Java:
  * ```java
- * BlockingSshClient client = new BlockingSshClient("example.com", 22);
+ * BlockingSshClient client = new BlockingSshClient("example.com", 22, myHostKeyVerifier);
  * if (client.connect()) {
  *     if (client.authenticatePassword("user", "password")) {
  *         SshSession session = client.openSession();
@@ -53,11 +54,18 @@ class BlockingSshClient private constructor(
     /**
      * Create a blocking SSH client for TCP connection.
      */
+    @JvmOverloads
     constructor(
         host: String,
         port: Int = 22,
+        hostKeyVerifier: HostKeyVerifier,
         clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
-    ) : this(SshClient(host, port, clientVersion))
+    ) : this(SshClientConfig {
+        this.host = host
+        this.port = port
+        this.hostKeyVerifier = hostKeyVerifier
+        this.clientVersion = clientVersion
+    })
 
     /**
      * Create a blocking SSH client from configuration.

@@ -19,8 +19,15 @@ package org.connectbot.sshlib.example
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import kotlinx.coroutines.*
+import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.KnownHostsVerifier
+import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
+import org.connectbot.sshlib.SshClientConfig
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.security.MessageDigest
+import java.util.Base64
 
 fun main(args: Array<String>) =
     runBlocking {
@@ -50,7 +57,12 @@ fun main(args: Array<String>) =
                 }
             }
 
-        val client = SshClient(host, port)
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            hostKeyVerifier = InteractiveHostKeyVerifier(host, port)
+        }
+        val client = SshClient(config)
         try {
             if (!client.connect()) {
                 System.err.println("Failed to connect to $host:$port")
@@ -132,6 +144,42 @@ fun main(args: Array<String>) =
             client.disconnect()
         }
     }
+
+private class InteractiveHostKeyVerifier(
+    private val hostname: String,
+    private val port: Int
+) : HostKeyVerifier {
+    private val knownHostsFile = File(System.getProperty("user.home"), ".ssh/known_hosts")
+    private val delegate = KnownHostsVerifier(knownHostsFile, hostname, port)
+
+    override suspend fun verify(key: PublicKey): Boolean {
+        if (delegate.verify(key)) return true
+
+        val fingerprint = MessageDigest.getInstance("SHA-256").digest(key.encoded)
+        val fingerprintStr = Base64.getEncoder().encodeToString(fingerprint).trimEnd('=')
+
+        System.err.println("The authenticity of host '$hostname ($hostname)' can't be established.")
+        System.err.println("${key.type} key fingerprint is SHA256:$fingerprintStr.")
+        System.err.print("Are you sure you want to continue connecting (yes/no)? ")
+        System.err.flush()
+
+        val answer = readlnOrNull()?.trim()?.lowercase()
+        if (answer != "yes") return false
+
+        appendToKnownHosts(key)
+        System.err.println("Warning: Permanently added '$hostname' to the list of known hosts.")
+        return true
+    }
+
+    private fun appendToKnownHosts(key: PublicKey) {
+        val hostEntry = if (port == 22) hostname else "[$hostname]:$port"
+        val keyBase64 = Base64.getEncoder().encodeToString(key.encoded)
+        val line = "$hostEntry ${key.type} $keyBase64\n"
+
+        knownHostsFile.parentFile?.mkdirs()
+        knownHostsFile.appendText(line)
+    }
+}
 
 private var savedStty: String? = null
 
