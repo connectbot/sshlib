@@ -48,7 +48,7 @@ class DiffieHellman {
             "15728E5A8AACAA68FFFFFFFFFFFFFFFF", 16
         )
 
-        val GROUP14_G = BigInteger.valueOf(2)
+        val GROUP14_G: BigInteger = BigInteger.valueOf(2)
 
         /**
          * Generate random bytes for private key.
