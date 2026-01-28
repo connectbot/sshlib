@@ -75,18 +75,11 @@ object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
     }
 
     internal fun encodeDerEcdsaSignature(r: BigInteger, s: BigInteger): ByteArray {
-        val rBytes = r.toByteArray()
-        val sBytes = s.toByteArray()
-        val buf = ByteArrayOutputStream()
-        buf.write(0x30) // SEQUENCE
-        val contentLen = 2 + rBytes.size + 2 + sBytes.size
-        buf.write(contentLen)
-        buf.write(0x02) // INTEGER
-        buf.write(rBytes.size)
-        buf.write(rBytes)
-        buf.write(0x02) // INTEGER
-        buf.write(sBytes.size)
-        buf.write(sBytes)
-        return buf.toByteArray()
+        return encodeDer {
+            sequence {
+                integer(r)
+                integer(s)
+            }
+        }
     }
 }
