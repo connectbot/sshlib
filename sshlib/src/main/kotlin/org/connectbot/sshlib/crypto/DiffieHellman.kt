@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
+
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -85,7 +87,7 @@ class DiffieHellman {
 
         // Verify server's public key is in valid range: 1 < f < p-1
         if (f <= BigInteger.ONE || f >= GROUP14_P - BigInteger.ONE) {
-            throw IllegalArgumentException("Invalid server public key")
+            throw SshException("Invalid server public key")
         }
 
         // Calculate shared secret: K = f^x mod p

@@ -27,6 +27,7 @@ import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SshException
 import org.slf4j.LoggerFactory
 
 /**
@@ -330,7 +331,7 @@ class SshConnection(
         logger.info("Server signature verified")
     }
 
-    class SshException(message: String) : RuntimeException(message)
+
 
     override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
         logger.warn("ECDH not implemented yet")
@@ -663,7 +664,7 @@ class SshConnection(
                     return packet.body() as T
                 }
                 else -> {
-                    throw IllegalStateException("Expected $expectedType but got $messageType")
+                    throw SshException("Expected $expectedType but got $messageType")
                 }
             }
         }
@@ -690,7 +691,7 @@ class SshConnection(
                     return packet as T
                 }
                 else -> {
-                    throw IllegalStateException("Expected one of ${expectedTypes.joinToString()} but got $messageType")
+                    throw SshException("Expected one of ${expectedTypes.joinToString()} but got $messageType")
                 }
             }
         }

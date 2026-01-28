@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
+
 import org.connectbot.sshlib.struct.EcdsaPublicKeyBlob
 import org.connectbot.sshlib.struct.EcdsaSignatureBlob
 import org.connectbot.sshlib.struct.SshPublicKey
@@ -65,7 +67,7 @@ object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
     internal fun decodeEcPoint(encoded: ByteArray, spec: ECParameterSpec): ECPoint {
         val fieldSize = (spec.order.bitLength() + 7) / 8
         if (encoded[0] != 0x04.toByte() || encoded.size != 1 + 2 * fieldSize) {
-            throw IllegalArgumentException("Invalid EC point encoding")
+            throw SshException("Invalid EC point encoding")
         }
         val x = BigInteger(1, encoded, 1, fieldSize)
         val y = BigInteger(1, encoded, 1 + fieldSize, fieldSize)
