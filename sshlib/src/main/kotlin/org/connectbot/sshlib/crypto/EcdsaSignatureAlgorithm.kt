@@ -22,6 +22,7 @@ import org.connectbot.sshlib.struct.SshPublicKey
 import org.connectbot.sshlib.struct.SshSignature
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
+import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
@@ -42,7 +43,7 @@ object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
             else -> return false
         }
 
-        val params = java.security.AlgorithmParameters.getInstance("EC")
+        val params = AlgorithmParameters.getInstance("EC")
         params.init(ecSpec)
         val paramSpec = params.getParameterSpec(ECParameterSpec::class.java)
 
