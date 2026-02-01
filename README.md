@@ -1,8 +1,11 @@
-# SSH Client Library & Protocol Parser
+# ConnectBot SSH Client Library *(IN PROGRESS)*
 
-An SSH client library built with Kotlin coroutines and Kaitai Struct. Connects
-to SSH servers, authenticates, and provides interactive shell sessions with
-channel data I/O. Protocol parsing uses declarative Kaitai Struct specifications
+This is ConnectBot SSH library built with Kotlin coroutines and Kaitai Struct. It
+connects to SSH servers, authenticates, and provides interactive shell sessions with
+channel data I/O. *This is currently a work-in-progress and not meant to be used for
+production.*
+
+The protocol parsing uses declarative Kaitai Struct specifications
 that auto-generate code from `.ksy` definitions. The internal state machine is
 defined in KStateMachine for easier reasoning of possible state transitions.
 
@@ -17,7 +20,6 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
 - **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
-- **CLI Client**: Interactive terminal client included in testapp module
 
 ## Quick Start
 
@@ -27,13 +29,18 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 ./gradlew build
 ```
 
-### Use the CLI Client
+### Use the Test CLI Client
+
+There is a "testapp" that allows you to try the library from a test client app.
+You can use it by running the following commands:
 
 ```bash
 ./gradlew :testapp:installDist
 ./testapp/build/install/testapp/bin/testapp user@host
 ./testapp/build/install/testapp/bin/testapp user@host -p 2222
-./testapp/build/install/testapp/bin/testapp -d user@host  # debug logging
+
+# Enable more debug logging:
+./testapp/build/install/testapp/bin/testapp -d user@host
 ```
 
 ### Library API
@@ -60,28 +67,10 @@ session.close()
 client.disconnect()
 ```
 
-### Parse SSH Messages
-
-```java
-ByteBufferKaitaiStream stream = new ByteBufferKaitaiStream(bytes);
-Ssh.IdBanner banner = new Ssh.IdBanner(stream);
-banner._read();
-System.out.println("Version: " + banner.protoVersion());
-
-Ssh.UnencryptedPacket packet = new Ssh.UnencryptedPacket(stream);
-packet._read();
-switch (packet.payload().messageType()) {
-    case SSH_MSG_KEXINIT:
-        Ssh.SshMsgKexinit kexinit = (Ssh.SshMsgKexinit) packet.payload().body();
-        System.out.println("KEX algorithms: " + kexinit.kexAlgorithms());
-        break;
-}
-```
-
 ## Current Limitations
 
-- No public key authentication
-- No ECDH/Curve25519 key exchange
+- No public key authentication or keyboard-interactive authentication
+- No ECDH, Curve25519, or ML-KEM hybrid key exchange
 - No SFTP, port forwarding, or agent forwarding
 - Client-only (no server implementation)
 
