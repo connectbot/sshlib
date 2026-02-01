@@ -19,9 +19,12 @@ package org.connectbot.sshlib.client
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
@@ -71,6 +74,26 @@ class SshClientIntegrationTest {
             .waitingFor(
                 Wait.forLogMessage(".*Server listening.*", 1)
             )
+
+        @JvmStatic
+        fun encryptionAlgorithms() = listOf(
+            "aes128-gcm@openssh.com",
+            "aes256-gcm@openssh.com",
+            "aes128-ctr",
+            "aes256-ctr",
+        )
+
+        @JvmStatic
+        fun kexAlgorithms() = listOf(
+            "diffie-hellman-group14-sha256",
+            "diffie-hellman-group14-sha1",
+        )
+
+        @JvmStatic
+        fun hostKeyAlgorithms() = listOf(
+            "rsa-sha2-256",
+            "rsa-sha2-512",
+        )
     }
 
     private val acceptAllVerifier = object : HostKeyVerifier {
@@ -176,6 +199,105 @@ class SshClientIntegrationTest {
 
             session.close()
             assertFalse(session.isOpen, "Channel should be closed")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @ParameterizedTest(name = "encryption: {0}")
+    @MethodSource("encryptionAlgorithms")
+    fun `should connect with encryption algorithm`(algorithm: String) {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.encryptionAlgorithms = algorithm
+        }
+        val client = BlockingSshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with encryption $algorithm")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate with encryption $algorithm"
+            )
+
+            val session = client.openSession()
+            assertNotNull(session, "Should open session with encryption $algorithm")
+
+            val shellRequested = runBlocking { session!!.requestShell() }
+            assertTrue(shellRequested, "Should request shell with encryption $algorithm")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @ParameterizedTest(name = "kex: {0}")
+    @MethodSource("kexAlgorithms")
+    fun `should connect with kex algorithm`(algorithm: String) {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.kexAlgorithms = "$algorithm,kex-strict-c-v00@openssh.com"
+        }
+        val client = BlockingSshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with kex $algorithm")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate with kex $algorithm"
+            )
+
+            val session = client.openSession()
+            assertNotNull(session, "Should open session with kex $algorithm")
+
+            val shellRequested = runBlocking { session!!.requestShell() }
+            assertTrue(shellRequested, "Should request shell with kex $algorithm")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @ParameterizedTest(name = "hostkey: {0}")
+    @MethodSource("hostKeyAlgorithms")
+    fun `should connect with host key algorithm`(algorithm: String) {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.hostKeyAlgorithms = algorithm
+        }
+        val client = BlockingSshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with host key $algorithm")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate with host key $algorithm"
+            )
+
+            val session = client.openSession()
+            assertNotNull(session, "Should open session with host key $algorithm")
+
+            val shellRequested = runBlocking { session!!.requestShell() }
+            assertTrue(shellRequested, "Should request shell with host key $algorithm")
+
+            session!!.close()
         } finally {
             client.disconnect()
         }

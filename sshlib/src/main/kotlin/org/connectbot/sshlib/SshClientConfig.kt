@@ -16,6 +16,7 @@
 
 package org.connectbot.sshlib
 
+import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.TransportFactory
 
@@ -41,7 +42,11 @@ import org.connectbot.sshlib.transport.TransportFactory
 class SshClientConfig private constructor(
     val transportFactory: TransportFactory,
     val clientVersion: String,
-    val hostKeyVerifier: HostKeyVerifier
+    val hostKeyVerifier: HostKeyVerifier,
+    val kexAlgorithms: String,
+    val hostKeyAlgorithms: String,
+    val encryptionAlgorithms: String,
+    val macAlgorithms: String
 ) {
     class Builder {
         /**
@@ -72,6 +77,11 @@ class SshClientConfig private constructor(
          */
         var transportFactory: TransportFactory? = null
 
+        var kexAlgorithms: String = SshConnection.DEFAULT_KEX_ALGORITHMS
+        var hostKeyAlgorithms: String = SshConnection.DEFAULT_HOST_KEY_ALGORITHMS
+        var encryptionAlgorithms: String = SshConnection.DEFAULT_ENCRYPTION_ALGORITHMS
+        var macAlgorithms: String = SshConnection.DEFAULT_MAC_ALGORITHMS
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -81,7 +91,10 @@ class SshClientConfig private constructor(
 
             val verifier = hostKeyVerifier
             requireNotNull(verifier) { "hostKeyVerifier must be set" }
-            return SshClientConfig(factory, clientVersion, verifier)
+            return SshClientConfig(
+                factory, clientVersion, verifier,
+                kexAlgorithms, hostKeyAlgorithms, encryptionAlgorithms, macAlgorithms
+            )
         }
     }
 

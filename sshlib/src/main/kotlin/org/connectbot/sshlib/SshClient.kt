@@ -124,7 +124,11 @@ class SshClient private constructor(
             val sshConnection = SshConnection(
                 transport = newTransport,
                 clientVersion = config.clientVersion,
-                hostKeyVerifier = config.hostKeyVerifier
+                hostKeyVerifier = config.hostKeyVerifier,
+                kexAlgorithms = config.kexAlgorithms,
+                hostKeyAlgorithms = config.hostKeyAlgorithms,
+                encryptionAlgorithms = config.encryptionAlgorithms,
+                macAlgorithms = config.macAlgorithms
             )
             val success = sshConnection.connect()
 
