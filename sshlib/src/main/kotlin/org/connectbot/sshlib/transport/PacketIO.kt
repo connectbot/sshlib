@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.transport
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import org.connectbot.sshlib.crypto.PacketAead
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketMac
 import org.connectbot.sshlib.struct.*
@@ -50,6 +51,10 @@ class PacketIO(private val transport: Transport) {
     private var receiveCipher: PacketCipher? = null
     private var receiveMac: PacketMac? = null
 
+    // AEAD ciphers for each direction
+    private var sendAead: PacketAead? = null
+    private var receiveAead: PacketAead? = null
+
     // Whether to use ETM (Encrypt-then-MAC) mode
     private var useEtm: Boolean = false
 
@@ -81,6 +86,20 @@ class PacketIO(private val transport: Transport) {
     }
 
     /**
+     * Enable AEAD encryption for subsequent packets.
+     *
+     * @param clientToServerAead AEAD cipher for outgoing packets
+     * @param serverToClientAead AEAD cipher for incoming packets
+     */
+    fun enableAead(
+        clientToServerAead: PacketAead,
+        serverToClientAead: PacketAead
+    ) {
+        this.sendAead = clientToServerAead
+        this.receiveAead = serverToClientAead
+    }
+
+    /**
      * Reset send sequence numbers to 0.
      * Required by strict KEX after NEWKEYS exchange (draft-ietf-sshm-strict-kex-01).
      */
@@ -103,6 +122,11 @@ class PacketIO(private val transport: Transport) {
      * @throws TransportException if packet is malformed or transport fails
      */
     suspend fun readPacket(): UnencryptedPacket.UnencryptedPayload {
+        val currentAead = receiveAead
+        if (currentAead != null) {
+            return readAeadPacket(currentAead)
+        }
+
         val currentCipher = receiveCipher
         val currentMac = receiveMac
 
@@ -238,12 +262,47 @@ class PacketIO(private val transport: Transport) {
     }
 
     /**
+     * Read an AEAD packet (e.g., AES-GCM per RFC 5647).
+     *
+     * Wire format: packet_length (4B, cleartext) || ciphertext || auth_tag (16B)
+     * AAD: the 4-byte packet_length
+     * Plaintext: padding_length || payload || padding
+     */
+    private suspend fun readAeadPacket(aead: PacketAead): UnencryptedPacket.UnencryptedPayload {
+        val lengthBytes = transport.read(4)
+        val packetLength = ByteBuffer.wrap(lengthBytes).int
+
+        if (packetLength < 12 || packetLength > 35000) {
+            throw TransportException("Invalid AEAD packet length: $packetLength")
+        }
+
+        val ciphertext = transport.read(packetLength)
+        val tag = transport.read(aead.tagLength)
+
+        val plaintext = aead.decrypt(lengthBytes, ciphertext, tag)
+
+        val fullPacket = lengthBytes + plaintext
+        val stream = ByteBufferKaitaiStream(fullPacket)
+        val packet = UnencryptedPacket(stream)
+        packet._read()
+
+        receiveSequenceNumber++
+        return packet.payload()
+    }
+
+    /**
      * Write an SSH packet.
      *
      * @param messageType SSH message type code
      * @param payload Message payload (excluding message type byte)
      */
     suspend fun writePacket(messageType: Int, payload: ByteArray = byteArrayOf()) {
+        val currentAead = sendAead
+        if (currentAead != null) {
+            writeAeadPacket(messageType, payload, currentAead)
+            return
+        }
+
         val currentCipher = sendCipher
         val currentMac = sendMac
 
@@ -374,6 +433,39 @@ class PacketIO(private val transport: Transport) {
     }
 
     /**
+     * Write an AEAD packet (e.g., AES-GCM per RFC 5647).
+     *
+     * Wire format: packet_length (4B, cleartext) || ciphertext || auth_tag (16B)
+     * Plaintext: padding_length || message_type || payload || padding
+     * Padding must align the plaintext to a 16-byte boundary.
+     */
+    private suspend fun writeAeadPacket(
+        messageType: Int,
+        payload: ByteArray,
+        aead: PacketAead
+    ) {
+        val payloadLength = 1 + payload.size // message type + payload
+        val blockSize = 16 // AES block size for GCM padding alignment
+
+        val paddingLength = calculateAeadPaddingLength(payloadLength, blockSize)
+        val packetLength = 1 + payloadLength + paddingLength
+
+        val plaintextBuffer = ByteArrayOutputStream()
+        plaintextBuffer.write(paddingLength)
+        plaintextBuffer.write(messageType)
+        plaintextBuffer.write(payload)
+        plaintextBuffer.write(Random.nextBytes(paddingLength))
+
+        val plaintext = plaintextBuffer.toByteArray()
+        val lengthBytes = ByteBuffer.allocate(4).putInt(packetLength).array()
+
+        val result = aead.encrypt(lengthBytes, plaintext)
+
+        transport.write(lengthBytes + result.ciphertext + result.tag)
+        sendSequenceNumber++
+    }
+
+    /**
      * Calculate padding length according to RFC 4253 section 6.
      *
      * The padding length must be such that:
@@ -391,6 +483,24 @@ class PacketIO(private val transport: Transport) {
         // Ensure minimum padding of 4 bytes
         if (paddingLength < 4) {
             paddingLength += minBlockSize
+        }
+
+        return paddingLength
+    }
+
+    /**
+     * Calculate padding length for AEAD packets (RFC 5647).
+     *
+     * For AEAD, the 4-byte length field is AAD (not encrypted), so alignment
+     * is on packet_length (padding_length + payload + padding) only.
+     */
+    private fun calculateAeadPaddingLength(payloadLength: Int, blockSize: Int): Int {
+        val contentLength = 1 + payloadLength // padding_length byte + payload
+        val slack = contentLength % blockSize
+        var paddingLength = if (slack == 0) 0 else blockSize - slack
+
+        if (paddingLength < 4) {
+            paddingLength += blockSize
         }
 
         return paddingLength

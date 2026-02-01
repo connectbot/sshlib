@@ -39,8 +39,12 @@ RUN adduser -g 'Test User' -s /bin/sh -D $USERNAME && \
 RUN mkdir -p /run/openssh && \
     ssh-keygen -A && \
     sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    echo "KexAlgorithms +diffie-hellman-group14-sha256,diffie-hellman-group14-sha1" >> /etc/ssh/sshd_config && \
+    echo "HostKeyAlgorithms +ssh-rsa" >> /etc/ssh/sshd_config && \
+    echo "Ciphers +aes128-ctr,aes256-ctr" >> /etc/ssh/sshd_config && \
+    echo "MACs +hmac-sha2-256,hmac-sha2-512" >> /etc/ssh/sshd_config
 
 EXPOSE 22
 
-CMD ["/usr/sbin/sshd", "-D", "-e", "-oKexAlgorithms=diffie-hellman-group14-sha256"]
+CMD ["/usr/sbin/sshd", "-D", "-e"]
