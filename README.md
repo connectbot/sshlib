@@ -12,7 +12,7 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - **Protocol Parsing**: Complete SSH wire protocol coverage (RFCs 4250-4256,
   4419, 5656, 8308, 8709, 8731, 9142)
 - **Key Exchange**: diffie-hellman-group14-sha256, diffie-hellman-group14-sha1
-- **Encryption**: AES-128-CTR, AES-256-CTR with HMAC-SHA2-256/512
+- **Encryption**: AES-128-GCM, AES-256-GCM, AES-128-CTR, AES-256-CTR with HMAC-SHA2-256/512
 - **Authentication**: Password
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
@@ -76,26 +76,6 @@ switch (packet.payload().messageType()) {
         System.out.println("KEX algorithms: " + kexinit.kexAlgorithms());
         break;
 }
-```
-
-## Project Structure
-
-```
-ssh-proto/
-├── sshlib/                      # SSH library module
-│   └── src/main/
-│       ├── kotlin/org/connectbot/sshlib/
-│       │   ├── SshClient.kt           # Public async API
-│       │   ├── SshSession.kt          # Session interface (read/write/PTY)
-│       │   ├── SshClientConfig.kt     # Configuration DSL
-│       │   ├── blocking/              # Java-compatible blocking wrapper
-│       │   ├── client/                # SshConnection, SessionChannel
-│       │   ├── crypto/                # AES-CTR, HMAC, DH, key derivation
-│       │   ├── transport/             # Transport interface, Ktor TCP, PacketIO
-│       │   └── struct/                # State machine (KStateMachine)
-│       └── resources/kaitai/          # .ksy protocol definitions
-└── testapp/                     # CLI client and integration tests
-    └── src/main/kotlin/               # Interactive SSH CLI
 ```
 
 ## Current Limitations
