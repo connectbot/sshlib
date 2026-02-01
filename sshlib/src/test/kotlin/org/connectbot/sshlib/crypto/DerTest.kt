@@ -16,10 +16,12 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.math.BigInteger
+import kotlin.test.assertFailsWith
 
 class DerTest {
 
@@ -65,12 +67,39 @@ class DerTest {
     fun testReader() {
         val data = byteArrayOf(0x30, 0x06, 0x02, 0x01, 0x0A, 0x02, 0x01, 0x14)
         val reader = DerReader(data)
-        
+
         reader.readSequence { seq ->
             val v1 = seq.readInteger()
             val v2 = seq.readInteger()
             assertEquals(BigInteger.valueOf(10), v1)
             assertEquals(BigInteger.valueOf(20), v2)
+        }
+        reader.ensureFullyConsumed()
+    }
+
+    @Test
+    fun `rejects trailing bytes after DER data`() {
+        val data = byteArrayOf(0x30, 0x03, 0x02, 0x01, 0x0A, 0xFF.toByte())
+        val reader = DerReader(data)
+
+        reader.readSequence { seq ->
+            seq.readInteger()
+        }
+        assertFailsWith<SshException> {
+            reader.ensureFullyConsumed()
+        }
+    }
+
+    @Test
+    fun `rejects unconsumed bytes inside sequence`() {
+        // SEQUENCE length says 4 bytes, but only one INTEGER (3 bytes) is read
+        val data = byteArrayOf(0x30, 0x04, 0x02, 0x01, 0x0A, 0xFF.toByte())
+        val reader = DerReader(data)
+
+        assertFailsWith<SshException> {
+            reader.readSequence { seq ->
+                seq.readInteger()
+            }
         }
     }
 }
