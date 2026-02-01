@@ -25,14 +25,20 @@ import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 
 object Ed25519SignatureAlgorithm : SshSignatureAlgorithm {
+    private val ED25519_OID = byteArrayOf(0x2b, 0x65, 0x70) // 1.3.101.112
+
     override fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean {
         val keyBlob = pubKey.keyBlob() as SshEd25519PublicKeyBlob
         val rawKey = keyBlob.key().data()
 
-        val x509Prefix = byteArrayOf(
-            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
-        )
-        val x509Key = x509Prefix + rawKey
+        val x509Key = encodeDer {
+            sequence {
+                sequence {
+                    objectIdentifier(ED25519_OID)
+                }
+                bitString(rawKey)
+            }
+        }
         val keySpec = X509EncodedKeySpec(x509Key)
         val jcaKey = KeyFactory.getInstance("Ed25519").generatePublic(keySpec)
 

@@ -78,18 +78,10 @@ class EcdsaSignatureAlgorithmTest {
     }
 
     private fun parseDerEcdsaSignature(der: ByteArray): Pair<BigInteger, BigInteger> {
-        var offset = 2
-        if (der[1].toInt() and 0x80 != 0) {
-            offset = 2 + (der[1].toInt() and 0x7f)
+        val reader = DerReader(der)
+        return reader.readSequence { seq ->
+            seq.readInteger() to seq.readInteger()
         }
-        assert(der[offset] == 0x02.toByte())
-        val rLen = der[offset + 1].toInt() and 0xff
-        val r = BigInteger(1, der.copyOfRange(offset + 2, offset + 2 + rLen))
-        offset += 2 + rLen
-        assert(der[offset] == 0x02.toByte())
-        val sLen = der[offset + 1].toInt() and 0xff
-        val s = BigInteger(1, der.copyOfRange(offset + 2, offset + 2 + sLen))
-        return Pair(r, s)
     }
 
     private fun parse(hostKey: ByteArray, sshSig: ByteArray): Pair<SshPublicKey, SshSignature> {

@@ -58,11 +58,22 @@ class DerWriter {
     fun integer(i: BigInteger) {
         writeTag(0x02, i.toByteArray())
     }
-    
+
+    fun bitString(bytes: ByteArray) {
+        val content = ByteArray(1 + bytes.size)
+        content[0] = 0x00 // zero unused bits
+        System.arraycopy(bytes, 0, content, 1, bytes.size)
+        writeTag(0x03, content)
+    }
+
     fun octetString(bytes: ByteArray) {
         writeTag(0x04, bytes)
     }
-    
+
+    fun objectIdentifier(oid: ByteArray) {
+        writeTag(0x06, oid)
+    }
+
     fun nullValue() {
         buffer.write(0x05)
         buffer.write(0x00)
@@ -105,26 +116,36 @@ class DerWriter {
 class DerReader(private val data: ByteBuffer) {
     constructor(bytes: ByteArray) : this(ByteBuffer.wrap(bytes))
 
-    fun readSequence(block: (DerReader) -> Unit) {
+    fun <T> readSequence(block: (DerReader) -> T): T {
         val tag = data.get().toInt() and 0xFF
         if (tag != 0x30) {
             throw SshException("Expected SEQUENCE (0x30) but got 0x${tag.toString(16)}")
         }
         val length = readLength()
         val end = data.position() + length
-        
+
         // Create a limit slice for the sequence content
         val oldLimit = data.limit()
         data.limit(end)
-        
+
         try {
-            block(this)
+            val result = block(this)
+            if (data.position() != end) {
+                throw SshException("SEQUENCE has ${end - data.position()} unconsumed bytes")
+            }
+            return result
         } finally {
             data.limit(oldLimit)
             data.position(end)
         }
     }
-    
+
+    fun ensureFullyConsumed() {
+        if (data.hasRemaining()) {
+            throw SshException("${data.remaining()} trailing bytes after DER data")
+        }
+    }
+
     fun readInteger(): BigInteger {
         val tag = data.get().toInt() and 0xFF
         if (tag != 0x02) {
