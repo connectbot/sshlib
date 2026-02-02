@@ -48,6 +48,10 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 
 ### MACs
+- `hmac-sha2-512-etm@openssh.com` ([OpenSSH PROTOCOL](
+  https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
+- `hmac-sha2-256-etm@openssh.com` ([OpenSSH PROTOCOL](
+  https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
 - `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 - `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 

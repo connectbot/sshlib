@@ -87,6 +87,14 @@ class SshClientIntegrationTest {
             "rsa-sha2-256",
             "rsa-sha2-512",
         )
+
+        @JvmStatic
+        fun macAlgorithms() = listOf(
+            "hmac-sha2-256-etm@openssh.com",
+            "hmac-sha2-512-etm@openssh.com",
+            "hmac-sha2-256",
+            "hmac-sha2-512",
+        )
     }
 
     private val acceptAllVerifier = object : HostKeyVerifier {
@@ -289,6 +297,41 @@ class SshClientIntegrationTest {
 
             val shellRequested = runBlocking { session!!.requestShell() }
             assertTrue(shellRequested, "Should request shell with host key $algorithm")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @ParameterizedTest(name = "mac: {0}")
+    @MethodSource("macAlgorithms")
+    fun `should connect with mac algorithm`(algorithm: String) {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            // Use a non-AEAD cipher to ensure MAC is used
+            this.encryptionAlgorithms = "aes128-ctr"
+            this.macAlgorithms = algorithm
+        }
+        val client = BlockingSshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with MAC $algorithm")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate with MAC $algorithm"
+            )
+
+            val session = client.openSession()
+            assertNotNull(session, "Should open session with MAC $algorithm")
+
+            val shellRequested = runBlocking { session!!.requestShell() }
+            assertTrue(shellRequested, "Should request shell with MAC $algorithm")
 
             session!!.close()
         } finally {

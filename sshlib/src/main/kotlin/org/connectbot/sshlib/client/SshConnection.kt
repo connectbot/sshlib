@@ -57,7 +57,7 @@ class SshConnection(
         internal const val DEFAULT_KEX_ALGORITHMS = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
         internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
         internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc"
-        internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256,hmac-sha2-512"
+        internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512"
         private const val COMPRESSION_ALGORITHMS = "none"
 
         private fun kexHashAlgorithm(kexName: String): String = when {
@@ -92,6 +92,7 @@ class SshConnection(
     private var negotiatedEncryptionS2C: String? = null
     private var negotiatedMacC2S: String? = null
     private var negotiatedMacS2C: String? = null
+    private var strictKexEnabled: Boolean = false
 
     private var nextLocalChannelNumber = 0
     private val channels = mutableMapOf<Int, SessionChannel>()
@@ -358,6 +359,13 @@ class SshConnection(
         logger.debug("  Server MAC c->s: $serverMacC2S")
         logger.debug("  Server MAC s->c: $serverMacS2C")
 
+        val clientKexStrict = kexAlgorithms.contains("kex-strict-c-v00@openssh.com")
+        val serverKexStrict = serverKexAlgs.contains("kex-strict-s-v00@openssh.com")
+        strictKexEnabled = clientKexStrict && serverKexStrict
+        if (strictKexEnabled) {
+            logger.info("  Strict KEX enabled")
+        }
+
         val clientKexList = kexAlgorithms.split(",")
         negotiatedKex = clientKexList.firstOrNull { it in serverKexAlgs }
             ?: throw SshException("No matching KEX algorithm. Client: $kexAlgorithms, Server: $serverKexAlgs")
@@ -532,15 +540,17 @@ class SshConnection(
         logger.debug("Sending NEW_KEYS")
         runBlocking {
             packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
-            // TODO check if we're using strict KEX
-            packetIO.resetSendSequenceNumber()
+            if (strictKexEnabled) {
+                packetIO.resetSendSequenceNumber()
+            }
         }
     }
 
     override fun receiveNewKeys() {
         logger.info("Received NEW_KEYS from server")
-        // TODO check if we're using strict KEX
-        packetIO.resetReceiveSequenceNumber()
+        if (strictKexEnabled) {
+            packetIO.resetReceiveSequenceNumber()
+        }
     }
 
     override fun activateEncryption() {
@@ -655,7 +665,9 @@ class SshConnection(
             clientToServerCipher,
             clientToServerMac,
             serverToClientCipher,
-            serverToClientMac
+            serverToClientMac,
+            clientToServerEtm = macC2S.endsWith("-etm@openssh.com"),
+            serverToClientEtm = macS2C.endsWith("-etm@openssh.com")
         )
     }
 
@@ -679,8 +691,8 @@ class SshConnection(
 
     private fun createMac(algorithm: String, key: ByteArray): PacketMac {
         return when (algorithm) {
-            "hmac-sha2-256" -> HmacSha256(key.copyOf(32))
-            "hmac-sha2-512" -> HmacSha512(key.copyOf(64))
+            "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com" -> HmacSha256(key.copyOf(32))
+            "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com" -> HmacSha512(key.copyOf(64))
             else -> throw SshException("Unknown MAC algorithm: $algorithm")
         }
     }
