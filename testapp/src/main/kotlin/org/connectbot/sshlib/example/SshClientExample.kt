@@ -20,6 +20,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import kotlinx.coroutines.*
 import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.KnownHostsVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
@@ -45,17 +46,6 @@ fun main(args: Array<String>) =
         val (user, host, port) = parsed
 
         val console = System.console()
-        val password =
-            if (console != null) {
-                String(console.readPassword("Password: "))
-            } else {
-                System.err.println("Warning: no console available, reading password from stdin")
-                print("Password: ")
-                readlnOrNull() ?: run {
-                    System.err.println("No password provided")
-                    return@runBlocking
-                }
-            }
 
         val config = SshClientConfig {
             this.host = host
@@ -69,9 +59,50 @@ fun main(args: Array<String>) =
                 return@runBlocking
             }
 
-            if (!client.authenticatePassword(user, password)) {
-                System.err.println("Authentication failed")
-                return@runBlocking
+            val kbdCallback = object : KeyboardInteractiveCallback {
+                override suspend fun onInfoRequest(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                    respond: suspend (responses: List<String>) -> Unit
+                ) {
+                    if (name.isNotEmpty()) System.err.println(name)
+                    if (instruction.isNotEmpty()) System.err.println(instruction)
+
+                    val responses = prompts.map { prompt ->
+                        if (prompt.echo) {
+                            System.err.print(prompt.text)
+                            System.err.flush()
+                            readlnOrNull() ?: ""
+                        } else if (console != null) {
+                            String(console.readPassword(prompt.text))
+                        } else {
+                            System.err.print(prompt.text)
+                            System.err.flush()
+                            readlnOrNull() ?: ""
+                        }
+                    }
+                    respond(responses)
+                }
+            }
+
+            if (!client.authenticateKeyboardInteractive(user, kbdCallback)) {
+                // Fall back to password auth
+                val password = if (console != null) {
+                    String(console.readPassword("Password: "))
+                } else {
+                    System.err.println("Warning: no console available, reading password from stdin")
+                    print("Password: ")
+                    readlnOrNull() ?: run {
+                        System.err.println("No password provided")
+                        return@runBlocking
+                    }
+                }
+
+                if (!client.authenticatePassword(user, password)) {
+                    System.err.println("Authentication failed")
+                    return@runBlocking
+                }
             }
 
             val session = client.openSession()

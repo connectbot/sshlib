@@ -59,6 +59,8 @@ class SshClientStateMachine(
         data class ReceiveServiceAccept(val service: String) : SshEvent()
         object AuthenticationSuccess : SshEvent()
         object AuthenticationFailure : SshEvent()
+        data class ReceiveUserauthInfoRequest(val msg: SshMsgUserauthInfoRequest) : SshEvent()
+        data class ReceiveUserauthBanner(val msg: SshMsgUserauthBanner) : SshEvent()
         data class OpenChannel(
             val channelType: String,
             val localChannelNumber: Int,
@@ -204,6 +206,18 @@ class SshClientStateMachine(
                     callbacks.authenticationFailure()
                 }
             }
+
+            transition<SshEvent.ReceiveUserauthInfoRequest> {
+                onTriggered {
+                    callbacks.receiveUserauthInfoRequest(it.event.msg)
+                }
+            }
+
+            transition<SshEvent.ReceiveUserauthBanner> {
+                onTriggered {
+                    callbacks.receiveUserauthBanner(it.event.msg)
+                }
+            }
         }
 
         authenticated {
@@ -327,6 +341,8 @@ interface SshClientCallbacks {
     fun startAuthentication()
     fun authenticationSuccess()
     fun authenticationFailure()
+    fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest)
+    fun receiveUserauthBanner(msg: SshMsgUserauthBanner)
     fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int)
     fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation)
     fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure)

@@ -21,6 +21,7 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 ## Algorithm Support
 
 ### Authentication
+- `keyboard-interactive`
 - `password`
 
 ### Host Keys

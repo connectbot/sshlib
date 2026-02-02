@@ -18,6 +18,7 @@ package org.connectbot.sshlib.blocking
 
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
@@ -96,6 +97,18 @@ class BlockingSshClient private constructor(
      */
     fun authenticatePassword(username: String, password: String): Boolean =
         runBlocking { client.authenticatePassword(username, password) }
+
+    /**
+     * Authenticate using keyboard-interactive authentication (RFC 4256).
+     *
+     * @param username SSH username
+     * @param callback Receives prompts from the server and provides responses
+     * @return true if authentication succeeded
+     */
+    fun authenticateKeyboardInteractive(
+        username: String,
+        callback: KeyboardInteractiveCallback
+    ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) }
 
     /**
      * Check if connected and authenticated.
