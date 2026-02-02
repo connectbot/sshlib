@@ -68,6 +68,8 @@ class SshClientIntegrationTest {
             "aes256-gcm@openssh.com",
             "aes128-ctr",
             "aes256-ctr",
+            "aes128-cbc",
+            "aes256-cbc",
             "3des-cbc",
         )
 
