@@ -56,7 +56,7 @@ class SshConnection(
 
         internal const val DEFAULT_KEX_ALGORITHMS = "diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
         internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
-        internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,3des-cbc"
+        internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc"
         internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256,hmac-sha2-512"
         private const val COMPRESSION_ALGORITHMS = "none"
 
@@ -599,8 +599,8 @@ class SshConnection(
 
     private fun getCipherParams(cipherName: String): Pair<Int, Int> {
         return when (cipherName) {
-            "aes128-ctr" -> 16 to 16
-            "aes256-ctr" -> 32 to 16
+            "aes128-ctr", "aes128-cbc" -> 16 to 16
+            "aes256-ctr", "aes256-cbc" -> 32 to 16
             "3des-cbc" -> 24 to 8
             else -> throw SshException("Unknown cipher: $cipherName")
         }
@@ -609,6 +609,7 @@ class SshConnection(
     private fun createCipher(algorithm: String, key: ByteArray, iv: ByteArray, forEncryption: Boolean): PacketCipher {
         return when (algorithm) {
             "aes128-ctr", "aes256-ctr" -> AesCtrCipher(key, iv, forEncryption)
+            "aes128-cbc", "aes256-cbc" -> AesCbcCipher(key, iv, forEncryption)
             "3des-cbc" -> TripleDesCbcCipher(key, iv, forEncryption)
             else -> throw SshException("Unknown cipher: $algorithm")
         }
