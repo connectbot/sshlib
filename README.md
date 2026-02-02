@@ -14,12 +14,32 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - **SSH Client**: Connect, authenticate, open shell sessions, read/write data
 - **Protocol Parsing**: Complete SSH wire protocol coverage (RFCs 4250-4256,
   4419, 5656, 8308, 8709, 8731, 9142)
-- **Key Exchange**: diffie-hellman-group14-sha256, diffie-hellman-group14-sha1
-- **Encryption**: AES-128-GCM, AES-256-GCM, AES-128-CTR, AES-256-CTR with HMAC-SHA2-256/512
-- **Authentication**: Password
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
 - **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
+
+## Algorithm Support
+
+### Authentication
+- `password`
+
+### Host Keys
+- `rsa-sha2-512`
+- `rsa-sha2-256`
+
+### Key Exchange
+- `diffie-hellman-group14-sha256` ([RFC 8268](https://tools.ietf.org/html/rfc8268))
+- `diffie-hellman-group14-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
+
+### Encryption
+- `aes256-gcm@openssh.com` ([RFC 5647](https://tools.ietf.org/html/rfc5647), [draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
+- `aes128-gcm@openssh.com` ([RFC 5647](https://tools.ietf.org/html/rfc5647), [draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
+- `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
+- `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
+
+### MACs
+- `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
+- `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 
 ## Quick Start
 
