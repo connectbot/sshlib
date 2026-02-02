@@ -36,20 +36,6 @@ import org.testcontainers.junit.jupiter.Testcontainers
 
 /**
  * Integration tests for SSH client using testcontainers with real SSH servers.
- *
- * NOTE: These tests currently fail due to issues in the SSH protocol implementation.
- * The client can be built and used programmatically, but needs debugging to work
- * with real SSH servers.
- *
- * Known issues to investigate:
- * - Key exchange negotiation may not match server expectations
- * - Packet framing/encryption activation timing
- * - Server key verification not implemented
- *
- * To enable these tests for debugging:
- * 1. Remove the @Disabled annotation
- * 2. Ensure Docker is installed and running
- * 3. Add detailed logging to SshConnection and PacketIO
  */
 @Testcontainers
 class SshClientIntegrationTest {
@@ -82,6 +68,7 @@ class SshClientIntegrationTest {
             "aes256-gcm@openssh.com",
             "aes128-ctr",
             "aes256-ctr",
+            "3des-cbc",
         )
 
         @JvmStatic
