@@ -55,8 +55,11 @@ that runs in reaction to state changes.
   https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
 - `hmac-sha2-256-etm@openssh.com` ([OpenSSH PROTOCOL](
   https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
+- `hmac-sha1-etm@openssh.com` ([OpenSSH PROTOCOL](
+  https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
 - `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 - `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
+- `hmac-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253))
 
 ## Quick Start
 

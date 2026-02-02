@@ -57,7 +57,7 @@ class SshConnection(
         internal const val DEFAULT_KEX_ALGORITHMS = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
         internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
         internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc"
-        internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512"
+        internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1-etm@openssh.com,hmac-sha1"
         private const val COMPRESSION_ALGORITHMS = "none"
 
         private fun kexHashAlgorithm(kexName: String): String = when {
@@ -625,7 +625,8 @@ class SshConnection(
 
         val macKeyLength = when {
             macC2S.startsWith("hmac-sha2-512") || macS2C.startsWith("hmac-sha2-512") -> 64
-            else -> 32
+            macC2S.startsWith("hmac-sha2-256") || macS2C.startsWith("hmac-sha2-256") -> 32
+            else -> 20
         }
 
         val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
@@ -691,6 +692,7 @@ class SshConnection(
 
     private fun createMac(algorithm: String, key: ByteArray): PacketMac {
         return when (algorithm) {
+            "hmac-sha1", "hmac-sha1-etm@openssh.com" -> HmacSha1(key.copyOf(20))
             "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com" -> HmacSha256(key.copyOf(32))
             "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com" -> HmacSha512(key.copyOf(64))
             else -> throw SshException("Unknown MAC algorithm: $algorithm")
