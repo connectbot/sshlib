@@ -54,13 +54,16 @@ class SshConnection(
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
 
-        internal const val DEFAULT_KEX_ALGORITHMS = "diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
+        internal const val DEFAULT_KEX_ALGORITHMS = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
         internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
         internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc"
         internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256,hmac-sha2-512"
         private const val COMPRESSION_ALGORITHMS = "none"
 
         private fun kexHashAlgorithm(kexName: String): String = when {
+            kexName == "ecdh-sha2-nistp256" -> "SHA-256"
+            kexName == "ecdh-sha2-nistp384" -> "SHA-384"
+            kexName == "ecdh-sha2-nistp521" -> "SHA-512"
             kexName.endsWith("-sha1") -> "SHA-1"
             kexName.endsWith("-sha256") -> "SHA-256"
             kexName.endsWith("-sha512") -> "SHA-512"
@@ -78,7 +81,7 @@ class SshConnection(
     private var clientKexInit: ByteArray? = null
     private var serverKexInit: ByteArray? = null
 
-    private val dh = DiffieHellman()
+    private var kex: KexAlgorithm? = null
     private var clientPublicKey: ByteArray? = null
     private var sharedSecret: ByteArray? = null
     private var exchangeHash: ByteArray? = null
@@ -132,23 +135,29 @@ class SshConnection(
             serverKexInit = byteArrayOf(kexInitMsgType) + kexInitPacket._raw_body()
 
             dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
-            // Note: ReceiveKexInit transition triggers sendKexDhInit() via state machine
+            // Note: ReceiveKexInit transition triggers sendKexInit() via state machine
 
-            // Diffie-Hellman key exchange - read server's DH_REPLY
+            // Key exchange - read server's reply
             // KEX-specific messages (30-49) need special parsing based on negotiated algorithm
-            val dhReplyPacket = packetIO.readPacket()
+            val kexReplyPacket = packetIO.readPacket()
+            val messageTypeByte = kexReplyPacket.messageType().id().toByte()
+            val rawBody = byteArrayOf(messageTypeByte) + kexReplyPacket._raw_body()
 
-            // Re-parse as KEXDH payload since we negotiated diffie-hellman-group14
-            // _raw_body() excludes the message type byte, so we need to prepend it
-            val messageTypeByte = dhReplyPacket.messageType().id().toByte()
-            val rawBody = byteArrayOf(messageTypeByte) + dhReplyPacket._raw_body()
-            val kexdhStream = ByteBufferKaitaiStream(rawBody)
-            val kexdhPayload = KexdhPayload(kexdhStream)
-            kexdhPayload._read()
-            val dhReply = kexdhPayload.body() as SshMsgKexdhReply
-
-            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
-            // Note: ReceiveKex.DhReply transition triggers sendNewKeys() via state machine
+            val negotiated = negotiatedKex
+                ?: throw SshException("No KEX algorithm negotiated")
+            if (negotiated.startsWith("ecdh-sha2-")) {
+                val ecdhStream = ByteBufferKaitaiStream(rawBody)
+                val ecdhPayload = KexEcdhPayload(ecdhStream)
+                ecdhPayload._read()
+                val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
+            } else {
+                val kexdhStream = ByteBufferKaitaiStream(rawBody)
+                val kexdhPayload = KexdhPayload(kexdhStream)
+                kexdhPayload._read()
+                val dhReply = kexdhPayload.body() as SshMsgKexdhReply
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+            }
 
             // New keys - read server's NEWKEYS
             val newKeysPacket = packetIO.readPacket()
@@ -389,52 +398,103 @@ class SshConnection(
         }
     }
 
-    override fun sendKexDhInit() {
+    override fun sendKexExchangeInit() {
+        val kex = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
+        if (kex.startsWith("ecdh-sha2-")) {
+            sendKexEcdhInit(kex)
+        } else {
+            sendKexDhInit()
+        }
+    }
+
+    private fun sendKexDhInit() {
+        val negotiated = negotiatedKex
+            ?: throw SshException("No KEX algorithm negotiated")
+        val hashAlg = kexHashAlgorithm(negotiated)
         logger.debug("Sending DH_INIT")
 
-        // Generate client's DH key pair
+        val dh = DiffieHellman(hashAlg)
+        kex = dh
         clientPublicKey = dh.generateClientKeys()
 
+        val pubKey = clientPublicKey
+            ?: throw SshException("Client public key not generated")
+
         val msg = SshMsgKexdhInit()
-        msg.setE(createMpint(clientPublicKey!!))
+        msg.setE(createMpint(pubKey))
 
         runBlocking {
             packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), toByteArray(msg))
         }
     }
 
+    private fun sendKexEcdhInit(kexName: String) {
+        val curveName = kexName.removePrefix("ecdh-sha2-")
+        logger.debug("Sending ECDH_INIT (curve=$curveName)")
+
+        val ecdh = EcdhKeyExchange(curveName)
+        kex = ecdh
+        clientPublicKey = ecdh.generateClientKeys()
+
+        val pubKey = clientPublicKey
+            ?: throw SshException("Client public key not generated")
+
+        val msg = SshMsgKexEcdhInit()
+        msg.setQC(createByteString(pubKey))
+
+        runBlocking {
+            packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), toByteArray(msg))
+        }
+    }
+
     override fun receiveKexDhReply(msg: SshMsgKexdhReply) {
         logger.info("Received DH_REPLY from server")
+        completeKex(
+            serverHostKey = msg.serverKey().data(),
+            serverPublicKey = msg.f().body(),
+            signature = msg.signatureH().data()
+        )
+    }
 
-        // Extract server's public key and signature
-        val serverHostKey = msg.serverKey().data()
-        val serverPublicKey = msg.f().body()
-        val signature = msg.signatureH().data()
+    override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
+        logger.info("Received ECDH_REPLY from server")
+        completeKex(
+            serverHostKey = msg.kS().data(),
+            serverPublicKey = msg.qS().data(),
+            signature = msg.signatureH().data()
+        )
+    }
 
-        // Compute shared secret
-        sharedSecret = dh.computeSharedSecret(serverPublicKey)
+    private fun completeKex(serverHostKey: ByteArray, serverPublicKey: ByteArray, signature: ByteArray) {
+        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+        val sv = serverVersion ?: throw SshException("Server version not received")
+        val cki = clientKexInit ?: throw SshException("Client KEX_INIT not sent")
+        val ski = serverKexInit ?: throw SshException("Server KEX_INIT not received")
+        val cpk = clientPublicKey ?: throw SshException("Client public key not generated")
 
-        // Compute exchange hash
-        val kex = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
-        val hashAlg = kexHashAlgorithm(kex)
-        exchangeHash = dh.computeExchangeHash(
+        sharedSecret = kexAlg.computeSharedSecret(serverPublicKey)
+
+        val secret = sharedSecret
+            ?: throw SshException("Shared secret computation failed")
+
+        exchangeHash = kexAlg.computeExchangeHash(
             clientVersion.toByteArray(),
-            serverVersion!!.toByteArray(),
-            clientKexInit!!,
-            serverKexInit!!,
+            sv.toByteArray(),
+            cki,
+            ski,
             serverHostKey,
-            clientPublicKey!!,
+            cpk,
             serverPublicKey,
-            sharedSecret!!,
-            hashAlg
+            secret
         )
 
-        // Session ID is the exchange hash from first key exchange
+        val hash = exchangeHash
+            ?: throw SshException("Exchange hash computation failed")
+
         if (sessionId == null) {
-            sessionId = exchangeHash
+            sessionId = hash
         }
 
-        // Verify server host key
         val keyType = try {
             val stream = ByteBufferKaitaiStream(serverHostKey)
             val str = AsciiString(stream)
@@ -457,17 +517,11 @@ class SshConnection(
         }
         logger.info("Host key verified")
 
-        if (!SignatureVerifier.verify(serverHostKey, signature, exchangeHash!!)) {
+        if (!SignatureVerifier.verify(serverHostKey, signature, hash)) {
             logger.error("Server signature verification failed")
             throw SshException("Server signature verification failed")
         }
         logger.info("Server signature verified")
-    }
-
-
-
-    override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
-        logger.warn("ECDH not implemented yet")
     }
 
     override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
@@ -522,12 +576,16 @@ class SshConnection(
 
         val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
 
-        val hashAlg = kexHashAlgorithm(negotiatedKex ?: throw SshException("No KEX algorithm negotiated"))
+        val secret = sharedSecret ?: throw SshException("Shared secret not computed")
+        val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
+        val sid = sessionId ?: throw SshException("Session ID not established")
+        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+
         val keyDerivation = KeyDerivation(
-            sharedSecret!!,
-            exchangeHash!!,
-            sessionId!!,
-            hashAlg
+            secret,
+            hash,
+            sid,
+            kexAlg.hashAlgorithm
         )
 
         // AEAD: 12-byte IV, key per algorithm, no integrity key needed
@@ -563,12 +621,16 @@ class SshConnection(
         val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
         val ivLength = maxOf(ivLengthC2S, ivLengthS2C)
 
-        val hashAlg = kexHashAlgorithm(negotiatedKex ?: throw SshException("No KEX algorithm negotiated"))
+        val secret = sharedSecret ?: throw SshException("Shared secret not computed")
+        val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
+        val sid = sessionId ?: throw SshException("Session ID not established")
+        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+
         val keyDerivation = KeyDerivation(
-            sharedSecret!!,
-            exchangeHash!!,
-            sessionId!!,
-            hashAlg
+            secret,
+            hash,
+            sid,
+            kexAlg.hashAlgorithm
         )
 
         val keys = keyDerivation.deriveKeys(
