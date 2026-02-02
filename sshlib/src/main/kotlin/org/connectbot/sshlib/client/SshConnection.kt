@@ -336,7 +336,8 @@ class SshConnection(
         sharedSecret = dh.computeSharedSecret(serverPublicKey)
 
         // Compute exchange hash
-        val hashAlg = kexHashAlgorithm(negotiatedKex ?: "diffie-hellman-group14-sha256")
+        val kex = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
+        val hashAlg = kexHashAlgorithm(kex)
         exchangeHash = dh.computeExchangeHash(
             clientVersion.toByteArray(),
             serverVersion!!.toByteArray(),
@@ -442,7 +443,7 @@ class SshConnection(
 
         val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
 
-        val hashAlg = kexHashAlgorithm(negotiatedKex ?: "diffie-hellman-group14-sha256")
+        val hashAlg = kexHashAlgorithm(negotiatedKex ?: throw SshException("No KEX algorithm negotiated"))
         val keyDerivation = KeyDerivation(
             sharedSecret!!,
             exchangeHash!!,
@@ -490,7 +491,7 @@ class SshConnection(
 
         val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
 
-        val hashAlg = kexHashAlgorithm(negotiatedKex ?: "diffie-hellman-group14-sha256")
+        val hashAlg = kexHashAlgorithm(negotiatedKex ?: throw SshException("No KEX algorithm negotiated"))
         val keyDerivation = KeyDerivation(
             sharedSecret!!,
             exchangeHash!!,
