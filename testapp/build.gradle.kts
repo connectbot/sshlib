@@ -25,14 +25,14 @@ application {
 
 dependencies {
     implementation(project(":sshlib"))
-    implementation("ch.qos.logback:logback-classic:1.5.26")
+    implementation("ch.qos.logback:logback-classic:1.5.27")
 
     // Integration test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.0.2")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.3")
     testImplementation("org.testcontainers:testcontainers:2.0.3")
-    testImplementation("ch.qos.logback:logback-classic:1.5.26")
+    testImplementation("ch.qos.logback:logback-classic:1.5.27")
     testImplementation(kotlin("test"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.2")
 }
