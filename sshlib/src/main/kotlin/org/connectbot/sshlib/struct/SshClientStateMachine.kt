@@ -129,7 +129,7 @@ class SshClientStateMachine(
                 targetState = waitKex
                 onTriggered {
                     callbacks.receiveKexInit(it.event.msg)
-                    callbacks.sendKexDhInit()
+                    callbacks.sendKexExchangeInit()
                 }
             }
         }
@@ -329,7 +329,7 @@ interface SshClientCallbacks {
     fun receiveVersion(banner: IdBanner)
     fun sendKexInit()
     fun receiveKexInit(msg: SshMsgKexinit)
-    fun sendKexDhInit()
+    fun sendKexExchangeInit()
     fun receiveKexDhReply(msg: SshMsgKexdhReply)
     fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
     fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply)
