@@ -29,13 +29,8 @@ object SignatureVerifier {
         val pubKey = SshPublicKey(ByteBufferKaitaiStream(serverHostKey))
         pubKey._read()
 
-        val algorithm = when (sig.algorithmName()) {
-            "ssh-rsa", "rsa-sha2-256", "rsa-sha2-512" -> RsaSignatureAlgorithm
-            "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521" -> EcdsaSignatureAlgorithm
-            "ssh-ed25519" -> Ed25519SignatureAlgorithm
-            "ssh-ed448" -> Ed448SignatureAlgorithm
-            else -> return false
-        }
+        val algorithm = SignatureEntry.fromSshName(sig.algorithmName())?.algorithm
+            ?: return false
 
         return algorithm.verify(pubKey, sig, exchangeHash)
     }
