@@ -55,7 +55,7 @@ class SshConnection(
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
 
         internal const val DEFAULT_KEX_ALGORITHMS = "diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
-        internal const val DEFAULT_HOST_KEY_ALGORITHMS = "rsa-sha2-256,rsa-sha2-512,ssh-rsa"
+        internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
         internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr"
         internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256,hmac-sha2-512"
         private const val COMPRESSION_ALGORITHMS = "none"
