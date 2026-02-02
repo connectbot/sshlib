@@ -64,7 +64,7 @@ class SshClientConfig private constructor(
         /**
          * Client version string sent during SSH handshake.
          */
-        var clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+        var clientVersion: String = "SSH-2.0-CBSSH_1.0"
 
         /**
          * Host key verifier.

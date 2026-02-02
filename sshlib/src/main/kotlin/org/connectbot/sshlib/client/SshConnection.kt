@@ -39,11 +39,11 @@ import org.slf4j.LoggerFactory
  * implementations to handle a complete SSH connection lifecycle.
  *
  * @param transport Underlying transport (e.g., TCP socket)
- * @param clientVersion Client version string (default: SSH-2.0-SshProtoClient_1.0)
+ * @param clientVersion Client version string (default: SSH-2.0-CBSSH_1.0)
  */
 class SshConnection(
     private val transport: Transport,
-    private val clientVersion: String = "SSH-2.0-SshProtoClient_1.0",
+    private val clientVersion: String = "SSH-2.0-CBSSH_1.0",
     private val hostKeyVerifier: HostKeyVerifier,
     private val kexAlgorithms: String = DEFAULT_KEX_ALGORITHMS,
     private val hostKeyAlgorithms: String = DEFAULT_HOST_KEY_ALGORITHMS,

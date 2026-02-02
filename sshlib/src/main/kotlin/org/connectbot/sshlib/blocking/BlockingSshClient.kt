@@ -60,7 +60,7 @@ class BlockingSshClient private constructor(
         host: String,
         port: Int = 22,
         hostKeyVerifier: HostKeyVerifier,
-        clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+        clientVersion: String = "SSH-2.0-CBSSH_1.0"
     ) : this(SshClientConfig {
         this.host = host
         this.port = port
@@ -78,7 +78,7 @@ class BlockingSshClient private constructor(
      */
     constructor(
         transportFactory: TransportFactory,
-        clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+        clientVersion: String = "SSH-2.0-CBSSH_1.0"
     ) : this(SshClient(transportFactory, clientVersion))
 
     /**
