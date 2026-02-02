@@ -1,13 +1,16 @@
 # ConnectBot SSH Client Library *(IN PROGRESS)*
 
-This is ConnectBot SSH library built with Kotlin coroutines and Kaitai Struct. It
-connects to SSH servers, authenticates, and provides interactive shell sessions with
-channel data I/O. *This is currently a work-in-progress and not meant to be used for
+*This is currently a work-in-progress and not meant to be used for
 production.*
+
+This is ConnectBot SSH library built with Kotlin. Internally it uses coroutines,
+protocol definition files, and a state machine to run the SSH protocol. It can
+connects to SSH servers, authenticates, and provide interactive shell sessions.
 
 The protocol parsing uses declarative Kaitai Struct specifications
 that auto-generate code from `.ksy` definitions. The internal state machine is
-defined in KStateMachine for easier reasoning of possible state transitions.
+defined in KStateMachine for clear separation of protocol states from the code
+that runs in reaction to state changes.
 
 ## Features
 
@@ -30,9 +33,9 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - `ecdsa-sha2-nistp256` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
 - `ecdsa-sha2-nistp384` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
 - `ecdsa-sha2-nistp521` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
-- `rsa-sha2-512`
-- `rsa-sha2-256`
-- `ssh-rsa`
+- `rsa-sha2-512` ([RFC 8332](https://tools.ietf.org/html/rfc8332#section-3))
+- `rsa-sha2-256` ([RFC 8332](https://tools.ietf.org/html/rfc8332#section-3))
+- `ssh-rsa` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
 
 ### Key Exchange
 - `ecdh-sha2-nistp521` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
@@ -42,16 +45,16 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - `diffie-hellman-group14-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
 
 ### Encryption
-- `aes256-gcm@openssh.com` ([RFC 5647](https://tools.ietf.org/html/rfc5647), [draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
-- `aes128-gcm@openssh.com` ([RFC 5647](https://tools.ietf.org/html/rfc5647), [draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
+- `aes256-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
+- `aes128-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 - `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 
 ### MACs
 - `hmac-sha2-512-etm@openssh.com` ([OpenSSH PROTOCOL](
-  https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
+  https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
 - `hmac-sha2-256-etm@openssh.com` ([OpenSSH PROTOCOL](
-  https://github.com/openssh/openssh-portable/blob/e1b26ce504662a5d5b991091228984ccfd25f280/PROTOCOL#L54))
+  https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
 - `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 - `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
 
