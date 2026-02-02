@@ -43,6 +43,10 @@ import kotlin.random.Random
 class PacketIO(private val transport: Transport) {
     companion object {
         private val logger = LoggerFactory.getLogger(PacketIO::class.java)
+
+        // Minimum packet_length: padding_length(1) + message_type(1) + min_padding(4) = 6
+        private const val MIN_PACKET_LENGTH = 6
+        private const val MAX_PACKET_LENGTH = 35000
     }
 
     // Separate ciphers and MACs for each direction
@@ -55,8 +59,9 @@ class PacketIO(private val transport: Transport) {
     private var sendAead: PacketAead? = null
     private var receiveAead: PacketAead? = null
 
-    // Whether to use ETM (Encrypt-then-MAC) mode
-    private var useEtm: Boolean = false
+    // Whether to use ETM (Encrypt-then-MAC) mode for each direction
+    private var sendEtm: Boolean = false
+    private var receiveEtm: Boolean = false
 
     // Separate sequence numbers for each direction (client->server and server->client)
     private var sendSequenceNumber: Long = 0
@@ -69,20 +74,23 @@ class PacketIO(private val transport: Transport) {
      * @param clientToServerMac MAC for outgoing packets
      * @param serverToClientCipher Cipher for incoming packets
      * @param serverToClientMac MAC for incoming packets
-     * @param etm Whether to use ETM (Encrypt-then-MAC) mode. Default is false (encrypt-and-MAC).
+     * @param clientToServerEtm Whether to use ETM for outgoing packets
+     * @param serverToClientEtm Whether to use ETM for incoming packets
      */
     fun enableEncryption(
         clientToServerCipher: PacketCipher,
         clientToServerMac: PacketMac,
         serverToClientCipher: PacketCipher,
         serverToClientMac: PacketMac,
-        etm: Boolean = false
+        clientToServerEtm: Boolean = false,
+        serverToClientEtm: Boolean = false
     ) {
         this.sendCipher = clientToServerCipher
         this.sendMac = clientToServerMac
         this.receiveCipher = serverToClientCipher
         this.receiveMac = serverToClientMac
-        this.useEtm = etm
+        this.sendEtm = clientToServerEtm
+        this.receiveEtm = serverToClientEtm
     }
 
     /**
@@ -132,7 +140,7 @@ class PacketIO(private val transport: Transport) {
 
         if (currentCipher == null || currentMac == null) {
             return readUnencryptedPacket()
-        } else if (useEtm) {
+        } else if (receiveEtm) {
             return readEtmPacket(currentCipher, currentMac)
         } else {
             return readEncryptedPacket(currentCipher, currentMac)
@@ -144,7 +152,7 @@ class PacketIO(private val transport: Transport) {
         val lengthBytes = transport.read(4)
         val packetLength = ByteBuffer.wrap(lengthBytes).int
 
-        if (packetLength < 12 || packetLength > 35000) {
+        if (packetLength < MIN_PACKET_LENGTH || packetLength > MAX_PACKET_LENGTH) {
             throw TransportException("Invalid packet length: $packetLength")
         }
 
@@ -174,7 +182,7 @@ class PacketIO(private val transport: Transport) {
         // Extract packet_length
         val packetLength = ByteBuffer.wrap(decryptedFirst, 0, 4).int
 
-        if (packetLength < 12 || packetLength > 35000) {
+        if (packetLength < MIN_PACKET_LENGTH || packetLength > MAX_PACKET_LENGTH) {
             throw TransportException("Invalid encrypted packet length: $packetLength")
         }
 
@@ -231,7 +239,7 @@ class PacketIO(private val transport: Transport) {
         val lengthBytes = transport.read(4)
         val encryptedLength = ByteBuffer.wrap(lengthBytes).int
 
-        if (encryptedLength < 12 || encryptedLength > 35000) {
+        if (encryptedLength < MIN_PACKET_LENGTH || encryptedLength > MAX_PACKET_LENGTH) {
             throw TransportException("Invalid ETM packet length: $encryptedLength")
         }
 
@@ -272,7 +280,7 @@ class PacketIO(private val transport: Transport) {
         val lengthBytes = transport.read(4)
         val packetLength = ByteBuffer.wrap(lengthBytes).int
 
-        if (packetLength < 12 || packetLength > 35000) {
+        if (packetLength < MIN_PACKET_LENGTH || packetLength > MAX_PACKET_LENGTH) {
             throw TransportException("Invalid AEAD packet length: $packetLength")
         }
 
@@ -308,7 +316,7 @@ class PacketIO(private val transport: Transport) {
 
         if (currentCipher == null || currentMac == null) {
             writeUnencryptedPacket(messageType, payload)
-        } else if (useEtm) {
+        } else if (sendEtm) {
             writeEtmPacket(messageType, payload, currentCipher, currentMac)
         } else {
             writeEncryptedPacket(messageType, payload, currentCipher, currentMac)
@@ -406,8 +414,8 @@ class PacketIO(private val transport: Transport) {
         val payloadLength = 1 + payload.size
         val blockSize = cipher.blockSize
 
-        // Calculate padding
-        val paddingLength = calculatePaddingLength(payloadLength, blockSize)
+        // Calculate padding (length field is not encrypted in ETM)
+        val paddingLength = calculateAeadPaddingLength(payloadLength, blockSize)
         val packetLength = 1 + payloadLength + paddingLength
 
         // Build the payload to encrypt (padding_length + message type + payload + padding)
@@ -489,10 +497,10 @@ class PacketIO(private val transport: Transport) {
     }
 
     /**
-     * Calculate padding length for AEAD packets (RFC 5647).
+     * Calculate padding length for ETM/AEAD packets.
      *
-     * For AEAD, the 4-byte length field is AAD (not encrypted), so alignment
-     * is on packet_length (padding_length + payload + padding) only.
+     * For ETM and AEAD, the 4-byte length field is not encrypted, so alignment
+     * is on the encrypted portion (padding_length + payload + padding) only.
      */
     private fun calculateAeadPaddingLength(payloadLength: Int, blockSize: Int): Int {
         val contentLength = 1 + payloadLength // padding_length byte + payload

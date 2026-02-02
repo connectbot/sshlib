@@ -45,7 +45,7 @@ RUN mkdir -p /run/openssh && \
     echo "KexAlgorithms +diffie-hellman-group14-sha256,diffie-hellman-group14-sha1" >> /etc/ssh/sshd_config && \
     echo "HostKeyAlgorithms +ssh-rsa" >> /etc/ssh/sshd_config && \
     echo "Ciphers +aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc" >> /etc/ssh/sshd_config && \
-    echo "MACs +hmac-sha2-256,hmac-sha2-512" >> /etc/ssh/sshd_config && \
+    echo "MACs +hmac-sha2-256,hmac-sha2-512,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com" >> /etc/ssh/sshd_config && \
     echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "UsePAM yes" >> /etc/ssh/sshd_config
 
