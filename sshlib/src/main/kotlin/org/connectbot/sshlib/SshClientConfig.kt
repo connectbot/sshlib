@@ -16,7 +16,10 @@
 
 package org.connectbot.sshlib
 
-import org.connectbot.sshlib.client.SshConnection
+import org.connectbot.sshlib.crypto.CipherEntry
+import org.connectbot.sshlib.crypto.KexEntry
+import org.connectbot.sshlib.crypto.MacEntry
+import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.TransportFactory
 
@@ -77,10 +80,10 @@ class SshClientConfig private constructor(
          */
         var transportFactory: TransportFactory? = null
 
-        var kexAlgorithms: String = SshConnection.DEFAULT_KEX_ALGORITHMS
-        var hostKeyAlgorithms: String = SshConnection.DEFAULT_HOST_KEY_ALGORITHMS
-        var encryptionAlgorithms: String = SshConnection.DEFAULT_ENCRYPTION_ALGORITHMS
-        var macAlgorithms: String = SshConnection.DEFAULT_MAC_ALGORITHMS
+        var kexAlgorithms: String = KexEntry.defaultString
+        var hostKeyAlgorithms: String = SignatureEntry.defaultString
+        var encryptionAlgorithms: String = CipherEntry.defaultString
+        var macAlgorithms: String = MacEntry.defaultString
 
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {

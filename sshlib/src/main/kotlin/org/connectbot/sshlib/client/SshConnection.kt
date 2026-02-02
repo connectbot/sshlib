@@ -45,30 +45,15 @@ class SshConnection(
     private val transport: Transport,
     private val clientVersion: String = "SSH-2.0-CBSSH_1.0",
     private val hostKeyVerifier: HostKeyVerifier,
-    private val kexAlgorithms: String = DEFAULT_KEX_ALGORITHMS,
-    private val hostKeyAlgorithms: String = DEFAULT_HOST_KEY_ALGORITHMS,
-    private val encryptionAlgorithms: String = DEFAULT_ENCRYPTION_ALGORITHMS,
-    private val macAlgorithms: String = DEFAULT_MAC_ALGORITHMS
+    private val kexAlgorithms: String = KexEntry.defaultString,
+    private val hostKeyAlgorithms: String = SignatureEntry.defaultString,
+    private val encryptionAlgorithms: String = CipherEntry.defaultString,
+    private val macAlgorithms: String = MacEntry.defaultString
 ) : SshClientCallbacks {
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
-
-        internal const val DEFAULT_KEX_ALGORITHMS = "ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,kex-strict-c-v00@openssh.com"
-        internal const val DEFAULT_HOST_KEY_ALGORITHMS = "ssh-ed25519,ssh-ed448,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-256,rsa-sha2-512,ssh-rsa"
-        internal const val DEFAULT_ENCRYPTION_ALGORITHMS = "aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc"
-        internal const val DEFAULT_MAC_ALGORITHMS = "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1-etm@openssh.com,hmac-sha1"
         private const val COMPRESSION_ALGORITHMS = "none"
-
-        private fun kexHashAlgorithm(kexName: String): String = when {
-            kexName == "ecdh-sha2-nistp256" -> "SHA-256"
-            kexName == "ecdh-sha2-nistp384" -> "SHA-384"
-            kexName == "ecdh-sha2-nistp521" -> "SHA-512"
-            kexName.endsWith("-sha1") -> "SHA-1"
-            kexName.endsWith("-sha256") -> "SHA-256"
-            kexName.endsWith("-sha512") -> "SHA-512"
-            else -> "SHA-256"
-        }
     }
 
     private val packetIO = PacketIO(transport)
@@ -146,18 +131,23 @@ class SshConnection(
 
             val negotiated = negotiatedKex
                 ?: throw SshException("No KEX algorithm negotiated")
-            if (negotiated.startsWith("ecdh-sha2-")) {
-                val ecdhStream = ByteBufferKaitaiStream(rawBody)
-                val ecdhPayload = KexEcdhPayload(ecdhStream)
-                ecdhPayload._read()
-                val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
-                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
-            } else {
-                val kexdhStream = ByteBufferKaitaiStream(rawBody)
-                val kexdhPayload = KexdhPayload(kexdhStream)
-                kexdhPayload._read()
-                val dhReply = kexdhPayload.body() as SshMsgKexdhReply
-                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+            val kexEntry = KexEntry.fromSshName(negotiated)
+                ?: throw SshException("Unknown KEX algorithm: $negotiated")
+            when (kexEntry.type) {
+                KexType.ECDH -> {
+                    val ecdhStream = ByteBufferKaitaiStream(rawBody)
+                    val ecdhPayload = KexEcdhPayload(ecdhStream)
+                    ecdhPayload._read()
+                    val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
+                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
+                }
+                KexType.DH -> {
+                    val kexdhStream = ByteBufferKaitaiStream(rawBody)
+                    val kexdhPayload = KexdhPayload(kexdhStream)
+                    kexdhPayload._read()
+                    val dhReply = kexdhPayload.body() as SshMsgKexdhReply
+                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+                }
             }
 
             // New keys - read server's NEWKEYS
@@ -384,8 +374,8 @@ class SshConnection(
         logger.info("  Negotiated encryption c->s: $negotiatedEncryptionC2S")
         logger.info("  Negotiated encryption s->c: $negotiatedEncryptionS2C")
 
-        val isAeadC2S = negotiatedEncryptionC2S?.endsWith("gcm@openssh.com") == true
-        val isAeadS2C = negotiatedEncryptionS2C?.endsWith("gcm@openssh.com") == true
+        val isAeadC2S = CipherEntry.fromSshName(negotiatedEncryptionC2S!!)?.isAead == true
+        val isAeadS2C = CipherEntry.fromSshName(negotiatedEncryptionS2C!!)?.isAead == true
 
         if (!isAeadC2S) {
             val clientMacList = macAlgorithms.split(",")
@@ -407,21 +397,19 @@ class SshConnection(
     }
 
     override fun sendKexExchangeInit() {
-        val kex = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
-        if (kex.startsWith("ecdh-sha2-")) {
-            sendKexEcdhInit(kex)
-        } else {
-            sendKexDhInit()
+        val kexName = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
+        val kexEntry = KexEntry.fromSshName(kexName)
+            ?: throw SshException("Unknown KEX algorithm: $kexName")
+        when (kexEntry.type) {
+            KexType.ECDH -> sendKexEcdhInit(kexEntry)
+            KexType.DH -> sendKexDhInit(kexEntry)
         }
     }
 
-    private fun sendKexDhInit() {
-        val negotiated = negotiatedKex
-            ?: throw SshException("No KEX algorithm negotiated")
-        val hashAlg = kexHashAlgorithm(negotiated)
+    private fun sendKexDhInit(kexEntry: KexEntry) {
         logger.debug("Sending DH_INIT")
 
-        val dh = DiffieHellman(hashAlg)
+        val dh = kexEntry.create()
         kex = dh
         clientPublicKey = dh.generateClientKeys()
 
@@ -436,11 +424,10 @@ class SshConnection(
         }
     }
 
-    private fun sendKexEcdhInit(kexName: String) {
-        val curveName = kexName.removePrefix("ecdh-sha2-")
-        logger.debug("Sending ECDH_INIT (curve=$curveName)")
+    private fun sendKexEcdhInit(kexEntry: KexEntry) {
+        logger.debug("Sending ECDH_INIT (${kexEntry.sshName})")
 
-        val ecdh = EcdhKeyExchange(curveName)
+        val ecdh = kexEntry.create()
         kex = ecdh
         clientPublicKey = ecdh.generateClientKeys()
 
@@ -561,30 +548,26 @@ class SshConnection(
         val encS2C = negotiatedEncryptionS2C
             ?: throw SshException("No encryption algorithm negotiated for server-to-client")
 
-        val isAead = encC2S.endsWith("gcm@openssh.com")
+        val cipherC2S = CipherEntry.fromSshName(encC2S)
+            ?: throw SshException("Unknown cipher: $encC2S")
 
-        if (isAead) {
+        if (cipherC2S.isAead) {
             activateAeadEncryption(encC2S, encS2C)
         } else {
-            activateEncryption(encC2S, encS2C)
+            activateNonAeadEncryption(encC2S, encS2C)
         }
 
         logger.info("Encryption active")
     }
 
     private fun activateAeadEncryption(encC2S: String, encS2C: String) {
-        val keyLengthC2S = when (encC2S) {
-            "aes128-gcm@openssh.com" -> 16
-            "aes256-gcm@openssh.com" -> 32
-            else -> throw SshException("Unknown AEAD cipher: $encC2S")
-        }
-        val keyLengthS2C = when (encS2C) {
-            "aes128-gcm@openssh.com" -> 16
-            "aes256-gcm@openssh.com" -> 32
-            else -> throw SshException("Unknown AEAD cipher: $encS2C")
-        }
+        val entryC2S = CipherEntry.fromSshName(encC2S)
+            ?: throw SshException("Unknown AEAD cipher: $encC2S")
+        val entryS2C = CipherEntry.fromSshName(encS2C)
+            ?: throw SshException("Unknown AEAD cipher: $encS2C")
 
-        val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
+        val keyLength = maxOf(entryC2S.keyLength, entryS2C.keyLength)
+        val ivLength = maxOf(entryC2S.ivLength, entryS2C.ivLength)
 
         val secret = sharedSecret ?: throw SshException("Shared secret not computed")
         val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
@@ -598,39 +581,42 @@ class SshConnection(
             kexAlg.hashAlgorithm
         )
 
-        // AEAD: 12-byte IV, key per algorithm, no integrity key needed
         val keys = keyDerivation.deriveKeys(
-            ivLength = 12,
+            ivLength = ivLength,
             keyLength = keyLength,
             macKeyLength = 0
         )
 
-        val c2sKey = keys.encryptionKeyClientToServer.copyOf(keyLengthC2S)
-        val s2cKey = keys.encryptionKeyServerToClient.copyOf(keyLengthS2C)
+        val c2sKey = keys.encryptionKeyClientToServer.copyOf(entryC2S.keyLength)
+        val s2cKey = keys.encryptionKeyServerToClient.copyOf(entryS2C.keyLength)
+        val c2sIv = keys.initialIvClientToServer.copyOf(entryC2S.ivLength)
+        val s2cIv = keys.initialIvServerToClient.copyOf(entryS2C.ivLength)
 
-        val c2sAead = AesGcmCipher(c2sKey, keys.initialIvClientToServer)
-        val s2cAead = AesGcmCipher(s2cKey, keys.initialIvServerToClient)
+        val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
+        val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
 
         packetIO.enableAead(c2sAead, s2cAead)
     }
 
-    private fun activateEncryption(encC2S: String, encS2C: String) {
-        val (keyLengthC2S, ivLengthC2S) = getCipherParams(encC2S)
-        val (keyLengthS2C, ivLengthS2C) = getCipherParams(encS2C)
+    private fun activateNonAeadEncryption(encC2S: String, encS2C: String) {
+        val cipherEntryC2S = CipherEntry.fromSshName(encC2S)
+            ?: throw SshException("Unknown cipher: $encC2S")
+        val cipherEntryS2C = CipherEntry.fromSshName(encS2C)
+            ?: throw SshException("Unknown cipher: $encS2C")
 
-        val macC2S = negotiatedMacC2S
+        val macC2SName = negotiatedMacC2S
             ?: throw SshException("No MAC algorithm negotiated for client-to-server")
-        val macS2C = negotiatedMacS2C
+        val macS2CName = negotiatedMacS2C
             ?: throw SshException("No MAC algorithm negotiated for server-to-client")
 
-        val macKeyLength = when {
-            macC2S.startsWith("hmac-sha2-512") || macS2C.startsWith("hmac-sha2-512") -> 64
-            macC2S.startsWith("hmac-sha2-256") || macS2C.startsWith("hmac-sha2-256") -> 32
-            else -> 20
-        }
+        val macEntryC2S = MacEntry.fromSshName(macC2SName)
+            ?: throw SshException("Unknown MAC algorithm: $macC2SName")
+        val macEntryS2C = MacEntry.fromSshName(macS2CName)
+            ?: throw SshException("Unknown MAC algorithm: $macS2CName")
 
-        val keyLength = maxOf(keyLengthC2S, keyLengthS2C)
-        val ivLength = maxOf(ivLengthC2S, ivLengthS2C)
+        val keyLength = maxOf(cipherEntryC2S.keyLength, cipherEntryS2C.keyLength)
+        val ivLength = maxOf(cipherEntryC2S.ivLength, cipherEntryS2C.ivLength)
+        val macKeyLength = maxOf(macEntryC2S.keyLength, macEntryS2C.keyLength)
 
         val secret = sharedSecret ?: throw SshException("Shared secret not computed")
         val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
@@ -650,53 +636,26 @@ class SshConnection(
             macKeyLength = macKeyLength
         )
 
-        val c2sCipherKey = keys.encryptionKeyClientToServer.copyOf(keyLengthC2S)
-        val s2cCipherKey = keys.encryptionKeyServerToClient.copyOf(keyLengthS2C)
+        val c2sCipherKey = keys.encryptionKeyClientToServer.copyOf(cipherEntryC2S.keyLength)
+        val s2cCipherKey = keys.encryptionKeyServerToClient.copyOf(cipherEntryS2C.keyLength)
 
-        val c2sIv = keys.initialIvClientToServer.copyOf(ivLengthC2S)
-        val s2cIv = keys.initialIvServerToClient.copyOf(ivLengthS2C)
+        val c2sIv = keys.initialIvClientToServer.copyOf(cipherEntryC2S.ivLength)
+        val s2cIv = keys.initialIvServerToClient.copyOf(cipherEntryS2C.ivLength)
 
-        val clientToServerCipher = createCipher(encC2S, c2sCipherKey, c2sIv, true)
-        val serverToClientCipher = createCipher(encS2C, s2cCipherKey, s2cIv, false)
+        val clientToServerCipher = (cipherEntryC2S.create(c2sCipherKey, c2sIv, true) as EncryptionInstance.Cipher).cipher
+        val serverToClientCipher = (cipherEntryS2C.create(s2cCipherKey, s2cIv, false) as EncryptionInstance.Cipher).cipher
 
-        val clientToServerMac = createMac(macC2S, keys.integrityKeyClientToServer)
-        val serverToClientMac = createMac(macS2C, keys.integrityKeyServerToClient)
+        val clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
+        val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
 
         packetIO.enableEncryption(
             clientToServerCipher,
             clientToServerMac,
             serverToClientCipher,
             serverToClientMac,
-            clientToServerEtm = macC2S.endsWith("-etm@openssh.com"),
-            serverToClientEtm = macS2C.endsWith("-etm@openssh.com")
+            clientToServerEtm = macEntryC2S.isEtm,
+            serverToClientEtm = macEntryS2C.isEtm
         )
-    }
-
-    private fun getCipherParams(cipherName: String): Pair<Int, Int> {
-        return when (cipherName) {
-            "aes128-ctr", "aes128-cbc" -> 16 to 16
-            "aes256-ctr", "aes256-cbc" -> 32 to 16
-            "3des-cbc" -> 24 to 8
-            else -> throw SshException("Unknown cipher: $cipherName")
-        }
-    }
-
-    private fun createCipher(algorithm: String, key: ByteArray, iv: ByteArray, forEncryption: Boolean): PacketCipher {
-        return when (algorithm) {
-            "aes128-ctr", "aes256-ctr" -> AesCtrCipher(key, iv, forEncryption)
-            "aes128-cbc", "aes256-cbc" -> AesCbcCipher(key, iv, forEncryption)
-            "3des-cbc" -> TripleDesCbcCipher(key, iv, forEncryption)
-            else -> throw SshException("Unknown cipher: $algorithm")
-        }
-    }
-
-    private fun createMac(algorithm: String, key: ByteArray): PacketMac {
-        return when (algorithm) {
-            "hmac-sha1", "hmac-sha1-etm@openssh.com" -> HmacSha1(key.copyOf(20))
-            "hmac-sha2-256", "hmac-sha2-256-etm@openssh.com" -> HmacSha256(key.copyOf(32))
-            "hmac-sha2-512", "hmac-sha2-512-etm@openssh.com" -> HmacSha512(key.copyOf(64))
-            else -> throw SshException("Unknown MAC algorithm: $algorithm")
-        }
     }
 
     override fun sendServiceRequest(service: String) {
