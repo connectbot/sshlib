@@ -19,6 +19,8 @@ package org.connectbot.sshlib.client
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.crypto.*
 import org.connectbot.sshlib.struct.*
 import org.connectbot.sshlib.struct.SshClientCallbacks
@@ -96,6 +98,8 @@ class SshConnection(
     private var pendingAuth: CompletableDeferred<Boolean>? = null
     private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
     private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
+
+    private var infoRequestChannel: Channel<SshMsgUserauthInfoRequest>? = null
 
     private var packetLoopJob: Job? = null
 
@@ -201,6 +205,81 @@ class SshConnection(
             return deferred.await()
         } catch (e: Exception) {
             logger.error("Authentication error", e)
+            return false
+        }
+    }
+
+    /**
+     * Authenticate using keyboard-interactive (RFC 4256).
+     *
+     * @param username Username
+     * @param callback Callback that receives prompts and provides responses
+     * @return true if authentication succeeded
+     */
+    suspend fun authenticateKeyboardInteractive(
+        username: String,
+        callback: KeyboardInteractiveCallback
+    ): Boolean {
+        try {
+            val req = SshMsgUserauthRequest()
+            req.setUserName(createAsciiString(username))
+            req.setServiceName(createAsciiString("ssh-connection"))
+            req.setMethodName(createAsciiString("keyboard-interactive"))
+
+            val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
+                setLanguageTag(createByteString(ByteArray(0)))
+                setSubmethods(createByteString(ByteArray(0)))
+                _check()
+            }
+            req.setMethodSpecificFields(kbdInteractive)
+
+            val deferred = CompletableDeferred<Boolean>()
+            pendingAuth = deferred
+
+            val channel = Channel<SshMsgUserauthInfoRequest>(Channel.UNLIMITED)
+            infoRequestChannel = channel
+
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
+                toByteArray(req)
+            )
+
+            val consumerJob = connectionScope.launch {
+                for (infoRequest in channel) {
+                    val name = String(infoRequest.name().data(), Charsets.UTF_8)
+                    val instruction = String(infoRequest.instruction().data(), Charsets.UTF_8)
+                    val prompts = infoRequest.prompts().map { prompt ->
+                        KeyboardInteractiveCallback.Prompt(
+                            text = String(prompt.prompt().data(), Charsets.UTF_8),
+                            echo = prompt.echo() != 0
+                        )
+                    }
+
+                    callback.onInfoRequest(name, instruction, prompts) { responses ->
+                        val responseMsg = SshMsgUserauthInfoResponse()
+                        responseMsg.setNumResponses(responses.size.toLong())
+                        responseMsg.setResponses(responses.map { response ->
+                            val bytes = response.toByteArray(Charsets.UTF_8)
+                            createByteString(bytes)
+                        })
+
+                        packetIO.writePacket(
+                            SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
+                            toByteArray(responseMsg)
+                        )
+                    }
+                }
+            }
+
+            try {
+                return deferred.await()
+            } finally {
+                channel.close()
+                consumerJob.cancel()
+                infoRequestChannel = null
+            }
+        } catch (e: Exception) {
+            logger.error("Keyboard-interactive authentication error", e)
             return false
         }
     }
@@ -561,6 +640,22 @@ class SshConnection(
         pendingAuth = null
     }
 
+    override fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) {
+        val channel = infoRequestChannel
+        if (channel != null) {
+            val sent = channel.trySend(msg)
+            if (sent.isFailure) {
+                logger.warn("Failed to deliver info request to consumer")
+            }
+        } else {
+            logger.warn("Received info request but no consumer is registered")
+        }
+    }
+
+    override fun receiveUserauthBanner(msg: SshMsgUserauthBanner) {
+        logger.info("SSH banner: ${msg.message().value()}")
+    }
+
     override fun debug(msg: SshMsgDebug) {
         logger.debug("SSH debug: ${msg.message()}")
     }
@@ -770,6 +865,14 @@ class SshConnection(
             }
             SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
+            }
+            SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER -> {
+                val msg = parseBody<SshMsgUserauthBanner>(packet)
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthBanner(msg))
+            }
+            SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
+                val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
+                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))
             }
             SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.Disconnect)

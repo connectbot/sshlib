@@ -18,6 +18,7 @@ package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.blocking.BlockingSshClient
@@ -298,6 +299,64 @@ class SshClientIntegrationTest {
             assertTrue(shellRequested, "Should request shell with host key $algorithm")
 
             session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should authenticate with keyboard-interactive`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val callback = object : KeyboardInteractiveCallback {
+                override suspend fun onInfoRequest(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                    respond: suspend (responses: List<String>) -> Unit
+                ) {
+                    respond(prompts.map { PASSWORD })
+                }
+            }
+
+            val authenticated = client.authenticateKeyboardInteractive(USERNAME, callback)
+            assertTrue(authenticated, "Should authenticate via keyboard-interactive")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should fail keyboard-interactive with wrong password`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val callback = object : KeyboardInteractiveCallback {
+                override suspend fun onInfoRequest(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                    respond: suspend (responses: List<String>) -> Unit
+                ) {
+                    respond(prompts.map { "wrongpassword" })
+                }
+            }
+
+            val authenticated = client.authenticateKeyboardInteractive(USERNAME, callback)
+            assertFalse(authenticated, "Should fail keyboard-interactive with wrong password")
+            assertFalse(client.isAuthenticated, "Client should not be authenticated")
         } finally {
             client.disconnect()
         }

@@ -13,6 +13,7 @@ RUN apk update && apk add --no-cache \
     zlib-dev \
     openssl-dev \
     libedit-dev \
+    linux-pam-dev \
     linux-headers && \
     \
     # Download and extract OpenSSH
@@ -22,14 +23,15 @@ RUN apk update && apk add --no-cache \
     cd "/tmp/openssh-${SSH_VERSION}" && \
     \
     # Configure with debug flags and install
-    CFLAGS="-DDEBUG_KEX -DDEBUG_KEXECDH -DDEBUG_KEXDH -DDEBUG_PK" ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/empty && \
+    CFLAGS="-DDEBUG_KEX -DDEBUG_KEXECDH -DDEBUG_KEXDH -DDEBUG_PK" ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/empty --with-pam && \
     make && \
     make install && \
     \
     # Clean up
     cd / && \
     rm -rf "/tmp/openssh-${SSH_VERSION}.tar.gz" "/tmp/openssh-${SSH_VERSION}" && \
-    apk del build-base autoconf make gcc musl-dev zlib-dev openssl-dev libedit-dev linux-headers
+    apk del build-base autoconf make gcc musl-dev zlib-dev openssl-dev libedit-dev linux-pam-dev linux-headers && \
+    apk add --no-cache linux-pam
 
 # Create test user
 RUN adduser -g 'Test User' -s /bin/sh -D $USERNAME && \
@@ -43,7 +45,16 @@ RUN mkdir -p /run/openssh && \
     echo "KexAlgorithms +diffie-hellman-group14-sha256,diffie-hellman-group14-sha1" >> /etc/ssh/sshd_config && \
     echo "HostKeyAlgorithms +ssh-rsa" >> /etc/ssh/sshd_config && \
     echo "Ciphers +aes128-ctr,aes256-ctr" >> /etc/ssh/sshd_config && \
-    echo "MACs +hmac-sha2-256,hmac-sha2-512" >> /etc/ssh/sshd_config
+    echo "MACs +hmac-sha2-256,hmac-sha2-512" >> /etc/ssh/sshd_config && \
+    echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
+    echo "UsePAM yes" >> /etc/ssh/sshd_config
+
+# Configure PAM for sshd
+RUN mkdir -p /etc/pam.d && \
+    echo "auth       required     pam_unix.so" > /etc/pam.d/sshd && \
+    echo "account    required     pam_unix.so" >> /etc/pam.d/sshd && \
+    echo "password   required     pam_unix.so" >> /etc/pam.d/sshd && \
+    echo "session    required     pam_unix.so" >> /etc/pam.d/sshd
 
 EXPOSE 22
 

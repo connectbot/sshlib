@@ -181,6 +181,41 @@ class SshClient private constructor(
     }
 
     /**
+     * Authenticate using keyboard-interactive authentication (RFC 4256).
+     *
+     * @param username SSH username
+     * @param callback Receives prompts from the server and provides responses
+     * @return true if authentication succeeded
+     */
+    suspend fun authenticateKeyboardInteractive(
+        username: String,
+        callback: KeyboardInteractiveCallback
+    ): Boolean {
+        val conn = connection
+        if (conn == null) {
+            logger.error("Not connected - call connect() first")
+            return false
+        }
+
+        return try {
+            logger.info("Authenticating as $username via keyboard-interactive")
+            val success = conn.authenticateKeyboardInteractive(username, callback)
+
+            if (success) {
+                authenticated = true
+                logger.info("Keyboard-interactive authentication successful")
+            } else {
+                logger.warn("Keyboard-interactive authentication failed")
+            }
+
+            success
+        } catch (e: Exception) {
+            logger.error("Keyboard-interactive authentication error", e)
+            false
+        }
+    }
+
+    /**
      * Check if connected and authenticated.
      */
     val isAuthenticated: Boolean
