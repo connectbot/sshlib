@@ -70,7 +70,7 @@ class SshClient private constructor(
         operator fun invoke(
             host: String,
             port: Int = 22,
-            clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+            clientVersion: String = "SSH-2.0-CBSSH_1.0"
         ): SshClient {
             val config = SshClientConfig {
                 this.host = host
@@ -95,7 +95,7 @@ class SshClient private constructor(
          */
         operator fun invoke(
             transportFactory: TransportFactory,
-            clientVersion: String = "SSH-2.0-SshProtoClient_1.0"
+            clientVersion: String = "SSH-2.0-CBSSH_1.0"
         ): SshClient {
             val config = SshClientConfig {
                 this.transportFactory = transportFactory
