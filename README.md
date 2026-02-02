@@ -25,8 +25,14 @@ defined in KStateMachine for easier reasoning of possible state transitions.
 - `password`
 
 ### Host Keys
+- `ssh-ed25519` ([RFC 8709](https://tools.ietf.org/html/rfc8709))
+- `ssh-ed448` ([RFC 8709](https://tools.ietf.org/html/rfc8709))
+- `ecdsa-sha2-nistp256` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
+- `ecdsa-sha2-nistp384` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
+- `ecdsa-sha2-nistp521` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
 - `rsa-sha2-512`
 - `rsa-sha2-256`
+- `ssh-rsa`
 
 ### Key Exchange
 - `diffie-hellman-group14-sha256` ([RFC 8268](https://tools.ietf.org/html/rfc8268))
