@@ -31,6 +31,8 @@ import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshException
 import org.slf4j.LoggerFactory
+import java.math.BigInteger
+import java.security.SecureRandom
 
 /**
  * SSH connection handler that manages the protocol flow.
@@ -147,6 +149,37 @@ class SshConnection(
                     kexdhPayload._read()
                     val dhReply = kexdhPayload.body() as SshMsgKexdhReply
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+                }
+                KexType.DH_GEX -> {
+                    // First packet is SSH_MSG_KEX_DH_GEX_GROUP
+                    val groupStream = ByteBufferKaitaiStream(rawBody)
+                    val groupPayload = KexDhGexPayload(groupStream)
+                    groupPayload._read()
+                    val group = groupPayload.body() as SshMsgKexDhGexGroup
+
+                    val dhGex = kex as DiffieHellmanGroupExchange
+                    dhGex.setGroup(
+                        BigInteger(1, group.p().body()),
+                        BigInteger(1, group.g().body())
+                    )
+                    clientPublicKey = dhGex.generateClientKeys()
+
+                    val initMsg = SshMsgKexDhGexInit()
+                    initMsg.setE(createMpint(clientPublicKey!!))
+                    packetIO.writePacket(
+                        SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
+                        toByteArray(initMsg)
+                    )
+
+                    // Second packet is SSH_MSG_KEX_DH_GEX_REPLY
+                    val replyPacket = packetIO.readPacket()
+                    val replyMsgType = replyPacket.messageType().id().toByte()
+                    val replyRawBody = byteArrayOf(replyMsgType) + replyPacket._raw_body()
+                    val replyStream = ByteBufferKaitaiStream(replyRawBody)
+                    val replyPayload = KexDhGexPayload(replyStream)
+                    replyPayload._read()
+                    val reply = replyPayload.body() as SshMsgKexDhGexReply
+                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexReply(reply))
                 }
             }
 
@@ -306,7 +339,7 @@ class SshConnection(
 
         // Cookie (16 random bytes)
         val cookie = ByteArray(16).apply {
-            java.security.SecureRandom().nextBytes(this)
+            SecureRandom().nextBytes(this)
         }
         kexInit.setCookie(cookie)
 
@@ -403,6 +436,7 @@ class SshConnection(
         when (kexEntry.type) {
             KexType.ECDH -> sendKexEcdhInit(kexEntry)
             KexType.DH -> sendKexDhInit(kexEntry)
+            KexType.DH_GEX -> sendKexDhGexRequest(kexEntry)
         }
     }
 
@@ -439,6 +473,22 @@ class SshConnection(
 
         runBlocking {
             packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), toByteArray(msg))
+        }
+    }
+
+    private fun sendKexDhGexRequest(kexEntry: KexEntry) {
+        logger.debug("Sending DH_GEX_REQUEST (${kexEntry.sshName})")
+
+        val dhGex = kexEntry.create() as DiffieHellmanGroupExchange
+        kex = dhGex
+
+        val msg = SshMsgKexDhGexRequest()
+        msg.setMin(dhGex.min.toLong())
+        msg.setN(dhGex.n.toLong())
+        msg.setMax(dhGex.max.toLong())
+
+        runBlocking {
+            packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), toByteArray(msg))
         }
     }
 
@@ -520,7 +570,12 @@ class SshConnection(
     }
 
     override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
-        logger.warn("DH-GEX not implemented yet")
+        logger.info("Received DH_GEX_REPLY from server")
+        completeKex(
+            serverHostKey = msg.serverPublicHostKey().data(),
+            serverPublicKey = msg.f().body(),
+            signature = msg.signatureH().data()
+        )
     }
 
     override fun sendNewKeys() {
