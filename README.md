@@ -4,8 +4,9 @@
 production.*
 
 This is ConnectBot SSH library built with Kotlin. Internally it uses coroutines,
-protocol definition files, and a state machine to run the SSH protocol. It can
-connects to SSH servers, authenticates, and provide interactive shell sessions.
+protocol definition files, and a state machine to run the SSH protocol. It
+currently connects to SSH servers, authenticates, and provide interactive shell
+sessions.
 
 The protocol parsing uses declarative Kaitai Struct specifications
 that auto-generate code from `.ksy` definitions. The internal state machine is
@@ -54,6 +55,7 @@ that runs in reaction to state changes.
 - `aes128-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 - `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
+- `3des-cbc` ([RFC 4253](https://datatracker.ietf.org/doc/html/rfc4253#section-6.3))
 
 ### MACs
 - `hmac-sha2-512-etm@openssh.com` ([OpenSSH PROTOCOL](
