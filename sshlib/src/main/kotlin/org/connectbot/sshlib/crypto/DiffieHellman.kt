@@ -23,26 +23,13 @@ import java.security.SecureRandom
 
 /**
  * Diffie-Hellman key exchange implementation for SSH (RFC 4253).
- * Supports DH Group 14 (2048-bit) from RFC 3526.
  */
-class DiffieHellman(override val hashAlgorithm: String = "SHA-256") : KexAlgorithm {
+class DiffieHellman(
+    override val hashAlgorithm: String = "SHA-256",
+    private val p: BigInteger = DhGroups.GROUP14_P,
+    private val g: BigInteger = DhGroups.GENERATOR
+) : KexAlgorithm {
     companion object {
-        val GROUP14_P = BigInteger(
-            "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1" +
-            "29024E088A67CC74020BBEA63B139B22514A08798E3404DD" +
-            "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245" +
-            "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
-            "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D" +
-            "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F" +
-            "83655D23DCA3AD961C62F356208552BB9ED529077096966D" +
-            "670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B" +
-            "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9" +
-            "DE2BCBF6955817183995497CEA956AE515D2261898FA0510" +
-            "15728E5A8AACAA68FFFFFFFFFFFFFFFF", 16
-        )
-
-        val GROUP14_G: BigInteger = BigInteger.valueOf(2)
-
         private val secureRandom = SecureRandom()
     }
 
@@ -50,9 +37,9 @@ class DiffieHellman(override val hashAlgorithm: String = "SHA-256") : KexAlgorit
     private var publicKey: BigInteger? = null
 
     override fun generateClientKeys(): ByteArray {
-        val x = BigInteger(2048, secureRandom).mod(GROUP14_P - BigInteger.ONE) + BigInteger.ONE
+        val x = BigInteger(p.bitLength(), secureRandom).mod(p - BigInteger.ONE) + BigInteger.ONE
         privateKey = x
-        val e = GROUP14_G.modPow(x, GROUP14_P)
+        val e = g.modPow(x, p)
         publicKey = e
         return e.toByteArray()
     }
@@ -60,12 +47,12 @@ class DiffieHellman(override val hashAlgorithm: String = "SHA-256") : KexAlgorit
     override fun computeSharedSecret(serverPublicKey: ByteArray): ByteArray {
         val x = privateKey
             ?: throw SshException("Client keys not generated; call generateClientKeys() first")
-        val f = BigInteger(serverPublicKey)
+        val f = BigInteger(1, serverPublicKey)
 
-        if (f <= BigInteger.ONE || f >= GROUP14_P - BigInteger.ONE) {
+        if (f <= BigInteger.ONE || f >= p - BigInteger.ONE) {
             throw SshException("Invalid server public key")
         }
 
-        return f.modPow(x, GROUP14_P).toByteArray()
+        return f.modPow(x, p).toByteArray()
     }
 }

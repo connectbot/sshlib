@@ -197,8 +197,13 @@ class AlgorithmsTest {
         assertEquals(KexEntry.ECDH_SHA2_NISTP256, KexEntry.fromSshName("ecdh-sha2-nistp256"))
         assertEquals(KexEntry.ECDH_SHA2_NISTP384, KexEntry.fromSshName("ecdh-sha2-nistp384"))
         assertEquals(KexEntry.ECDH_SHA2_NISTP521, KexEntry.fromSshName("ecdh-sha2-nistp521"))
+        assertEquals(KexEntry.DH_GROUP18_SHA512, KexEntry.fromSshName("diffie-hellman-group18-sha512"))
+        assertEquals(KexEntry.DH_GROUP16_SHA512, KexEntry.fromSshName("diffie-hellman-group16-sha512"))
+        assertEquals(KexEntry.DH_GROUP_EXCHANGE_SHA256, KexEntry.fromSshName("diffie-hellman-group-exchange-sha256"))
         assertEquals(KexEntry.DH_GROUP14_SHA256, KexEntry.fromSshName("diffie-hellman-group14-sha256"))
         assertEquals(KexEntry.DH_GROUP14_SHA1, KexEntry.fromSshName("diffie-hellman-group14-sha1"))
+        assertEquals(KexEntry.DH_GROUP_EXCHANGE_SHA1, KexEntry.fromSshName("diffie-hellman-group-exchange-sha1"))
+        assertEquals(KexEntry.DH_GROUP1_SHA1, KexEntry.fromSshName("diffie-hellman-group1-sha1"))
     }
 
     @Test
@@ -216,8 +221,13 @@ class AlgorithmsTest {
         assertEquals(KexType.ECDH, KexEntry.ECDH_SHA2_NISTP256.type)
         assertEquals(KexType.ECDH, KexEntry.ECDH_SHA2_NISTP384.type)
         assertEquals(KexType.ECDH, KexEntry.ECDH_SHA2_NISTP521.type)
+        assertEquals(KexType.DH, KexEntry.DH_GROUP18_SHA512.type)
+        assertEquals(KexType.DH, KexEntry.DH_GROUP16_SHA512.type)
+        assertEquals(KexType.DH_GEX, KexEntry.DH_GROUP_EXCHANGE_SHA256.type)
         assertEquals(KexType.DH, KexEntry.DH_GROUP14_SHA256.type)
         assertEquals(KexType.DH, KexEntry.DH_GROUP14_SHA1.type)
+        assertEquals(KexType.DH_GEX, KexEntry.DH_GROUP_EXCHANGE_SHA1.type)
+        assertEquals(KexType.DH, KexEntry.DH_GROUP1_SHA1.type)
     }
 
     @Test
@@ -225,8 +235,13 @@ class AlgorithmsTest {
         assertEquals("SHA-256", KexEntry.ECDH_SHA2_NISTP256.hashAlgorithm)
         assertEquals("SHA-384", KexEntry.ECDH_SHA2_NISTP384.hashAlgorithm)
         assertEquals("SHA-512", KexEntry.ECDH_SHA2_NISTP521.hashAlgorithm)
+        assertEquals("SHA-512", KexEntry.DH_GROUP18_SHA512.hashAlgorithm)
+        assertEquals("SHA-512", KexEntry.DH_GROUP16_SHA512.hashAlgorithm)
+        assertEquals("SHA-256", KexEntry.DH_GROUP_EXCHANGE_SHA256.hashAlgorithm)
         assertEquals("SHA-256", KexEntry.DH_GROUP14_SHA256.hashAlgorithm)
         assertEquals("SHA-1", KexEntry.DH_GROUP14_SHA1.hashAlgorithm)
+        assertEquals("SHA-1", KexEntry.DH_GROUP_EXCHANGE_SHA1.hashAlgorithm)
+        assertEquals("SHA-1", KexEntry.DH_GROUP1_SHA1.hashAlgorithm)
     }
 
     @Test
@@ -237,8 +252,14 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `KexEntry defaultString contains all entries`() {
-        for (entry in KexEntry.entries) {
+    fun `KexEntry defaults exclude DH_GROUP1_SHA1`() {
+        assertFalse(KexEntry.defaults.contains(KexEntry.DH_GROUP1_SHA1))
+        assertFalse(KexEntry.defaultString.contains("diffie-hellman-group1-sha1"))
+    }
+
+    @Test
+    fun `KexEntry defaultString contains all default entries`() {
+        for (entry in KexEntry.defaults) {
             assertTrue(
                 "${entry.sshName} not found in defaultString",
                 KexEntry.defaultString.contains(entry.sshName)

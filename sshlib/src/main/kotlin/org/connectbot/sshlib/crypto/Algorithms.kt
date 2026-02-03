@@ -115,7 +115,7 @@ enum class MacEntry(
     }
 }
 
-enum class KexType { DH, ECDH }
+enum class KexType { DH, ECDH, DH_GEX }
 
 enum class KexEntry(
     val sshName: String,
@@ -135,19 +135,39 @@ enum class KexEntry(
         "ecdh-sha2-nistp521", "SHA-512", KexType.ECDH,
         { EcdhKeyExchange("nistp521") }
     ),
+    DH_GROUP18_SHA512(
+        "diffie-hellman-group18-sha512", "SHA-512", KexType.DH,
+        { DiffieHellman("SHA-512", DhGroups.GROUP18_P, DhGroups.GENERATOR) }
+    ),
+    DH_GROUP16_SHA512(
+        "diffie-hellman-group16-sha512", "SHA-512", KexType.DH,
+        { DiffieHellman("SHA-512", DhGroups.GROUP16_P, DhGroups.GENERATOR) }
+    ),
+    DH_GROUP_EXCHANGE_SHA256(
+        "diffie-hellman-group-exchange-sha256", "SHA-256", KexType.DH_GEX,
+        { DiffieHellmanGroupExchange("SHA-256") }
+    ),
     DH_GROUP14_SHA256(
         "diffie-hellman-group14-sha256", "SHA-256", KexType.DH,
-        { DiffieHellman("SHA-256") }
+        { DiffieHellman("SHA-256", DhGroups.GROUP14_P, DhGroups.GENERATOR) }
     ),
     DH_GROUP14_SHA1(
         "diffie-hellman-group14-sha1", "SHA-1", KexType.DH,
-        { DiffieHellman("SHA-1") }
+        { DiffieHellman("SHA-1", DhGroups.GROUP14_P, DhGroups.GENERATOR) }
+    ),
+    DH_GROUP_EXCHANGE_SHA1(
+        "diffie-hellman-group-exchange-sha1", "SHA-1", KexType.DH_GEX,
+        { DiffieHellmanGroupExchange("SHA-1") }
+    ),
+    DH_GROUP1_SHA1(
+        "diffie-hellman-group1-sha1", "SHA-1", KexType.DH,
+        { DiffieHellman("SHA-1", DhGroups.GROUP1_P, DhGroups.GENERATOR) }
     );
 
     fun create(): KexAlgorithm = factory()
 
     companion object {
-        val defaults: List<KexEntry> = entries.toList()
+        val defaults: List<KexEntry> = entries.filter { it != DH_GROUP1_SHA1 }
 
         val defaultString: String =
             defaults.joinToString(",") { it.sshName } + ",kex-strict-c-v00@openssh.com"
