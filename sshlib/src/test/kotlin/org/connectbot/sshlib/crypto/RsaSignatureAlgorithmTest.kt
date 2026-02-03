@@ -22,6 +22,7 @@ import org.connectbot.sshlib.struct.SshSignature
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
+import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.Signature
 import java.security.interfaces.RSAPublicKey
@@ -39,7 +40,7 @@ class RsaSignatureAlgorithmTest {
         encodeString(out, value.toByteArray(Charsets.US_ASCII))
     }
 
-    private fun encodeMpint(out: DataOutputStream, value: java.math.BigInteger) {
+    private fun encodeMpint(out: DataOutputStream, value: BigInteger) {
         val bytes = value.toByteArray()
         out.writeInt(bytes.size)
         out.write(bytes)

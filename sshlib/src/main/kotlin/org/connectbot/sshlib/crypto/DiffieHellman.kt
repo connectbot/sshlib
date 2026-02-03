@@ -53,6 +53,6 @@ class DiffieHellman(
             throw SshException("Invalid server public key")
         }
 
-        return f.modPow(x, p).toByteArray()
+        return encodeMpint(f.modPow(x, p).toByteArray())
     }
 }

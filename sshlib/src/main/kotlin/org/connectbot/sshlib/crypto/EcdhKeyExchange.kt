@@ -92,7 +92,7 @@ class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
             agreement.doPhase(serverPubKey, true)
             val rawSecret = agreement.generateSecret()
 
-            return BigInteger(1, rawSecret).toByteArray()
+            return encodeMpint(BigInteger(1, rawSecret).toByteArray())
         } catch (e: SshException) {
             throw e
         } catch (e: Exception) {

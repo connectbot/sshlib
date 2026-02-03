@@ -29,6 +29,10 @@ enum class CipherEntry(
     val isAead: Boolean,
     private val factory: (key: ByteArray, iv: ByteArray, forEncryption: Boolean) -> EncryptionInstance
 ) {
+    CHACHA20_POLY1305(
+        "chacha20-poly1305@openssh.com", 64, 0, 8, true,
+        { key, _, _ -> EncryptionInstance.Aead(ChaCha20Poly1305Cipher(key)) }
+    ),
     AES128_GCM(
         "aes128-gcm@openssh.com", 16, 12, 16, true,
         { key, iv, _ -> EncryptionInstance.Aead(AesGcmCipher(key, iv)) }
@@ -123,6 +127,14 @@ enum class KexEntry(
     val type: KexType,
     private val factory: () -> KexAlgorithm
 ) {
+    MLKEM768X25519_SHA256(
+        "mlkem768x25519-sha256", "SHA-256", KexType.ECDH,
+        { MlKemHybridKeyExchange() }
+    ),
+    CURVE25519_SHA256(
+        "curve25519-sha256", "SHA-256", KexType.ECDH,
+        { Curve25519KeyExchange() }
+    ),
     ECDH_SHA2_NISTP256(
         "ecdh-sha2-nistp256", "SHA-256", KexType.ECDH,
         { EcdhKeyExchange("nistp256") }

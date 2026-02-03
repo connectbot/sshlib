@@ -31,6 +31,14 @@ interface KexAlgorithm {
 
     fun generateClientKeys(): ByteArray
 
+    /**
+     * Compute the shared secret K from the server's public value.
+     *
+     * The returned bytes are the wire-encoded K, ready for use in the exchange
+     * hash and key derivation. For classic DH/ECDH this is mpint encoding
+     * (uint32 length + positive integer bytes). For ML-KEM hybrid this is SSH
+     * string encoding (uint32 length + raw hash bytes).
+     */
     fun computeSharedSecret(serverPublicKey: ByteArray): ByteArray
 
     /**
@@ -38,7 +46,8 @@ interface KexAlgorithm {
      *
      * H = hash(V_C || V_S || I_C || I_S || K_S || e/Q_C || f/Q_S || K)
      *
-     * All values are encoded as SSH strings (uint32 length + data).
+     * All values except K are encoded as SSH strings (uint32 length + data).
+     * K is already wire-encoded by [computeSharedSecret] and written directly.
      */
     fun computeExchangeHash(
         clientVersion: ByteArray,
@@ -70,7 +79,7 @@ interface KexAlgorithm {
         writeString(serverHostKey)
         writeString(clientPublicKey)
         writeString(serverPublicKey)
-        writeString(sharedSecret)
+        transcript.write(sharedSecret)
 
         val md = MessageDigest.getInstance(hashAlgorithm)
         return md.digest(transcript.toByteArray())

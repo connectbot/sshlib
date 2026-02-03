@@ -70,7 +70,7 @@ class DiffieHellmanGroupExchangeTest {
         serverAgreement.doPhase(clientPubKey, true)
         val serverRawSecret = serverAgreement.generateSecret()
 
-        val serverSecret = BigInteger(1, serverRawSecret).toByteArray()
+        val serverSecret = encodeMpint(BigInteger(1, serverRawSecret).toByteArray())
 
         assertContentEquals(serverSecret, clientSecret)
     }
