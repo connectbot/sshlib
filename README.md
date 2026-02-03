@@ -38,6 +38,8 @@ that runs in reaction to state changes.
 - `ssh-rsa` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
 
 ### Key Exchange
+- `mlkem768x25519-sha256` ([draft-ietf-sshm-mlkem-hybrid-kex](https://datatracker.ietf.org/doc/draft-ietf-sshm-mlkem-hybrid-kex/) (depends on JEP-496 support)
+- `curve25519-sha256` ([RFC 8731](https://tools.ietf.org/html/rfc8731))
 - `ecdh-sha2-nistp521` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
 - `ecdh-sha2-nistp384` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
 - `ecdh-sha2-nistp256` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-4))
@@ -50,6 +52,7 @@ that runs in reaction to state changes.
 - `diffie-hellman-group1-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
 
 ### Encryption
+- `chacha20-poly1305@openssh.com` ([draft-ietf-sshm-chacha20-poly1305](https://datatracker.ietf.org/doc/html/draft-ietf-sshm-chacha20-poly1305))
 - `aes256-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes128-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))

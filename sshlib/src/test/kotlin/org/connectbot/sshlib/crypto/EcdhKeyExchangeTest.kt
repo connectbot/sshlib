@@ -18,6 +18,7 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
 import org.junit.Test
+import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
@@ -100,9 +101,8 @@ class EcdhKeyExchangeTest {
         serverAgreement.doPhase(clientPubKey, true)
         val serverRawSecret = serverAgreement.generateSecret()
 
-        // Convert server raw secret to positive BigInteger bytes (same as EcdhKeyExchange)
-        val serverBigInt = java.math.BigInteger(1, serverRawSecret)
-        val serverSecret = serverBigInt.toByteArray()
+        val serverBigInt = BigInteger(1, serverRawSecret)
+        val serverSecret = encodeMpint(serverBigInt.toByteArray())
 
         assertContentEquals(serverSecret, clientSecret)
     }

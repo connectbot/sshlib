@@ -644,8 +644,8 @@ class SshConnection(
 
         val c2sKey = keys.encryptionKeyClientToServer.copyOf(entryC2S.keyLength)
         val s2cKey = keys.encryptionKeyServerToClient.copyOf(entryS2C.keyLength)
-        val c2sIv = keys.initialIvClientToServer.copyOf(entryC2S.ivLength)
-        val s2cIv = keys.initialIvServerToClient.copyOf(entryS2C.ivLength)
+        val c2sIv = if (entryC2S.ivLength > 0) keys.initialIvClientToServer.copyOf(entryC2S.ivLength) else ByteArray(0)
+        val s2cIv = if (entryS2C.ivLength > 0) keys.initialIvServerToClient.copyOf(entryS2C.ivLength) else ByteArray(0)
 
         val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
         val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead

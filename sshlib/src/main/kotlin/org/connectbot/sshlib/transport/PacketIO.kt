@@ -275,9 +275,24 @@ class PacketIO(private val transport: Transport) {
      * Wire format: packet_length (4B, cleartext) || ciphertext || auth_tag (16B)
      * AAD: the 4-byte packet_length
      * Plaintext: padding_length || payload || padding
+     *
+     * For ciphers that encrypt the length (e.g., ChaCha20-Poly1305):
+     * Wire format: encrypted_length (4B) || ciphertext || auth_tag (16B)
+     * The encrypted length bytes are passed as AAD to encrypt/decrypt.
      */
     private suspend fun readAeadPacket(aead: PacketAead): UnencryptedPacket.UnencryptedPayload {
-        val lengthBytes = transport.read(4)
+        val wireLength = transport.read(4)
+
+        val lengthBytes: ByteArray
+        val aadBytes: ByteArray
+        if (aead.encryptsLength) {
+            aadBytes = wireLength.clone()
+            lengthBytes = aead.decryptLength(receiveSequenceNumber, wireLength)
+        } else {
+            lengthBytes = wireLength
+            aadBytes = wireLength
+        }
+
         val packetLength = ByteBuffer.wrap(lengthBytes).int
 
         if (packetLength < MIN_PACKET_LENGTH || packetLength > MAX_PACKET_LENGTH) {
@@ -287,7 +302,7 @@ class PacketIO(private val transport: Transport) {
         val ciphertext = transport.read(packetLength)
         val tag = transport.read(aead.tagLength)
 
-        val plaintext = aead.decrypt(lengthBytes, ciphertext, tag)
+        val plaintext = aead.decrypt(aadBytes, ciphertext, tag)
 
         val fullPacket = lengthBytes + plaintext
         val stream = ByteBufferKaitaiStream(fullPacket)
@@ -446,6 +461,10 @@ class PacketIO(private val transport: Transport) {
      * Wire format: packet_length (4B, cleartext) || ciphertext || auth_tag (16B)
      * Plaintext: padding_length || message_type || payload || padding
      * Padding must align the plaintext to a 16-byte boundary.
+     *
+     * For ciphers that encrypt the length (e.g., ChaCha20-Poly1305):
+     * Wire format: encrypted_length (4B) || ciphertext || auth_tag (16B)
+     * The encrypted length bytes are passed as AAD to encrypt.
      */
     private suspend fun writeAeadPacket(
         messageType: Int,
@@ -453,7 +472,7 @@ class PacketIO(private val transport: Transport) {
         aead: PacketAead
     ) {
         val payloadLength = 1 + payload.size // message type + payload
-        val blockSize = 16 // AES block size for GCM padding alignment
+        val blockSize = if (aead.encryptsLength) 8 else 16
 
         val paddingLength = calculateAeadPaddingLength(payloadLength, blockSize)
         val packetLength = 1 + payloadLength + paddingLength
@@ -467,9 +486,19 @@ class PacketIO(private val transport: Transport) {
         val plaintext = plaintextBuffer.toByteArray()
         val lengthBytes = ByteBuffer.allocate(4).putInt(packetLength).array()
 
-        val result = aead.encrypt(lengthBytes, plaintext)
+        val wireLength: ByteArray
+        val aadBytes: ByteArray
+        if (aead.encryptsLength) {
+            wireLength = aead.encryptLength(sendSequenceNumber, lengthBytes)
+            aadBytes = wireLength
+        } else {
+            wireLength = lengthBytes
+            aadBytes = lengthBytes
+        }
 
-        transport.write(lengthBytes + result.ciphertext + result.tag)
+        val result = aead.encrypt(aadBytes, plaintext)
+
+        transport.write(wireLength + result.ciphertext + result.tag)
         sendSequenceNumber++
     }
 

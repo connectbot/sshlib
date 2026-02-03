@@ -85,6 +85,8 @@ dependencies {
     implementation("io.github.nsk90:kstatemachine-jvm:0.36.0")
     implementation("io.ktor:ktor-network:3.4.0")
     implementation("org.slf4j:slf4j-api:2.0.17")
+    implementation("com.google.crypto.tink:tink:1.20.0")
+    implementation("asia.hombre:kyber:2.0.1")
 
     // Unit tests
     testImplementation("junit:junit:4.13.2")

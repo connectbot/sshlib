@@ -102,7 +102,7 @@ class DiffieHellmanTest {
         val serverRawSecret = serverAgreement.generateSecret()
 
         val serverBigInt = BigInteger(1, serverRawSecret)
-        val serverSecret = serverBigInt.toByteArray()
+        val serverSecret = encodeMpint(serverBigInt.toByteArray())
 
         assertContentEquals(serverSecret, clientSecret)
     }

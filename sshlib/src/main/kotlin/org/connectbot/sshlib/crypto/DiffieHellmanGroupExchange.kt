@@ -66,7 +66,7 @@ class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : KexAlgori
             throw SshException("Invalid server public key")
         }
 
-        return f.modPow(x, p).toByteArray()
+        return encodeMpint(f.modPow(x, p).toByteArray())
     }
 
     /**
@@ -121,7 +121,7 @@ class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : KexAlgori
         writeString(g.toByteArray())
         writeString(clientPublicKey)
         writeString(serverPublicKey)
-        writeString(sharedSecret)
+        transcript.write(sharedSecret)
 
         val md = MessageDigest.getInstance(hashAlgorithm)
         return md.digest(transcript.toByteArray())
