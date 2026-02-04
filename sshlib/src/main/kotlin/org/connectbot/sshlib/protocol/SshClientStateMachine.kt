@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.struct
+package org.connectbot.sshlib.protocol
 
 import ru.nsk.kstatemachine.event.Event
 import ru.nsk.kstatemachine.state.*
@@ -43,7 +43,7 @@ import ru.nsk.kstatemachine.transition.onTriggered
  * Note: This state machine is designed for SSH clients only. For server-side
  * state management, a separate SshServerStateMachine would be needed.
  */
-class SshClientStateMachine(
+internal class SshClientStateMachine(
     private val callbacks: SshClientCallbacks
 ) {
     sealed class SshEvent : Event {
@@ -324,7 +324,7 @@ class SshClientStateMachine(
     }
 }
 
-interface SshClientCallbacks {
+internal interface SshClientCallbacks {
     fun sendVersion()
     fun receiveVersion(banner: IdBanner)
     fun sendKexInit()

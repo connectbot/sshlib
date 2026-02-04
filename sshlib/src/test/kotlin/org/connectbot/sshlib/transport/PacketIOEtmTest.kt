@@ -21,7 +21,7 @@ import org.connectbot.sshlib.crypto.AesCbcCipher
 import org.connectbot.sshlib.crypto.AesCtrCipher
 import org.connectbot.sshlib.crypto.HmacSha256
 import org.connectbot.sshlib.crypto.TripleDesCbcCipher
-import org.connectbot.sshlib.struct.SshEnums
+import org.connectbot.sshlib.protocol.SshEnums
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

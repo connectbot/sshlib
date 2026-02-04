@@ -17,10 +17,10 @@
 package org.connectbot.sshlib.crypto
 
 import io.kaitai.struct.ByteBufferKaitaiStream
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshSignature
 
-object SignatureVerifier {
+internal object SignatureVerifier {
 
     fun verify(serverHostKey: ByteArray, signatureData: ByteArray, exchangeHash: ByteArray): Boolean {
         val sig = SshSignature(ByteBufferKaitaiStream(signatureData))

@@ -28,7 +28,7 @@ import java.security.SecureRandom
  * Uses a 4-message protocol where the client requests DH parameters from
  * the server before performing the key exchange.
  */
-class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : KexAlgorithm {
+internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : KexAlgorithm {
     companion object {
         private val secureRandom = SecureRandom()
     }

@@ -21,7 +21,7 @@ import java.math.BigInteger
 /**
  * Well-known Diffie-Hellman group primes for SSH key exchange.
  */
-object DhGroups {
+internal object DhGroups {
     val GENERATOR: BigInteger = BigInteger.valueOf(2)
 
     /** 1024-bit MODP Group (RFC 2409 Section 6.2, Oakley Group 2) */

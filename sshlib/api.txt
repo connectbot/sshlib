@@ -1,0 +1,253 @@
+// Signature format: 4.0
+package org.connectbot.sshlib {
+
+  public interface HostKeyVerifier {
+    method public default suspend Object? addKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public default suspend Object? removeKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? verify(org.connectbot.sshlib.PublicKey key, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+  }
+
+  public interface KeyboardInteractiveCallback {
+    method public suspend Object? onInfoRequest(String name, String instruction, java.util.List<org.connectbot.sshlib.KeyboardInteractiveCallback.Prompt> prompts, kotlin.jvm.functions.Function2<? super java.util.List<? extends java.lang.String>,? super kotlin.coroutines.Continuation<? super kotlin.Unit>,? extends java.lang.Object?> respond, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+  }
+
+  public static final class KeyboardInteractiveCallback.Prompt {
+    ctor public KeyboardInteractiveCallback.Prompt(String text, boolean echo);
+    method public String component1();
+    method public boolean component2();
+    method public org.connectbot.sshlib.KeyboardInteractiveCallback.Prompt copy(String text, boolean echo);
+    method public boolean equals(Object? other);
+    method public boolean getEcho();
+    method public String getText();
+    method public int hashCode();
+    method public String toString();
+    property public final boolean echo;
+    property public final String text;
+  }
+
+  public final class KnownHostsVerifier implements org.connectbot.sshlib.HostKeyVerifier {
+    ctor public KnownHostsVerifier(error.NonExistentClass file, String hostname, optional int port);
+    method public suspend Object? verify(org.connectbot.sshlib.PublicKey key, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+  }
+
+  public final class PublicKey {
+    ctor public PublicKey(String type, byte[] encoded);
+    method public String component1();
+    method public byte[] component2();
+    method public org.connectbot.sshlib.PublicKey copy(String type, byte[] encoded);
+    method public boolean equals(Object? other);
+    method public byte[] getEncoded();
+    method public String getType();
+    method public int hashCode();
+    method public String toString();
+    property public final byte[] encoded;
+    property public final String type;
+  }
+
+  public final class SshClient {
+    method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? authenticatePassword(String username, String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? connect(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? disconnect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public boolean isAuthenticated();
+    method public suspend Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
+    property public final boolean isAuthenticated;
+    field public static final org.connectbot.sshlib.SshClient.Companion Companion;
+  }
+
+  public static final class SshClient.Companion {
+    method public operator org.connectbot.sshlib.SshClient invoke(String host, optional int port, optional String clientVersion);
+    method public operator org.connectbot.sshlib.SshClient invoke(org.connectbot.sshlib.SshClientConfig config);
+    method public operator org.connectbot.sshlib.SshClient invoke(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional String clientVersion);
+  }
+
+  public final class SshClientConfig {
+    method public String getClientVersion();
+    method public String getEncryptionAlgorithms();
+    method public String getHostKeyAlgorithms();
+    method public org.connectbot.sshlib.HostKeyVerifier getHostKeyVerifier();
+    method public String getKexAlgorithms();
+    method public String getMacAlgorithms();
+    method public org.connectbot.sshlib.transport.TransportFactory getTransportFactory();
+    property public final String clientVersion;
+    property public final String encryptionAlgorithms;
+    property public final String hostKeyAlgorithms;
+    property public final org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier;
+    property public final String kexAlgorithms;
+    property public final String macAlgorithms;
+    property public final org.connectbot.sshlib.transport.TransportFactory transportFactory;
+    field public static final org.connectbot.sshlib.SshClientConfig.Companion Companion;
+  }
+
+  public static final class SshClientConfig.Builder {
+    ctor public SshClientConfig.Builder();
+    method public org.connectbot.sshlib.SshClientConfig build();
+    method public String getClientVersion();
+    method public String getEncryptionAlgorithms();
+    method public String getHost();
+    method public String getHostKeyAlgorithms();
+    method public org.connectbot.sshlib.HostKeyVerifier? getHostKeyVerifier();
+    method public String getKexAlgorithms();
+    method public String getMacAlgorithms();
+    method public int getPort();
+    method public org.connectbot.sshlib.transport.TransportFactory? getTransportFactory();
+    method public void setClientVersion(String);
+    method public void setEncryptionAlgorithms(String);
+    method public void setHost(String);
+    method public void setHostKeyAlgorithms(String);
+    method public void setHostKeyVerifier(org.connectbot.sshlib.HostKeyVerifier?);
+    method public void setKexAlgorithms(String);
+    method public void setMacAlgorithms(String);
+    method public void setPort(int);
+    method public void setTransportFactory(org.connectbot.sshlib.transport.TransportFactory?);
+    property public final String clientVersion;
+    property public final String encryptionAlgorithms;
+    property public final String host;
+    property public final String hostKeyAlgorithms;
+    property public final org.connectbot.sshlib.HostKeyVerifier? hostKeyVerifier;
+    property public final String kexAlgorithms;
+    property public final String macAlgorithms;
+    property public final int port;
+    property public final org.connectbot.sshlib.transport.TransportFactory? transportFactory;
+  }
+
+  public static final class SshClientConfig.Companion {
+    method public operator org.connectbot.sshlib.SshClientConfig invoke(kotlin.jvm.functions.Function1<? super org.connectbot.sshlib.SshClientConfig.Builder,kotlin.Unit> block);
+  }
+
+  public class SshException {
+    ctor public SshException(String message, optional Throwable? cause);
+  }
+
+  public interface SshSession {
+    method public void close();
+    method public int getLocalChannelNumber();
+    method public int getRemoteChannelNumber();
+    method public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStderr();
+    method public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStdout();
+    method public boolean isOpen();
+    method public suspend Object? read(kotlin.coroutines.Continuation<? super byte[]?>);
+    method public suspend Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<? extends java.lang.Integer,? extends byte[]>?>);
+    method public suspend Object? requestPty(optional String terminalType, optional int widthChars, optional int heightRows, optional int widthPixels, optional int heightPixels, optional byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public abstract boolean isOpen;
+    property public abstract int localChannelNumber;
+    property public abstract int remoteChannelNumber;
+    property public abstract kotlinx.coroutines.channels.ReceiveChannel<byte[]> stderr;
+    property public abstract kotlinx.coroutines.channels.ReceiveChannel<byte[]> stdout;
+  }
+
+}
+
+package org.connectbot.sshlib.blocking {
+
+  public final class BlockingSshClient {
+    ctor public BlockingSshClient(String host, optional int port, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier);
+    ctor public BlockingSshClient(String host, optional int port, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional String clientVersion);
+    ctor public BlockingSshClient(String host, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier);
+    ctor public BlockingSshClient(org.connectbot.sshlib.SshClientConfig config);
+    ctor public BlockingSshClient(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional String clientVersion);
+    method public boolean authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback);
+    method public boolean authenticatePassword(String username, String password);
+    method public boolean connect();
+    method public void disconnect();
+    method public boolean isAuthenticated();
+    method public org.connectbot.sshlib.SshSession? openSession();
+    property public final boolean isAuthenticated;
+  }
+
+}
+
+package org.connectbot.sshlib.client {
+
+  public final class SessionChannel implements org.connectbot.sshlib.SshSession {
+    method public void close();
+    method public int getLocalChannelNumber();
+    method public int getRemoteChannelNumber();
+    method public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStderr();
+    method public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStdout();
+    method public boolean isOpen();
+    method public suspend Object? read(kotlin.coroutines.Continuation<? super byte[]?>);
+    method public suspend Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<? extends java.lang.Integer,? extends byte[]>?>);
+    method public suspend Object? requestPty(String terminalType, int widthChars, int heightRows, int widthPixels, int heightPixels, byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public boolean isOpen;
+    property public int localChannelNumber;
+    property public int remoteChannelNumber;
+    property public kotlinx.coroutines.channels.ReceiveChannel<byte[]> stderr;
+    property public kotlinx.coroutines.channels.ReceiveChannel<byte[]> stdout;
+    field public static final org.connectbot.sshlib.client.SessionChannel.Companion Companion;
+  }
+
+  public static final class SessionChannel.Companion {
+  }
+
+  public final class SshConnection {
+    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional String kexAlgorithms, optional String hostKeyAlgorithms, optional String encryptionAlgorithms, optional String macAlgorithms);
+    method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? authenticatePassword(String username, String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public boolean connect();
+    method public suspend Object? openSessionChannel(optional int initialWindowSize, optional int maxPacketSize, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.client.SessionChannel?>);
+    field public static final org.connectbot.sshlib.client.SshConnection.Companion Companion;
+  }
+
+  public static final class SshConnection.Companion {
+  }
+
+}
+
+package org.connectbot.sshlib.transport {
+
+  public interface AddressResolver {
+    method public suspend Object? resolve(String host, kotlin.coroutines.Continuation<? super java.util.List<? extends error.NonExistentClass>>);
+  }
+
+  public final class KtorTcpTransport implements org.connectbot.sshlib.transport.Transport {
+    ctor public KtorTcpTransport(String host, optional int port);
+    method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? connect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public boolean isConnected();
+    method public suspend Object? read(int count, kotlin.coroutines.Continuation<? super byte[]>);
+    method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public boolean isConnected;
+  }
+
+  public final class KtorTcpTransportFactory implements org.connectbot.sshlib.transport.TransportFactory {
+    ctor public KtorTcpTransportFactory(String host, optional int port);
+    method public suspend Object? create(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.transport.Transport>);
+  }
+
+  public interface TcpSocketFactory {
+    method public suspend Object? connect(error.NonExistentClass address, int port, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.transport.TransportSocket>);
+  }
+
+  public interface Transport {
+    method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public boolean isConnected();
+    method public suspend Object? read(int count, kotlin.coroutines.Continuation<? super byte[]>);
+    method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public abstract boolean isConnected;
+  }
+
+  public final class TransportException extends org.connectbot.sshlib.SshException {
+    ctor public TransportException(String message, optional Throwable? cause);
+  }
+
+  public fun interface TransportFactory {
+    method public suspend Object? create(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.transport.Transport>);
+  }
+
+  public interface TransportSocket {
+    method public boolean isClosed();
+    method public io.ktor.utils.io.ByteReadChannel openReadChannel();
+    method public io.ktor.utils.io.ByteWriteChannel openWriteChannel(optional boolean autoFlush);
+    property public abstract boolean isClosed;
+  }
+
+}
+

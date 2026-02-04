@@ -32,7 +32,7 @@ import javax.crypto.spec.SecretKeySpec
  * @param iv Initial IV (16 bytes)
  * @param forEncryption True for encryption, false for decryption
  */
-class AesCbcCipher(
+internal class AesCbcCipher(
     private val key: ByteArray,
     private val iv: ByteArray,
     forEncryption: Boolean

@@ -19,7 +19,7 @@ package org.connectbot.sshlib.crypto
 /**
  * Interface for SSH packet encryption/decryption.
  */
-interface PacketCipher {
+internal interface PacketCipher {
     /**
      * Block size in bytes for this cipher.
      */

@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib.crypto
 
-data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
+internal data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
 
 /**
  * Interface for SSH AEAD (Authenticated Encryption with Associated Data) ciphers.
@@ -25,7 +25,7 @@ data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
  * unlike the separate cipher + MAC approach. The packet_length field serves
  * as AAD (authenticated but not encrypted).
  */
-interface PacketAead {
+internal interface PacketAead {
     val tagLength: Int
 
     val encryptsLength: Boolean get() = false

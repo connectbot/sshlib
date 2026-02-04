@@ -26,7 +26,7 @@ import java.security.MessageDigest
  * pattern: generate an ephemeral key pair, compute a shared secret from the
  * server's public value, and compute an exchange hash over the transcript.
  */
-interface KexAlgorithm {
+internal interface KexAlgorithm {
     val hashAlgorithm: String
 
     fun generateClientKeys(): ByteArray

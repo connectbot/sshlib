@@ -26,7 +26,7 @@ import java.security.spec.X509EncodedKeySpec
 /**
  * ML-KEM provider using Java 23+ native javax.crypto.KEM API via reflection.
  */
-class JavaMlKemProvider : MlKemProvider {
+internal class JavaMlKemProvider : MlKemProvider {
     companion object {
         private const val MLKEM768_PUBLIC_KEY_SIZE = 1184
 

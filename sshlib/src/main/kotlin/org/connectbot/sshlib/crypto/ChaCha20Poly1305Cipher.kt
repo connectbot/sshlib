@@ -29,7 +29,7 @@ import javax.crypto.spec.SecretKeySpec
  *
  * The Poly1305 tag covers encrypted_length || ciphertext.
  */
-class ChaCha20Poly1305Cipher(key: ByteArray) : PacketAead {
+internal class ChaCha20Poly1305Cipher(key: ByteArray) : PacketAead {
     companion object {
         const val KEY_SIZE = 64
         const val TAG_SIZE = 16

@@ -26,7 +26,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.security.spec.XECPrivateKeySpec
 import javax.crypto.KeyAgreement
 
-class PlatformX25519Provider : X25519Provider {
+internal class PlatformX25519Provider : X25519Provider {
     companion object {
         private const val ALGORITHM = "X25519"
 

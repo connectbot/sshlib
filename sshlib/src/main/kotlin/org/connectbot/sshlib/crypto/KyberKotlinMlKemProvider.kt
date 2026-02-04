@@ -25,7 +25,7 @@ import asia.hombre.kyber.interfaces.RandomProvider
 import java.io.IOException
 import java.security.SecureRandom
 
-class KyberKotlinMlKemProvider : MlKemProvider {
+internal class KyberKotlinMlKemProvider : MlKemProvider {
     private val randomProvider = object : RandomProvider {
         private val secureRandom = SecureRandom()
         override fun fillWithRandom(byteArray: ByteArray) {

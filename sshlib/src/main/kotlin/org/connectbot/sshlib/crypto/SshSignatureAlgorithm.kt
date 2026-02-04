@@ -16,9 +16,9 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshSignature
 
-fun interface SshSignatureAlgorithm {
+internal fun interface SshSignatureAlgorithm {
     fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean
 }

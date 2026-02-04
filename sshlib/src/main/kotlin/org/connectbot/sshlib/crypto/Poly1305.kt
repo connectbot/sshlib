@@ -21,7 +21,7 @@ package org.connectbot.sshlib.crypto
  *
  * Uses a 5x27-bit limb accumulator representation for the modular arithmetic.
  */
-class Poly1305 {
+internal class Poly1305 {
     companion object {
         private const val BLOCK_SIZE = 16
     }

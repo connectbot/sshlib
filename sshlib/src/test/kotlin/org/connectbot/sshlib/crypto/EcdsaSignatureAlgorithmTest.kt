@@ -17,8 +17,8 @@
 package org.connectbot.sshlib.crypto
 
 import io.kaitai.struct.ByteBufferKaitaiStream
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshSignature
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream

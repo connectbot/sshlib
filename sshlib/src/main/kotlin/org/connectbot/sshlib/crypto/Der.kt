@@ -24,7 +24,7 @@ import java.nio.ByteBuffer
 /**
  * Helper to create a DER encoded byte array using the DSL.
  */
-fun encodeDer(init: DerWriter.() -> Unit): ByteArray {
+internal fun encodeDer(init: DerWriter.() -> Unit): ByteArray {
     val writer = DerWriter()
     writer.init()
     return writer.toByteArray()
@@ -43,7 +43,7 @@ fun encodeDer(init: DerWriter.() -> Unit): ByteArray {
  * }
  * ```
  */
-class DerWriter {
+internal class DerWriter {
     private val buffer = ByteArrayOutputStream()
 
     fun toByteArray(): ByteArray = buffer.toByteArray()
@@ -113,7 +113,7 @@ class DerWriter {
  * }
  * ```
  */
-class DerReader(private val data: ByteBuffer) {
+internal class DerReader(private val data: ByteBuffer) {
     constructor(bytes: ByteArray) : this(ByteBuffer.wrap(bytes))
 
     fun <T> readSequence(block: (DerReader) -> T): T {

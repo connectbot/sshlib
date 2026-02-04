@@ -20,6 +20,7 @@ plugins {
 
 subprojects {
     repositories {
+        google()
         mavenCentral()
     }
 }

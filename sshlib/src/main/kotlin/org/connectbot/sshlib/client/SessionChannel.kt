@@ -20,7 +20,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshSession
-import org.connectbot.sshlib.struct.*
+import org.connectbot.sshlib.protocol.*
 import org.slf4j.LoggerFactory
 
 class SessionChannel internal constructor(

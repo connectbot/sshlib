@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.struct
+package org.connectbot.sshlib.protocol
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct

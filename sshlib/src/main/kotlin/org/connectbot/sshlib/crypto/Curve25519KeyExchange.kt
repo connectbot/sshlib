@@ -19,7 +19,7 @@ package org.connectbot.sshlib.crypto
 import org.connectbot.sshlib.SshException
 import java.math.BigInteger
 
-class Curve25519KeyExchange(
+internal class Curve25519KeyExchange(
     private val x25519Provider: X25519Provider = X25519ProviderFactory.provider,
     private val presetPrivateKey: ByteArray? = null
 ) : KexAlgorithm {

@@ -33,7 +33,7 @@ import javax.crypto.KeyAgreement
  *
  * Supports the three required NIST curves: nistp256, nistp384, nistp521.
  */
-class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
+internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
 
     private val jcaCurveName: String
     private val ecParameterSpec: ECParameterSpec
