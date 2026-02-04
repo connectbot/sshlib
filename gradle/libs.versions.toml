@@ -1,0 +1,38 @@
+[versions]
+kotlin = "2.3.0"
+kaitai = "0.11"
+coroutines = "1.10.2"
+kstatemachine = "0.36.0"
+ktor = "3.4.0"
+slf4j = "2.0.17"
+tink = "1.20.0"
+kyber = "2.0.1"
+junit4 = "4.13.2"
+junitVintage = "6.0.2"
+junit = "6.0.2"
+logback = "1.5.27"
+testcontainers = "2.0.3"
+metalava = "0.4.0-alpha03"
+
+[libraries]
+kaitai-runtime = { module = "io.kaitai:kaitai-struct-runtime", version.ref = "kaitai" }
+kaitai-compiler = { module = "io.kaitai:kaitai-struct-compiler_2.13", version.ref = "kaitai" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kstatemachine = { module = "io.github.nsk90:kstatemachine-jvm", version.ref = "kstatemachine" }
+ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
+kyber = { module = "asia.hombre:kyber", version.ref = "kyber" }
+junit = { module = "junit:junit", version.ref = "junit4" }
+junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junitVintage" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
+testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+metalava = { id = "me.tylerbwong.gradle.metalava", version.ref = "metalava" }
