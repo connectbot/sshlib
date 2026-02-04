@@ -34,7 +34,7 @@ import javax.crypto.spec.SecretKeySpec
  * @param key AES key (16 bytes for AES-128, 32 bytes for AES-256)
  * @param iv Initial 12-byte IV from key derivation
  */
-class AesGcmCipher(
+internal class AesGcmCipher(
     key: ByteArray,
     private val iv: ByteArray
 ) : PacketAead {

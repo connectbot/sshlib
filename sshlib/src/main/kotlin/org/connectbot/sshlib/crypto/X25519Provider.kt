@@ -18,7 +18,7 @@ package org.connectbot.sshlib.crypto
 
 import java.security.InvalidKeyException
 
-interface X25519Provider {
+internal interface X25519Provider {
     companion object {
         const val KEY_SIZE = 32
     }

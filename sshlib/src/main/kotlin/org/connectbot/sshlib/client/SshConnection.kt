@@ -22,9 +22,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.crypto.*
-import org.connectbot.sshlib.struct.*
-import org.connectbot.sshlib.struct.SshClientCallbacks
-import org.connectbot.sshlib.struct.SshClientStateMachine
+import org.connectbot.sshlib.protocol.*
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.HostKeyVerifier
@@ -51,7 +49,7 @@ class SshConnection(
     private val hostKeyAlgorithms: String = SignatureEntry.defaultString,
     private val encryptionAlgorithms: String = CipherEntry.defaultString,
     private val macAlgorithms: String = MacEntry.defaultString
-) : SshClientCallbacks {
+) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
@@ -61,7 +59,41 @@ class SshConnection(
     private val packetIO = PacketIO(transport)
     @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     private val stateMachineDispatcher = newSingleThreadContext("ssh-state-machine")
-    private val stateMachine = SshClientStateMachine(this)
+
+    private val callbacks = object : SshClientCallbacks {
+        override fun sendVersion() = this@SshConnection.sendVersion()
+        override fun receiveVersion(banner: IdBanner) = this@SshConnection.receiveVersion(banner)
+        override fun sendKexInit() = this@SshConnection.sendKexInit()
+        override fun receiveKexInit(msg: SshMsgKexinit) = this@SshConnection.receiveKexInit(msg)
+        override fun sendKexExchangeInit() = this@SshConnection.sendKexExchangeInit()
+        override fun receiveKexDhReply(msg: SshMsgKexdhReply) = this@SshConnection.receiveKexDhReply(msg)
+        override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
+        override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
+        override fun sendNewKeys() = this@SshConnection.sendNewKeys()
+        override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
+        override fun activateEncryption() = this@SshConnection.activateEncryption()
+        override fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
+        override fun receiveServiceAccept(service: String) = this@SshConnection.receiveServiceAccept(service)
+        override fun startAuthentication() = this@SshConnection.startAuthentication()
+        override fun authenticationSuccess() = this@SshConnection.authenticationSuccess()
+        override fun authenticationFailure() = this@SshConnection.authenticationFailure()
+        override fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) = this@SshConnection.receiveUserauthInfoRequest(msg)
+        override fun receiveUserauthBanner(msg: SshMsgUserauthBanner) = this@SshConnection.receiveUserauthBanner(msg)
+        override fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) = this@SshConnection.sendChannelOpen(channelType, localChannelNumber, initialWindowSize, maxPacketSize)
+        override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) = this@SshConnection.receiveChannelOpenConfirmation(msg)
+        override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) = this@SshConnection.receiveChannelOpenFailure(msg)
+        override fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) = this@SshConnection.sendChannelRequest(recipientChannel, requestType, wantReply, message)
+        override fun receiveChannelSuccess() = this@SshConnection.receiveChannelSuccess()
+        override fun receiveChannelFailure() = this@SshConnection.receiveChannelFailure()
+        override fun receiveGlobalRequest(msg: SshMsgGlobalRequest) = this@SshConnection.receiveGlobalRequest(msg)
+        override fun debug(msg: SshMsgDebug) = this@SshConnection.debug(msg)
+        override fun ignore() = this@SshConnection.ignore()
+        override fun disconnect() = this@SshConnection.disconnect()
+        override fun onStateEnter(stateName: String) = this@SshConnection.onStateEnter(stateName)
+        override fun onStateExit(stateName: String) = this@SshConnection.onStateExit(stateName)
+    }
+
+    private val stateMachine = SshClientStateMachine(callbacks)
     private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var serverVersion: String? = null
@@ -319,11 +351,11 @@ class SshConnection(
 
     // SshClientCallbacks implementation
 
-    override fun sendVersion() {
+    private fun sendVersion() {
         logger.debug("Sending version: $clientVersion")
     }
 
-    override fun receiveVersion(banner: IdBanner) {
+    private fun receiveVersion(banner: IdBanner) {
         // protoVersion() includes everything after "SSH-" up to and including \r\n
         // For exchange hash, we need "SSH-" + version without the CR-LF
         val versionWithCrlf = banner.protoVersion()
@@ -332,7 +364,7 @@ class SshConnection(
         logger.info("Server version: $serverVersion")
     }
 
-    override fun sendKexInit() {
+    private fun sendKexInit() {
         logger.debug("Sending KEX_INIT")
 
         val kexInit = SshMsgKexinit()
@@ -365,7 +397,7 @@ class SshConnection(
         }
     }
 
-    override fun receiveKexInit(msg: SshMsgKexinit) {
+    private fun receiveKexInit(msg: SshMsgKexinit) {
         logger.info("Received KEX_INIT from server")
 
         val serverKexAlgs = msg.kexAlgorithms().entries().data()
@@ -429,7 +461,7 @@ class SshConnection(
         }
     }
 
-    override fun sendKexExchangeInit() {
+    private fun sendKexExchangeInit() {
         val kexName = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
         val kexEntry = KexEntry.fromSshName(kexName)
             ?: throw SshException("Unknown KEX algorithm: $kexName")
@@ -492,7 +524,7 @@ class SshConnection(
         }
     }
 
-    override fun receiveKexDhReply(msg: SshMsgKexdhReply) {
+    private fun receiveKexDhReply(msg: SshMsgKexdhReply) {
         logger.info("Received DH_REPLY from server")
         completeKex(
             serverHostKey = msg.serverKey().data(),
@@ -501,7 +533,7 @@ class SshConnection(
         )
     }
 
-    override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
+    private fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
         logger.info("Received ECDH_REPLY from server")
         completeKex(
             serverHostKey = msg.kS().data(),
@@ -569,7 +601,7 @@ class SshConnection(
         logger.info("Server signature verified")
     }
 
-    override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
+    private fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
         logger.info("Received DH_GEX_REPLY from server")
         completeKex(
             serverHostKey = msg.serverPublicHostKey().data(),
@@ -578,7 +610,7 @@ class SshConnection(
         )
     }
 
-    override fun sendNewKeys() {
+    private fun sendNewKeys() {
         logger.debug("Sending NEW_KEYS")
         runBlocking {
             packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
@@ -588,14 +620,14 @@ class SshConnection(
         }
     }
 
-    override fun receiveNewKeys() {
+    private fun receiveNewKeys() {
         logger.info("Received NEW_KEYS from server")
         if (strictKexEnabled) {
             packetIO.resetReceiveSequenceNumber()
         }
     }
 
-    override fun activateEncryption() {
+    private fun activateEncryption() {
         logger.info("Activating encryption")
 
         val encC2S = negotiatedEncryptionC2S
@@ -713,7 +745,7 @@ class SshConnection(
         )
     }
 
-    override fun sendServiceRequest(service: String) {
+    private fun sendServiceRequest(service: String) {
         logger.info("Requesting service: $service")
 
         val msg = SshMsgServiceRequest()
@@ -724,27 +756,27 @@ class SshConnection(
         }
     }
 
-    override fun receiveServiceAccept(service: String) {
+    private fun receiveServiceAccept(service: String) {
         logger.info("Service accepted: $service")
     }
 
-    override fun startAuthentication() {
+    private fun startAuthentication() {
         logger.info("Starting authentication")
     }
 
-    override fun authenticationSuccess() {
+    private fun authenticationSuccess() {
         logger.info("Authentication successful")
         pendingAuth?.complete(true)
         pendingAuth = null
     }
 
-    override fun authenticationFailure() {
+    private fun authenticationFailure() {
         logger.warn("Authentication failed")
         pendingAuth?.complete(false)
         pendingAuth = null
     }
 
-    override fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) {
+    private fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) {
         val channel = infoRequestChannel
         if (channel != null) {
             val sent = channel.trySend(msg)
@@ -756,19 +788,19 @@ class SshConnection(
         }
     }
 
-    override fun receiveUserauthBanner(msg: SshMsgUserauthBanner) {
+    private fun receiveUserauthBanner(msg: SshMsgUserauthBanner) {
         logger.info("SSH banner: ${msg.message().value()}")
     }
 
-    override fun debug(msg: SshMsgDebug) {
+    private fun debug(msg: SshMsgDebug) {
         logger.debug("SSH debug: ${msg.message()}")
     }
 
-    override fun ignore() {
+    private fun ignore() {
         logger.trace("Received IGNORE message")
     }
 
-    override fun disconnect() {
+    private fun disconnect() {
         logger.info("Disconnecting")
         runBlocking {
             transport.close()
@@ -784,15 +816,15 @@ class SshConnection(
         stateMachineDispatcher.close()
     }
 
-    override fun onStateEnter(stateName: String) {
+    private fun onStateEnter(stateName: String) {
         logger.debug("State: $stateName")
     }
 
-    override fun onStateExit(stateName: String) {
+    private fun onStateExit(stateName: String) {
         // Not logging state exits to reduce verbosity
     }
 
-    override fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
+    private fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
         logger.debug("Sending CHANNEL_OPEN: $channelType (local=$localChannelNumber)")
 
         val msg = SshMsgChannelOpen()
@@ -813,19 +845,19 @@ class SshConnection(
         }
     }
 
-    override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
+    private fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
         logger.info("Channel open confirmed")
         pendingChannelOpen?.complete(msg)
         pendingChannelOpen = null
     }
 
-    override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
+    private fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
         logger.error("Channel open failed: ${msg.reasonCode()}")
         pendingChannelOpen?.complete(null)
         pendingChannelOpen = null
     }
 
-    override fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
+    private fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
         logger.debug("Sending CHANNEL_REQUEST: $requestType (channel=$recipientChannel, wantReply=$wantReply)")
 
         runBlocking {
@@ -836,19 +868,19 @@ class SshConnection(
         }
     }
 
-    override fun receiveChannelSuccess() {
+    private fun receiveChannelSuccess() {
         logger.debug("Channel request succeeded")
         pendingChannelRequest?.complete(true)
         pendingChannelRequest = null
     }
 
-    override fun receiveChannelFailure() {
+    private fun receiveChannelFailure() {
         logger.warn("Channel request failed")
         pendingChannelRequest?.complete(false)
         pendingChannelRequest = null
     }
 
-    override fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
+    private fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
         val requestName = msg.requestName().value()
         val wantReply = msg.wantReply() != 0
 

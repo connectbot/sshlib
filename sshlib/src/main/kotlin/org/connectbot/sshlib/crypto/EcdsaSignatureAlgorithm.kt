@@ -18,10 +18,10 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
 
-import org.connectbot.sshlib.struct.EcdsaPublicKeyBlob
-import org.connectbot.sshlib.struct.EcdsaSignatureBlob
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.EcdsaPublicKeyBlob
+import org.connectbot.sshlib.protocol.EcdsaSignatureBlob
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshSignature
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.security.AlgorithmParameters
@@ -32,7 +32,7 @@ import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
 
-object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
+internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
     override fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean {
         val keyBlob = pubKey.keyBlob() as EcdsaPublicKeyBlob
         val curveName = keyBlob.curveIdentifier().value()

@@ -32,7 +32,7 @@ import javax.crypto.spec.SecretKeySpec
  * @param iv Initial IV (8 bytes)
  * @param forEncryption True for encryption, false for decryption
  */
-class TripleDesCbcCipher(
+internal class TripleDesCbcCipher(
     private val key: ByteArray,
     private val iv: ByteArray,
     forEncryption: Boolean

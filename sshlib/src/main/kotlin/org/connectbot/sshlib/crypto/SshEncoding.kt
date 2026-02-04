@@ -22,7 +22,7 @@ package org.connectbot.sshlib.crypto
  * Returns uint32(length) || body, where body has leading zeros stripped and
  * a 0x00 prepended if the high bit is set (to keep the value positive).
  */
-fun encodeMpint(value: ByteArray): ByteArray {
+internal fun encodeMpint(value: ByteArray): ByteArray {
     var start = 0
     while (start < value.size - 1 && value[start] == 0.toByte()) {
         start++
@@ -51,7 +51,7 @@ fun encodeMpint(value: ByteArray): ByteArray {
  *
  * Returns uint32(length) || data.
  */
-fun encodeSshString(value: ByteArray): ByteArray {
+internal fun encodeSshString(value: ByteArray): ByteArray {
     val result = ByteArray(4 + value.size)
     result[0] = (value.size shr 24).toByte()
     result[1] = (value.size shr 16).toByte()

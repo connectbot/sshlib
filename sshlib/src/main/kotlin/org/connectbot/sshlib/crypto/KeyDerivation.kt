@@ -27,7 +27,7 @@ import java.security.MessageDigest
  * @param sharedSecret Wire-encoded shared secret K (already in mpint or string format
  *                     with uint32 length prefix, as returned by [KexAlgorithm.computeSharedSecret])
  */
-class KeyDerivation(
+internal class KeyDerivation(
     private val sharedSecret: ByteArray,
     private val exchangeHash: ByteArray,
     private val sessionId: ByteArray,

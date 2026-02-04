@@ -16,15 +16,15 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.connectbot.sshlib.struct.SshEd448PublicKeyBlob
-import org.connectbot.sshlib.struct.SshEd448SignatureBlob
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.SshEd448PublicKeyBlob
+import org.connectbot.sshlib.protocol.SshEd448SignatureBlob
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshSignature
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 
-object Ed448SignatureAlgorithm : SshSignatureAlgorithm {
+internal object Ed448SignatureAlgorithm : SshSignatureAlgorithm {
     private val ED448_OID = byteArrayOf(0x2b, 0x65, 0x71) // 1.3.101.113
 
     override fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean {

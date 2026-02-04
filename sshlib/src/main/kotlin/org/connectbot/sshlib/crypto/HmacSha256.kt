@@ -16,8 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.connectbot.sshlib.struct.EtmMac
-import org.connectbot.sshlib.struct.toByteArray
+import org.connectbot.sshlib.protocol.EtmMac
+import org.connectbot.sshlib.protocol.toByteArray
 import java.nio.ByteBuffer
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -29,7 +29,7 @@ import javax.crypto.spec.SecretKeySpec
  *
  * @param key MAC key (32 bytes)
  */
-class HmacSha256(private val key: ByteArray) : PacketMac {
+internal class HmacSha256(private val key: ByteArray) : PacketMac {
     override val macLength: Int = 32
 
     private val mac: Mac = Mac.getInstance("HmacSHA256")

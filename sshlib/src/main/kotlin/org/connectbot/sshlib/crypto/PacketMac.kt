@@ -19,7 +19,7 @@ package org.connectbot.sshlib.crypto
 /**
  * Interface for SSH packet message authentication codes (MAC).
  */
-interface PacketMac {
+internal interface PacketMac {
     /**
      * MAC length in bytes.
      */

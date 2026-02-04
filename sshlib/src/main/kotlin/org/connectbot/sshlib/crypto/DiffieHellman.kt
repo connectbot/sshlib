@@ -24,7 +24,7 @@ import java.security.SecureRandom
 /**
  * Diffie-Hellman key exchange implementation for SSH (RFC 4253).
  */
-class DiffieHellman(
+internal class DiffieHellman(
     override val hashAlgorithm: String = "SHA-256",
     private val p: BigInteger = DhGroups.GROUP14_P,
     private val g: BigInteger = DhGroups.GENERATOR

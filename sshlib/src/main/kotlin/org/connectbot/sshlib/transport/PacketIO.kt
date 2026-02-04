@@ -20,7 +20,7 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import org.connectbot.sshlib.crypto.PacketAead
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketMac
-import org.connectbot.sshlib.struct.*
+import org.connectbot.sshlib.protocol.*
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -40,7 +40,7 @@ import kotlin.random.Random
  *
  * @param transport Underlying transport layer
  */
-class PacketIO(private val transport: Transport) {
+internal class PacketIO(private val transport: Transport) {
     companion object {
         private val logger = LoggerFactory.getLogger(PacketIO::class.java)
 

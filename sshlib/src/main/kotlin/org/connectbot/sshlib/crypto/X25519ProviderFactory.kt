@@ -19,10 +19,10 @@ package org.connectbot.sshlib.crypto
 import org.slf4j.LoggerFactory
 import java.security.KeyPairGenerator
 
-object X25519ProviderFactory {
+internal object X25519ProviderFactory {
     private val logger = LoggerFactory.getLogger(X25519ProviderFactory::class.java)
 
-    val provider: X25519Provider by lazy {
+    internal val provider: X25519Provider by lazy {
         if (isPlatformNativeAvailable()) {
             try {
                 val p = PlatformX25519Provider()

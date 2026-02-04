@@ -18,10 +18,10 @@ package org.connectbot.sshlib.crypto
 
 import org.slf4j.LoggerFactory
 
-object MlKemProviderFactory {
+internal object MlKemProviderFactory {
     private val logger = LoggerFactory.getLogger(MlKemProviderFactory::class.java)
 
-    val provider: MlKemProvider by lazy {
+    internal val provider: MlKemProvider by lazy {
         try {
             val p = JavaMlKemProvider()
             logger.debug("Using Java 23+ native ML-KEM implementation")

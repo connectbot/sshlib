@@ -16,12 +16,12 @@
 
 package org.connectbot.sshlib.crypto
 
-sealed interface EncryptionInstance {
+internal sealed interface EncryptionInstance {
     data class Cipher(val cipher: PacketCipher) : EncryptionInstance
     data class Aead(val aead: PacketAead) : EncryptionInstance
 }
 
-enum class CipherEntry(
+internal enum class CipherEntry(
     val sshName: String,
     val keyLength: Int,
     val ivLength: Int,
@@ -62,7 +62,7 @@ enum class CipherEntry(
         { key, iv, enc -> EncryptionInstance.Cipher(TripleDesCbcCipher(key, iv, enc)) }
     );
 
-    fun create(key: ByteArray, iv: ByteArray, forEncryption: Boolean): EncryptionInstance =
+    internal fun create(key: ByteArray, iv: ByteArray, forEncryption: Boolean): EncryptionInstance =
         factory(key, iv, forEncryption)
 
     companion object {
@@ -75,7 +75,7 @@ enum class CipherEntry(
     }
 }
 
-enum class MacEntry(
+internal enum class MacEntry(
     val sshName: String,
     val keyLength: Int,
     val macLength: Int,
@@ -107,7 +107,7 @@ enum class MacEntry(
         { key -> HmacSha1(key.copyOf(20)) }
     );
 
-    fun create(key: ByteArray): PacketMac = factory(key)
+    internal fun create(key: ByteArray): PacketMac = factory(key)
 
     companion object {
         val defaults: List<MacEntry> = entries.toList()
@@ -119,9 +119,9 @@ enum class MacEntry(
     }
 }
 
-enum class KexType { DH, ECDH, DH_GEX }
+internal enum class KexType { DH, ECDH, DH_GEX }
 
-enum class KexEntry(
+internal enum class KexEntry(
     val sshName: String,
     val hashAlgorithm: String,
     val type: KexType,
@@ -176,7 +176,7 @@ enum class KexEntry(
         { DiffieHellman("SHA-1", DhGroups.GROUP1_P, DhGroups.GENERATOR) }
     );
 
-    fun create(): KexAlgorithm = factory()
+    internal fun create(): KexAlgorithm = factory()
 
     companion object {
         val defaults: List<KexEntry> = entries.filter { it != DH_GROUP1_SHA1 }
@@ -189,9 +189,9 @@ enum class KexEntry(
     }
 }
 
-enum class SignatureEntry(
+internal enum class SignatureEntry(
     val sshName: String,
-    val algorithm: SshSignatureAlgorithm
+    internal val algorithm: SshSignatureAlgorithm
 ) {
     SSH_ED25519("ssh-ed25519", Ed25519SignatureAlgorithm),
     SSH_ED448("ssh-ed448", Ed448SignatureAlgorithm),

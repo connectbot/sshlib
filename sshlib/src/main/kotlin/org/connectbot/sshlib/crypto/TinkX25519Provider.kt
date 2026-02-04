@@ -18,7 +18,7 @@ package org.connectbot.sshlib.crypto
 
 import com.google.crypto.tink.subtle.X25519
 
-class TinkX25519Provider : X25519Provider {
+internal class TinkX25519Provider : X25519Provider {
     override fun generatePrivateKey(): ByteArray = X25519.generatePrivateKey()
 
     override fun publicFromPrivate(privateKey: ByteArray): ByteArray =

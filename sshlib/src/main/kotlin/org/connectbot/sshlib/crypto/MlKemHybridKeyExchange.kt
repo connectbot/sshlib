@@ -29,7 +29,7 @@ import java.security.MessageDigest
  * Server reply: mlkem_ciphertext (1088) || x25519_pubkey (32) = 1120 bytes
  * K = SHA-256(mlkem_ss || x25519_ss)
  */
-class MlKemHybridKeyExchange(
+internal class MlKemHybridKeyExchange(
     private val mlKemProvider: MlKemProvider = MlKemProviderFactory.provider,
     private val x25519Provider: X25519Provider = X25519ProviderFactory.provider
 ) : KexAlgorithm {

@@ -16,16 +16,16 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.connectbot.sshlib.struct.SshPublicKey
-import org.connectbot.sshlib.struct.SshRsaPublicKeyBlob
-import org.connectbot.sshlib.struct.SshRsaSignatureBlob
-import org.connectbot.sshlib.struct.SshSignature
+import org.connectbot.sshlib.protocol.SshPublicKey
+import org.connectbot.sshlib.protocol.SshRsaPublicKeyBlob
+import org.connectbot.sshlib.protocol.SshRsaSignatureBlob
+import org.connectbot.sshlib.protocol.SshSignature
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.RSAPublicKeySpec
 
-object RsaSignatureAlgorithm : SshSignatureAlgorithm {
+internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
     override fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean {
         val keyBlob = pubKey.keyBlob() as SshRsaPublicKeyBlob
         val e = BigInteger(1, keyBlob.e().body())

@@ -18,10 +18,10 @@ package org.connectbot.sshlib.crypto
 
 import java.io.IOException
 
-data class MlKemKeyPair(val publicKey: ByteArray, val privateKey: ByteArray)
-data class MlKemEncapsulationResult(val ciphertext: ByteArray, val sharedSecret: ByteArray)
+internal data class MlKemKeyPair(val publicKey: ByteArray, val privateKey: ByteArray)
+internal data class MlKemEncapsulationResult(val ciphertext: ByteArray, val sharedSecret: ByteArray)
 
-interface MlKemProvider {
+internal interface MlKemProvider {
     @Throws(IOException::class)
     fun generateKeyPair(): MlKemKeyPair
 
