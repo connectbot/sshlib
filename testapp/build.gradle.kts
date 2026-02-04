@@ -15,7 +15,7 @@
  */
 
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     application
 }
 
@@ -25,16 +25,16 @@ application {
 
 dependencies {
     implementation(project(":sshlib"))
-    implementation("ch.qos.logback:logback-classic:1.5.27")
+    implementation(libs.logback.classic)
 
     // Integration test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.0.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.0.2")
-    testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.3")
-    testImplementation("org.testcontainers:testcontainers:2.0.3")
-    testImplementation("ch.qos.logback:logback-classic:1.5.27")
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers)
+    testImplementation(libs.logback.classic)
     testImplementation(kotlin("test"))
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.0.2")
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.test {

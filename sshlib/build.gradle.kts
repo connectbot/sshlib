@@ -15,7 +15,7 @@
  */
 
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     `java-library`
 }
 
@@ -56,43 +56,39 @@ tasks.register<KaitaiTask>("kaitai") {
     outputs.dir(kaitaiOutputDir)
 }
 
-tasks.named("compileJava") {
-    dependsOn("kaitai")
-}
-
-tasks.named("compileKotlin") {
+tasks.matching { it.name.startsWith("metalava") }.configureEach {
     dependsOn("kaitai")
 }
 
 sourceSets {
     main {
         java {
-            srcDir(kaitaiOutputDir)
+            srcDir(tasks.named("kaitai"))
         }
     }
 }
 
 dependencies {
     // Public API dependencies
-    api("io.kaitai:kaitai-struct-runtime:0.11")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    api(libs.kaitai.runtime)
+    api(libs.kotlinx.coroutines.core)
 
     // Kaitai compiler
-    kaitaiCompiler("io.kaitai:kaitai-struct-compiler_2.13:0.11")
+    kaitaiCompiler(libs.kaitai.compiler)
 
     // Internal dependencies
     implementation(kotlin("stdlib"))
-    implementation("io.github.nsk90:kstatemachine-jvm:0.36.0")
-    implementation("io.ktor:ktor-network:3.4.0")
-    implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("com.google.crypto.tink:tink:1.20.0")
-    implementation("asia.hombre:kyber:2.0.1")
+    implementation(libs.kstatemachine)
+    implementation(libs.ktor.network)
+    implementation(libs.slf4j.api)
+    implementation(libs.tink)
+    implementation(libs.kyber)
 
     // Unit tests
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.0.2")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 tasks.test {
