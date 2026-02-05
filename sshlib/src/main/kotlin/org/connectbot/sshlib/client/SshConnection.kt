@@ -349,6 +349,84 @@ class SshConnection(
         }
     }
 
+    /**
+     * Authenticate using public key (RFC 4252 §7).
+     *
+     * @param username Username
+     * @param privateKey Parsed private key
+     * @return true if authentication succeeded
+     */
+    internal suspend fun authenticatePublicKey(username: String, privateKey: SshPrivateKey): Boolean {
+        try {
+            val sid = sessionId ?: throw SshException("Session ID not established")
+
+            val publicKeyBlob = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
+
+            val sigAlgorithmName = privateKey.signatureAlgorithm
+            val sigEntry = SignatureEntry.fromSshName(sigAlgorithmName)
+                ?: throw SshException("Unknown signature algorithm: $sigAlgorithmName")
+
+            // Build the data to sign per RFC 4252 §7
+            val signatureData = buildSignatureData(
+                sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob
+            )
+
+            // Sign the data
+            val signature = sigEntry.algorithm.sign(
+                sigAlgorithmName, privateKey.jcaKeyPair.private, signatureData
+            )
+
+            // Build the SSH_MSG_USERAUTH_REQUEST
+            val req = SshMsgUserauthRequest()
+            req.setUserName(createAsciiString(username))
+            req.setServiceName(createAsciiString("ssh-connection"))
+            req.setMethodName(createAsciiString("publickey"))
+            req._check()
+
+            val pubkeyAuth = UserauthRequestPublickey()
+            pubkeyAuth.setHasSignature(1)
+            pubkeyAuth.setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
+            pubkeyAuth.setPublicKeyBlob(createByteString(publicKeyBlob))
+            pubkeyAuth.setSignature(createByteString(signature))
+            pubkeyAuth._check()
+
+            req.setMethodSpecificFields(pubkeyAuth)
+
+            val deferred = CompletableDeferred<Boolean>()
+            pendingAuth = deferred
+
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
+                toByteArray(req)
+            )
+
+            return deferred.await()
+        } catch (e: Exception) {
+            logger.error("Public key authentication error", e)
+            return false
+        }
+    }
+
+    private fun buildSignatureData(
+        sessionId: ByteArray,
+        username: String,
+        serviceName: String,
+        algorithmName: String,
+        publicKeyBlob: ByteArray
+    ): ByteArray {
+        val data = UserauthPublickeySignatureData()
+        data.setSessionIdentifier(createByteString(sessionId))
+        data.setMessageType(byteArrayOf(50))
+        data.setUserName(createByteString(username.toByteArray(Charsets.UTF_8)))
+        data.setServiceName(createByteString(serviceName.toByteArray(Charsets.US_ASCII)))
+        data.setMethodName(createByteString("publickey".toByteArray(Charsets.US_ASCII)))
+        data.setHasSignature(byteArrayOf(1))
+        data.setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
+        data.setPublicKeyBlob(createByteString(publicKeyBlob))
+        data._check()
+        return toByteArray(data)
+    }
+
     // SshClientCallbacks implementation
 
     private fun sendVersion() {

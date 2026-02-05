@@ -48,4 +48,13 @@ internal object Ed25519SignatureAlgorithm : SshSignatureAlgorithm {
         verifier.update(data)
         return verifier.verify(sigBlob.signature().data())
     }
+
+    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+        val signer = Signature.getInstance("Ed25519")
+        signer.initSign(privateKey)
+        signer.update(data)
+        val sigBytes = signer.sign()
+        return encodeSshString("ssh-ed25519".toByteArray(Charsets.US_ASCII)) +
+                encodeSshString(sigBytes)
+    }
 }

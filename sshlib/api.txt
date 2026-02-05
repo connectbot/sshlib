@@ -47,6 +47,8 @@ package org.connectbot.sshlib {
   public final class SshClient {
     method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticatePassword(String username, String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? authenticatePublicKey(String username, byte[] privateKeyData, optional String? passphrase, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? authenticatePublicKey(String username, String privateKeyData, optional String? passphrase, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? connect(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? disconnect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public boolean isAuthenticated();
@@ -151,6 +153,10 @@ package org.connectbot.sshlib.blocking {
     ctor public BlockingSshClient(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional String clientVersion);
     method public boolean authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback);
     method public boolean authenticatePassword(String username, String password);
+    method public boolean authenticatePublicKey(String username, byte[] privateKeyData);
+    method public boolean authenticatePublicKey(String username, byte[] privateKeyData, optional String? passphrase);
+    method public boolean authenticatePublicKey(String username, String privateKeyData);
+    method public boolean authenticatePublicKey(String username, String privateKeyData, optional String? passphrase);
     method public boolean connect();
     method public void disconnect();
     method public boolean isAuthenticated();

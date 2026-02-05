@@ -34,7 +34,7 @@ fun main(args: Array<String>) =
     runBlocking {
         val parsed = parseArgs(args)
         if (parsed == null) {
-            System.err.println("Usage: ssh [-d] <user>@<host> [-p port]")
+            System.err.println("Usage: ssh [-d] [-i keyfile] <user>@<host> [-p port]")
             return@runBlocking
         }
 
@@ -59,49 +59,78 @@ fun main(args: Array<String>) =
                 return@runBlocking
             }
 
-            val kbdCallback = object : KeyboardInteractiveCallback {
-                override suspend fun onInfoRequest(
-                    name: String,
-                    instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>,
-                    respond: suspend (responses: List<String>) -> Unit
-                ) {
-                    if (name.isNotEmpty()) System.err.println(name)
-                    if (instruction.isNotEmpty()) System.err.println(instruction)
+            var authenticated = false
 
-                    val responses = prompts.map { prompt ->
-                        if (prompt.echo) {
-                            System.err.print(prompt.text)
-                            System.err.flush()
-                            readlnOrNull() ?: ""
-                        } else if (console != null) {
-                            String(console.readPassword(prompt.text))
-                        } else {
-                            System.err.print(prompt.text)
-                            System.err.flush()
-                            readlnOrNull() ?: ""
-                        }
+            // Try public key authentication if -i was specified
+            if (parsed.keyFile != null) {
+                val keyData = parsed.keyFile.readText()
+                var passphrase: String? = null
+                // Check if key is encrypted and prompt for passphrase
+                try {
+                    // Attempt to read without passphrase first
+                    if (client.authenticatePublicKey(user, keyData)) {
+                        authenticated = true
                     }
-                    respond(responses)
+                } catch (_: Exception) {
+                    // Might need a passphrase
+                    passphrase = if (console != null) {
+                        String(console.readPassword("Enter passphrase for ${parsed.keyFile}: "))
+                    } else {
+                        System.err.print("Enter passphrase for ${parsed.keyFile}: ")
+                        System.err.flush()
+                        readlnOrNull() ?: ""
+                    }
+                    if (client.authenticatePublicKey(user, keyData, passphrase)) {
+                        authenticated = true
+                    }
                 }
             }
 
-            if (!client.authenticateKeyboardInteractive(user, kbdCallback)) {
-                // Fall back to password auth
-                val password = if (console != null) {
-                    String(console.readPassword("Password: "))
-                } else {
-                    System.err.println("Warning: no console available, reading password from stdin")
-                    print("Password: ")
-                    readlnOrNull() ?: run {
-                        System.err.println("No password provided")
-                        return@runBlocking
+            if (!authenticated) {
+                val kbdCallback = object : KeyboardInteractiveCallback {
+                    override suspend fun onInfoRequest(
+                        name: String,
+                        instruction: String,
+                        prompts: List<KeyboardInteractiveCallback.Prompt>,
+                        respond: suspend (responses: List<String>) -> Unit
+                    ) {
+                        if (name.isNotEmpty()) System.err.println(name)
+                        if (instruction.isNotEmpty()) System.err.println(instruction)
+
+                        val responses = prompts.map { prompt ->
+                            if (prompt.echo) {
+                                System.err.print(prompt.text)
+                                System.err.flush()
+                                readlnOrNull() ?: ""
+                            } else if (console != null) {
+                                String(console.readPassword(prompt.text))
+                            } else {
+                                System.err.print(prompt.text)
+                                System.err.flush()
+                                readlnOrNull() ?: ""
+                            }
+                        }
+                        respond(responses)
                     }
                 }
 
-                if (!client.authenticatePassword(user, password)) {
-                    System.err.println("Authentication failed")
-                    return@runBlocking
+                if (!client.authenticateKeyboardInteractive(user, kbdCallback)) {
+                    // Fall back to password auth
+                    val password = if (console != null) {
+                        String(console.readPassword("Password: "))
+                    } else {
+                        System.err.println("Warning: no console available, reading password from stdin")
+                        print("Password: ")
+                        readlnOrNull() ?: run {
+                            System.err.println("No password provided")
+                            return@runBlocking
+                        }
+                    }
+
+                    if (!client.authenticatePassword(user, password)) {
+                        System.err.println("Authentication failed")
+                        return@runBlocking
+                    }
                 }
             }
 
@@ -249,6 +278,7 @@ private data class ParsedArgs(
     val host: String,
     val port: Int,
     val debug: Boolean,
+    val keyFile: File? = null,
 )
 
 private fun parseArgs(args: Array<String>): ParsedArgs? {
@@ -257,6 +287,7 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
     var port = 22
     var debug = false
     var target: String? = null
+    var keyFile: File? = null
 
     var i = 0
     while (i < args.size) {
@@ -264,6 +295,11 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
             "-p" -> {
                 if (i + 1 >= args.size) return null
                 port = args[++i].toIntOrNull() ?: return null
+            }
+
+            "-i" -> {
+                if (i + 1 >= args.size) return null
+                keyFile = File(args[++i])
             }
 
             "-d" -> {
@@ -286,5 +322,6 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
         host = target.substring(atIndex + 1),
         port = port,
         debug = debug,
+        keyFile = keyFile,
     )
 }
