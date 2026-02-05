@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.protocol.*
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.AlgorithmParameters
@@ -31,8 +32,8 @@ internal object OpenSshKeyReader {
     fun isEncrypted(data: ByteArray): Boolean {
         val buf = ByteBuffer.wrap(data)
         skipMagic(buf)
-        readString(buf) // cipher name
-        val kdfName = readString(buf)
+        buf.readString() // cipher name
+        val kdfName = buf.readString()
         return kdfName != "none"
     }
 
@@ -40,25 +41,25 @@ internal object OpenSshKeyReader {
         val buf = ByteBuffer.wrap(data)
         skipMagic(buf)
 
-        val cipherName = readString(buf)
-        val kdfName = readString(buf)
-        val kdfOptions = readByteString(buf)
+        val cipherName = buf.readString()
+        val kdfName = buf.readString()
+        val kdfOptions = buf.readByteString()
         val numberOfKeys = buf.int
 
         if (numberOfKeys != 1) {
             throw SshException("Only one key supported, but encountered bundle of $numberOfKeys")
         }
 
-        readByteString(buf) // public key blob (discarded)
+        buf.readByteString() // public key blob (discarded)
 
-        var privateSection = readByteString(buf)
+        var privateSection = buf.readByteString()
 
         if (kdfName == "bcrypt") {
             if (passphrase == null) {
                 throw SshException("OpenSSH key is encrypted but no passphrase provided")
             }
             val optBuf = ByteBuffer.wrap(kdfOptions)
-            val salt = readByteString(optBuf)
+            val salt = optBuf.readByteString()
             val rounds = optBuf.int
             val passwordBytes = passphrase.toByteArray(Charsets.UTF_8)
             privateSection = KeyDecryption.decryptOpenSsh(privateSection, passwordBytes, salt, rounds, cipherName)
@@ -74,15 +75,15 @@ internal object OpenSshKeyReader {
             throw SshException("Decryption failed (check integers don't match)")
         }
 
-        val keyType = readString(priv)
+        val keyType = priv.readString()
 
         val keyPair: KeyPair
         val sigAlgorithm: String
 
         when {
             keyType == "ssh-ed25519" -> {
-                readByteString(priv) // public key (64 bytes but we only need the seed)
-                val privateBytes = readByteString(priv) // 64 bytes: seed || public
+                priv.readByteString() // public key (64 bytes but we only need the seed)
+                val privateBytes = priv.readByteString() // 64 bytes: seed || public
                 val seed = privateBytes.copyOfRange(0, 32)
 
                 val pkcs8 = encodeDer {
@@ -114,9 +115,9 @@ internal object OpenSshKeyReader {
             }
 
             keyType.startsWith("ecdsa-sha2-") -> {
-                val curveName = readString(priv)
-                val qBytes = readByteString(priv) // public point (uncompressed)
-                val privateScalar = readMpint(priv)
+                val curveName = priv.readString()
+                val qBytes = priv.readByteString() // public point (uncompressed)
+                val privateScalar = priv.readMpintUnsigned()
 
                 val (ecGenSpec, sshAlg) = when (curveName) {
                     "nistp256" -> ECGenParameterSpec("secp256r1") to "ecdsa-sha2-nistp256"
@@ -139,12 +140,12 @@ internal object OpenSshKeyReader {
             }
 
             keyType == "ssh-rsa" -> {
-                val n = readMpint(priv)
-                val e = readMpint(priv)
-                val d = readMpint(priv)
-                val iqmp = readMpint(priv)
-                val p = readMpint(priv)
-                val q = readMpint(priv)
+                val n = priv.readMpintUnsigned()
+                val e = priv.readMpintUnsigned()
+                val d = priv.readMpintUnsigned()
+                val iqmp = priv.readMpintUnsigned()
+                val p = priv.readMpintUnsigned()
+                val q = priv.readMpintUnsigned()
 
                 val dP = d.mod(p.subtract(BigInteger.ONE))
                 val dQ = d.mod(q.subtract(BigInteger.ONE))
@@ -169,24 +170,5 @@ internal object OpenSshKeyReader {
         if (!magic.contentEquals(OPENSSH_V1_MAGIC)) {
             throw SshException("Invalid OpenSSH key magic")
         }
-    }
-
-    private fun readString(buf: ByteBuffer): String {
-        val len = buf.int
-        val bytes = ByteArray(len)
-        buf.get(bytes)
-        return String(bytes, Charsets.US_ASCII)
-    }
-
-    private fun readByteString(buf: ByteBuffer): ByteArray {
-        val len = buf.int
-        val bytes = ByteArray(len)
-        buf.get(bytes)
-        return bytes
-    }
-
-    private fun readMpint(buf: ByteBuffer): BigInteger {
-        val bytes = readByteString(buf)
-        return BigInteger(1, bytes)
     }
 }
