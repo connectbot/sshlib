@@ -1,0 +1,192 @@
+/*
+ * Copyright 2025 Kenny Root
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.connectbot.sshlib.crypto
+
+import org.connectbot.sshlib.SshException
+import java.math.BigInteger
+import java.nio.ByteBuffer
+import java.security.AlgorithmParameters
+import java.security.KeyFactory
+import java.security.KeyPair
+import java.security.spec.*
+
+internal object OpenSshKeyReader {
+
+    private val OPENSSH_V1_MAGIC = "openssh-key-v1\u0000".toByteArray(Charsets.US_ASCII)
+
+    fun isEncrypted(data: ByteArray): Boolean {
+        val buf = ByteBuffer.wrap(data)
+        skipMagic(buf)
+        readString(buf) // cipher name
+        val kdfName = readString(buf)
+        return kdfName != "none"
+    }
+
+    fun read(data: ByteArray, passphrase: String?): SshPrivateKey {
+        val buf = ByteBuffer.wrap(data)
+        skipMagic(buf)
+
+        val cipherName = readString(buf)
+        val kdfName = readString(buf)
+        val kdfOptions = readByteString(buf)
+        val numberOfKeys = buf.int
+
+        if (numberOfKeys != 1) {
+            throw SshException("Only one key supported, but encountered bundle of $numberOfKeys")
+        }
+
+        readByteString(buf) // public key blob (discarded)
+
+        var privateSection = readByteString(buf)
+
+        if (kdfName == "bcrypt") {
+            if (passphrase == null) {
+                throw SshException("OpenSSH key is encrypted but no passphrase provided")
+            }
+            val optBuf = ByteBuffer.wrap(kdfOptions)
+            val salt = readByteString(optBuf)
+            val rounds = optBuf.int
+            val passwordBytes = passphrase.toByteArray(Charsets.UTF_8)
+            privateSection = KeyDecryption.decryptOpenSsh(privateSection, passwordBytes, salt, rounds, cipherName)
+        } else if (cipherName != "none" || kdfName != "none") {
+            throw SshException("Unsupported encryption: cipher=$cipherName, kdf=$kdfName")
+        }
+
+        val priv = ByteBuffer.wrap(privateSection)
+        val checkInt1 = priv.int
+        val checkInt2 = priv.int
+
+        if (checkInt1 != checkInt2) {
+            throw SshException("Decryption failed (check integers don't match)")
+        }
+
+        val keyType = readString(priv)
+
+        val keyPair: KeyPair
+        val sigAlgorithm: String
+
+        when {
+            keyType == "ssh-ed25519" -> {
+                readByteString(priv) // public key (64 bytes but we only need the seed)
+                val privateBytes = readByteString(priv) // 64 bytes: seed || public
+                val seed = privateBytes.copyOfRange(0, 32)
+
+                val pkcs8 = encodeDer {
+                    sequence {
+                        integer(BigInteger.ZERO)
+                        sequence {
+                            objectIdentifier(byteArrayOf(0x2b, 0x65, 0x70)) // 1.3.101.112
+                        }
+                        octetString(encodeDer { octetString(seed) })
+                    }
+                }
+                val privKey = KeyFactory.getInstance("Ed25519")
+                    .generatePrivate(PKCS8EncodedKeySpec(pkcs8))
+
+                val pubKeyBytes = privateBytes.copyOfRange(32, 64)
+                val x509 = encodeDer {
+                    sequence {
+                        sequence {
+                            objectIdentifier(byteArrayOf(0x2b, 0x65, 0x70))
+                        }
+                        bitString(pubKeyBytes)
+                    }
+                }
+                val pubKey = KeyFactory.getInstance("Ed25519")
+                    .generatePublic(X509EncodedKeySpec(x509))
+
+                keyPair = KeyPair(pubKey, privKey)
+                sigAlgorithm = "ssh-ed25519"
+            }
+
+            keyType.startsWith("ecdsa-sha2-") -> {
+                val curveName = readString(priv)
+                val qBytes = readByteString(priv) // public point (uncompressed)
+                val privateScalar = readMpint(priv)
+
+                val (ecGenSpec, sshAlg) = when (curveName) {
+                    "nistp256" -> ECGenParameterSpec("secp256r1") to "ecdsa-sha2-nistp256"
+                    "nistp384" -> ECGenParameterSpec("secp384r1") to "ecdsa-sha2-nistp384"
+                    "nistp521" -> ECGenParameterSpec("secp521r1") to "ecdsa-sha2-nistp521"
+                    else -> throw SshException("Unknown EC curve: $curveName")
+                }
+
+                val params = AlgorithmParameters.getInstance("EC")
+                params.init(ecGenSpec)
+                val paramSpec = params.getParameterSpec(ECParameterSpec::class.java)
+
+                val point = EcdsaSignatureAlgorithm.decodeEcPoint(qBytes, paramSpec)
+                val pubKeySpec = ECPublicKeySpec(point, paramSpec)
+                val privKeySpec = ECPrivateKeySpec(privateScalar, paramSpec)
+
+                val kf = KeyFactory.getInstance("EC")
+                keyPair = KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(privKeySpec))
+                sigAlgorithm = sshAlg
+            }
+
+            keyType == "ssh-rsa" -> {
+                val n = readMpint(priv)
+                val e = readMpint(priv)
+                val d = readMpint(priv)
+                val iqmp = readMpint(priv)
+                val p = readMpint(priv)
+                val q = readMpint(priv)
+
+                val dP = d.mod(p.subtract(BigInteger.ONE))
+                val dQ = d.mod(q.subtract(BigInteger.ONE))
+
+                val privKeySpec = RSAPrivateCrtKeySpec(n, e, d, p, q, dP, dQ, iqmp)
+                val pubKeySpec = RSAPublicKeySpec(n, e)
+
+                val kf = KeyFactory.getInstance("RSA")
+                keyPair = KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(privKeySpec))
+                sigAlgorithm = "rsa-sha2-512"
+            }
+
+            else -> throw SshException("Unknown key type: $keyType")
+        }
+
+        return SshPrivateKey(keyType, keyPair, sigAlgorithm)
+    }
+
+    private fun skipMagic(buf: ByteBuffer) {
+        val magic = ByteArray(OPENSSH_V1_MAGIC.size)
+        buf.get(magic)
+        if (!magic.contentEquals(OPENSSH_V1_MAGIC)) {
+            throw SshException("Invalid OpenSSH key magic")
+        }
+    }
+
+    private fun readString(buf: ByteBuffer): String {
+        val len = buf.int
+        val bytes = ByteArray(len)
+        buf.get(bytes)
+        return String(bytes, Charsets.US_ASCII)
+    }
+
+    private fun readByteString(buf: ByteBuffer): ByteArray {
+        val len = buf.int
+        val bytes = ByteArray(len)
+        buf.get(bytes)
+        return bytes
+    }
+
+    private fun readMpint(buf: ByteBuffer): BigInteger {
+        val bytes = readByteString(buf)
+        return BigInteger(1, bytes)
+    }
+}

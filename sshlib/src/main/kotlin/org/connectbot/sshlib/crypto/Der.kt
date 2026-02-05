@@ -79,6 +79,13 @@ internal class DerWriter {
         buffer.write(0x00)
     }
 
+    fun contextTag(tag: Int, init: DerWriter.() -> Unit) {
+        val child = DerWriter()
+        child.init()
+        val content = child.toByteArray()
+        writeTag(0xA0 or tag, content)
+    }
+
     private fun writeTag(tag: Int, content: ByteArray) {
         buffer.write(tag)
         writeLength(content.size)
@@ -124,7 +131,6 @@ internal class DerReader(private val data: ByteBuffer) {
         val length = readLength()
         val end = data.position() + length
 
-        // Create a limit slice for the sequence content
         val oldLimit = data.limit()
         data.limit(end)
 
@@ -146,6 +152,8 @@ internal class DerReader(private val data: ByteBuffer) {
         }
     }
 
+    fun hasRemaining(): Boolean = data.hasRemaining()
+
     fun readInteger(): BigInteger {
         val tag = data.get().toInt() and 0xFF
         if (tag != 0x02) {
@@ -155,6 +163,79 @@ internal class DerReader(private val data: ByteBuffer) {
         val bytes = ByteArray(length)
         data.get(bytes)
         return BigInteger(bytes)
+    }
+
+    fun readOctetString(): ByteArray {
+        val tag = data.get().toInt() and 0xFF
+        if (tag != 0x04) {
+            throw SshException("Expected OCTET STRING (0x04) but got 0x${tag.toString(16)}")
+        }
+        val length = readLength()
+        val bytes = ByteArray(length)
+        data.get(bytes)
+        return bytes
+    }
+
+    fun readBitString(): ByteArray {
+        val tag = data.get().toInt() and 0xFF
+        if (tag != 0x03) {
+            throw SshException("Expected BIT STRING (0x03) but got 0x${tag.toString(16)}")
+        }
+        val length = readLength()
+        val unusedBits = data.get().toInt() and 0xFF
+        if (unusedBits != 0) {
+            throw SshException("Non-zero unused bits ($unusedBits) in BIT STRING not supported")
+        }
+        val bytes = ByteArray(length - 1)
+        data.get(bytes)
+        return bytes
+    }
+
+    fun readObjectIdentifier(): ByteArray {
+        val tag = data.get().toInt() and 0xFF
+        if (tag != 0x06) {
+            throw SshException("Expected OBJECT IDENTIFIER (0x06) but got 0x${tag.toString(16)}")
+        }
+        val length = readLength()
+        val bytes = ByteArray(length)
+        data.get(bytes)
+        return bytes
+    }
+
+    fun peekTag(): Int {
+        if (!data.hasRemaining()) return -1
+        val tag = data.get(data.position()).toInt() and 0xFF
+        return tag
+    }
+
+    fun <T> readContextTag(tag: Int, block: (DerReader) -> T): T {
+        val actualTag = data.get().toInt() and 0xFF
+        val expectedTag = 0xA0 or tag
+        if (actualTag != expectedTag) {
+            throw SshException("Expected context tag [$tag] (0x${expectedTag.toString(16)}) but got 0x${actualTag.toString(16)}")
+        }
+        val length = readLength()
+        val end = data.position() + length
+
+        val oldLimit = data.limit()
+        data.limit(end)
+
+        try {
+            val result = block(this)
+            if (data.position() != end) {
+                throw SshException("Context tag [$tag] has ${end - data.position()} unconsumed bytes")
+            }
+            return result
+        } finally {
+            data.limit(oldLimit)
+            data.position(end)
+        }
+    }
+
+    fun skipTag() {
+        data.get() // skip tag byte
+        val length = readLength()
+        data.position(data.position() + length)
     }
 
     private fun readLength(): Int {

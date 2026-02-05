@@ -44,4 +44,19 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
         verifier.update(data)
         return verifier.verify(sigBlob.signature().data())
     }
+
+    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+        val jcaAlgorithm = when (algorithmName) {
+            "rsa-sha2-512" -> "SHA512withRSA"
+            else -> "SHA256withRSA"
+        }
+
+        val signer = Signature.getInstance(jcaAlgorithm)
+        signer.initSign(privateKey)
+        signer.update(data)
+        val sigBytes = signer.sign()
+
+        return encodeSshString(algorithmName.toByteArray(Charsets.US_ASCII)) +
+                encodeSshString(sigBytes)
+    }
 }

@@ -32,6 +32,7 @@ dependencies {
     implementation(libs.slf4j.api)
     implementation(libs.tink)
     implementation(libs.kyber)
+    implementation(libs.jbcrypt)
 
     // Unit tests
     testImplementation(libs.junit)

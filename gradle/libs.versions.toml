@@ -7,6 +7,7 @@ ktor = "3.4.0"
 slf4j = "2.0.17"
 tink = "1.20.0"
 kyber = "2.0.1"
+jbcrypt = "1.0.2"
 junit4 = "4.13.2"
 junitVintage = "6.0.2"
 junit = "6.0.2"
@@ -24,6 +25,7 @@ ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 kyber = { module = "asia.hombre:kyber", version.ref = "kyber" }
+jbcrypt = { module = "org.connectbot:jbcrypt", version.ref = "jbcrypt" }
 junit = { module = "junit:junit", version.ref = "junit4" }
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junitVintage" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }

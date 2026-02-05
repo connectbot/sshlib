@@ -27,6 +27,7 @@ import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.Signature
+import java.security.interfaces.ECKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
@@ -81,5 +82,37 @@ internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
                 integer(s)
             }
         }
+    }
+
+    internal fun decodeDerEcdsaSignature(derSig: ByteArray): Pair<BigInteger, BigInteger> {
+        val reader = DerReader(derSig)
+        return reader.readSequence { seq ->
+            val r = seq.readInteger()
+            val s = seq.readInteger()
+            r to s
+        }
+    }
+
+    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+        val ecKey = privateKey as ECKey
+        val fieldSize = (ecKey.params.order.bitLength() + 7) / 8
+
+        val jcaAlgorithm = when (fieldSize) {
+            32 -> "SHA256withECDSA"
+            48 -> "SHA384withECDSA"
+            66 -> "SHA512withECDSA"
+            else -> throw SshException("Unsupported EC key size: $fieldSize")
+        }
+
+        val signer = Signature.getInstance(jcaAlgorithm)
+        signer.initSign(privateKey)
+        signer.update(data)
+        val derSig = signer.sign()
+
+        val (r, s) = decodeDerEcdsaSignature(derSig)
+        val sshSigBlob = encodeMpint(r.toByteArray()) + encodeMpint(s.toByteArray())
+
+        return encodeSshString(algorithmName.toByteArray(Charsets.US_ASCII)) +
+                encodeSshString(sshSigBlob)
     }
 }

@@ -16,10 +16,10 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.connectbot.sshlib.protocol.SshPublicKey
-import org.connectbot.sshlib.protocol.SshSignature
+import java.security.KeyPair
 
-internal interface SshSignatureAlgorithm {
-    fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean
-    fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray
-}
+internal class SshPrivateKey(
+    val keyType: String,
+    val jcaKeyPair: KeyPair,
+    val signatureAlgorithm: String
+)

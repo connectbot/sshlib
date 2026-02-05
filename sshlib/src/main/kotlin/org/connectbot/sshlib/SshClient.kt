@@ -17,6 +17,7 @@
 package org.connectbot.sshlib
 
 import org.connectbot.sshlib.client.SshConnection
+import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.transport.TransportFactory
@@ -211,6 +212,60 @@ class SshClient private constructor(
             success
         } catch (e: Exception) {
             logger.error("Keyboard-interactive authentication error", e)
+            false
+        }
+    }
+
+    /**
+     * Authenticate using public key authentication (RFC 4252 §7).
+     *
+     * @param username SSH username
+     * @param privateKeyData Private key file contents
+     * @param passphrase Passphrase for encrypted keys, or null
+     * @return true if authentication succeeded
+     */
+    suspend fun authenticatePublicKey(
+        username: String,
+        privateKeyData: ByteArray,
+        passphrase: String? = null
+    ): Boolean {
+        return authenticatePublicKey(username, String(privateKeyData, Charsets.UTF_8), passphrase)
+    }
+
+    /**
+     * Authenticate using public key authentication (RFC 4252 §7).
+     *
+     * @param username SSH username
+     * @param privateKeyData Private key file contents as a string
+     * @param passphrase Passphrase for encrypted keys, or null
+     * @return true if authentication succeeded
+     */
+    suspend fun authenticatePublicKey(
+        username: String,
+        privateKeyData: String,
+        passphrase: String? = null
+    ): Boolean {
+        val conn = connection
+        if (conn == null) {
+            logger.error("Not connected - call connect() first")
+            return false
+        }
+
+        return try {
+            logger.info("Authenticating as $username via public key")
+            val privateKey = PrivateKeyReader.read(privateKeyData, passphrase)
+            val success = conn.authenticatePublicKey(username, privateKey)
+
+            if (success) {
+                authenticated = true
+                logger.info("Public key authentication successful")
+            } else {
+                logger.warn("Public key authentication failed")
+            }
+
+            success
+        } catch (e: Exception) {
+            logger.error("Public key authentication error", e)
             false
         }
     }

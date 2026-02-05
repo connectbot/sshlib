@@ -111,6 +111,36 @@ class BlockingSshClient private constructor(
     ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) }
 
     /**
+     * Authenticate using public key authentication (RFC 4252 §7).
+     *
+     * @param username SSH username
+     * @param privateKeyData Private key file contents
+     * @param passphrase Passphrase for encrypted keys, or null
+     * @return true if authentication succeeded
+     */
+    @JvmOverloads
+    fun authenticatePublicKey(
+        username: String,
+        privateKeyData: ByteArray,
+        passphrase: String? = null
+    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
+
+    /**
+     * Authenticate using public key authentication (RFC 4252 §7).
+     *
+     * @param username SSH username
+     * @param privateKeyData Private key file contents as a string
+     * @param passphrase Passphrase for encrypted keys, or null
+     * @return true if authentication succeeded
+     */
+    @JvmOverloads
+    fun authenticatePublicKey(
+        username: String,
+        privateKeyData: String,
+        passphrase: String? = null
+    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
+
+    /**
      * Check if connected and authenticated.
      */
     val isAuthenticated: Boolean
