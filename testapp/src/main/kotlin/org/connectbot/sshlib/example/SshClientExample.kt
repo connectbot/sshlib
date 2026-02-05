@@ -34,7 +34,7 @@ fun main(args: Array<String>) =
     runBlocking {
         val parsed = parseArgs(args)
         if (parsed == null) {
-            System.err.println("Usage: ssh [-d] [-i keyfile] <user>@<host> [-p port]")
+            System.err.println("Usage: ssh [-d] [-i keyfile] [-K passphrase] <user>@<host> [-p port]")
             return@runBlocking
         }
 
@@ -64,15 +64,9 @@ fun main(args: Array<String>) =
             // Try public key authentication if -i was specified
             if (parsed.keyFile != null) {
                 val keyData = parsed.keyFile.readText()
-                var passphrase: String? = null
-                // Check if key is encrypted and prompt for passphrase
-                try {
-                    // Attempt to read without passphrase first
-                    if (client.authenticatePublicKey(user, keyData)) {
-                        authenticated = true
-                    }
-                } catch (_: Exception) {
-                    // Might need a passphrase
+                var passphrase = parsed.keyPassphrase
+
+                if (passphrase == null && client.isPrivateKeyEncrypted(keyData)) {
                     passphrase = if (console != null) {
                         String(console.readPassword("Enter passphrase for ${parsed.keyFile}: "))
                     } else {
@@ -80,7 +74,21 @@ fun main(args: Array<String>) =
                         System.err.flush()
                         readlnOrNull() ?: ""
                     }
-                    if (client.authenticatePublicKey(user, keyData, passphrase)) {
+                }
+
+                if (client.authenticatePublicKey(user, keyData, passphrase)) {
+                    authenticated = true
+                } else if (passphrase == null && !authenticated) {
+                    // Try one more time with a prompt if it failed and we didn't have a passphrase
+                    // (maybe it was encrypted but isPrivateKeyEncrypted didn't catch it)
+                    passphrase = if (console != null) {
+                        String(console.readPassword("Enter passphrase for ${parsed.keyFile} (optional): "))
+                    } else {
+                        System.err.print("Enter passphrase for ${parsed.keyFile} (optional): ")
+                        System.err.flush()
+                        readlnOrNull() ?: ""
+                    }
+                    if (passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase)) {
                         authenticated = true
                     }
                 }
@@ -279,6 +287,7 @@ private data class ParsedArgs(
     val port: Int,
     val debug: Boolean,
     val keyFile: File? = null,
+    val keyPassphrase: String? = null,
 )
 
 private fun parseArgs(args: Array<String>): ParsedArgs? {
@@ -288,6 +297,7 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
     var debug = false
     var target: String? = null
     var keyFile: File? = null
+    var keyPassphrase: String? = null
 
     var i = 0
     while (i < args.size) {
@@ -300,6 +310,11 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
             "-i" -> {
                 if (i + 1 >= args.size) return null
                 keyFile = File(args[++i])
+            }
+
+            "-K" -> {
+                if (i + 1 >= args.size) return null
+                keyPassphrase = args[++i]
             }
 
             "-d" -> {
@@ -323,5 +338,6 @@ private fun parseArgs(args: Array<String>): ParsedArgs? {
         port = port,
         debug = debug,
         keyFile = keyFile,
+        keyPassphrase = keyPassphrase,
     )
 }

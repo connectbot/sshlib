@@ -271,6 +271,31 @@ class SshClient private constructor(
     }
 
     /**
+     * Check if the provided private key data is encrypted and requires a passphrase.
+     *
+     * @param privateKeyData Private key file contents
+     * @return true if the key is encrypted
+     */
+    fun isPrivateKeyEncrypted(privateKeyData: ByteArray): Boolean {
+        return isPrivateKeyEncrypted(String(privateKeyData, Charsets.UTF_8))
+    }
+
+    /**
+     * Check if the provided private key data is encrypted and requires a passphrase.
+     *
+     * @param privateKeyData Private key file contents as a string
+     * @return true if the key is encrypted
+     */
+    fun isPrivateKeyEncrypted(privateKeyData: String): Boolean {
+        return try {
+            PrivateKeyReader.isEncrypted(privateKeyData)
+        } catch (e: Exception) {
+            logger.error("Failed to check if key is encrypted", e)
+            false
+        }
+    }
+
+    /**
      * Check if connected and authenticated.
      */
     val isAuthenticated: Boolean
