@@ -196,8 +196,10 @@ class SshConnection(
                     )
                     clientPublicKey = dhGex.generateClientKeys()
 
-                    val initMsg = SshMsgKexDhGexInit()
-                    initMsg.setE(createMpint(clientPublicKey!!))
+                    val initMsg = SshMsgKexDhGexInit().apply {
+                        setE(createMpint(clientPublicKey!!))
+                        _check()
+                    }
                     packetIO.writePacket(
                         SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
                         toByteArray(initMsg)
@@ -246,18 +248,20 @@ class SshConnection(
      */
     suspend fun authenticatePassword(username: String, password: String): Boolean {
         try {
-            val req = SshMsgUserauthRequest()
-            req.setUserName(createAsciiString(username))
-            req.setServiceName(createAsciiString("ssh-connection"))
-            req.setMethodName(createAsciiString("password"))
+            val req = SshMsgUserauthRequest().apply {
+                setUserName(createAsciiString(username))
+                setServiceName(createAsciiString("ssh-connection"))
+                setMethodName(createAsciiString("password"))
 
-            val passAuth = UserauthRequestPassword().apply {
-                setChangePassword(0)
-                setPlaintextPassword(createUtf8String(password))
+                val passAuth = UserauthRequestPassword().apply {
+                    setChangePassword(0)
+                    setPlaintextPassword(createUtf8String(password))
+                    _check()
+                }
+
+                setMethodSpecificFields(passAuth)
                 _check()
             }
-
-            req.setMethodSpecificFields(passAuth)
 
             val deferred = CompletableDeferred<Boolean>()
             pendingAuth = deferred
@@ -286,17 +290,19 @@ class SshConnection(
         callback: KeyboardInteractiveCallback
     ): Boolean {
         try {
-            val req = SshMsgUserauthRequest()
-            req.setUserName(createAsciiString(username))
-            req.setServiceName(createAsciiString("ssh-connection"))
-            req.setMethodName(createAsciiString("keyboard-interactive"))
+            val req = SshMsgUserauthRequest().apply {
+                setUserName(createAsciiString(username))
+                setServiceName(createAsciiString("ssh-connection"))
+                setMethodName(createAsciiString("keyboard-interactive"))
 
-            val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
-                setLanguageTag(createByteString(ByteArray(0)))
-                setSubmethods(createByteString(ByteArray(0)))
+                val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
+                    setLanguageTag(createByteString(ByteArray(0)))
+                    setSubmethods(createByteString(ByteArray(0)))
+                    _check()
+                }
+                setMethodSpecificFields(kbdInteractive)
                 _check()
             }
-            req.setMethodSpecificFields(kbdInteractive)
 
             val deferred = CompletableDeferred<Boolean>()
             pendingAuth = deferred
@@ -321,12 +327,14 @@ class SshConnection(
                     }
 
                     callback.onInfoRequest(name, instruction, prompts) { responses ->
-                        val responseMsg = SshMsgUserauthInfoResponse()
-                        responseMsg.setNumResponses(responses.size.toLong())
-                        responseMsg.setResponses(responses.map { response ->
-                            val bytes = response.toByteArray(Charsets.UTF_8)
-                            createByteString(bytes)
-                        })
+                        val responseMsg = SshMsgUserauthInfoResponse().apply {
+                            setNumResponses(responses.size.toLong())
+                            setResponses(responses.map { response ->
+                                val bytes = response.toByteArray(Charsets.UTF_8)
+                                createByteString(bytes)
+                            })
+                            _check()
+                        }
 
                         packetIO.writePacket(
                             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
@@ -377,20 +385,22 @@ class SshConnection(
             )
 
             // Build the SSH_MSG_USERAUTH_REQUEST
-            val req = SshMsgUserauthRequest()
-            req.setUserName(createAsciiString(username))
-            req.setServiceName(createAsciiString("ssh-connection"))
-            req.setMethodName(createAsciiString("publickey"))
-            req._check()
+            val req = SshMsgUserauthRequest().apply {
+                setUserName(createAsciiString(username))
+                setServiceName(createAsciiString("ssh-connection"))
+                setMethodName(createAsciiString("publickey"))
 
-            val pubkeyAuth = UserauthRequestPublickey()
-            pubkeyAuth.setHasSignature(1)
-            pubkeyAuth.setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
-            pubkeyAuth.setPublicKeyBlob(createByteString(publicKeyBlob))
-            pubkeyAuth.setSignature(createByteString(signature))
-            pubkeyAuth._check()
+                val pubkeyAuth = UserauthRequestPublickey().apply {
+                    setHasSignature(1)
+                    setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
+                    setPublicKeyBlob(createByteString(publicKeyBlob))
+                    setSignature(createByteString(signature))
+                    _check()
+                }
 
-            req.setMethodSpecificFields(pubkeyAuth)
+                setMethodSpecificFields(pubkeyAuth)
+                _check()
+            }
 
             val deferred = CompletableDeferred<Boolean>()
             pendingAuth = deferred
@@ -414,16 +424,17 @@ class SshConnection(
         algorithmName: String,
         publicKeyBlob: ByteArray
     ): ByteArray {
-        val data = UserauthPublickeySignatureData()
-        data.setSessionIdentifier(createByteString(sessionId))
-        data.setMessageType(byteArrayOf(50))
-        data.setUserName(createByteString(username.toByteArray(Charsets.UTF_8)))
-        data.setServiceName(createByteString(serviceName.toByteArray(Charsets.US_ASCII)))
-        data.setMethodName(createByteString("publickey".toByteArray(Charsets.US_ASCII)))
-        data.setHasSignature(byteArrayOf(1))
-        data.setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
-        data.setPublicKeyBlob(createByteString(publicKeyBlob))
-        data._check()
+        val data = UserauthPublickeySignatureData().apply {
+            setSessionIdentifier(createByteString(sessionId))
+            setMessageType(byteArrayOf(50))
+            setUserName(createByteString(username.toByteArray(Charsets.UTF_8)))
+            setServiceName(createByteString(serviceName.toByteArray(Charsets.US_ASCII)))
+            setMethodName(createByteString("publickey".toByteArray(Charsets.US_ASCII)))
+            setHasSignature(byteArrayOf(1))
+            setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
+            setPublicKeyBlob(createByteString(publicKeyBlob))
+            _check()
+        }
         return toByteArray(data)
     }
 
@@ -445,26 +456,27 @@ class SshConnection(
     private fun sendKexInit() {
         logger.debug("Sending KEX_INIT")
 
-        val kexInit = SshMsgKexinit()
+        val kexInit = SshMsgKexinit().apply {
+            // Cookie (16 random bytes)
+            val cookie = ByteArray(16).apply {
+                SecureRandom().nextBytes(this)
+            }
+            setCookie(cookie)
 
-        // Cookie (16 random bytes)
-        val cookie = ByteArray(16).apply {
-            SecureRandom().nextBytes(this)
+            setKexAlgorithms(createNameList(kexAlgorithms))
+            setServerHostKeyAlgorithms(createNameList(hostKeyAlgorithms))
+            setEncryptionAlgorithmsClientToServer(createNameList(encryptionAlgorithms))
+            setEncryptionAlgorithmsServerToClient(createNameList(encryptionAlgorithms))
+            setMacAlgorithmsClientToServer(createNameList(macAlgorithms))
+            setMacAlgorithmsServerToClient(createNameList(macAlgorithms))
+            setCompressionAlgorithmsClientToServer(createNameList(COMPRESSION_ALGORITHMS))
+            setCompressionAlgorithmsServerToClient(createNameList(COMPRESSION_ALGORITHMS))
+            setLanguagesClientToServer(createNameList(""))
+            setLanguagesServerToClient(createNameList(""))
+            setFirstKexPacketFollows(0)
+            setReserved(0)
+            _check()
         }
-        kexInit.setCookie(cookie)
-
-        kexInit.setKexAlgorithms(createNameList(kexAlgorithms))
-        kexInit.setServerHostKeyAlgorithms(createNameList(hostKeyAlgorithms))
-        kexInit.setEncryptionAlgorithmsClientToServer(createNameList(encryptionAlgorithms))
-        kexInit.setEncryptionAlgorithmsServerToClient(createNameList(encryptionAlgorithms))
-        kexInit.setMacAlgorithmsClientToServer(createNameList(macAlgorithms))
-        kexInit.setMacAlgorithmsServerToClient(createNameList(macAlgorithms))
-        kexInit.setCompressionAlgorithmsClientToServer(createNameList(COMPRESSION_ALGORITHMS))
-        kexInit.setCompressionAlgorithmsServerToClient(createNameList(COMPRESSION_ALGORITHMS))
-        kexInit.setLanguagesClientToServer(createNameList(""))
-        kexInit.setLanguagesServerToClient(createNameList(""))
-        kexInit.setFirstKexPacketFollows(0)
-        kexInit.setReserved(0)
 
         val kexInitPayload = toByteArray(kexInit)
 
@@ -560,8 +572,10 @@ class SshConnection(
         val pubKey = clientPublicKey
             ?: throw SshException("Client public key not generated")
 
-        val msg = SshMsgKexdhInit()
-        msg.setE(createMpint(pubKey))
+        val msg = SshMsgKexdhInit().apply {
+            setE(createMpint(pubKey))
+            _check()
+        }
 
         runBlocking {
             packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), toByteArray(msg))
@@ -578,8 +592,10 @@ class SshConnection(
         val pubKey = clientPublicKey
             ?: throw SshException("Client public key not generated")
 
-        val msg = SshMsgKexEcdhInit()
-        msg.setQC(createByteString(pubKey))
+        val msg = SshMsgKexEcdhInit().apply {
+            setQC(createByteString(pubKey))
+            _check()
+        }
 
         runBlocking {
             packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), toByteArray(msg))
@@ -592,10 +608,12 @@ class SshConnection(
         val dhGex = kexEntry.create() as DiffieHellmanGroupExchange
         kex = dhGex
 
-        val msg = SshMsgKexDhGexRequest()
-        msg.setMin(dhGex.min.toLong())
-        msg.setN(dhGex.n.toLong())
-        msg.setMax(dhGex.max.toLong())
+        val msg = SshMsgKexDhGexRequest().apply {
+            setMin(dhGex.min.toLong())
+            setN(dhGex.n.toLong())
+            setMax(dhGex.max.toLong())
+            _check()
+        }
 
         runBlocking {
             packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), toByteArray(msg))
@@ -826,8 +844,10 @@ class SshConnection(
     private fun sendServiceRequest(service: String) {
         logger.info("Requesting service: $service")
 
-        val msg = SshMsgServiceRequest()
-        msg.setServiceName(createAsciiString(service))
+        val msg = SshMsgServiceRequest().apply {
+            setServiceName(createAsciiString(service))
+            _check()
+        }
 
         runBlocking {
             packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), toByteArray(msg))
@@ -905,15 +925,18 @@ class SshConnection(
     private fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
         logger.debug("Sending CHANNEL_OPEN: $channelType (local=$localChannelNumber)")
 
-        val msg = SshMsgChannelOpen()
-        msg.setChannelType(createAsciiString(channelType))
-        msg.setSenderChannel(localChannelNumber.toLong())
-        msg.setInitialWindowSize(initialWindowSize.toLong())
-        msg.setMaximumPacketSize(maxPacketSize.toLong())
+        val msg = SshMsgChannelOpen().apply {
+            setChannelType(createAsciiString(channelType))
+            setSenderChannel(localChannelNumber.toLong())
+            setInitialWindowSize(initialWindowSize.toLong())
+            setMaximumPacketSize(maxPacketSize.toLong())
 
-        val sessionData = ChannelOpenSession()
-        sessionData._check()
-        msg.setChannelSpecificData(sessionData)
+            val sessionData = ChannelOpenSession().apply {
+                _check()
+            }
+            setChannelSpecificData(sessionData)
+            _check()
+        }
 
         runBlocking {
             packetIO.writePacket(
@@ -1243,9 +1266,11 @@ class SshConnection(
     }
 
     internal suspend fun sendChannelData(recipientChannel: Int, data: ByteArray) {
-        val msg = SshMsgChannelData()
-        msg.setRecipientChannel(recipientChannel.toLong())
-        msg.setData(createByteString(data))
+        val msg = SshMsgChannelData().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            setData(createByteString(data))
+            _check()
+        }
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(),
@@ -1254,9 +1279,11 @@ class SshConnection(
     }
 
     internal suspend fun sendWindowAdjust(recipientChannel: Int, bytesToAdd: Int) {
-        val msg = SshMsgChannelWindowAdjust()
-        msg.setRecipientChannel(recipientChannel.toLong())
-        msg.setBytesToAdd(bytesToAdd.toLong())
+        val msg = SshMsgChannelWindowAdjust().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            setBytesToAdd(bytesToAdd.toLong())
+            _check()
+        }
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(),
@@ -1265,8 +1292,10 @@ class SshConnection(
     }
 
     internal suspend fun sendChannelEof(recipientChannel: Int) {
-        val msg = SshMsgChannelEof()
-        msg.setRecipientChannel(recipientChannel.toLong())
+        val msg = SshMsgChannelEof().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            _check()
+        }
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(),
@@ -1361,12 +1390,14 @@ class SshConnection(
         wantReply: Boolean,
         configureRequest: (SshMsgChannelRequest) -> Unit
     ): Boolean {
-        val msg = SshMsgChannelRequest()
-        msg.setRecipientChannel(recipientChannel.toLong())
-        msg.setRequestType(createAsciiString(requestType))
-        msg.setWantReply(if (wantReply) 1 else 0)
+        val msg = SshMsgChannelRequest().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            setRequestType(createAsciiString(requestType))
+            setWantReply(if (wantReply) 1 else 0)
 
-        configureRequest(msg)
+            configureRequest(this)
+            _check()
+        }
 
         val deferred = if (wantReply) {
             CompletableDeferred<Boolean>().also { pendingChannelRequest = it }
@@ -1390,8 +1421,10 @@ class SshConnection(
      * Send SSH_MSG_CHANNEL_CLOSE (RFC 4254 section 5.3).
      */
     internal suspend fun sendChannelClose(recipientChannel: Int) {
-        val msg = SshMsgChannelClose()
-        msg.setRecipientChannel(recipientChannel.toLong())
+        val msg = SshMsgChannelClose().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            _check()
+        }
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
