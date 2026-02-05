@@ -31,7 +31,7 @@ jobs:
 
     - name: Work around CodeQL issue 20661
       # Downgrade Kotlin fron 2.3.x to 2.2.x \todo Remove when https://github.com/github/codeql/issues/20661 is fixed.
-      run: sed -i -Ee 's/(kotlin\("jvm"\) +version +"2\.)3\.0"/\12.21"/' build.gradle.kts
+      run: sed -i -Ee 's/^(kotlin *= *"2\.)3\.0"/\12.21"/' gradle/libs.versions.toml
       shell: bash
 
     # Initializes the CodeQL tools for scanning.
