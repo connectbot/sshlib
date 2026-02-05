@@ -202,7 +202,7 @@ class SshConnection(
                     }
                     packetIO.writePacket(
                         SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
-                        toByteArray(initMsg)
+                        initMsg.toByteArray()
                     )
 
                     // Second packet is SSH_MSG_KEX_DH_GEX_REPLY
@@ -268,7 +268,7 @@ class SshConnection(
 
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                toByteArray(req)
+                req.toByteArray()
             )
 
             return deferred.await()
@@ -312,7 +312,7 @@ class SshConnection(
 
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                toByteArray(req)
+                req.toByteArray()
             )
 
             val consumerJob = connectionScope.launch {
@@ -338,7 +338,7 @@ class SshConnection(
 
                         packetIO.writePacket(
                             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
-                            toByteArray(responseMsg)
+                            responseMsg.toByteArray()
                         )
                     }
                 }
@@ -407,7 +407,7 @@ class SshConnection(
 
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                toByteArray(req)
+                req.toByteArray()
             )
 
             return deferred.await()
@@ -435,7 +435,7 @@ class SshConnection(
             setPublicKeyBlob(createByteString(publicKeyBlob))
             _check()
         }
-        return toByteArray(data)
+        return data.toByteArray()
     }
 
     // SshClientCallbacks implementation
@@ -478,7 +478,7 @@ class SshConnection(
             _check()
         }
 
-        val kexInitPayload = toByteArray(kexInit)
+        val kexInitPayload = kexInit.toByteArray()
 
         clientKexInit = byteArrayOf(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toByte()) + kexInitPayload
 
@@ -578,7 +578,7 @@ class SshConnection(
         }
 
         runBlocking {
-            packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), toByteArray(msg))
+            packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), msg.toByteArray())
         }
     }
 
@@ -598,7 +598,7 @@ class SshConnection(
         }
 
         runBlocking {
-            packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), toByteArray(msg))
+            packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), msg.toByteArray())
         }
     }
 
@@ -616,7 +616,7 @@ class SshConnection(
         }
 
         runBlocking {
-            packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), toByteArray(msg))
+            packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
         }
     }
 
@@ -850,7 +850,7 @@ class SshConnection(
         }
 
         runBlocking {
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), toByteArray(msg))
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), msg.toByteArray())
         }
     }
 
@@ -941,7 +941,7 @@ class SshConnection(
         runBlocking {
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
-                toByteArray(msg)
+                msg.toByteArray()
             )
         }
     }
@@ -964,7 +964,7 @@ class SshConnection(
         runBlocking {
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
-                toByteArray(message)
+                message.toByteArray()
             )
         }
     }
@@ -1176,87 +1176,6 @@ class SshConnection(
         }
     }
 
-    private fun toByteArray(struct: KaitaiStruct.ReadWrite): ByteArray {
-        struct._check()
-        val io = ByteBufferKaitaiStream(1024 * 32)
-        struct._write(io)
-        val size = io.pos()
-        io.seek(0)
-        return io.readBytes(size.toLong())
-    }
-
-    private fun createAsciiString(str: String): AsciiString {
-        val s = AsciiString()
-        s.setLen(str.length.toLong())
-        s.setValue(str)
-        s._check()
-        return s
-    }
-
-    private fun createUtf8String(str: String): Utf8String {
-        val bytes = str.toByteArray(Charsets.UTF_8)
-        val s = Utf8String()
-        s.setLen(bytes.size.toLong())
-        s.setValue(str)
-        s._check()
-        return s
-    }
-
-    private fun createNameList(names: String): NameList {
-        val nameList = NameList()
-        val entries = NameList.NameEntry()
-        entries.set_parent(nameList)
-        entries.set_root(nameList)
-
-        if (names.isEmpty()) {
-            entries.setData(emptyList())
-            nameList.setLenEntries(0)
-        } else {
-            val list = names.split(",")
-            entries.setData(list)
-            val contentBytes = names.toByteArray(Charsets.US_ASCII)
-            nameList.setLenEntries(contentBytes.size.toLong())
-        }
-
-        entries._check()
-        nameList.setEntries(entries)
-        nameList._check()
-        return nameList
-    }
-
-    private fun createMpint(data: ByteArray): Mpint {
-        var start = 0
-        while (start < data.size - 1 && data[start] == 0.toByte()) {
-            start++
-        }
-
-        val needsPadding = (data[start].toInt() and 0x80) != 0
-
-        val formattedLength = data.size - start + if (needsPadding) 1 else 0
-        val formatted = ByteArray(formattedLength)
-
-        if (needsPadding) {
-            formatted[0] = 0
-            System.arraycopy(data, start, formatted, 1, data.size - start)
-        } else {
-            System.arraycopy(data, start, formatted, 0, data.size - start)
-        }
-
-        val m = Mpint()
-        m.setLenBody(formattedLength.toLong())
-        m.setBody(formatted)
-        m._check()
-        return m
-    }
-
-    private fun createByteString(data: ByteArray): ByteString {
-        val bs = ByteString()
-        bs.setLenData(data.size.toLong())
-        bs.setData(data)
-        bs._check()
-        return bs
-    }
-
     private inline fun <reified T : KaitaiStruct.ReadWrite> parseBody(packet: UnencryptedPacket.UnencryptedPayload): T {
         val rawBody = packet._raw_body()
         val stream = ByteBufferKaitaiStream(rawBody)
@@ -1274,7 +1193,7 @@ class SshConnection(
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(),
-            toByteArray(msg)
+            msg.toByteArray()
         )
     }
 
@@ -1287,7 +1206,7 @@ class SshConnection(
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(),
-            toByteArray(msg)
+            msg.toByteArray()
         )
     }
 
@@ -1299,7 +1218,7 @@ class SshConnection(
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(),
-            toByteArray(msg)
+            msg.toByteArray()
         )
     }
 
@@ -1428,7 +1347,7 @@ class SshConnection(
 
         packetIO.writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
-            toByteArray(msg)
+            msg.toByteArray()
         )
     }
 }
