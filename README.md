@@ -27,6 +27,7 @@ that runs in reaction to state changes.
 ### Authentication
 - `keyboard-interactive`
 - `password`
+- `publickey`
 
 ### Host Keys
 - `ssh-ed25519` ([RFC 8709](https://tools.ietf.org/html/rfc8709))
@@ -119,8 +120,6 @@ client.disconnect()
 
 ## Current Limitations
 
-- No public key authentication or keyboard-interactive authentication
-- No ECDH, Curve25519, or ML-KEM hybrid key exchange
 - No SFTP, port forwarding, or agent forwarding
 - Client-only (no server implementation)
 
