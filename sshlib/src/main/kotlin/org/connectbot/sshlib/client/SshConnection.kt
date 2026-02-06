@@ -20,6 +20,8 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import org.connectbot.sshlib.AuthHandler
+import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.crypto.*
 import org.connectbot.sshlib.protocol.*
@@ -123,6 +125,10 @@ class SshConnection(
     private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
 
     private var infoRequestChannel: Channel<SshMsgUserauthInfoRequest>? = null
+
+    // Strategy-based authentication state
+    private var authResultChannel: Channel<AuthResult>? = null
+    private var currentAuthMethod: String? = null
 
     private var packetLoopJob: Job? = null
 
@@ -436,6 +442,206 @@ class SshConnection(
             _check()
         }
         return data.toByteArray()
+    }
+
+    /**
+     * Authenticate using the strategy-based [AuthHandler] flow.
+     *
+     * Drives the authentication per RFC 4252: none → publickey probe → sign →
+     * keyboard-interactive → password.
+     */
+    internal suspend fun authenticate(username: String, handler: AuthHandler): Boolean {
+        val channel = Channel<AuthResult>(Channel.UNLIMITED)
+        authResultChannel = channel
+        try {
+            return doAuthenticate(username, handler, channel)
+        } finally {
+            authResultChannel = null
+            currentAuthMethod = null
+            channel.close()
+        }
+    }
+
+    private suspend fun doAuthenticate(
+        username: String,
+        handler: AuthHandler,
+        channel: Channel<AuthResult>
+    ): Boolean {
+        // Step 1: Send "none" auth to discover allowed methods
+        currentAuthMethod = "none"
+        sendAuthRequest(username, "none") {
+            val noneAuth = UserauthRequestNone().apply { _check() }
+            setMethodSpecificFields(noneAuth)
+        }
+
+        val noneResult = channel.receive()
+        if (noneResult is AuthResult.Success) return true
+        if (noneResult !is AuthResult.Failure) return false
+
+        val allowedMethods = noneResult.allowedMethods
+        handler.onAuthMethodsAvailable(allowedMethods)
+
+        // Step 2: Public key phase
+        if ("publickey" in allowedMethods) {
+            val keys = handler.onPublicKeysNeeded()
+            for (key in keys) {
+                val probeResult = probePublicKey(username, key, channel)
+                if (probeResult is AuthResult.Success) return true
+                if (probeResult is AuthResult.PkOk) {
+                    val signResult = signPublicKey(username, key, handler, channel)
+                    if (signResult) return true
+                }
+                // AuthResult.Failure → try next key
+            }
+        }
+
+        // Step 3: Keyboard-interactive phase
+        if ("keyboard-interactive" in allowedMethods) {
+            val kbdResult = doKeyboardInteractive(username, handler, channel)
+            if (kbdResult) return true
+        }
+
+        // Step 4: Password phase
+        if ("password" in allowedMethods) {
+            val password = handler.onPasswordNeeded() ?: return false
+            val passResult = doPasswordAuth(username, password, channel)
+            if (passResult) return true
+        }
+
+        return false
+    }
+
+    private suspend fun probePublicKey(
+        username: String,
+        key: AuthPublicKey,
+        channel: Channel<AuthResult>
+    ): AuthResult {
+        currentAuthMethod = "publickey"
+        sendAuthRequest(username, "publickey") {
+            val pubkeyAuth = UserauthRequestPublickey().apply {
+                setHasSignature(0)
+                setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                setPublicKeyBlob(createByteString(key.publicKeyBlob))
+                _check()
+            }
+            setMethodSpecificFields(pubkeyAuth)
+        }
+        return channel.receive()
+    }
+
+    private suspend fun signPublicKey(
+        username: String,
+        key: AuthPublicKey,
+        handler: AuthHandler,
+        channel: Channel<AuthResult>
+    ): Boolean {
+        val sid = sessionId ?: throw SshException("Session ID not established")
+        val signatureData = buildSignatureData(
+            sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob
+        )
+
+        val signature = handler.onSignatureRequest(key, signatureData) ?: return false
+
+        currentAuthMethod = "publickey"
+        sendAuthRequest(username, "publickey") {
+            val pubkeyAuth = UserauthRequestPublickey().apply {
+                setHasSignature(1)
+                setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                setPublicKeyBlob(createByteString(key.publicKeyBlob))
+                setSignature(createByteString(signature))
+                _check()
+            }
+            setMethodSpecificFields(pubkeyAuth)
+        }
+
+        return when (channel.receive()) {
+            is AuthResult.Success -> true
+            else -> false
+        }
+    }
+
+    private suspend fun doKeyboardInteractive(
+        username: String,
+        handler: AuthHandler,
+        channel: Channel<AuthResult>
+    ): Boolean {
+        currentAuthMethod = "keyboard-interactive"
+        sendAuthRequest(username, "keyboard-interactive") {
+            val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
+                setLanguageTag(createByteString(ByteArray(0)))
+                setSubmethods(createByteString(ByteArray(0)))
+                _check()
+            }
+            setMethodSpecificFields(kbdInteractive)
+        }
+
+        while (true) {
+            when (val result = channel.receive()) {
+                is AuthResult.Success -> return true
+                is AuthResult.Failure -> return false
+                is AuthResult.InfoRequest -> {
+                    val responses = handler.onKeyboardInteractivePrompt(
+                        result.name, result.instruction, result.prompts
+                    ) ?: return false
+
+                    val responseMsg = SshMsgUserauthInfoResponse().apply {
+                        setNumResponses(responses.size.toLong())
+                        setResponses(responses.map { response ->
+                            createByteString(response.toByteArray(Charsets.UTF_8))
+                        })
+                        _check()
+                    }
+
+                    packetIO.writePacket(
+                        SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
+                        responseMsg.toByteArray()
+                    )
+                }
+                is AuthResult.PkOk -> {
+                    // Unexpected during keyboard-interactive
+                    return false
+                }
+            }
+        }
+    }
+
+    private suspend fun doPasswordAuth(
+        username: String,
+        password: String,
+        channel: Channel<AuthResult>
+    ): Boolean {
+        currentAuthMethod = "password"
+        sendAuthRequest(username, "password") {
+            val passAuth = UserauthRequestPassword().apply {
+                setChangePassword(0)
+                setPlaintextPassword(createUtf8String(password))
+                _check()
+            }
+            setMethodSpecificFields(passAuth)
+        }
+
+        return when (channel.receive()) {
+            is AuthResult.Success -> true
+            else -> false
+        }
+    }
+
+    private suspend fun sendAuthRequest(
+        username: String,
+        method: String,
+        configure: SshMsgUserauthRequest.() -> Unit
+    ) {
+        val req = SshMsgUserauthRequest().apply {
+            setUserName(createAsciiString(username))
+            setServiceName(createAsciiString("ssh-connection"))
+            setMethodName(createAsciiString(method))
+            configure()
+            _check()
+        }
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
+            req.toByteArray()
+        )
     }
 
     // SshClientCallbacks implementation
@@ -1098,18 +1304,50 @@ class SshConnection(
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
             }
             SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
+                val ch = authResultChannel
+                if (ch != null) {
+                    ch.trySend(AuthResult.Success)
+                }
                 dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
             }
             SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
-                dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
+                val ch = authResultChannel
+                if (ch != null) {
+                    val msg = parseBody<SshMsgUserauthFailure>(packet)
+                    val methods = msg.validAuthentications().entries().data().toSet()
+                    val partial = msg.partialSuccess() != 0
+                    ch.trySend(AuthResult.Failure(methods, partial))
+                } else {
+                    dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
+                }
             }
             SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER -> {
                 val msg = parseBody<SshMsgUserauthBanner>(packet)
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthBanner(msg))
             }
             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
-                val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
-                dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))
+                val ch = authResultChannel
+                if (ch != null && currentAuthMethod == "publickey") {
+                    val msg = parseBody<SshMsgUserauthPkOk>(packet)
+                    ch.trySend(AuthResult.PkOk(
+                        msg.publicKeyAlgorithmName().value(),
+                        msg.publicKeyBlob().data()
+                    ))
+                } else if (ch != null && currentAuthMethod == "keyboard-interactive") {
+                    val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
+                    val name = String(msg.name().data(), Charsets.UTF_8)
+                    val instruction = String(msg.instruction().data(), Charsets.UTF_8)
+                    val prompts = msg.prompts().map { prompt ->
+                        KeyboardInteractiveCallback.Prompt(
+                            text = String(prompt.prompt().data(), Charsets.UTF_8),
+                            echo = prompt.echo() != 0
+                        )
+                    }
+                    ch.trySend(AuthResult.InfoRequest(name, instruction, prompts))
+                } else {
+                    val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
+                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))
+                }
             }
             SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.Disconnect)
