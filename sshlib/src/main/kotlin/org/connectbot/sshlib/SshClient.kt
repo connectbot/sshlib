@@ -271,6 +271,42 @@ class SshClient private constructor(
     }
 
     /**
+     * Authenticate using the strategy-based [AuthHandler] flow.
+     *
+     * The library drives the authentication per RFC 4252, calling back into the
+     * handler for materials. The flow is:
+     * none → publickey probe → sign → keyboard-interactive → password.
+     *
+     * @param username SSH username
+     * @param handler Callback handler providing authentication materials
+     * @return true if authentication succeeded
+     */
+    suspend fun authenticate(username: String, handler: AuthHandler): Boolean {
+        val conn = connection
+        if (conn == null) {
+            logger.error("Not connected - call connect() first")
+            return false
+        }
+
+        return try {
+            logger.info("Authenticating as $username via auth handler")
+            val success = conn.authenticate(username, handler)
+
+            if (success) {
+                authenticated = true
+                logger.info("Auth handler authentication successful")
+            } else {
+                logger.warn("Auth handler authentication failed")
+            }
+
+            success
+        } catch (e: Exception) {
+            logger.error("Auth handler authentication error", e)
+            false
+        }
+    }
+
+    /**
      * Check if the provided private key data is encrypted and requires a passphrase.
      *
      * @param privateKeyData Private key file contents

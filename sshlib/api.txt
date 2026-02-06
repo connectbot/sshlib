@@ -1,6 +1,28 @@
 // Signature format: 4.0
 package org.connectbot.sshlib {
 
+  public interface AuthHandler {
+    method public default suspend Object? onAuthMethodsAvailable(java.util.Set<java.lang.String> methods, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? onKeyboardInteractivePrompt(String name, String instruction, java.util.List<org.connectbot.sshlib.KeyboardInteractiveCallback.Prompt> prompts, kotlin.coroutines.Continuation<? super java.util.List<? extends java.lang.String>?>);
+    method public suspend Object? onPasswordNeeded(kotlin.coroutines.Continuation<? super java.lang.String?>);
+    method public suspend Object? onPublicKeysNeeded(kotlin.coroutines.Continuation<? super java.util.List<? extends org.connectbot.sshlib.AuthPublicKey>>);
+    method public suspend Object? onSignatureRequest(org.connectbot.sshlib.AuthPublicKey key, byte[] dataToSign, kotlin.coroutines.Continuation<? super byte[]?>);
+  }
+
+  public final class AuthPublicKey {
+    ctor public AuthPublicKey(String algorithmName, byte[] publicKeyBlob);
+    method public String component1();
+    method public byte[] component2();
+    method public org.connectbot.sshlib.AuthPublicKey copy(String algorithmName, byte[] publicKeyBlob);
+    method public boolean equals(Object? other);
+    method public String getAlgorithmName();
+    method public byte[] getPublicKeyBlob();
+    method public int hashCode();
+    method public String toString();
+    property public final String algorithmName;
+    property public final byte[] publicKeyBlob;
+  }
+
   public interface HostKeyVerifier {
     method public default suspend Object? addKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public default suspend Object? removeKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
@@ -45,6 +67,7 @@ package org.connectbot.sshlib {
   }
 
   public final class SshClient {
+    method public suspend Object? authenticate(String username, org.connectbot.sshlib.AuthHandler handler, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticatePassword(String username, String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticatePublicKey(String username, byte[] privateKeyData, optional String? passphrase, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
@@ -52,6 +75,8 @@ package org.connectbot.sshlib {
     method public suspend Object? connect(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? disconnect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public boolean isAuthenticated();
+    method public boolean isPrivateKeyEncrypted(byte[] privateKeyData);
+    method public boolean isPrivateKeyEncrypted(String privateKeyData);
     method public suspend Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
     property public final boolean isAuthenticated;
     field public static final org.connectbot.sshlib.SshClient.Companion Companion;
@@ -141,6 +166,14 @@ package org.connectbot.sshlib {
     property public abstract kotlinx.coroutines.channels.ReceiveChannel<byte[]> stdout;
   }
 
+  public final class SshSigning {
+    method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, byte[] privateKeyData, String? passphrase);
+    method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, String privateKeyData, String? passphrase);
+    method public byte[] sign(String algorithmName, byte[] privateKeyData, String? passphrase, byte[] dataToSign);
+    method public byte[] sign(String algorithmName, String privateKeyData, String? passphrase, byte[] dataToSign);
+    field public static final org.connectbot.sshlib.SshSigning INSTANCE;
+  }
+
 }
 
 package org.connectbot.sshlib.blocking {
@@ -151,6 +184,7 @@ package org.connectbot.sshlib.blocking {
     ctor public BlockingSshClient(String host, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier);
     ctor public BlockingSshClient(org.connectbot.sshlib.SshClientConfig config);
     ctor public BlockingSshClient(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional String clientVersion);
+    method public boolean authenticate(String username, org.connectbot.sshlib.AuthHandler handler);
     method public boolean authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback);
     method public boolean authenticatePassword(String username, String password);
     method public boolean authenticatePublicKey(String username, byte[] privateKeyData);

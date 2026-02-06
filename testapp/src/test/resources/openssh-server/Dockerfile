@@ -49,6 +49,15 @@ RUN mkdir -p /run/openssh && \
     echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "UsePAM yes" >> /etc/ssh/sshd_config
 
+# Set up public key authentication for test user
+COPY test_ed25519.pub /tmp/test_ed25519.pub
+RUN mkdir -p /home/$USERNAME/.ssh && \
+    cat /tmp/test_ed25519.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+    chown -R $USERNAME:$USERNAME /home/$USERNAME/.ssh && \
+    chmod 700 /home/$USERNAME/.ssh && \
+    chmod 600 /home/$USERNAME/.ssh/authorized_keys && \
+    rm /tmp/test_ed25519.pub
+
 # Configure PAM for sshd
 RUN mkdir -p /etc/pam.d && \
     echo "auth       required     pam_unix.so" > /etc/pam.d/sshd && \

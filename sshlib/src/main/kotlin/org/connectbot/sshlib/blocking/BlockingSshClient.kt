@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.blocking
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.SshClient
@@ -97,6 +98,16 @@ class BlockingSshClient private constructor(
      */
     fun authenticatePassword(username: String, password: String): Boolean =
         runBlocking { client.authenticatePassword(username, password) }
+
+    /**
+     * Authenticate using the strategy-based [AuthHandler] flow.
+     *
+     * @param username SSH username
+     * @param handler Callback handler providing authentication materials
+     * @return true if authentication succeeded
+     */
+    fun authenticate(username: String, handler: AuthHandler): Boolean =
+        runBlocking { client.authenticate(username, handler) }
 
     /**
      * Authenticate using keyboard-interactive authentication (RFC 4256).
