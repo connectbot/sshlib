@@ -105,10 +105,7 @@ mavenPublishing {
     publishToMavenCentral(automaticRelease = true, validateDeployment = DeploymentValidation.PUBLISHED)
     signAllPublications()
 
-    coordinates(groupId = "org.connectbot", artifactId = "protocol")
-
     pom {
-        name.set("protocol")
         description.set("ConnectBot's SSH protocol messages in Kaitai Struct.")
         inceptionYear.set("2025")
         url.set(gitHubUrl)

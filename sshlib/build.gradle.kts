@@ -114,10 +114,7 @@ mavenPublishing {
     publishToMavenCentral(automaticRelease = true, validateDeployment = DeploymentValidation.PUBLISHED)
     signAllPublications()
 
-    coordinates(groupId = "org.connectbot", artifactId = "sshlib-ktx")
-
     pom {
-        name.set("sshlib-ktx")
         description.set("ConnectBot's SSH library written in Kotlin.")
         inceptionYear.set("2025")
         url.set(gitHubUrl)

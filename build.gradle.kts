@@ -23,7 +23,7 @@ plugins {
 }
 
 subprojects {
-    group = "org.connectbot"
+    group = "org.connectbot.sshlib"
 
     repositories {
         google()

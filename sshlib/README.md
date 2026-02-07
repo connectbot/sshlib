@@ -1,4 +1,4 @@
-# Module sshlib-ktx
+# Module sshlib
 
 A high-level SSH client library for Kotlin and Java, built with coroutines and modern cryptography.
 
