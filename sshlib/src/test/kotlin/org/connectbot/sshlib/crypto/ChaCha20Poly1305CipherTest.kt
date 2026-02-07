@@ -74,13 +74,14 @@ class ChaCha20Poly1305CipherTest {
         val key = ByteArray(64).apply {
             for (i in indices) this[i] = i.toByte()
         }
-        val cipher = ChaCha20Poly1305Cipher(key)
+        val encCipher = ChaCha20Poly1305Cipher(key)
+        val decCipher = ChaCha20Poly1305Cipher(key)
 
         val plainLength = byteArrayOf(0x00, 0x00, 0x00, 0x14) // 20 bytes
         val seqNum = 42L
 
-        val encrypted = cipher.encryptLength(seqNum, plainLength)
-        val decrypted = cipher.decryptLength(seqNum, encrypted)
+        val encrypted = encCipher.encryptLength(seqNum, plainLength)
+        val decrypted = decCipher.decryptLength(seqNum, encrypted)
 
         assertContentEquals(plainLength, decrypted)
     }

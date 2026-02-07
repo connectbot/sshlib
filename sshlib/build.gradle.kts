@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
+import com.vanniktech.maven.publish.DeploymentValidation
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.publish)
+    alias(libs.plugins.dokka)
     alias(libs.plugins.metalava)
     `java-library`
 }
@@ -43,4 +49,96 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+spotless {
+    kotlinGradle {
+        target(
+            fileTree(".") {
+                include("**/*.gradle.kts")
+                exclude("**/build", "**/out")
+            },
+        )
+        ktlint()
+    }
+
+    format("xml") {
+        target(
+            fileTree(".") {
+                include("config/**/*.xml", "lib/**/*.xml", "test-app/**/*.xml")
+                exclude("**/build", "**/out")
+            },
+        )
+    }
+
+    format("misc") {
+        target("**/.gitignore")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+val gitHubUrl = "https://github.com/kruton/ssh-proto"
+
+dokka {
+    moduleName.set("ConnectBot SSH Library")
+
+    dokkaSourceSets.configureEach {
+        includes.from("README.md")
+        sourceLink {
+            localDirectory.set(file("./"))
+            remoteUrl.set(uri("$gitHubUrl/blob/main"))
+            remoteLineSuffix.set("#L")
+        }
+    }
+
+    pluginsConfiguration {
+        html.footerMessage.set("Copyright Kenny Root")
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = true, validateDeployment = DeploymentValidation.PUBLISHED)
+    signAllPublications()
+
+    coordinates(groupId = "org.connectbot", artifactId = "sshlib-ktx")
+
+    pom {
+        name.set("sshlib-ktx")
+        description.set("ConnectBot's SSH library written in Kotlin.")
+        inceptionYear.set("2025")
+        url.set(gitHubUrl)
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("kruton")
+                name.set("Kenny Root")
+                url.set("https://github.com/kruton/")
+            }
+        }
+        scm {
+            connection.set("scm:git:$gitHubUrl.git")
+            developerConnection.set("$gitHubUrl.git")
+            url.set(gitHubUrl)
+        }
+    }
 }

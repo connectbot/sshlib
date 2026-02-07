@@ -16,9 +16,15 @@
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.release)
+    alias(libs.plugins.publish) apply false
 }
 
 subprojects {
+    group = "org.connectbot"
+
     repositories {
         google()
         mavenCentral()
