@@ -1,5 +1,6 @@
 [versions]
 kotlin = "2.3.0"
+spotless = "8.2.0"
 kaitai = "0.11"
 coroutines = "1.10.2"
 kstatemachine = "0.36.0"
@@ -14,6 +15,9 @@ junit = "6.0.2"
 logback = "1.5.27"
 testcontainers = "2.0.3"
 metalava = "0.4.0-alpha03"
+dokka = "2.2.0-Beta"
+publish = "0.36.0"
+release = "3.1.0"
 
 [libraries]
 kaitai-runtime = { module = "io.kaitai:kaitai-struct-runtime", version.ref = "kaitai" }
@@ -37,4 +41,8 @@ testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 metalava = { id = "me.tylerbwong.gradle.metalava", version.ref = "metalava" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
+release = { id = "net.researchgate.release", version.ref = "release" }
