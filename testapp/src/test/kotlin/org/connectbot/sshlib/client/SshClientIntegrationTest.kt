@@ -17,10 +17,13 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.AuthHandler
+import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshSigning
 import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -397,6 +400,211 @@ class SshClientIntegrationTest {
             val authenticated = client.authenticateKeyboardInteractive(USERNAME, callback)
             assertFalse(authenticated, "Should fail keyboard-interactive with wrong password")
             assertFalse(client.isAuthenticated, "Client should not be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    // --- AuthHandler integration tests ---
+
+    private fun readTestKey(): String {
+        return javaClass.getResourceAsStream("/openssh-server/test_ed25519")!!
+            .bufferedReader().readText()
+    }
+
+    @Test
+    fun `auth handler should authenticate with password fallback`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            var methodsReceived: Set<String>? = null
+
+            val handler = object : AuthHandler {
+                override suspend fun onAuthMethodsAvailable(methods: Set<String>) {
+                    methodsReceived = methods
+                }
+
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
+
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
+
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String, instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                ): List<String>? = null
+
+                override suspend fun onPasswordNeeded(): String = PASSWORD
+            }
+
+            val authenticated = client.authenticate(USERNAME, handler)
+            assertTrue(authenticated, "Should authenticate via password fallback")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+            assertNotNull(methodsReceived, "Should have received available methods")
+            assertTrue(methodsReceived!!.isNotEmpty(), "Available methods should not be empty")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `auth handler should authenticate with keyboard-interactive`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val handler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
+
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
+
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String, instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                ): List<String> = prompts.map { PASSWORD }
+
+                override suspend fun onPasswordNeeded(): String? = null
+            }
+
+            val authenticated = client.authenticate(USERNAME, handler)
+            assertTrue(authenticated, "Should authenticate via keyboard-interactive")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `auth handler should authenticate with public key`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val keyData = readTestKey()
+            val pubKey = SshSigning.getPublicKey("ssh-ed25519", keyData, null)
+
+            val handler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = listOf(pubKey)
+
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray {
+                    return SshSigning.sign(key.algorithmName, keyData, null, dataToSign)
+                }
+
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String, instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                ): List<String>? = null
+
+                override suspend fun onPasswordNeeded(): String? = null
+            }
+
+            val authenticated = client.authenticate(USERNAME, handler)
+            assertTrue(authenticated, "Should authenticate via public key")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `auth handler should fall through pubkey to keyboard-interactive to password`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val callSequence = mutableListOf<String>()
+
+            val handler = object : AuthHandler {
+                override suspend fun onAuthMethodsAvailable(methods: Set<String>) {
+                    callSequence.add("methods")
+                }
+
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> {
+                    callSequence.add("pubkeys")
+                    // Return a fake key that won't be accepted
+                    return listOf(AuthPublicKey("ssh-ed25519", ByteArray(51)))
+                }
+
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? {
+                    callSequence.add("sign")
+                    return null
+                }
+
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String, instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                ): List<String>? {
+                    callSequence.add("kbd")
+                    // Skip keyboard-interactive
+                    return null
+                }
+
+                override suspend fun onPasswordNeeded(): String {
+                    callSequence.add("password")
+                    return PASSWORD
+                }
+            }
+
+            val authenticated = client.authenticate(USERNAME, handler)
+            assertTrue(authenticated, "Should authenticate via password after fallthrough")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+            assertTrue("methods" in callSequence, "onAuthMethodsAvailable should have been called")
+            assertTrue("pubkeys" in callSequence, "onPublicKeysNeeded should have been called")
+            assertTrue("password" in callSequence, "onPasswordNeeded should have been called")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `auth handler should report available methods`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = BlockingSshClient(host, port, acceptAllVerifier)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            var receivedMethods: Set<String>? = null
+
+            val handler = object : AuthHandler {
+                override suspend fun onAuthMethodsAvailable(methods: Set<String>) {
+                    receivedMethods = methods
+                }
+
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
+
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
+
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String, instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                ): List<String>? = null
+
+                override suspend fun onPasswordNeeded(): String = PASSWORD
+            }
+
+            client.authenticate(USERNAME, handler)
+            val methods = receivedMethods ?: fail("Should have received available methods")
+            assertTrue("publickey" in methods, "Should include publickey method")
+            assertTrue("password" in methods, "Should include password method")
         } finally {
             client.disconnect()
         }
