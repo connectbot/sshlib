@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.blocking
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
@@ -150,6 +151,18 @@ class BlockingSshClient private constructor(
         privateKeyData: String,
         passphrase: String? = null
     ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
+
+    /**
+     * Enable SSH agent forwarding with the provided agent.
+     *
+     * Must be called before opening sessions. When agent forwarding is enabled,
+     * remote servers can request signatures from your agent provider.
+     *
+     * @param provider Agent implementation that handles signing requests
+     */
+    fun enableAgentForwarding(provider: AgentProvider) {
+        client.enableAgentForwarding(provider)
+    }
 
     /**
      * Check if connected and authenticated.
