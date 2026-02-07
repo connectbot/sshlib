@@ -20,6 +20,7 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.KeyboardInteractiveCallback
@@ -118,6 +119,11 @@ class SshConnection(
     private var nextLocalChannelNumber = 0
     private val channels = mutableMapOf<Int, SessionChannel>()
     private val channelsByRemote = mutableMapOf<Int, SessionChannel>()
+    private val agentChannels = mutableMapOf<Int, AgentChannel>()
+    private val agentChannelsByRemote = mutableMapOf<Int, AgentChannel>()
+
+    private var agentProvider: AgentProvider? = null
+    private var serverHostKeyBlob: ByteArray? = null
 
     // Pending async operations - completed by callbacks
     private var pendingAuth: CompletableDeferred<Boolean>? = null
@@ -886,6 +892,8 @@ class SshConnection(
 
         val publicKey = PublicKey(keyType, serverHostKey)
 
+        serverHostKeyBlob = serverHostKey
+
         val trusted = runBlocking {
             hostKeyVerifier.verify(publicKey)
         }
@@ -1111,6 +1119,113 @@ class SshConnection(
         }
     }
 
+    /**
+     * Enable SSH agent forwarding with the provided agent.
+     *
+     * Must be called before the remote server opens agent channels.
+     * When agent forwarding is enabled, remote servers can request
+     * signatures from your agent provider.
+     *
+     * @param provider Agent implementation that handles signing requests
+     */
+    fun enableAgentForwarding(provider: AgentProvider) {
+        this.agentProvider = provider
+        logger.info("Agent forwarding enabled")
+    }
+
+    private suspend fun handleIncomingChannelOpen(packet: UnencryptedPacket.UnencryptedPayload) {
+        try {
+            val rawBody = packet._raw_body()
+            val stream = ByteBufferKaitaiStream(rawBody)
+            val msg = SshMsgChannelOpen(stream)
+            msg._read()
+
+            val channelType = msg.channelType().value()
+            val senderChannel = msg.senderChannel().toInt()
+            val initialWindow = msg.initialWindowSize()
+            val maxPacketSize = msg.maximumPacketSize().toInt()
+
+            logger.info("Received CHANNEL_OPEN: type=$channelType, sender=$senderChannel")
+
+            if (channelType == "auth-agent@openssh.com" && agentProvider != null) {
+                val localChannelNumber = nextLocalChannelNumber++
+
+                val sessionInfo = AgentSessionInfo(
+                    sessionId = sessionId ?: ByteArray(0),
+                    serverHostKey = serverHostKeyBlob ?: ByteArray(0)
+                )
+                val handler = AgentProtocolHandler(agentProvider!!, sessionInfo)
+                val agentChannel = AgentChannel(
+                    handler,
+                    this,
+                    localChannelNumber,
+                    senderChannel,
+                    maxPacketSize,
+                    initialWindow
+                )
+
+                agentChannels[localChannelNumber] = agentChannel
+                agentChannelsByRemote[localChannelNumber] = agentChannel
+
+                sendChannelOpenConfirmation(
+                    recipientChannel = senderChannel,
+                    senderChannel = localChannelNumber,
+                    initialWindowSize = 64 * 1024,
+                    maximumPacketSize = 32 * 1024
+                )
+                logger.info("Accepted agent channel: local=$localChannelNumber, remote=$senderChannel")
+            } else {
+                logger.warn("Rejecting channel open: type=$channelType (agent=${agentProvider != null})")
+                sendChannelOpenFailure(
+                    recipientChannel = senderChannel,
+                    reasonCode = 3,  // SSH_OPEN_CONNECT_FAILED
+                    description = "Channel type not supported",
+                    languageTag = ""
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to handle incoming channel open", e)
+        }
+    }
+
+    private suspend fun sendChannelOpenConfirmation(
+        recipientChannel: Int,
+        senderChannel: Int,
+        initialWindowSize: Int,
+        maximumPacketSize: Int
+    ) {
+        val msg = SshMsgChannelOpenConfirmation()
+        msg.setRecipientChannel(recipientChannel.toLong())
+        msg.setSenderChannel(senderChannel.toLong())
+        msg.setInitialWindowSize(initialWindowSize.toLong())
+        msg.setMaximumPacketSize(maximumPacketSize.toLong())
+        msg._check()
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION.id().toInt(),
+            msg.toByteArray()
+        )
+    }
+
+    private suspend fun sendChannelOpenFailure(
+        recipientChannel: Int,
+        reasonCode: Int,
+        description: String,
+        languageTag: String
+    ) {
+        val msg = SshMsgChannelOpenFailure()
+        msg.setRecipientChannel(recipientChannel.toLong())
+        msg.setReasonCode(reasonCode.toLong())
+        msg.setDescription(createByteString(description.toByteArray(Charsets.UTF_8)))
+        msg.setLanguageTag(createByteString(languageTag.toByteArray(Charsets.UTF_8)))
+        msg._check()
+
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE.id().toInt(),
+            msg.toByteArray()
+        )
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun close() {
         connectionScope.cancel()
@@ -1229,6 +1344,9 @@ class SshConnection(
                     logger.error("Failed to parse SSH_MSG_GLOBAL_REQUEST", e)
                 }
             }
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN -> {
+                handleIncomingChannelOpen(packet)
+            }
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
                 val messageTypeByte = packet.messageType().id().toByte()
                 val rawBody = byteArrayOf(messageTypeByte) + packet._raw_body()
@@ -1247,11 +1365,13 @@ class SshConnection(
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
                 val msg = parseBody<SshMsgChannelData>(packet)
-                val channel = channelsByRemote[msg.recipientChannel().toInt()]
-                if (channel != null) {
-                    channel.onData(msg.data().data())
-                } else {
-                    logger.warn("Data for unknown channel ${msg.recipientChannel()}")
+                val recipientChannel = msg.recipientChannel().toInt()
+                val channel = channelsByRemote[recipientChannel]
+                val agentChannel = agentChannelsByRemote[recipientChannel]
+                when {
+                    channel != null -> channel.onData(msg.data().data())
+                    agentChannel != null -> runBlocking { agentChannel.handleData(msg.data().data()) }
+                    else -> logger.warn("Data for unknown channel $recipientChannel")
                 }
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA -> {
@@ -1265,29 +1385,35 @@ class SshConnection(
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
                 val msg = parseBody<SshMsgChannelWindowAdjust>(packet)
-                val channel = channelsByRemote[msg.recipientChannel().toInt()]
-                if (channel != null) {
-                    channel.onWindowAdjust(msg.bytesToAdd())
-                } else {
-                    logger.warn("Window adjust for unknown channel ${msg.recipientChannel()}")
+                val recipientChannel = msg.recipientChannel().toInt()
+                val channel = channelsByRemote[recipientChannel]
+                val agentChannel = agentChannelsByRemote[recipientChannel]
+                when {
+                    channel != null -> channel.onWindowAdjust(msg.bytesToAdd())
+                    agentChannel != null -> agentChannel.onWindowAdjust(msg.bytesToAdd())
+                    else -> logger.warn("Window adjust for unknown channel $recipientChannel")
                 }
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF -> {
                 val msg = parseBody<SshMsgChannelEof>(packet)
-                val channel = channelsByRemote[msg.recipientChannel().toInt()]
-                if (channel != null) {
-                    channel.onEof()
-                } else {
-                    logger.warn("EOF for unknown channel ${msg.recipientChannel()}")
+                val recipientChannel = msg.recipientChannel().toInt()
+                val channel = channelsByRemote[recipientChannel]
+                val agentChannel = agentChannelsByRemote[recipientChannel]
+                when {
+                    channel != null -> channel.onEof()
+                    agentChannel != null -> agentChannel.onEof()
+                    else -> logger.warn("EOF for unknown channel $recipientChannel")
                 }
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
                 val msg = parseBody<SshMsgChannelClose>(packet)
-                val channel = channelsByRemote[msg.recipientChannel().toInt()]
-                if (channel != null) {
-                    channel.onClose()
-                } else {
-                    logger.warn("Close for unknown channel ${msg.recipientChannel()}")
+                val recipientChannel = msg.recipientChannel().toInt()
+                val channel = channelsByRemote[recipientChannel]
+                val agentChannel = agentChannelsByRemote[recipientChannel]
+                when {
+                    channel != null -> channel.onClose()
+                    agentChannel != null -> agentChannel.onClose()
+                    else -> logger.warn("Close for unknown channel $recipientChannel")
                 }
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {

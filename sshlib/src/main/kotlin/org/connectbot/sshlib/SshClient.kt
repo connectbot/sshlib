@@ -307,6 +307,18 @@ class SshClient private constructor(
     }
 
     /**
+     * Enable SSH agent forwarding with the provided agent.
+     *
+     * Must be called before opening sessions. When agent forwarding is enabled,
+     * remote servers can request signatures from your agent provider.
+     *
+     * @param provider Agent implementation that handles signing requests
+     */
+    fun enableAgentForwarding(provider: AgentProvider) {
+        connection?.enableAgentForwarding(provider)
+    }
+
+    /**
      * Check if the provided private key data is encrypted and requires a passphrase.
      *
      * @param privateKeyData Private key file contents

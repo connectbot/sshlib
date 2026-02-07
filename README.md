@@ -20,6 +20,7 @@ that runs in reaction to state changes.
   4419, 5656, 8308, 8709, 8731, 9142)
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
+- **Agent Forwarding**: Forward SSH agent requests with session binding support
 - **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
 
 ## Algorithm Support
@@ -118,9 +119,48 @@ session.close()
 client.disconnect()
 ```
 
+### SSH Agent Forwarding
+
+Enable SSH agent forwarding to allow remote servers to use your keys:
+
+```kotlin
+// Implement an agent provider
+class MyAgentProvider : AgentProvider {
+    override suspend fun getIdentities(): List<AgentIdentity> {
+        val keyBlob = loadPublicKeyBlob()
+        return listOf(AgentIdentity(keyBlob, "my-key"))
+    }
+
+    override suspend fun signData(context: AgentSigningContext): ByteArray? {
+        // Show approval UI to user with session context
+        val approved = showSigningPrompt(
+            "Remote server ${context.serverHostKey.toHex()} wants to use your key",
+            "Session bound: ${context.isBound}"
+        )
+
+        return if (approved) {
+            signWithPrivateKey(context.publicKeyBlob, context.dataToSign)
+        } else {
+            null  // Deny the request
+        }
+    }
+}
+
+// Enable agent forwarding
+val client = SshClient("bastion.example.com")
+client.connect()
+client.authenticatePassword("user", "pass")
+client.enableAgentForwarding(MyAgentProvider())
+
+// Now remote servers can use your agent through forwarding
+val session = client.openSession()
+session.requestShell()
+// When you SSH from bastion to another server, it can request signatures
+```
+
 ## Current Limitations
 
-- No SFTP, port forwarding, or agent forwarding
+- No SFTP or port forwarding
 - Client-only (no server implementation)
 
 ## License
