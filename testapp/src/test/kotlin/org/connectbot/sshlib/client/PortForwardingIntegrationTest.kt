@@ -240,6 +240,53 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
+    fun `jump host should connect second SSH client through first`() = runBlocking {
+        val jumpClient = createAuthenticatedClient()
+
+        try {
+            // Use the jump client to create a transport to the same SSH server's port 22
+            // inside the container (127.0.0.1:22 from the container's perspective)
+            val transportFactory = jumpClient.openDirectTcpipTransport("127.0.0.1", 22)
+            assertNotNull(transportFactory, "Should create transport factory")
+
+            val targetConfig = SshClientConfig {
+                this.transportFactory = transportFactory!!
+                this.hostKeyVerifier = acceptAllVerifier
+            }
+            val targetClient = SshClient(targetConfig)
+
+            assertTrue(targetClient.connect(), "Should connect through jump host")
+            assertTrue(
+                targetClient.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate through jump host"
+            )
+
+            // Open a session on the target and run a command
+            val session = targetClient.openSession()
+            assertNotNull(session, "Should open session through jump host")
+            session!!.requestShell()
+            delay(200)
+            session.write("echo jump-test-ok\n".toByteArray())
+            delay(500)
+
+            val output = StringBuilder()
+            while (true) {
+                val data = session.stdout.tryReceive().getOrNull() ?: break
+                output.append(String(data))
+            }
+            assertTrue(
+                output.contains("jump-test-ok"),
+                "Should receive command output through jump host, got: $output"
+            )
+
+            session.close()
+            targetClient.disconnect()
+        } finally {
+            jumpClient.disconnect()
+        }
+    }
+
+    @Test
     fun `dynamic port forwarding with authenticator`() = runBlocking {
         val client = createAuthenticatedClient()
 

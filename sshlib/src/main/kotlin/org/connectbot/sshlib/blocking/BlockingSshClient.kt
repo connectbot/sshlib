@@ -244,6 +244,17 @@ class BlockingSshClient private constructor(
     }
 
     /**
+     * Create a [org.connectbot.sshlib.transport.TransportFactory] that tunnels through this SSH connection.
+     */
+    @JvmOverloads
+    fun openDirectTcpipTransport(
+        remoteHost: String,
+        remotePort: Int,
+        originAddr: String = "127.0.0.1",
+        originPort: Int = 0
+    ): TransportFactory? = client.openDirectTcpipTransport(remoteHost, remotePort, originAddr, originPort)
+
+    /**
      * Disconnect from the SSH server.
      */
     fun disconnect() = runBlocking { client.disconnect() }
