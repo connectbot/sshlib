@@ -149,6 +149,7 @@ package org.connectbot.sshlib {
     method public boolean isPrivateKeyEncrypted(String privateKeyData);
     method public suspend Object? localPortForward(error.NonExistentClass bindAddress, String remoteHost, int remotePort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public suspend Object? localPortForward(int bindPort, String remoteHost, int remotePort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
+    method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort, optional String originAddr, optional int originPort);
     method public suspend Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
     method public suspend Object? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     property public final boolean isAuthenticated;
@@ -284,6 +285,9 @@ package org.connectbot.sshlib.blocking {
     method public boolean isAuthenticated();
     method public org.connectbot.sshlib.PortForwarder? localPortForward(error.NonExistentClass bindAddress, String remoteHost, int remotePort);
     method public org.connectbot.sshlib.PortForwarder? localPortForward(int bindPort, String remoteHost, int remotePort);
+    method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort);
+    method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort, optional String originAddr);
+    method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort, optional String originAddr, optional int originPort);
     method public org.connectbot.sshlib.SshSession? openSession();
     method public org.connectbot.sshlib.PortForwarder? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort);
     property public final boolean isAuthenticated;

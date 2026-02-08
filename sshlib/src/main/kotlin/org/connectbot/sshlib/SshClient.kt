@@ -25,6 +25,7 @@ import org.connectbot.sshlib.client.LocalPortForwarder
 import org.connectbot.sshlib.client.RemotePortForwarder
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.crypto.PrivateKeyReader
+import org.connectbot.sshlib.transport.ForwardingChannelTransport
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.transport.TransportFactory
@@ -530,6 +531,53 @@ class SshClient private constructor(
         } catch (e: Exception) {
             logger.error("Failed to start stream forwarding", e)
             null
+        }
+    }
+
+    /**
+     * Create a [TransportFactory] that tunnels through this SSH connection.
+     *
+     * Opens a direct-tcpip channel to [remoteHost]:[remotePort] and wraps it
+     * as a [Transport], allowing a second [SshClient] to connect through this
+     * connection without transiting the kernel network stack (jump host /
+     * ProxyJump pattern).
+     *
+     * ```kotlin
+     * val jump = SshClient("jump.example.com")
+     * jump.connect()
+     * jump.authenticatePassword("user", "pass")
+     *
+     * val targetConfig = SshClientConfig {
+     *     transportFactory = jump.openDirectTcpipTransport("target.internal", 22)
+     *     hostKeyVerifier = myVerifier
+     * }
+     * val target = SshClient(targetConfig)
+     * target.connect()
+     * ```
+     *
+     * @param remoteHost Host reachable from the SSH server to connect to
+     * @param remotePort Port on the remote host
+     * @param originAddr Originator address reported to the server
+     * @param originPort Originator port reported to the server
+     * @return TransportFactory for use in [SshClientConfig], or null if not authenticated
+     */
+    fun openDirectTcpipTransport(
+        remoteHost: String,
+        remotePort: Int,
+        originAddr: String = "127.0.0.1",
+        originPort: Int = 0
+    ): TransportFactory? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated")
+            return null
+        }
+
+        return TransportFactory {
+            val channel = conn.openDirectTcpipChannel(
+                remoteHost, remotePort, originAddr, originPort
+            ) ?: throw SshException("Failed to open direct-tcpip channel to $remoteHost:$remotePort")
+            ForwardingChannelTransport(channel)
         }
     }
 
