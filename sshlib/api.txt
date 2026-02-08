@@ -103,6 +103,17 @@ package org.connectbot.sshlib {
     method public suspend Object? verify(org.connectbot.sshlib.PublicKey key, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
   }
 
+  public interface PortForwarder {
+    method public default void close();
+    method public String getBoundHost();
+    method public int getBoundPort();
+    method public boolean isActive();
+    method public suspend Object? stop(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public abstract String boundHost;
+    property public abstract int boundPort;
+    property public abstract boolean isActive;
+  }
+
   public final class PublicKey {
     ctor public PublicKey(String type, byte[] encoded);
     method public String component1();
@@ -117,6 +128,10 @@ package org.connectbot.sshlib {
     property public final String type;
   }
 
+  public interface Socks5Authenticator {
+    method public boolean authenticate(String username, String password);
+  }
+
   public final class SshClient {
     method public suspend Object? authenticate(String username, org.connectbot.sshlib.AuthHandler handler, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
@@ -125,11 +140,17 @@ package org.connectbot.sshlib {
     method public suspend Object? authenticatePublicKey(String username, String privateKeyData, optional String? passphrase, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? connect(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? disconnect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public suspend Object? dynamicPortForward(error.NonExistentClass bindAddress, optional org.connectbot.sshlib.Socks5Authenticator? authenticator, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
+    method public suspend Object? dynamicPortForward(int bindPort, optional org.connectbot.sshlib.Socks5Authenticator? authenticator, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
+    method public suspend Object? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr, optional int originPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.StreamForwarder?>);
     method public boolean isAuthenticated();
     method public boolean isPrivateKeyEncrypted(byte[] privateKeyData);
     method public boolean isPrivateKeyEncrypted(String privateKeyData);
+    method public suspend Object? localPortForward(error.NonExistentClass bindAddress, String remoteHost, int remotePort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
+    method public suspend Object? localPortForward(int bindPort, String remoteHost, int remotePort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public suspend Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
+    method public suspend Object? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     property public final boolean isAuthenticated;
     field public static final org.connectbot.sshlib.SshClient.Companion Companion;
   }
@@ -226,6 +247,13 @@ package org.connectbot.sshlib {
     field public static final org.connectbot.sshlib.SshSigning INSTANCE;
   }
 
+  public interface StreamForwarder {
+    method public default void close();
+    method public boolean isActive();
+    method public suspend Object? stop(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public abstract boolean isActive;
+  }
+
 }
 
 package org.connectbot.sshlib.blocking {
@@ -245,9 +273,19 @@ package org.connectbot.sshlib.blocking {
     method public boolean authenticatePublicKey(String username, String privateKeyData, optional String? passphrase);
     method public boolean connect();
     method public void disconnect();
+    method public org.connectbot.sshlib.PortForwarder? dynamicPortForward(error.NonExistentClass bindAddress);
+    method public org.connectbot.sshlib.PortForwarder? dynamicPortForward(error.NonExistentClass bindAddress, optional org.connectbot.sshlib.Socks5Authenticator? authenticator);
+    method public org.connectbot.sshlib.PortForwarder? dynamicPortForward(int bindPort);
+    method public org.connectbot.sshlib.PortForwarder? dynamicPortForward(int bindPort, optional org.connectbot.sshlib.Socks5Authenticator? authenticator);
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
+    method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort);
+    method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr);
+    method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr, optional int originPort);
     method public boolean isAuthenticated();
+    method public org.connectbot.sshlib.PortForwarder? localPortForward(error.NonExistentClass bindAddress, String remoteHost, int remotePort);
+    method public org.connectbot.sshlib.PortForwarder? localPortForward(int bindPort, String remoteHost, int remotePort);
     method public org.connectbot.sshlib.SshSession? openSession();
+    method public org.connectbot.sshlib.PortForwarder? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort);
     property public final boolean isAuthenticated;
   }
 

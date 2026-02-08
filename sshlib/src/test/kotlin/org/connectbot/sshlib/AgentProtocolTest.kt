@@ -230,10 +230,10 @@ class AgentProtocolTest {
 
         assertNotNull(capturedContext)
         assertArrayEquals(byteArrayOf(1, 2, 3, 4), capturedContext!!.publicKeyBlob)
-        assertArrayEquals(byteArrayOf(5, 6, 7, 8), capturedContext!!.dataToSign)
-        assertEquals(2, capturedContext!!.flags)
-        assertArrayEquals(byteArrayOf(10, 11, 12), capturedContext!!.sessionId)
-        assertArrayEquals(byteArrayOf(13, 14, 15), capturedContext!!.serverHostKey)
-        assertFalse(capturedContext!!.isBound)
+        assertArrayEquals(byteArrayOf(5, 6, 7, 8), capturedContext.dataToSign)
+        assertEquals(2, capturedContext.flags)
+        assertArrayEquals(byteArrayOf(10, 11, 12), capturedContext.sessionId)
+        assertArrayEquals(byteArrayOf(13, 14, 15), capturedContext.serverHostKey)
+        assertFalse(capturedContext.isBound)
     }
 }

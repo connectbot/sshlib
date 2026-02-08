@@ -16,12 +16,20 @@
 
 package org.connectbot.sshlib
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import io.ktor.utils.io.*
+import org.connectbot.sshlib.client.DynamicPortForwarder
+import org.connectbot.sshlib.client.LocalPortForwarder
+import org.connectbot.sshlib.client.RemotePortForwarder
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.transport.TransportFactory
 import org.slf4j.LoggerFactory
+import java.net.InetSocketAddress
 
 /**
  * High-level async SSH client API.
@@ -109,6 +117,7 @@ class SshClient private constructor(
     private var transport: Transport? = null
     private var connection: SshConnection? = null
     private var authenticated = false
+    private val forwardingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Connect to the SSH server and perform key exchange.
@@ -366,6 +375,160 @@ class SshClient private constructor(
             conn.openSessionChannel()
         } catch (e: Exception) {
             logger.error("Failed to open session channel", e)
+            null
+        }
+    }
+
+    /**
+     * Start local port forwarding (RFC 4254 section 7.2).
+     *
+     * Listens on [bindAddress] locally and forwards each connection through SSH
+     * to [remoteHost]:[remotePort] on the remote side.
+     *
+     * @param bindAddress Local address to bind
+     * @param remoteHost Remote host to connect to through SSH
+     * @param remotePort Remote port to connect to through SSH
+     * @return PortForwarder handle, or null if not authenticated
+     */
+    suspend fun localPortForward(
+        bindAddress: InetSocketAddress,
+        remoteHost: String,
+        remotePort: Int
+    ): PortForwarder? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated")
+            return null
+        }
+
+        return try {
+            LocalPortForwarder.create(forwardingScope, conn, bindAddress, remoteHost, remotePort)
+        } catch (e: Exception) {
+            logger.error("Failed to start local port forwarding", e)
+            null
+        }
+    }
+
+    /**
+     * Start local port forwarding bound to localhost.
+     *
+     * @param bindPort Local port to bind (0 for automatic)
+     * @param remoteHost Remote host to connect to through SSH
+     * @param remotePort Remote port to connect to through SSH
+     * @return PortForwarder handle, or null if not authenticated
+     */
+    suspend fun localPortForward(
+        bindPort: Int,
+        remoteHost: String,
+        remotePort: Int
+    ): PortForwarder? = localPortForward(InetSocketAddress("127.0.0.1", bindPort), remoteHost, remotePort)
+
+    /**
+     * Start remote port forwarding (RFC 4254 section 7.1).
+     *
+     * Asks the SSH server to listen on [remoteBindAddress]:[remoteBindPort] and
+     * forwards each connection back to [localHost]:[localPort] on this machine.
+     *
+     * @param remoteBindAddress Address for the server to bind
+     * @param remoteBindPort Port for the server to bind (0 for automatic)
+     * @param localHost Local host to forward to
+     * @param localPort Local port to forward to
+     * @return PortForwarder handle, or null if the server rejected the request
+     */
+    suspend fun remotePortForward(
+        remoteBindAddress: String,
+        remoteBindPort: Int,
+        localHost: String,
+        localPort: Int
+    ): PortForwarder? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated")
+            return null
+        }
+
+        return try {
+            RemotePortForwarder.create(forwardingScope, conn, remoteBindAddress, remoteBindPort, localHost, localPort)
+        } catch (e: Exception) {
+            logger.error("Failed to start remote port forwarding", e)
+            null
+        }
+    }
+
+    /**
+     * Start dynamic (SOCKS5) port forwarding.
+     *
+     * Listens on [bindAddress] locally as a SOCKS5 proxy. Each SOCKS5 CONNECT
+     * request opens a direct-tcpip channel through SSH to the requested destination.
+     *
+     * @param bindAddress Local address to bind the SOCKS5 proxy
+     * @param authenticator Optional SOCKS5 username/password authenticator
+     * @return PortForwarder handle, or null if not authenticated
+     */
+    suspend fun dynamicPortForward(
+        bindAddress: InetSocketAddress,
+        authenticator: Socks5Authenticator? = null
+    ): PortForwarder? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated")
+            return null
+        }
+
+        return try {
+            DynamicPortForwarder.create(forwardingScope, conn, bindAddress, authenticator)
+        } catch (e: Exception) {
+            logger.error("Failed to start dynamic port forwarding", e)
+            null
+        }
+    }
+
+    /**
+     * Start dynamic (SOCKS5) port forwarding bound to localhost.
+     *
+     * @param bindPort Local port to bind (0 for automatic)
+     * @param authenticator Optional SOCKS5 username/password authenticator
+     * @return PortForwarder handle, or null if not authenticated
+     */
+    suspend fun dynamicPortForward(
+        bindPort: Int,
+        authenticator: Socks5Authenticator? = null
+    ): PortForwarder? = dynamicPortForward(InetSocketAddress("127.0.0.1", bindPort), authenticator)
+
+    /**
+     * Forward a pair of streams through an SSH direct-tcpip channel.
+     *
+     * Opens a direct-tcpip channel to [remoteHost]:[remotePort] and copies data
+     * bidirectionally between the provided Ktor channels and the SSH channel.
+     *
+     * @param readChannel Source of data to send through SSH
+     * @param writeChannel Destination for data received from SSH
+     * @param remoteHost Remote host to connect to through SSH
+     * @param remotePort Remote port to connect to through SSH
+     * @param originAddr Originator address reported to the server
+     * @param originPort Originator port reported to the server
+     * @return StreamForwarder handle, or null if the channel could not be opened
+     */
+    suspend fun forwardStream(
+        readChannel: ByteReadChannel,
+        writeChannel: ByteWriteChannel,
+        remoteHost: String,
+        remotePort: Int,
+        originAddr: String = "127.0.0.1",
+        originPort: Int = 0
+    ): StreamForwarder? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated")
+            return null
+        }
+
+        return try {
+            org.connectbot.sshlib.client.StreamForwarder.create(
+                conn, readChannel, writeChannel, remoteHost, remotePort, originAddr, originPort
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to start stream forwarding", e)
             null
         }
     }

@@ -16,15 +16,20 @@
 
 package org.connectbot.sshlib.blocking
 
+import io.ktor.utils.io.*
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
+import org.connectbot.sshlib.PortForwarder
+import org.connectbot.sshlib.Socks5Authenticator
+import org.connectbot.sshlib.StreamForwarder
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.transport.TransportFactory
+import java.net.InetSocketAddress
 
 /**
  * Blocking wrapper for SshClient for Java compatibility.
@@ -176,6 +181,67 @@ class BlockingSshClient private constructor(
      * @return SshSession instance if successful, null otherwise
      */
     fun openSession(): SshSession? = runBlocking { client.openSession() }
+
+    /**
+     * Start local port forwarding.
+     */
+    fun localPortForward(
+        bindAddress: InetSocketAddress,
+        remoteHost: String,
+        remotePort: Int
+    ): PortForwarder? = runBlocking { client.localPortForward(bindAddress, remoteHost, remotePort) }
+
+    /**
+     * Start local port forwarding bound to localhost.
+     */
+    fun localPortForward(
+        bindPort: Int,
+        remoteHost: String,
+        remotePort: Int
+    ): PortForwarder? = runBlocking { client.localPortForward(bindPort, remoteHost, remotePort) }
+
+    /**
+     * Start remote port forwarding.
+     */
+    fun remotePortForward(
+        remoteBindAddress: String,
+        remoteBindPort: Int,
+        localHost: String,
+        localPort: Int
+    ): PortForwarder? = runBlocking { client.remotePortForward(remoteBindAddress, remoteBindPort, localHost, localPort) }
+
+    /**
+     * Start dynamic (SOCKS5) port forwarding.
+     */
+    @JvmOverloads
+    fun dynamicPortForward(
+        bindAddress: InetSocketAddress,
+        authenticator: Socks5Authenticator? = null
+    ): PortForwarder? = runBlocking { client.dynamicPortForward(bindAddress, authenticator) }
+
+    /**
+     * Start dynamic (SOCKS5) port forwarding bound to localhost.
+     */
+    @JvmOverloads
+    fun dynamicPortForward(
+        bindPort: Int,
+        authenticator: Socks5Authenticator? = null
+    ): PortForwarder? = runBlocking { client.dynamicPortForward(bindPort, authenticator) }
+
+    /**
+     * Forward Ktor byte channels through an SSH direct-tcpip channel.
+     */
+    @JvmOverloads
+    fun forwardStream(
+        readChannel: ByteReadChannel,
+        writeChannel: ByteWriteChannel,
+        remoteHost: String,
+        remotePort: Int,
+        originAddr: String = "127.0.0.1",
+        originPort: Int = 0
+    ): StreamForwarder? = runBlocking {
+        client.forwardStream(readChannel, writeChannel, remoteHost, remotePort, originAddr, originPort)
+    }
 
     /**
      * Disconnect from the SSH server.
