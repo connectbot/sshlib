@@ -47,7 +47,9 @@ RUN mkdir -p /run/openssh && \
     echo "Ciphers +aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc" >> /etc/ssh/sshd_config && \
     echo "MACs +hmac-sha2-256,hmac-sha2-512,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com" >> /etc/ssh/sshd_config && \
     echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
-    echo "UsePAM yes" >> /etc/ssh/sshd_config
+    echo "UsePAM yes" >> /etc/ssh/sshd_config && \
+    echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config && \
+    echo "GatewayPorts yes" >> /etc/ssh/sshd_config
 
 # Set up public key authentication for test user
 COPY test_ed25519.pub /tmp/test_ed25519.pub

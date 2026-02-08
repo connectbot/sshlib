@@ -12,6 +12,7 @@ jbcrypt = "1.0.2"
 junit4 = "4.13.2"
 junitVintage = "6.0.2"
 junit = "6.0.2"
+mockk = "1.13.16"
 logback = "1.5.27"
 testcontainers = "2.0.3"
 metalava = "0.4.0-alpha03"
@@ -38,6 +39,7 @@ junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", vers
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
