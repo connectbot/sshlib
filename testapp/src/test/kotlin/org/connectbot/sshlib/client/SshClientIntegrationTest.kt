@@ -16,13 +16,17 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshSigning
 import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Assertions.*
@@ -605,6 +609,42 @@ class SshClientIntegrationTest {
             val methods = receivedMethods ?: fail("Should have received available methods")
             assertTrue("publickey" in methods, "Should include publickey method")
             assertTrue("password" in methods, "Should include password method")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `disconnectedFlow emits when server closes connection`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val disconnectDeferred = async {
+                withTimeout(10_000) {
+                    client.disconnectedFlow.first()
+                }
+            }
+
+            val session = client.openSession()
+            assertNotNull(session)
+            session!!.requestShell()
+            // Ask the server to terminate the connection
+            session.write("exit\n".toByteArray())
+
+            val cause = disconnectDeferred.await()
+            // Transport read failure produces a non-null throwable
+            assertNotNull(cause)
         } finally {
             client.disconnect()
         }

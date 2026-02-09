@@ -144,6 +144,7 @@ package org.connectbot.sshlib {
     method public suspend Object? dynamicPortForward(int bindPort, optional org.connectbot.sshlib.Socks5Authenticator? authenticator, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
     method public suspend Object? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr, optional int originPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.StreamForwarder?>);
+    method public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> getDisconnectedFlow();
     method public boolean isAuthenticated();
     method public boolean isPrivateKeyEncrypted(byte[] privateKeyData);
     method public boolean isPrivateKeyEncrypted(String privateKeyData);
@@ -152,6 +153,7 @@ package org.connectbot.sshlib {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort, optional String originAddr, optional int originPort);
     method public suspend Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
     method public suspend Object? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
+    property public final kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public final boolean isAuthenticated;
     field public static final org.connectbot.sshlib.SshClient.Companion Companion;
   }
@@ -285,6 +287,7 @@ package org.connectbot.sshlib.blocking {
     method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort);
     method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr);
     method public org.connectbot.sshlib.StreamForwarder? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, String remoteHost, int remotePort, optional String originAddr, optional int originPort);
+    method public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> getDisconnectedFlow();
     method public boolean isAuthenticated();
     method public org.connectbot.sshlib.PortForwarder? localPortForward(error.NonExistentClass bindAddress, String remoteHost, int remotePort);
     method public org.connectbot.sshlib.PortForwarder? localPortForward(int bindPort, String remoteHost, int remotePort);
@@ -293,6 +296,7 @@ package org.connectbot.sshlib.blocking {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(String remoteHost, int remotePort, optional String originAddr, optional int originPort);
     method public org.connectbot.sshlib.SshSession? openSession();
     method public org.connectbot.sshlib.PortForwarder? remotePortForward(String remoteBindAddress, int remoteBindPort, String localHost, int localPort);
+    property public final kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public final boolean isAuthenticated;
   }
 
@@ -332,7 +336,9 @@ package org.connectbot.sshlib.client {
     method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public boolean connect();
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
+    method public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> getDisconnectedFlow();
     method public suspend Object? openSessionChannel(optional int initialWindowSize, optional int maxPacketSize, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.client.SessionChannel?>);
+    property public final kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     field public static final org.connectbot.sshlib.client.SshConnection.Companion Companion;
   }
 

@@ -18,7 +18,12 @@ package org.connectbot.sshlib
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import io.ktor.utils.io.*
 import org.connectbot.sshlib.client.DynamicPortForwarder
 import org.connectbot.sshlib.client.LocalPortForwarder
@@ -119,6 +124,19 @@ class SshClient private constructor(
     private var connection: SshConnection? = null
     private var authenticated = false
     private val forwardingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var disconnectForwardJob: Job? = null
+
+    private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
+
+    /**
+     * Emits when the connection drops unexpectedly.
+     *
+     * The value is the [Throwable] that caused the disconnection (e.g., transport error),
+     * or `null` if the server sent a clean SSH_MSG_DISCONNECT.
+     *
+     * This flow does **not** emit when [disconnect] is called by the caller.
+     */
+    val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
 
     /**
      * Connect to the SSH server and perform key exchange.
@@ -145,6 +163,11 @@ class SshClient private constructor(
 
             if (success) {
                 connection = sshConnection
+                disconnectForwardJob = forwardingScope.launch {
+                    sshConnection.disconnectedFlow.collect { cause ->
+                        _disconnectedFlow.tryEmit(cause)
+                    }
+                }
                 logger.info("Successfully connected")
             } else {
                 disconnect()
@@ -586,6 +609,9 @@ class SshClient private constructor(
      */
     suspend fun disconnect() {
         logger.info("Disconnecting")
+
+        disconnectForwardJob?.cancel()
+        disconnectForwardJob = null
 
         connection?.close()
         connection = null
