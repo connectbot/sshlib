@@ -17,11 +17,14 @@
 package org.connectbot.sshlib
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
 import org.junit.Test
+import java.security.KeyPairGenerator
+import java.security.spec.ECGenParameterSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
@@ -101,6 +104,140 @@ class SshSigningTest {
     fun `sign with unknown algorithm throws`() {
         val keyData = readKey("ed25519_unencrypted")
         SshSigning.sign("unknown-algorithm", keyData, null, "data".toByteArray())
+    }
+
+    private fun loadKeyPair(keyResource: String, passphrase: String? = null): java.security.KeyPair {
+        val keyData = readKey(keyResource)
+        return PrivateKeyReader.read(keyData, passphrase).jcaKeyPair
+    }
+
+    @Test
+    fun `encodePublicKey Ed25519 from KeyPair`() {
+        val keyPair = loadKeyPair("ed25519_unencrypted")
+        val authPubKey = SshSigning.encodePublicKey(keyPair)
+        assertEquals("ssh-ed25519", authPubKey.algorithmName)
+
+        val fromPrivate = SshSigning.getPublicKey("ssh-ed25519", readKey("ed25519_unencrypted"), null)
+        assertEquals(fromPrivate, authPubKey)
+    }
+
+    @Test
+    fun `encodePublicKey ECDSA-256 from KeyPair`() {
+        val keyPair = loadKeyPair("ecdsa256_unencrypted")
+        val authPubKey = SshSigning.encodePublicKey(keyPair)
+        assertEquals("ecdsa-sha2-nistp256", authPubKey.algorithmName)
+
+        val fromPrivate = SshSigning.getPublicKey("ecdsa-sha2-nistp256", readKey("ecdsa256_unencrypted"), null)
+        assertEquals(fromPrivate, authPubKey)
+    }
+
+    @Test
+    fun `encodePublicKey ECDSA-384 from KeyPair`() {
+        val keyPair = loadKeyPair("ecdsa384_unencrypted")
+        val authPubKey = SshSigning.encodePublicKey(keyPair)
+        assertEquals("ecdsa-sha2-nistp384", authPubKey.algorithmName)
+    }
+
+    @Test
+    fun `encodePublicKey ECDSA-521 from KeyPair`() {
+        val keyPair = loadKeyPair("ecdsa521_unencrypted")
+        val authPubKey = SshSigning.encodePublicKey(keyPair)
+        assertEquals("ecdsa-sha2-nistp521", authPubKey.algorithmName)
+    }
+
+    @Test
+    fun `encodePublicKey RSA from KeyPair`() {
+        val keyPair = loadKeyPair("rsa_unencrypted")
+        val authPubKey = SshSigning.encodePublicKey(keyPair)
+        assertEquals("ssh-rsa", authPubKey.algorithmName)
+
+        val fromPrivate = SshSigning.getPublicKey("ssh-rsa", readKey("rsa_unencrypted"), null)
+        assertEquals(fromPrivate, authPubKey)
+    }
+
+    @Test(expected = SshException::class)
+    fun `encodePublicKey unsupported key type throws`() {
+        val kpg = KeyPairGenerator.getInstance("DSA")
+        kpg.initialize(2048)
+        SshSigning.encodePublicKey(kpg.generateKeyPair())
+    }
+
+    @Test
+    fun `signWithKeyPair Ed25519 produces valid signature`() {
+        val keyPair = loadKeyPair("ed25519_unencrypted")
+        val data = "test data for keypair signing".toByteArray()
+
+        val signature = SshSigning.signWithKeyPair("ssh-ed25519", keyPair, data)
+        assertTrue(signature.isNotEmpty())
+
+        val sigEntry = SignatureEntry.fromSshName("ssh-ed25519")!!
+        val pubKey = SshSigning.encodePublicKey(keyPair)
+        val parsedPubKey = SshPublicKey(ByteBufferKaitaiStream(pubKey.publicKeyBlob))
+        parsedPubKey._read()
+        val parsedSig = SshSignature(ByteBufferKaitaiStream(signature))
+        parsedSig._read()
+
+        assertTrue(sigEntry.algorithm.verify(parsedPubKey, parsedSig, data))
+    }
+
+    @Test
+    fun `signWithKeyPair ECDSA-256 produces valid signature`() {
+        val keyPair = loadKeyPair("ecdsa256_unencrypted")
+        val data = "test data for keypair signing".toByteArray()
+
+        val signature = SshSigning.signWithKeyPair("ecdsa-sha2-nistp256", keyPair, data)
+        assertTrue(signature.isNotEmpty())
+
+        val sigEntry = SignatureEntry.fromSshName("ecdsa-sha2-nistp256")!!
+        val pubKey = SshSigning.encodePublicKey(keyPair)
+        val parsedPubKey = SshPublicKey(ByteBufferKaitaiStream(pubKey.publicKeyBlob))
+        parsedPubKey._read()
+        val parsedSig = SshSignature(ByteBufferKaitaiStream(signature))
+        parsedSig._read()
+
+        assertTrue(sigEntry.algorithm.verify(parsedPubKey, parsedSig, data))
+    }
+
+    @Test
+    fun `signWithKeyPair RSA SHA-256 produces valid signature`() {
+        val keyPair = loadKeyPair("rsa_unencrypted")
+        val data = "test data for keypair signing".toByteArray()
+
+        val signature = SshSigning.signWithKeyPair("rsa-sha2-256", keyPair, data)
+        assertTrue(signature.isNotEmpty())
+
+        val sigEntry = SignatureEntry.fromSshName("rsa-sha2-256")!!
+        val pubKey = SshSigning.encodePublicKey(keyPair)
+        val parsedPubKey = SshPublicKey(ByteBufferKaitaiStream(pubKey.publicKeyBlob))
+        parsedPubKey._read()
+        val parsedSig = SshSignature(ByteBufferKaitaiStream(signature))
+        parsedSig._read()
+
+        assertTrue(sigEntry.algorithm.verify(parsedPubKey, parsedSig, data))
+    }
+
+    @Test
+    fun `signWithKeyPair RSA SHA-512 produces valid signature`() {
+        val keyPair = loadKeyPair("rsa_unencrypted")
+        val data = "test data for keypair signing".toByteArray()
+
+        val signature = SshSigning.signWithKeyPair("rsa-sha2-512", keyPair, data)
+        assertTrue(signature.isNotEmpty())
+
+        val sigEntry = SignatureEntry.fromSshName("rsa-sha2-512")!!
+        val pubKey = SshSigning.encodePublicKey(keyPair)
+        val parsedPubKey = SshPublicKey(ByteBufferKaitaiStream(pubKey.publicKeyBlob))
+        parsedPubKey._read()
+        val parsedSig = SshSignature(ByteBufferKaitaiStream(signature))
+        parsedSig._read()
+
+        assertTrue(sigEntry.algorithm.verify(parsedPubKey, parsedSig, data))
+    }
+
+    @Test(expected = SshException::class)
+    fun `signWithKeyPair unknown algorithm throws`() {
+        val keyPair = loadKeyPair("ed25519_unencrypted")
+        SshSigning.signWithKeyPair("unknown-algorithm", keyPair, "data".toByteArray())
     }
 }
 

@@ -242,10 +242,12 @@ package org.connectbot.sshlib {
   }
 
   public final class SshSigning {
+    method public org.connectbot.sshlib.AuthPublicKey encodePublicKey(error.NonExistentClass keyPair);
     method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, byte[] privateKeyData, String? passphrase);
     method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, String privateKeyData, String? passphrase);
     method public byte[] sign(String algorithmName, byte[] privateKeyData, String? passphrase, byte[] dataToSign);
     method public byte[] sign(String algorithmName, String privateKeyData, String? passphrase, byte[] dataToSign);
+    method public byte[] signWithKeyPair(String algorithmName, error.NonExistentClass keyPair, byte[] dataToSign);
     field public static final org.connectbot.sshlib.SshSigning INSTANCE;
   }
 
