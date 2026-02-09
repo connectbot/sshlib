@@ -20,6 +20,9 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.connectbot.sshlib.AgentProvider
@@ -101,6 +104,9 @@ class SshConnection(
 
     private val stateMachine = SshClientStateMachine(callbacks)
     private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
+    val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
 
     private var serverVersion: String? = null
     private var clientKexInit: ByteArray? = null
@@ -1129,6 +1135,7 @@ class SshConnection(
 
     private fun disconnect() {
         logger.info("Disconnecting")
+        _disconnectedFlow.tryEmit(null)
         runBlocking {
             transport.close()
         }
@@ -1862,6 +1869,7 @@ class SshConnection(
                 } else {
                     logger.warn("Packet loop ended unexpectedly", e)
                 }
+                _disconnectedFlow.tryEmit(e)
             } finally {
                 channels.values.forEach { it.onClose() }
                 forwardingChannels.values.forEach { it.onClose() }

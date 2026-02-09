@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.blocking
 
 import io.ktor.utils.io.*
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
@@ -168,6 +169,14 @@ class BlockingSshClient private constructor(
     fun enableAgentForwarding(provider: AgentProvider) {
         client.enableAgentForwarding(provider)
     }
+
+    /**
+     * Emits when the connection drops unexpectedly.
+     *
+     * @see SshClient.disconnectedFlow
+     */
+    val disconnectedFlow: SharedFlow<Throwable?>
+        get() = client.disconnectedFlow
 
     /**
      * Check if connected and authenticated.
