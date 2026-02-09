@@ -126,6 +126,28 @@ class SessionChannel internal constructor(
         connection.sendChannelEof(_remoteChannelNumber)
     }
 
+    override suspend fun resizeTerminal(
+        widthChars: Int,
+        heightRows: Int,
+        widthPixels: Int,
+        heightPixels: Int,
+    ): Boolean {
+        logger.debug("Resizing terminal: ${widthChars}x$heightRows")
+        return connection.sendChannelRequest(
+            _remoteChannelNumber,
+            "window-change",
+            wantReply = false
+        ) { msg ->
+            val windowChange = ChannelRequestWindowChange()
+            windowChange.setTerminalWidth(widthChars.toLong())
+            windowChange.setTerminalHeight(heightRows.toLong())
+            windowChange.setTerminalWidthPixels(widthPixels.toLong())
+            windowChange.setTerminalHeightPixels(heightPixels.toLong())
+            windowChange._check()
+            msg.setRequestSpecificFields(windowChange)
+        }
+    }
+
     override suspend fun requestPty(
         terminalType: String,
         widthChars: Int,

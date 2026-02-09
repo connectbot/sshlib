@@ -231,6 +231,7 @@ package org.connectbot.sshlib {
     method public suspend Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<? extends java.lang.Integer,? extends byte[]>?>);
     method public suspend Object? requestPty(optional String terminalType, optional int widthChars, optional int heightRows, optional int widthPixels, optional int heightPixels, optional byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     property public abstract boolean isOpen;
@@ -308,6 +309,7 @@ package org.connectbot.sshlib.client {
     method public suspend Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<? extends java.lang.Integer,? extends byte[]>?>);
     method public suspend Object? requestPty(String terminalType, int widthChars, int heightRows, int widthPixels, int heightPixels, byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     property public boolean isOpen;
