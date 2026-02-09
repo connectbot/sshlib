@@ -80,6 +80,14 @@ package org.connectbot.sshlib {
     method public suspend Object? verify(org.connectbot.sshlib.PublicKey key, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
   }
 
+  public final class KeyFingerprint {
+    method public String bubblebabble(byte[] publicKeyBlob);
+    method public String md5(byte[] publicKeyBlob);
+    method public String randomArt(byte[] publicKeyBlob, String keyType, int keySize);
+    method public String sha256(byte[] publicKeyBlob);
+    field public static final org.connectbot.sshlib.KeyFingerprint INSTANCE;
+  }
+
   public interface KeyboardInteractiveCallback {
     method public suspend Object? onInfoRequest(String name, String instruction, java.util.List<org.connectbot.sshlib.KeyboardInteractiveCallback.Prompt> prompts, kotlin.jvm.functions.Function2<? super java.util.List<? extends java.lang.String>,? super kotlin.coroutines.Continuation<? super kotlin.Unit>,? extends java.lang.Object?> respond, kotlin.coroutines.Continuation<? super kotlin.Unit>);
   }
