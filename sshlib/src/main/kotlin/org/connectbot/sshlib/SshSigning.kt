@@ -19,6 +19,9 @@ package org.connectbot.sshlib
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
+import java.security.KeyPair
+import java.security.interfaces.ECPublicKey
+import java.security.interfaces.RSAPublicKey
 
 /**
  * Utility for signing authentication data with local private keys.
@@ -96,4 +99,63 @@ object SshSigning {
         privateKeyData: ByteArray,
         passphrase: String?
     ): AuthPublicKey = getPublicKey(algorithmName, String(privateKeyData, Charsets.UTF_8), passphrase)
+
+    /**
+     * Encode a [KeyPair]'s public key to an [AuthPublicKey] for use with
+     * [AuthHandler.onPublicKeysNeeded].
+     *
+     * The SSH algorithm name is inferred from the key type (e.g., Ed25519 → "ssh-ed25519",
+     * RSA → "ssh-rsa"). For RSA keys that need a specific signature algorithm like
+     * "rsa-sha2-256", construct the [AuthPublicKey] with the desired algorithm name
+     * using the returned blob.
+     *
+     * @param keyPair JCA key pair
+     * @return The corresponding [AuthPublicKey]
+     */
+    fun encodePublicKey(keyPair: KeyPair): AuthPublicKey {
+        val keyType = inferKeyType(keyPair)
+        val blob = SshPublicKeyEncoder.encode(keyPair, keyType)
+        return AuthPublicKey(keyType, blob)
+    }
+
+    /**
+     * Sign authentication data using a JCA [KeyPair].
+     *
+     * @param algorithmName SSH signature algorithm (e.g., "ssh-ed25519", "rsa-sha2-256")
+     * @param keyPair JCA key pair containing the private key
+     * @param dataToSign The data to sign (as provided by [AuthHandler.onSignatureRequest])
+     * @return SSH-encoded signature blob
+     */
+    fun signWithKeyPair(
+        algorithmName: String,
+        keyPair: KeyPair,
+        dataToSign: ByteArray
+    ): ByteArray {
+        val sigEntry = SignatureEntry.fromSshName(algorithmName)
+            ?: throw SshException("Unknown signature algorithm: $algorithmName")
+        return sigEntry.algorithm.sign(algorithmName, keyPair.private, dataToSign)
+    }
+
+    private fun inferKeyType(keyPair: KeyPair): String {
+        val pub = keyPair.public
+        return when (pub.algorithm) {
+            "Ed25519" -> "ssh-ed25519"
+            "Ed448" -> "ssh-ed448"
+            "EdDSA" -> {
+                // Distinguish Ed25519 (32-byte key, 44-byte X.509) from Ed448 (57-byte key, 69-byte X.509)
+                if (pub.encoded.size <= 44) "ssh-ed25519" else "ssh-ed448"
+            }
+            "EC", "ECDSA" -> {
+                val ecPub = pub as ECPublicKey
+                when (ecPub.params.order.bitLength()) {
+                    256 -> "ecdsa-sha2-nistp256"
+                    384 -> "ecdsa-sha2-nistp384"
+                    521 -> "ecdsa-sha2-nistp521"
+                    else -> throw SshException("Unsupported EC curve with order bit length: ${ecPub.params.order.bitLength()}")
+                }
+            }
+            "RSA" -> "ssh-rsa"
+            else -> throw SshException("Unsupported key type: ${pub.algorithm}")
+        }
+    }
 }
