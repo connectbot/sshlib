@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.3.0"
+kotlin = "2.3.10"
 spotless = "8.2.1"
 kaitai = "0.11"
 coroutines = "1.10.2"
