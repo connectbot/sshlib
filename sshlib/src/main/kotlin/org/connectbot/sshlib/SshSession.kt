@@ -41,6 +41,13 @@ interface SshSession : AutoCloseable {
         terminalModes: ByteArray = byteArrayOf(0)
     ): Boolean
 
+    suspend fun resizeTerminal(
+        widthChars: Int,
+        heightRows: Int,
+        widthPixels: Int,
+        heightPixels: Int,
+    ): Boolean
+
     suspend fun requestShell(): Boolean
 
     suspend fun write(data: ByteArray)
