@@ -137,6 +137,115 @@ class KtorTcpTransportTest {
             transport.connect()
         }
     }
+
+    @Test
+    fun `IPv4_ONLY filters out IPv6 addresses`() = runTest {
+        val ipv4 = InetAddress.getByName("127.0.0.1")
+        val ipv6 = InetAddress.getByName("::1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv6, ipv4)))
+        val factory = MockTcpSocketFactory(
+            mapOf(
+                ipv4 to { MockSocket() },
+                ipv6 to { MockSocket() }
+            )
+        )
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        transport.connect()
+
+        assertEquals(1, factory.connectionAttempts.size)
+        assertEquals(ipv4, factory.connectionAttempts[0])
+    }
+
+    @Test
+    fun `IPv6_ONLY filters out IPv4 addresses`() = runTest {
+        val ipv4 = InetAddress.getByName("127.0.0.1")
+        val ipv6 = InetAddress.getByName("::1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv4, ipv6)))
+        val factory = MockTcpSocketFactory(
+            mapOf(
+                ipv4 to { MockSocket() },
+                ipv6 to { MockSocket() }
+            )
+        )
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv6_ONLY)
+        transport.connect()
+
+        assertEquals(1, factory.connectionAttempts.size)
+        assertEquals(ipv6, factory.connectionAttempts[0])
+    }
+
+    @Test
+    fun `IPv4_ONLY throws when no IPv4 addresses available`() = runTest {
+        val ipv6 = InetAddress.getByName("::1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv6)))
+        val factory = MockTcpSocketFactory(mapOf(ipv6 to { MockSocket() }))
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        val ex = assertFailsWith<TransportException> {
+            transport.connect()
+        }
+        assertTrue(ex.message!!.contains("No IPv4"))
+    }
+
+    @Test
+    fun `IPv6_ONLY throws when no IPv6 addresses available`() = runTest {
+        val ipv4 = InetAddress.getByName("127.0.0.1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv4)))
+        val factory = MockTcpSocketFactory(mapOf(ipv4 to { MockSocket() }))
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv6_ONLY)
+        val ex = assertFailsWith<TransportException> {
+            transport.connect()
+        }
+        assertTrue(ex.message!!.contains("No IPv6"))
+    }
+
+    @Test
+    fun `IPv4_ONLY connects with multiple IPv4 addresses`() = runTest {
+        val ipv4a = InetAddress.getByName("10.0.0.1")
+        val ipv4b = InetAddress.getByName("10.0.0.2")
+        val ipv6 = InetAddress.getByName("::1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv6, ipv4a, ipv4b)))
+        val factory = MockTcpSocketFactory(
+            mapOf(
+                ipv4a to { throw RuntimeException("refused") },
+                ipv4b to { MockSocket() },
+                ipv6 to { MockSocket() }
+            )
+        )
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        transport.connect()
+
+        assertTrue(factory.connectionAttempts.all { it is java.net.Inet4Address })
+        assertTrue(transport.isConnected)
+    }
+
+    @Test
+    fun `AUTO mode interleaves IPv6 and IPv4`() = runTest {
+        val ipv4 = InetAddress.getByName("127.0.0.1")
+        val ipv6 = InetAddress.getByName("::1")
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv4, ipv6)))
+        val factory = MockTcpSocketFactory(
+            mapOf(
+                ipv4 to { MockSocket() },
+                ipv6 to { MockSocket() }
+            )
+        )
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.AUTO)
+        transport.connect()
+
+        assertEquals(ipv6, factory.connectionAttempts[0])
+    }
 }
 
 class MockAddressResolver(private val hosts: Map<String, List<InetAddress>>) : AddressResolver {

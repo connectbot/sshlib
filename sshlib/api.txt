@@ -190,6 +190,7 @@ package org.connectbot.sshlib {
     method public String getHost();
     method public String getHostKeyAlgorithms();
     method public org.connectbot.sshlib.HostKeyVerifier? getHostKeyVerifier();
+    method public org.connectbot.sshlib.transport.IpVersion getIpVersion();
     method public String getKexAlgorithms();
     method public String getMacAlgorithms();
     method public int getPort();
@@ -199,6 +200,7 @@ package org.connectbot.sshlib {
     method public void setHost(String);
     method public void setHostKeyAlgorithms(String);
     method public void setHostKeyVerifier(org.connectbot.sshlib.HostKeyVerifier?);
+    method public void setIpVersion(org.connectbot.sshlib.transport.IpVersion);
     method public void setKexAlgorithms(String);
     method public void setMacAlgorithms(String);
     method public void setPort(int);
@@ -208,6 +210,7 @@ package org.connectbot.sshlib {
     property public final String host;
     property public final String hostKeyAlgorithms;
     property public final org.connectbot.sshlib.HostKeyVerifier? hostKeyVerifier;
+    property public final org.connectbot.sshlib.transport.IpVersion ipVersion;
     property public final String kexAlgorithms;
     property public final String macAlgorithms;
     property public final int port;
@@ -353,8 +356,14 @@ package org.connectbot.sshlib.transport {
     method public suspend Object? resolve(String host, kotlin.coroutines.Continuation<? super java.util.List<? extends error.NonExistentClass>>);
   }
 
+  public enum IpVersion {
+    enum_constant public static final org.connectbot.sshlib.transport.IpVersion AUTO;
+    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPv4_ONLY;
+    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPv6_ONLY;
+  }
+
   public final class KtorTcpTransport implements org.connectbot.sshlib.transport.Transport {
-    ctor public KtorTcpTransport(String host, optional int port);
+    ctor public KtorTcpTransport(String host, optional int port, optional org.connectbot.sshlib.transport.IpVersion ipVersion);
     method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend Object? connect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public boolean isConnected();
@@ -364,7 +373,7 @@ package org.connectbot.sshlib.transport {
   }
 
   public final class KtorTcpTransportFactory implements org.connectbot.sshlib.transport.TransportFactory {
-    ctor public KtorTcpTransportFactory(String host, optional int port);
+    ctor public KtorTcpTransportFactory(String host, optional int port, optional org.connectbot.sshlib.transport.IpVersion ipVersion);
     method public suspend Object? create(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.transport.Transport>);
   }
 

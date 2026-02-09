@@ -17,6 +17,18 @@
 package org.connectbot.sshlib.transport
 
 /**
+ * Controls which IP address families are used for TCP connections.
+ */
+enum class IpVersion {
+    /** Use Happy Eyeballs (RFC 8305) to race IPv6 and IPv4. */
+    AUTO,
+    /** Connect only over IPv4. */
+    IPv4_ONLY,
+    /** Connect only over IPv6. */
+    IPv6_ONLY
+}
+
+/**
  * Factory for creating transport connections.
  *
  * Implement this interface to provide custom transport implementations
@@ -50,13 +62,15 @@ fun interface TransportFactory {
  *
  * @param host The hostname or IP address to connect to
  * @param port The port number (default 22)
+ * @param ipVersion Which address families to use (default [IpVersion.AUTO])
  */
 class KtorTcpTransportFactory(
     private val host: String,
-    private val port: Int = 22
+    private val port: Int = 22,
+    private val ipVersion: IpVersion = IpVersion.AUTO
 ) : TransportFactory {
     override suspend fun create(): Transport {
-        val transport = KtorTcpTransport(host, port)
+        val transport = KtorTcpTransport(host, port, ipVersion = ipVersion)
         transport.connect()
         return transport
     }

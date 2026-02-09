@@ -20,6 +20,7 @@ import org.connectbot.sshlib.crypto.CipherEntry
 import org.connectbot.sshlib.crypto.KexEntry
 import org.connectbot.sshlib.crypto.MacEntry
 import org.connectbot.sshlib.crypto.SignatureEntry
+import org.connectbot.sshlib.transport.IpVersion
 import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.TransportFactory
 
@@ -76,9 +77,15 @@ class SshClientConfig private constructor(
 
         /**
          * Custom transport factory. If not set, uses [KtorTcpTransportFactory]
-         * with [host] and [port].
+         * with [host], [port], and [ipVersion].
          */
         var transportFactory: TransportFactory? = null
+
+        /**
+         * IP version preference for the default TCP transport.
+         * Ignored if [transportFactory] is set explicitly.
+         */
+        var ipVersion: IpVersion = IpVersion.AUTO
 
         var kexAlgorithms: String = KexEntry.defaultString
         var hostKeyAlgorithms: String = SignatureEntry.defaultString
@@ -89,7 +96,7 @@ class SshClientConfig private constructor(
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
                 require(port in 1..65535) { "Port must be between 1 and 65535" }
-                KtorTcpTransportFactory(host, port)
+                KtorTcpTransportFactory(host, port, ipVersion)
             }
 
             val verifier = hostKeyVerifier

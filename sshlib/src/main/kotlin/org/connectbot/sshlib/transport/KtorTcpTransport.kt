@@ -40,14 +40,16 @@ class KtorTcpTransport internal constructor(
     private val host: String,
     private val port: Int,
     private val addressResolver: AddressResolver,
-    private val socketFactory: TcpSocketFactory? = null
+    private val socketFactory: TcpSocketFactory? = null,
+    private val ipVersion: IpVersion = IpVersion.AUTO
 ) : Transport {
 
-    constructor(host: String, port: Int = 22) : this(
+    constructor(host: String, port: Int = 22, ipVersion: IpVersion = IpVersion.AUTO) : this(
         host,
         port,
         DefaultAddressResolver(),
-        null
+        null,
+        ipVersion
     )
 
     private var socket: TransportSocket? = null
@@ -77,29 +79,46 @@ class KtorTcpTransport internal constructor(
                 socketFactory
             }
 
-            // Happy Eyeballs (RFC 8305) implementation
-            val addresses = addressResolver.resolve(host)
+            val allAddresses = addressResolver.resolve(host)
 
-            if (addresses.isEmpty()) {
+            if (allAddresses.isEmpty()) {
                 throw TransportException("Could not resolve host: $host")
             }
 
-            // Sort addresses: IPv6 first, then IPv4, interleaved
-            val ipv6 = addresses.filterIsInstance<Inet6Address>()
-            val ipv4 = addresses.filterIsInstance<Inet4Address>()
-            val other = addresses.filter { it !is Inet4Address && it !is Inet6Address }
+            val addresses = when (ipVersion) {
+                IpVersion.IPv4_ONLY -> {
+                    val filtered = allAddresses.filterIsInstance<Inet4Address>()
+                    if (filtered.isEmpty()) {
+                        throw TransportException("No IPv4 addresses found for host: $host")
+                    }
+                    filtered
+                }
+                IpVersion.IPv6_ONLY -> {
+                    val filtered = allAddresses.filterIsInstance<Inet6Address>()
+                    if (filtered.isEmpty()) {
+                        throw TransportException("No IPv6 addresses found for host: $host")
+                    }
+                    filtered
+                }
+                IpVersion.AUTO -> {
+                    // Happy Eyeballs (RFC 8305): interleave IPv6 and IPv4
+                    val ipv6 = allAddresses.filterIsInstance<Inet6Address>()
+                    val ipv4 = allAddresses.filterIsInstance<Inet4Address>()
+                    val other = allAddresses.filter { it !is Inet4Address && it !is Inet6Address }
 
-            val sortedAddresses = mutableListOf<InetAddress>()
-            var v6Index = 0
-            var v4Index = 0
-
-            while (v6Index < ipv6.size || v4Index < ipv4.size) {
-                if (v6Index < ipv6.size) sortedAddresses.add(ipv6[v6Index++])
-                if (v4Index < ipv4.size) sortedAddresses.add(ipv4[v4Index++])
+                    val sorted = mutableListOf<InetAddress>()
+                    var v6Index = 0
+                    var v4Index = 0
+                    while (v6Index < ipv6.size || v4Index < ipv4.size) {
+                        if (v6Index < ipv6.size) sorted.add(ipv6[v6Index++])
+                        if (v4Index < ipv4.size) sorted.add(ipv4[v4Index++])
+                    }
+                    sorted.addAll(other)
+                    sorted
+                }
             }
-            sortedAddresses.addAll(other)
 
-            socket = connectHappyEyeballs(factory, sortedAddresses)
+            socket = connectHappyEyeballs(factory, addresses)
 
             readChannel = socket!!.openReadChannel()
             writeChannel = socket!!.openWriteChannel(autoFlush = false)
