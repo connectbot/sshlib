@@ -95,7 +95,7 @@ internal object KeyDecryption {
         return data.copyOfRange(0, data.size - padding)
     }
 
-    private fun generateKeyFromPasswordSaltWithMD5(
+    internal fun generateKeyFromPasswordSaltWithMD5(
         password: ByteArray,
         salt: ByteArray,
         keyLen: Int

@@ -18,31 +18,32 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
 import java.security.KeyPair
+import java.security.PublicKey
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 
 internal object SshPublicKeyEncoder {
 
-    fun encode(keyPair: KeyPair, keyType: String): ByteArray {
+    fun encode(keyPair: KeyPair, keyType: String): ByteArray = encode(keyPair.public, keyType)
+
+    fun encode(publicKey: PublicKey, keyType: String): ByteArray {
         return when {
-            keyType == "ssh-ed25519" -> encodeEd25519(keyPair)
-            keyType.startsWith("ecdsa-sha2-") -> encodeEcdsa(keyPair, keyType)
-            keyType == "ssh-rsa" -> encodeRsa(keyPair)
+            keyType == "ssh-ed25519" -> encodeEd25519(publicKey)
+            keyType.startsWith("ecdsa-sha2-") -> encodeEcdsa(publicKey as ECPublicKey, keyType)
+            keyType == "ssh-rsa" -> encodeRsa(publicKey as RSAPublicKey)
             else -> throw SshException("Unsupported key type for encoding: $keyType")
         }
     }
 
-    private fun encodeEd25519(keyPair: KeyPair): ByteArray {
-        val pubKeyEncoded = keyPair.public.encoded
-        // X.509 Ed25519 public key: the last 32 bytes are the raw key
+    private fun encodeEd25519(publicKey: PublicKey): ByteArray {
+        val pubKeyEncoded = publicKey.encoded
         val rawKey = pubKeyEncoded.copyOfRange(pubKeyEncoded.size - 32, pubKeyEncoded.size)
 
         return encodeSshString("ssh-ed25519".toByteArray(Charsets.US_ASCII)) +
                 encodeSshString(rawKey)
     }
 
-    private fun encodeEcdsa(keyPair: KeyPair, keyType: String): ByteArray {
-        val ecPub = keyPair.public as ECPublicKey
+    private fun encodeEcdsa(ecPub: ECPublicKey, keyType: String): ByteArray {
         val curveName = when (keyType) {
             "ecdsa-sha2-nistp256" -> "nistp256"
             "ecdsa-sha2-nistp384" -> "nistp384"
@@ -58,7 +59,7 @@ internal object SshPublicKeyEncoder {
                 encodeSshString(qBytes)
     }
 
-    private fun encodeEcPoint(pubKey: ECPublicKey, fieldSize: Int): ByteArray {
+    internal fun encodeEcPoint(pubKey: ECPublicKey, fieldSize: Int): ByteArray {
         val point = pubKey.w
         val xBytes = point.affineX.toByteArray().let { padOrTrim(it, fieldSize) }
         val yBytes = point.affineY.toByteArray().let { padOrTrim(it, fieldSize) }
@@ -74,12 +75,10 @@ internal object SshPublicKeyEncoder {
         return when {
             bytes.size == size -> bytes
             bytes.size > size -> {
-                // Strip leading zeros
                 val start = bytes.size - size
                 bytes.copyOfRange(start, bytes.size)
             }
             else -> {
-                // Pad with leading zeros
                 val result = ByteArray(size)
                 System.arraycopy(bytes, 0, result, size - bytes.size, bytes.size)
                 result
@@ -87,9 +86,7 @@ internal object SshPublicKeyEncoder {
         }
     }
 
-    private fun encodeRsa(keyPair: KeyPair): ByteArray {
-        val rsaPub = keyPair.public as RSAPublicKey
-
+    private fun encodeRsa(rsaPub: RSAPublicKey): ByteArray {
         return encodeSshString("ssh-rsa".toByteArray(Charsets.US_ASCII)) +
                 encodeMpint(rsaPub.publicExponent.toByteArray()) +
                 encodeMpint(rsaPub.modulus.toByteArray())
