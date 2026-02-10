@@ -615,6 +615,79 @@ class SshClientIntegrationTest {
     }
 
     @Test
+    fun `should connect with compression enabled`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.enableCompression = true
+        }
+        val client = BlockingSshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with compression enabled")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD),
+                "Should authenticate with compression enabled"
+            )
+
+            val session = client.openSession()
+            assertNotNull(session, "Should open session with compression enabled")
+
+            val shellRequested = runBlocking { session!!.requestShell() }
+            assertTrue(shellRequested, "Should request shell with compression enabled")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should exchange data with compression enabled`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.enableCompression = true
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect with compression")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+            session!!.requestPty()
+            session.requestShell()
+
+            session.write("echo hello-compression\n".toByteArray())
+
+            val output = withTimeout(5_000) {
+                val buf = StringBuilder()
+                while (!buf.contains("hello-compression")) {
+                    val data = session.read() ?: break
+                    buf.append(String(data))
+                }
+                buf.toString()
+            }
+
+            assertTrue(output.contains("hello-compression"), "Should receive echoed data through compressed connection")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun `disconnectedFlow emits when server closes connection`() = runBlocking {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)

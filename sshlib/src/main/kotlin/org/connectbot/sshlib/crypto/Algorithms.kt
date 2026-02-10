@@ -211,3 +211,26 @@ internal enum class SignatureEntry(
             entries.firstOrNull { it.sshName == name }
     }
 }
+
+internal enum class CompressionEntry(
+    val sshName: String,
+    val delayedActivation: Boolean,
+    private val factory: () -> PacketCompressor?
+) {
+    ZLIB_OPENSSH("zlib@openssh.com", delayedActivation = true, { ZlibCompressor() }),
+    ZLIB("zlib", delayedActivation = false, { ZlibCompressor() }),
+    NONE("none", delayedActivation = false, { null });
+
+    internal fun create(): PacketCompressor? = factory()
+
+    companion object {
+        val defaults: List<CompressionEntry> = listOf(NONE)
+
+        val defaultString: String = defaults.joinToString(",") { it.sshName }
+
+        val enabledString: String = entries.joinToString(",") { it.sshName }
+
+        fun fromSshName(name: String): CompressionEntry? =
+            entries.firstOrNull { it.sshName == name }
+    }
+}

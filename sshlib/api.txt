@@ -194,6 +194,7 @@ package org.connectbot.sshlib {
     ctor public SshClientConfig.Builder();
     method public org.connectbot.sshlib.SshClientConfig build();
     method public String getClientVersion();
+    method public boolean getEnableCompression();
     method public String getEncryptionAlgorithms();
     method public String getHost();
     method public String getHostKeyAlgorithms();
@@ -204,6 +205,7 @@ package org.connectbot.sshlib {
     method public int getPort();
     method public org.connectbot.sshlib.transport.TransportFactory? getTransportFactory();
     method public void setClientVersion(String);
+    method public void setEnableCompression(boolean);
     method public void setEncryptionAlgorithms(String);
     method public void setHost(String);
     method public void setHostKeyAlgorithms(String);
@@ -214,6 +216,7 @@ package org.connectbot.sshlib {
     method public void setPort(int);
     method public void setTransportFactory(org.connectbot.sshlib.transport.TransportFactory?);
     property public final String clientVersion;
+    property public final boolean enableCompression;
     property public final String encryptionAlgorithms;
     property public final String host;
     property public final String hostKeyAlgorithms;
@@ -341,7 +344,7 @@ package org.connectbot.sshlib.client {
   }
 
   public final class SshConnection {
-    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional String kexAlgorithms, optional String hostKeyAlgorithms, optional String encryptionAlgorithms, optional String macAlgorithms);
+    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional String kexAlgorithms, optional String hostKeyAlgorithms, optional String encryptionAlgorithms, optional String macAlgorithms, optional String compressionAlgorithms);
     method public suspend Object? authenticateKeyboardInteractive(String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? authenticatePassword(String username, String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
