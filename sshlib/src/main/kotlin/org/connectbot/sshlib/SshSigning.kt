@@ -19,9 +19,9 @@ package org.connectbot.sshlib
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
+import org.connectbot.sshlib.crypto.inferKeyType
 import java.security.KeyPair
-import java.security.interfaces.ECPublicKey
-import java.security.interfaces.RSAPublicKey
+import java.security.PublicKey
 
 /**
  * Utility for signing authentication data with local private keys.
@@ -136,26 +136,17 @@ object SshSigning {
         return sigEntry.algorithm.sign(algorithmName, keyPair.private, dataToSign)
     }
 
-    private fun inferKeyType(keyPair: KeyPair): String {
-        val pub = keyPair.public
-        return when (pub.algorithm) {
-            "Ed25519" -> "ssh-ed25519"
-            "Ed448" -> "ssh-ed448"
-            "EdDSA" -> {
-                // Distinguish Ed25519 (32-byte key, 44-byte X.509) from Ed448 (57-byte key, 69-byte X.509)
-                if (pub.encoded.size <= 44) "ssh-ed25519" else "ssh-ed448"
-            }
-            "EC", "ECDSA" -> {
-                val ecPub = pub as ECPublicKey
-                when (ecPub.params.order.bitLength()) {
-                    256 -> "ecdsa-sha2-nistp256"
-                    384 -> "ecdsa-sha2-nistp384"
-                    521 -> "ecdsa-sha2-nistp521"
-                    else -> throw SshException("Unsupported EC curve with order bit length: ${ecPub.params.order.bitLength()}")
-                }
-            }
-            "RSA" -> "ssh-rsa"
-            else -> throw SshException("Unsupported key type: ${pub.algorithm}")
-        }
+    /**
+     * Encode a [PublicKey] to its raw SSH wire-format public key blob.
+     *
+     * The key type is inferred from the JCA key (e.g., Ed25519 → "ssh-ed25519",
+     * RSA → "ssh-rsa").
+     *
+     * @param publicKey JCA public key
+     * @return SSH wire-format public key blob
+     */
+    fun encodePublicKeyBlob(publicKey: PublicKey): ByteArray {
+        val keyType = inferKeyType(publicKey)
+        return SshPublicKeyEncoder.encode(publicKey, keyType)
     }
 }

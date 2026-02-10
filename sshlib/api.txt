@@ -236,6 +236,14 @@ package org.connectbot.sshlib {
     ctor public SshException(String message, optional Throwable? cause);
   }
 
+  public final class SshKeys {
+    method public error.NonExistentClass decodePemPrivateKey(String pem, optional String? password);
+    method public String encodeOpenSshPrivateKey(error.NonExistentClass keyPair, optional String? password);
+    method public String encodePemPrivateKey(error.NonExistentClass keyPair, optional String? password);
+    method public void ensureEd25519Support();
+    field public static final org.connectbot.sshlib.SshKeys INSTANCE;
+  }
+
   public interface SshSession {
     method public void close();
     method public int getLocalChannelNumber();
@@ -259,6 +267,7 @@ package org.connectbot.sshlib {
 
   public final class SshSigning {
     method public org.connectbot.sshlib.AuthPublicKey encodePublicKey(error.NonExistentClass keyPair);
+    method public byte[] encodePublicKeyBlob(org.connectbot.sshlib.PublicKey publicKey);
     method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, byte[] privateKeyData, String? passphrase);
     method public org.connectbot.sshlib.AuthPublicKey getPublicKey(String algorithmName, String privateKeyData, String? passphrase);
     method public byte[] sign(String algorithmName, byte[] privateKeyData, String? passphrase, byte[] dataToSign);

@@ -239,6 +239,30 @@ class SshSigningTest {
         val keyPair = loadKeyPair("ed25519_unencrypted")
         SshSigning.signWithKeyPair("unknown-algorithm", keyPair, "data".toByteArray())
     }
+
+    @Test
+    fun `encodePublicKeyBlob Ed25519 matches encodePublicKey`() {
+        val keyPair = loadKeyPair("ed25519_unencrypted")
+        val blob = SshSigning.encodePublicKeyBlob(keyPair.public)
+        val expected = SshSigning.encodePublicKey(keyPair).publicKeyBlob
+        assertTrue(blob.contentEquals(expected))
+    }
+
+    @Test
+    fun `encodePublicKeyBlob ECDSA-256 matches encodePublicKey`() {
+        val keyPair = loadKeyPair("ecdsa256_unencrypted")
+        val blob = SshSigning.encodePublicKeyBlob(keyPair.public)
+        val expected = SshSigning.encodePublicKey(keyPair).publicKeyBlob
+        assertTrue(blob.contentEquals(expected))
+    }
+
+    @Test
+    fun `encodePublicKeyBlob RSA matches encodePublicKey`() {
+        val keyPair = loadKeyPair("rsa_unencrypted")
+        val blob = SshSigning.encodePublicKeyBlob(keyPair.public)
+        val expected = SshSigning.encodePublicKey(keyPair).publicKeyBlob
+        assertTrue(blob.contentEquals(expected))
+    }
 }
 
 class AuthPublicKeyTest {
