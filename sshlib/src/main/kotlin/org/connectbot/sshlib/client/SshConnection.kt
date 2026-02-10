@@ -57,12 +57,12 @@ class SshConnection(
     private val kexAlgorithms: String = KexEntry.defaultString,
     private val hostKeyAlgorithms: String = SignatureEntry.defaultString,
     private val encryptionAlgorithms: String = CipherEntry.defaultString,
-    private val macAlgorithms: String = MacEntry.defaultString
+    private val macAlgorithms: String = MacEntry.defaultString,
+    private val compressionAlgorithms: String = CompressionEntry.defaultString
 ) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
-        private const val COMPRESSION_ALGORITHMS = "none"
     }
 
     private val packetIO = PacketIO(transport)
@@ -123,6 +123,8 @@ class SshConnection(
     private var negotiatedEncryptionS2C: String? = null
     private var negotiatedMacC2S: String? = null
     private var negotiatedMacS2C: String? = null
+    private var negotiatedCompressionC2S: String? = null
+    private var negotiatedCompressionS2C: String? = null
     private var strictKexEnabled: Boolean = false
 
     private var nextLocalChannelNumber = 0
@@ -702,8 +704,8 @@ class SshConnection(
             setEncryptionAlgorithmsServerToClient(createNameList(encryptionAlgorithms))
             setMacAlgorithmsClientToServer(createNameList(macAlgorithms))
             setMacAlgorithmsServerToClient(createNameList(macAlgorithms))
-            setCompressionAlgorithmsClientToServer(createNameList(COMPRESSION_ALGORITHMS))
-            setCompressionAlgorithmsServerToClient(createNameList(COMPRESSION_ALGORITHMS))
+            setCompressionAlgorithmsClientToServer(createNameList(compressionAlgorithms))
+            setCompressionAlgorithmsServerToClient(createNameList(compressionAlgorithms))
             setLanguagesClientToServer(createNameList(""))
             setLanguagesServerToClient(createNameList(""))
             setFirstKexPacketFollows(0)
@@ -729,6 +731,8 @@ class SshConnection(
         val serverEncS2C = msg.encryptionAlgorithmsServerToClient().entries().data()
         val serverMacC2S = msg.macAlgorithmsClientToServer().entries().data()
         val serverMacS2C = msg.macAlgorithmsServerToClient().entries().data()
+        val serverCompC2S = msg.compressionAlgorithmsClientToServer().entries().data()
+        val serverCompS2C = msg.compressionAlgorithmsServerToClient().entries().data()
 
         logger.debug("  Server KEX algorithms: $serverKexAlgs")
         logger.debug("  Server host key algorithms: $serverHostKeyAlgs")
@@ -736,6 +740,8 @@ class SshConnection(
         logger.debug("  Server encryption s->c: $serverEncS2C")
         logger.debug("  Server MAC c->s: $serverMacC2S")
         logger.debug("  Server MAC s->c: $serverMacS2C")
+        logger.debug("  Server compression c->s: $serverCompC2S")
+        logger.debug("  Server compression s->c: $serverCompS2C")
 
         val clientKexStrict = kexAlgorithms.contains("kex-strict-c-v00@openssh.com")
         val serverKexStrict = serverKexAlgs.contains("kex-strict-s-v00@openssh.com")
@@ -782,6 +788,14 @@ class SshConnection(
         } else {
             logger.info("  MAC s->c: not needed (AEAD)")
         }
+
+        val clientCompList = compressionAlgorithms.split(",")
+        negotiatedCompressionC2S = clientCompList.firstOrNull { it in serverCompC2S }
+            ?: throw SshException("No matching compression algorithm (c->s). Client: $compressionAlgorithms, Server: $serverCompC2S")
+        negotiatedCompressionS2C = clientCompList.firstOrNull { it in serverCompS2C }
+            ?: throw SshException("No matching compression algorithm (s->c). Client: $compressionAlgorithms, Server: $serverCompS2C")
+        logger.info("  Negotiated compression c->s: $negotiatedCompressionC2S")
+        logger.info("  Negotiated compression s->c: $negotiatedCompressionS2C")
     }
 
     private fun sendKexExchangeInit() {
@@ -976,6 +990,18 @@ class SshConnection(
         }
 
         logger.info("Encryption active")
+
+        val compC2SName = negotiatedCompressionC2S
+        val compS2CName = negotiatedCompressionS2C
+        if (compC2SName != null && compS2CName != null) {
+            val compC2S = CompressionEntry.fromSshName(compC2SName)
+            val compS2C = CompressionEntry.fromSshName(compS2CName)
+            if (compC2S != null && compS2C != null) {
+                val immediateActivation = !compC2S.delayedActivation && !compS2C.delayedActivation
+                packetIO.enableCompression(compC2S.create(), compS2C.create(), immediateActivation)
+                logger.info("Compression configured: c2s=$compC2SName, s2c=$compS2CName, immediate=$immediateActivation")
+            }
+        }
     }
 
     private fun activateAeadEncryption(encC2S: String, encS2C: String) {
@@ -1099,6 +1125,7 @@ class SshConnection(
 
     private fun authenticationSuccess() {
         logger.info("Authentication successful")
+        packetIO.activateCompression()
         pendingAuth?.complete(true)
         pendingAuth = null
     }

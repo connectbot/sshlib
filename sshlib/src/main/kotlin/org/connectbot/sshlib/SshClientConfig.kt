@@ -17,6 +17,7 @@
 package org.connectbot.sshlib
 
 import org.connectbot.sshlib.crypto.CipherEntry
+import org.connectbot.sshlib.crypto.CompressionEntry
 import org.connectbot.sshlib.crypto.KexEntry
 import org.connectbot.sshlib.crypto.MacEntry
 import org.connectbot.sshlib.crypto.SignatureEntry
@@ -50,7 +51,8 @@ class SshClientConfig private constructor(
     val kexAlgorithms: String,
     val hostKeyAlgorithms: String,
     val encryptionAlgorithms: String,
-    val macAlgorithms: String
+    val macAlgorithms: String,
+    internal val compressionAlgorithms: String
 ) {
     class Builder {
         /**
@@ -92,6 +94,12 @@ class SshClientConfig private constructor(
         var encryptionAlgorithms: String = CipherEntry.defaultString
         var macAlgorithms: String = MacEntry.defaultString
 
+        /**
+         * Enable zlib compression. When true, the client offers
+         * `zlib@openssh.com,zlib,none`; when false, only `none`.
+         */
+        var enableCompression: Boolean = false
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -101,9 +109,16 @@ class SshClientConfig private constructor(
 
             val verifier = hostKeyVerifier
             requireNotNull(verifier) { "hostKeyVerifier must be set" }
+            val compressionAlgorithms = if (enableCompression) {
+                CompressionEntry.enabledString
+            } else {
+                CompressionEntry.defaultString
+            }
+
             return SshClientConfig(
                 factory, clientVersion, verifier,
-                kexAlgorithms, hostKeyAlgorithms, encryptionAlgorithms, macAlgorithms
+                kexAlgorithms, hostKeyAlgorithms, encryptionAlgorithms, macAlgorithms,
+                compressionAlgorithms
             )
         }
     }
