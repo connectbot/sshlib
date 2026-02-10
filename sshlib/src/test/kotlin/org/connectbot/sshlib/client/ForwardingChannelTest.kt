@@ -88,7 +88,7 @@ class ForwardingChannelTest {
     }
 
     @Test
-    fun `onClose sets isOpen to false and closes incomingData`() {
+    fun `onClose sets isOpen to false and closes incomingData`() = runTest {
         val (channel, _) = createChannel()
         assertTrue(channel.isOpen)
 

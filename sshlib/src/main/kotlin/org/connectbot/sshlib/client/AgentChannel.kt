@@ -32,6 +32,7 @@ internal class AgentChannel(
     }
 
     private var isOpen = true
+    private var closeSent = false
 
     suspend fun handleData(data: ByteArray) {
         if (!isOpen) {
@@ -56,8 +57,16 @@ internal class AgentChannel(
         logger.debug("Agent channel received EOF")
     }
 
-    fun onClose() {
+    suspend fun onClose() {
         logger.debug("Agent channel closed")
+        if (!closeSent) {
+            closeSent = true
+            try {
+                connection.sendChannelClose(remoteChannelNumber)
+            } catch (e: Exception) {
+                logger.debug("Failed to send CHANNEL_CLOSE reply", e)
+            }
+        }
         isOpen = false
     }
 
