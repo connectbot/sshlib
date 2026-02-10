@@ -37,6 +37,7 @@ class SessionChannel internal constructor(
     }
 
     private var _isOpen = true
+    private var closeSent = false
     private var localWindowSize: Long = initialWindowSize.toLong()
 
     private val _stdout = Channel<ByteArray>(Channel.UNLIMITED)
@@ -87,8 +88,16 @@ class SessionChannel internal constructor(
         _extendedData.close()
     }
 
-    internal fun onClose() {
+    internal suspend fun onClose() {
         logger.debug("Received CLOSE on channel $localChannelNumber")
+        if (!closeSent) {
+            closeSent = true
+            try {
+                connection.sendChannelClose(_remoteChannelNumber)
+            } catch (e: Exception) {
+                logger.debug("Failed to send CHANNEL_CLOSE reply", e)
+            }
+        }
         _isOpen = false
         _stdout.close()
         _stderr.close()
@@ -203,6 +212,7 @@ class SessionChannel internal constructor(
         if (!_isOpen) return
 
         logger.debug("Closing channel $localChannelNumber")
+        closeSent = true
         runBlocking {
             connection.sendChannelClose(_remoteChannelNumber)
         }

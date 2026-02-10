@@ -1690,6 +1690,7 @@ class SshConnection(
                     }
                     else -> logger.warn("Close for unknown channel $recipientChannel")
                 }
+                checkAllChannelsClosed()
             }
             SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
                 val rawBody = packet._raw_body()
@@ -1880,6 +1881,34 @@ class SshConnection(
         )
     }
 
+    private suspend fun checkAllChannelsClosed() {
+        val allSessionsClosed = channels.values.all { !it.isOpen }
+        val allForwardingClosed = forwardingChannels.values.all { !it.isOpen }
+        if (allSessionsClosed && allForwardingClosed && channels.isNotEmpty()) {
+            logger.info("All channels closed, sending disconnect")
+            sendDisconnect()
+        }
+    }
+
+    private suspend fun sendDisconnect() {
+        try {
+            val msg = SshMsgDisconnect().apply {
+                setReasonCode(SshEnums.DisconnectReason.SSH_DISCONNECT_BY_APPLICATION)
+                setDescription(createUtf8String(""))
+                setLanguage(createAsciiString(""))
+                _check()
+            }
+            packetIO.writePacket(
+                SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(),
+                msg.toByteArray()
+            )
+        } catch (e: Exception) {
+            logger.debug("Failed to send disconnect", e)
+        }
+        _disconnectedFlow.tryEmit(null)
+        transport.close()
+    }
+
     private fun startPacketLoop() {
         if (packetLoopJob != null) return
         packetLoopJob = connectionScope.launch {
@@ -1898,8 +1927,8 @@ class SshConnection(
                 }
                 _disconnectedFlow.tryEmit(e)
             } finally {
-                channels.values.forEach { it.onClose() }
-                forwardingChannels.values.forEach { it.onClose() }
+                for (ch in channels.values) { ch.onClose() }
+                for (ch in forwardingChannels.values) { ch.onClose() }
             }
         }
     }

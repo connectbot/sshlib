@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -688,7 +689,7 @@ class SshClientIntegrationTest {
     }
 
     @Test
-    fun `disconnectedFlow emits when server closes connection`() = runBlocking {
+    fun `disconnectedFlow emits when server closes channel`() = runBlocking {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
@@ -709,15 +710,170 @@ class SshClientIntegrationTest {
                 }
             }
 
+            kotlinx.coroutines.yield()
+
             val session = client.openSession()
             assertNotNull(session)
             session!!.requestShell()
-            // Ask the server to terminate the connection
             session.write("exit\n".toByteArray())
 
+            // Client detects all channels closed and disconnects cleanly
             val cause = disconnectDeferred.await()
-            // Transport read failure produces a non-null throwable
-            assertNotNull(cause)
+            assertNull(cause)
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `disconnectedFlow emits with error when server kills connection`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val disconnectDeferred = async {
+                withTimeout(10_000) {
+                    client.disconnectedFlow.first()
+                }
+            }
+
+            kotlinx.coroutines.yield()
+
+            val session = client.openSession()
+            assertNotNull(session)
+            session!!.requestShell()
+
+            // Kill our sshd child process from the server side.
+            // This drops the TCP connection without SSH_MSG_DISCONNECT.
+            session.write("kill -9 \$PPID\n".toByteArray())
+
+            val cause = disconnectDeferred.await()
+            assertNotNull(cause, "Should emit non-null Throwable on forced disconnect")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `session channel closes after server-side TCP drop`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+            session!!.requestShell()
+
+            // Force kill the server-side connection
+            session.write("kill -9 \$PPID\n".toByteArray())
+
+            // Wait for disconnectedFlow to fire (so we know the packet loop ended)
+            withTimeout(10_000) {
+                client.disconnectedFlow.first()
+            }
+
+            assertFalse(session.isOpen, "Session should be closed after server drops connection")
+            assertNull(session.read(), "Read should return null on closed session")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `disconnectedFlow does not emit on client-initiated disconnect`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        assertTrue(client.connect(), "Should connect to SSH server")
+        assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+        val session = client.openSession()
+        assertNotNull(session)
+        session!!.requestShell()
+
+        var emitted = false
+        val collectJob = async {
+            client.disconnectedFlow.first()
+            emitted = true
+        }
+
+        kotlinx.coroutines.yield()
+
+        // Client-initiated disconnect
+        client.disconnect()
+
+        // Give time for any erroneous emission to propagate
+        delay(500)
+
+        assertFalse(emitted, "disconnectedFlow should not emit on client-initiated disconnect")
+        collectJob.cancel()
+    }
+
+    @Test
+    fun `read returns null after server kills connection`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+            session!!.requestShell()
+
+            // Start a blocking read before killing the connection
+            val readDeferred = async {
+                // Drain any initial shell output, then wait for more
+                while (true) {
+                    val data = session.read() ?: break
+                }
+            }
+
+            // Give time for the read to be waiting
+            delay(200)
+
+            // Force kill the server-side connection
+            session.write("kill -9 \$PPID\n".toByteArray())
+
+            // The read should complete with null (channel closed)
+            withTimeout(10_000) {
+                readDeferred.await()
+            }
         } finally {
             client.disconnect()
         }

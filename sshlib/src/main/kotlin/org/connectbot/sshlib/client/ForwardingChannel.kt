@@ -35,6 +35,7 @@ internal class ForwardingChannel(
     }
 
     private var _isOpen = true
+    private var closeSent = false
     private var localWindowSize: Long = initialWindowSize.toLong()
 
     private val _incomingData = Channel<ByteArray>(Channel.UNLIMITED)
@@ -64,8 +65,16 @@ internal class ForwardingChannel(
         _incomingData.close()
     }
 
-    internal fun onClose() {
+    internal suspend fun onClose() {
         logger.debug("Forwarding channel $localChannelNumber closed")
+        if (!closeSent) {
+            closeSent = true
+            try {
+                connection.sendChannelClose(remoteChannelNumber)
+            } catch (e: Exception) {
+                logger.debug("Failed to send CHANNEL_CLOSE reply", e)
+            }
+        }
         _isOpen = false
         _incomingData.close()
     }
@@ -94,6 +103,7 @@ internal class ForwardingChannel(
 
     suspend fun close() {
         if (!_isOpen) return
+        closeSent = true
         _isOpen = false
         _incomingData.close()
         connection.sendChannelClose(remoteChannelNumber)
