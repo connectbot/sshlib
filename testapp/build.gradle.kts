@@ -26,17 +26,4 @@ application {
 dependencies {
     implementation(project(":sshlib"))
     implementation(libs.logback.classic)
-
-    // Integration test dependencies
-    testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.testcontainers.junit.jupiter)
-    testImplementation(libs.testcontainers)
-    testImplementation(libs.logback.classic)
-    testImplementation(kotlin("test"))
-    testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks.test {
-    useJUnitPlatform()
 }

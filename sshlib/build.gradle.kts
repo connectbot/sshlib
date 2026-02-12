@@ -24,6 +24,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.metalava)
     `java-library`
+    jacoco
 }
 
 dependencies {
@@ -46,10 +47,25 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testRuntimeOnly(libs.junit.vintage.engine)
+
+    // Integration test dependencies
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.testcontainers)
+    testImplementation(libs.logback.classic)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+        csv.required.set(true)
+    }
 }
 
 java {
