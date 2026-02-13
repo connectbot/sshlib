@@ -38,12 +38,12 @@ jobs:
           validate-wrappers: true
 
       - name: Build with Gradle
-        run: ./gradlew build --info -PjdkVersion=${{ matrix.java }}
+        run: ./gradlew build jacocoTestReport --info -PjdkVersion=${{ matrix.java }}
 
       - name: Upload to Sonatype
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
         run: |
-          ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername=${ORG_GRADLE_PROJECT_mavenCentralUsername} -PmavenCentralPassword=${ORG_GRADLE_PROJECT_mavenCentralPassword} --info --stacktrace
+          ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername=${ORG_GRADLE_PROJECT_mavenCentralUsername} -PmavenCentralPassword=${ORG_GRADLE_PROJECT_mavenCentralPassword}
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.MAVEN_GPG_KEYID }}
