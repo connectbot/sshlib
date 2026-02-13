@@ -22,10 +22,12 @@ package org.connectbot.sshlib.transport
 enum class IpVersion {
     /** Use Happy Eyeballs (RFC 8305) to race IPv6 and IPv4. */
     AUTO,
+
     /** Connect only over IPv4. */
-    IPv4_ONLY,
+    IPV4_ONLY,
+
     /** Connect only over IPv6. */
-    IPv6_ONLY
+    IPV6_ONLY,
 }
 
 /**
@@ -67,7 +69,7 @@ fun interface TransportFactory {
 class KtorTcpTransportFactory(
     private val host: String,
     private val port: Int = 22,
-    private val ipVersion: IpVersion = IpVersion.AUTO
+    private val ipVersion: IpVersion = IpVersion.AUTO,
 ) : TransportFactory {
     override suspend fun create(): Transport {
         val transport = KtorTcpTransport(host, port, ipVersion = ipVersion)

@@ -44,7 +44,7 @@ object SshSigning {
         algorithmName: String,
         privateKeyData: String,
         passphrase: String?,
-        dataToSign: ByteArray
+        dataToSign: ByteArray,
     ): ByteArray {
         val privateKey = PrivateKeyReader.read(privateKeyData, passphrase)
         val sigEntry = SignatureEntry.fromSshName(algorithmName)
@@ -65,7 +65,7 @@ object SshSigning {
         algorithmName: String,
         privateKeyData: ByteArray,
         passphrase: String?,
-        dataToSign: ByteArray
+        dataToSign: ByteArray,
     ): ByteArray = sign(algorithmName, String(privateKeyData, Charsets.UTF_8), passphrase, dataToSign)
 
     /**
@@ -79,7 +79,7 @@ object SshSigning {
     fun getPublicKey(
         algorithmName: String,
         privateKeyData: String,
-        passphrase: String?
+        passphrase: String?,
     ): AuthPublicKey {
         val privateKey = PrivateKeyReader.read(privateKeyData, passphrase)
         val blob = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
@@ -97,7 +97,7 @@ object SshSigning {
     fun getPublicKey(
         algorithmName: String,
         privateKeyData: ByteArray,
-        passphrase: String?
+        passphrase: String?,
     ): AuthPublicKey = getPublicKey(algorithmName, String(privateKeyData, Charsets.UTF_8), passphrase)
 
     /**
@@ -129,7 +129,7 @@ object SshSigning {
     fun signWithKeyPair(
         algorithmName: String,
         keyPair: KeyPair,
-        dataToSign: ByteArray
+        dataToSign: ByteArray,
     ): ByteArray {
         val sigEntry = SignatureEntry.fromSshName(algorithmName)
             ?: throw SshException("Unknown signature algorithm: $algorithmName")

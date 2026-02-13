@@ -26,13 +26,11 @@ internal object SshPublicKeyEncoder {
 
     fun encode(keyPair: KeyPair, keyType: String): ByteArray = encode(keyPair.public, keyType)
 
-    fun encode(publicKey: PublicKey, keyType: String): ByteArray {
-        return when {
-            keyType == "ssh-ed25519" -> encodeEd25519(publicKey)
-            keyType.startsWith("ecdsa-sha2-") -> encodeEcdsa(publicKey as ECPublicKey, keyType)
-            keyType == "ssh-rsa" -> encodeRsa(publicKey as RSAPublicKey)
-            else -> throw SshException("Unsupported key type for encoding: $keyType")
-        }
+    fun encode(publicKey: PublicKey, keyType: String): ByteArray = when {
+        keyType == "ssh-ed25519" -> encodeEd25519(publicKey)
+        keyType.startsWith("ecdsa-sha2-") -> encodeEcdsa(publicKey as ECPublicKey, keyType)
+        keyType == "ssh-rsa" -> encodeRsa(publicKey as RSAPublicKey)
+        else -> throw SshException("Unsupported key type for encoding: $keyType")
     }
 
     private fun encodeEd25519(publicKey: PublicKey): ByteArray {
@@ -40,7 +38,7 @@ internal object SshPublicKeyEncoder {
         val rawKey = pubKeyEncoded.copyOfRange(pubKeyEncoded.size - 32, pubKeyEncoded.size)
 
         return encodeSshString("ssh-ed25519".toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(rawKey)
+            encodeSshString(rawKey)
     }
 
     private fun encodeEcdsa(ecPub: ECPublicKey, keyType: String): ByteArray {
@@ -55,8 +53,8 @@ internal object SshPublicKeyEncoder {
         val qBytes = encodeEcPoint(ecPub, fieldSize)
 
         return encodeSshString(keyType.toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(curveName.toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(qBytes)
+            encodeSshString(curveName.toByteArray(Charsets.US_ASCII)) +
+            encodeSshString(qBytes)
     }
 
     internal fun encodeEcPoint(pubKey: ECPublicKey, fieldSize: Int): ByteArray {
@@ -71,24 +69,22 @@ internal object SshPublicKeyEncoder {
         return result
     }
 
-    private fun padOrTrim(bytes: ByteArray, size: Int): ByteArray {
-        return when {
-            bytes.size == size -> bytes
-            bytes.size > size -> {
-                val start = bytes.size - size
-                bytes.copyOfRange(start, bytes.size)
-            }
-            else -> {
-                val result = ByteArray(size)
-                System.arraycopy(bytes, 0, result, size - bytes.size, bytes.size)
-                result
-            }
+    private fun padOrTrim(bytes: ByteArray, size: Int): ByteArray = when {
+        bytes.size == size -> bytes
+
+        bytes.size > size -> {
+            val start = bytes.size - size
+            bytes.copyOfRange(start, bytes.size)
+        }
+
+        else -> {
+            val result = ByteArray(size)
+            System.arraycopy(bytes, 0, result, size - bytes.size, bytes.size)
+            result
         }
     }
 
-    private fun encodeRsa(rsaPub: RSAPublicKey): ByteArray {
-        return encodeSshString("ssh-rsa".toByteArray(Charsets.US_ASCII)) +
-                encodeMpint(rsaPub.publicExponent.toByteArray()) +
-                encodeMpint(rsaPub.modulus.toByteArray())
-    }
+    private fun encodeRsa(rsaPub: RSAPublicKey): ByteArray = encodeSshString("ssh-rsa".toByteArray(Charsets.US_ASCII)) +
+        encodeMpint(rsaPub.publicExponent.toByteArray()) +
+        encodeMpint(rsaPub.modulus.toByteArray())
 }

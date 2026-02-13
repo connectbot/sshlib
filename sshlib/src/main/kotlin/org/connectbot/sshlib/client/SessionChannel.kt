@@ -20,7 +20,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshSession
-import org.connectbot.sshlib.protocol.*
+import org.connectbot.sshlib.protocol.ByteString
+import org.connectbot.sshlib.protocol.ChannelRequestPtyReq
+import org.connectbot.sshlib.protocol.ChannelRequestShell
+import org.connectbot.sshlib.protocol.ChannelRequestWindowChange
 import org.slf4j.LoggerFactory
 
 class SessionChannel internal constructor(
@@ -29,7 +32,7 @@ class SessionChannel internal constructor(
     private var _remoteChannelNumber: Int,
     private val maxPacketSize: Int,
     private var remoteWindowSize: Long = 0,
-    private val initialWindowSize: Int = 64 * 1024
+    private val initialWindowSize: Int = 64 * 1024,
 ) : SshSession {
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
@@ -123,13 +126,9 @@ class SessionChannel internal constructor(
         }
     }
 
-    override suspend fun read(): ByteArray? {
-        return _stdout.receiveCatching().getOrNull()
-    }
+    override suspend fun read(): ByteArray? = _stdout.receiveCatching().getOrNull()
 
-    override suspend fun readExtended(): Pair<Int, ByteArray>? {
-        return _extendedData.receiveCatching().getOrNull()
-    }
+    override suspend fun readExtended(): Pair<Int, ByteArray>? = _extendedData.receiveCatching().getOrNull()
 
     override suspend fun sendEof() {
         connection.sendChannelEof(_remoteChannelNumber)
@@ -163,7 +162,7 @@ class SessionChannel internal constructor(
         heightRows: Int,
         widthPixels: Int,
         heightPixels: Int,
-        terminalModes: ByteArray
+        terminalModes: ByteArray,
     ): Boolean {
         logger.debug("Requesting PTY: $terminalType ${widthChars}x$heightRows")
         return connection.sendChannelRequest(

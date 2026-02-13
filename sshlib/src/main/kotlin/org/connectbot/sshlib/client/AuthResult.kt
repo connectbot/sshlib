@@ -25,6 +25,6 @@ internal sealed class AuthResult {
     data class InfoRequest(
         val name: String,
         val instruction: String,
-        val prompts: List<KeyboardInteractiveCallback.Prompt>
+        val prompts: List<KeyboardInteractiveCallback.Prompt>,
     ) : AuthResult()
 }

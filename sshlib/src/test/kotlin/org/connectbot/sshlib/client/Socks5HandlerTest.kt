@@ -16,10 +16,14 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readFully
 import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.Socks5Authenticator
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -29,7 +33,7 @@ class Socks5HandlerTest {
         host: String,
         port: Int,
         authMethods: ByteArray = byteArrayOf(0x00),
-        useDomain: Boolean = true
+        useDomain: Boolean = true,
     ): ByteArray {
         val buf = ByteBuffer.allocate(512)
 
@@ -62,7 +66,7 @@ class Socks5HandlerTest {
     private fun buildSocks5ConnectIPv4(
         addr: ByteArray,
         port: Int,
-        authMethods: ByteArray = byteArrayOf(0x00)
+        authMethods: ByteArray = byteArrayOf(0x00),
     ): ByteArray {
         val buf = ByteBuffer.allocate(512)
 
@@ -89,7 +93,7 @@ class Socks5HandlerTest {
     private fun buildSocks5ConnectIPv6(
         addr: ByteArray,
         port: Int,
-        authMethods: ByteArray = byteArrayOf(0x00)
+        authMethods: ByteArray = byteArrayOf(0x00),
     ): ByteArray {
         val buf = ByteBuffer.allocate(512)
 
@@ -117,7 +121,7 @@ class Socks5HandlerTest {
         host: String,
         port: Int,
         username: String,
-        password: String
+        password: String,
     ): ByteArray {
         val buf = ByteBuffer.allocate(512)
 
@@ -212,9 +216,7 @@ class Socks5HandlerTest {
     @Test
     fun `username password auth succeeds`() = runTest {
         val authenticator = object : Socks5Authenticator {
-            override fun authenticate(username: String, password: String): Boolean {
-                return username == "user" && password == "pass"
-            }
+            override fun authenticate(username: String, password: String): Boolean = username == "user" && password == "pass"
         }
         val handler = Socks5Handler(authenticator)
         val input = buildSocks5WithAuth("example.com", 80, "user", "pass")

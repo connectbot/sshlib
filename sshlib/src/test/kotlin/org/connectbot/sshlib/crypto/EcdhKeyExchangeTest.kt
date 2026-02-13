@@ -155,9 +155,14 @@ class EcdhKeyExchangeTest {
         ecdh.generateClientKeys()
 
         val h = ecdh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(32, h.size) // SHA-256 output
     }
@@ -168,9 +173,14 @@ class EcdhKeyExchangeTest {
         ecdh.generateClientKeys()
 
         val h = ecdh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(48, h.size) // SHA-384 output
     }
@@ -181,9 +191,14 @@ class EcdhKeyExchangeTest {
         ecdh.generateClientKeys()
 
         val h = ecdh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(64, h.size) // SHA-512 output
     }

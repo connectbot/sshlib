@@ -16,14 +16,18 @@
 
 package org.connectbot.sshlib.transport
 
-import java.net.InetAddress
-import io.ktor.network.sockets.*
 import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.InetSocketAddress
+import io.ktor.network.sockets.Socket
+import io.ktor.network.sockets.isClosed
+import io.ktor.network.sockets.openReadChannel
+import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
+import java.net.InetAddress
 
 /**
  * Resolves hostnames to IP addresses.
@@ -49,15 +53,13 @@ interface TcpSocketFactory {
 }
 
 internal class DefaultAddressResolver : AddressResolver {
-    override suspend fun resolve(host: String): List<InetAddress> {
-        return withContext(Dispatchers.IO) {
-            InetAddress.getAllByName(host).toList()
-        }
+    override suspend fun resolve(host: String): List<InetAddress> = withContext(Dispatchers.IO) {
+        InetAddress.getAllByName(host).toList()
     }
 }
 
 internal class KtorTcpSocketFactory(
-    private val selectorManager: SelectorManager
+    private val selectorManager: SelectorManager,
 ) : TcpSocketFactory {
     override suspend fun connect(address: InetAddress, port: Int): TransportSocket {
         val socketAddress = InetSocketAddress(address.hostAddress, port)

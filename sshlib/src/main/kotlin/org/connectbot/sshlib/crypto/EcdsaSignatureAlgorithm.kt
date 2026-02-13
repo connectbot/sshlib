@@ -17,12 +17,10 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
-
 import org.connectbot.sshlib.protocol.EcdsaPublicKeyBlob
 import org.connectbot.sshlib.protocol.EcdsaSignatureBlob
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
-import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
@@ -75,12 +73,10 @@ internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
         return ECPoint(x, y)
     }
 
-    internal fun encodeDerEcdsaSignature(r: BigInteger, s: BigInteger): ByteArray {
-        return encodeDer {
-            sequence {
-                integer(r)
-                integer(s)
-            }
+    internal fun encodeDerEcdsaSignature(r: BigInteger, s: BigInteger): ByteArray = encodeDer {
+        sequence {
+            integer(r)
+            integer(s)
         }
     }
 
@@ -113,6 +109,6 @@ internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
         val sshSigBlob = encodeMpint(r.toByteArray()) + encodeMpint(s.toByteArray())
 
         return encodeSshString(algorithmName.toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(sshSigBlob)
+            encodeSshString(sshSigBlob)
     }
 }

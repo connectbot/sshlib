@@ -46,7 +46,7 @@ interface HostKeyVerifier {
  */
 data class PublicKey(
     val type: String,
-    val encoded: ByteArray
+    val encoded: ByteArray,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -77,7 +77,7 @@ data class PublicKey(
 class KnownHostsVerifier(
     private val file: File,
     private val hostname: String,
-    private val port: Int = 22
+    private val port: Int = 22,
 ) : HostKeyVerifier {
 
     private val hostAlias: String = if (port == 22) hostname else "[$hostname]:$port"
@@ -106,7 +106,7 @@ class KnownHostsVerifier(
         // Simple wildcard matching
         // Note: Java Regex or simple manual matching.
         // Keeping it simple: exact match or basic wildcard
-        if (pattern.contains("*" ) || pattern.contains("?")) {
+        if (pattern.contains("*") || pattern.contains("?")) {
             val regex = pattern
                 .replace(".", "\\.")
                 .replace("*", ".*")
@@ -137,6 +137,6 @@ class KnownHostsVerifier(
 
     private data class Entry(
         val hosts: List<String>,
-        val key: PublicKey
+        val key: PublicKey,
     )
 }

@@ -378,8 +378,8 @@ package org.connectbot.sshlib.transport {
 
   public enum IpVersion {
     enum_constant public static final org.connectbot.sshlib.transport.IpVersion AUTO;
-    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPv4_ONLY;
-    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPv6_ONLY;
+    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPV4_ONLY;
+    enum_constant public static final org.connectbot.sshlib.transport.IpVersion IPV6_ONLY;
   }
 
   public final class KtorTcpTransport implements org.connectbot.sshlib.transport.Transport {

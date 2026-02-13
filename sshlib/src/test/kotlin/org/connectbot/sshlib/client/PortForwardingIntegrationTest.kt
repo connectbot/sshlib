@@ -23,7 +23,10 @@ import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.Socks5Authenticator
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.slf4j.LoggerFactory
@@ -158,8 +161,10 @@ class PortForwardingIntegrationTest {
 
         try {
             val forwarder = client.remotePortForward(
-                "127.0.0.1", 0,
-                "127.0.0.1", localPort
+                "127.0.0.1",
+                0,
+                "127.0.0.1",
+                localPort
             )
             assertNotNull(forwarder, "Should create remote port forwarder")
             assertTrue(forwarder!!.isActive, "Forwarder should be active")
@@ -213,12 +218,14 @@ class PortForwardingIntegrationTest {
             assertEquals(0x00.toByte(), methodReply[1])
 
             // SOCKS5 CONNECT to 127.0.0.1:22 (the SSH server)
-            out.write(byteArrayOf(
-                0x05, 0x01, 0x00, // version, CMD_CONNECT, RSV
-                0x01,             // ATYP IPv4
-                127, 0, 0, 1,    // 127.0.0.1
-                0x00, 0x16        // port 22
-            ))
+            out.write(
+                byteArrayOf(
+                    0x05, 0x01, 0x00, // version, CMD_CONNECT, RSV
+                    0x01, // ATYP IPv4
+                    127, 0, 0, 1, // 127.0.0.1
+                    0x00, 0x16 // port 22
+                )
+            )
             out.flush()
 
             // Read connect reply (10 bytes: ver, rep, rsv, atyp, 4 addr, 2 port)
@@ -292,9 +299,7 @@ class PortForwardingIntegrationTest {
 
         try {
             val authenticator = object : Socks5Authenticator {
-                override fun authenticate(username: String, password: String): Boolean {
-                    return username == "socks_user" && password == "socks_pass"
-                }
+                override fun authenticate(username: String, password: String): Boolean = username == "socks_user" && password == "socks_pass"
             }
 
             val forwarder = client.dynamicPortForward(

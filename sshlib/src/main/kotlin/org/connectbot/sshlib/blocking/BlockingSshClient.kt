@@ -16,7 +16,8 @@
 
 package org.connectbot.sshlib.blocking
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.AgentProvider
@@ -25,10 +26,10 @@ import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PortForwarder
 import org.connectbot.sshlib.Socks5Authenticator
-import org.connectbot.sshlib.StreamForwarder
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
+import org.connectbot.sshlib.StreamForwarder
 import org.connectbot.sshlib.transport.TransportFactory
 import java.net.InetSocketAddress
 
@@ -58,7 +59,7 @@ import java.net.InetSocketAddress
  * ```
  */
 class BlockingSshClient private constructor(
-    private val client: SshClient
+    private val client: SshClient,
 ) {
     /**
      * Create a blocking SSH client for TCP connection.
@@ -68,13 +69,15 @@ class BlockingSshClient private constructor(
         host: String,
         port: Int = 22,
         hostKeyVerifier: HostKeyVerifier,
-        clientVersion: String = "SSH-2.0-CBSSH_1.0"
-    ) : this(SshClientConfig {
-        this.host = host
-        this.port = port
-        this.hostKeyVerifier = hostKeyVerifier
-        this.clientVersion = clientVersion
-    })
+        clientVersion: String = "SSH-2.0-CBSSH_1.0",
+    ) : this(
+        SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = hostKeyVerifier
+            this.clientVersion = clientVersion
+        }
+    )
 
     /**
      * Create a blocking SSH client from configuration.
@@ -86,7 +89,7 @@ class BlockingSshClient private constructor(
      */
     constructor(
         transportFactory: TransportFactory,
-        clientVersion: String = "SSH-2.0-CBSSH_1.0"
+        clientVersion: String = "SSH-2.0-CBSSH_1.0",
     ) : this(SshClient(transportFactory, clientVersion))
 
     /**
@@ -103,8 +106,7 @@ class BlockingSshClient private constructor(
      * @param password SSH password
      * @return true if authentication succeeded
      */
-    fun authenticatePassword(username: String, password: String): Boolean =
-        runBlocking { client.authenticatePassword(username, password) }
+    fun authenticatePassword(username: String, password: String): Boolean = runBlocking { client.authenticatePassword(username, password) }
 
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
@@ -113,8 +115,7 @@ class BlockingSshClient private constructor(
      * @param handler Callback handler providing authentication materials
      * @return true if authentication succeeded
      */
-    fun authenticate(username: String, handler: AuthHandler): Boolean =
-        runBlocking { client.authenticate(username, handler) }
+    fun authenticate(username: String, handler: AuthHandler): Boolean = runBlocking { client.authenticate(username, handler) }
 
     /**
      * Authenticate using keyboard-interactive authentication (RFC 4256).
@@ -125,7 +126,7 @@ class BlockingSshClient private constructor(
      */
     fun authenticateKeyboardInteractive(
         username: String,
-        callback: KeyboardInteractiveCallback
+        callback: KeyboardInteractiveCallback,
     ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) }
 
     /**
@@ -140,7 +141,7 @@ class BlockingSshClient private constructor(
     fun authenticatePublicKey(
         username: String,
         privateKeyData: ByteArray,
-        passphrase: String? = null
+        passphrase: String? = null,
     ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
 
     /**
@@ -155,7 +156,7 @@ class BlockingSshClient private constructor(
     fun authenticatePublicKey(
         username: String,
         privateKeyData: String,
-        passphrase: String? = null
+        passphrase: String? = null,
     ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
 
     /**
@@ -197,7 +198,7 @@ class BlockingSshClient private constructor(
     fun localPortForward(
         bindAddress: InetSocketAddress,
         remoteHost: String,
-        remotePort: Int
+        remotePort: Int,
     ): PortForwarder? = runBlocking { client.localPortForward(bindAddress, remoteHost, remotePort) }
 
     /**
@@ -206,7 +207,7 @@ class BlockingSshClient private constructor(
     fun localPortForward(
         bindPort: Int,
         remoteHost: String,
-        remotePort: Int
+        remotePort: Int,
     ): PortForwarder? = runBlocking { client.localPortForward(bindPort, remoteHost, remotePort) }
 
     /**
@@ -216,7 +217,7 @@ class BlockingSshClient private constructor(
         remoteBindAddress: String,
         remoteBindPort: Int,
         localHost: String,
-        localPort: Int
+        localPort: Int,
     ): PortForwarder? = runBlocking { client.remotePortForward(remoteBindAddress, remoteBindPort, localHost, localPort) }
 
     /**
@@ -225,7 +226,7 @@ class BlockingSshClient private constructor(
     @JvmOverloads
     fun dynamicPortForward(
         bindAddress: InetSocketAddress,
-        authenticator: Socks5Authenticator? = null
+        authenticator: Socks5Authenticator? = null,
     ): PortForwarder? = runBlocking { client.dynamicPortForward(bindAddress, authenticator) }
 
     /**
@@ -234,7 +235,7 @@ class BlockingSshClient private constructor(
     @JvmOverloads
     fun dynamicPortForward(
         bindPort: Int,
-        authenticator: Socks5Authenticator? = null
+        authenticator: Socks5Authenticator? = null,
     ): PortForwarder? = runBlocking { client.dynamicPortForward(bindPort, authenticator) }
 
     /**
@@ -247,7 +248,7 @@ class BlockingSshClient private constructor(
         remoteHost: String,
         remotePort: Int,
         originAddr: String = "127.0.0.1",
-        originPort: Int = 0
+        originPort: Int = 0,
     ): StreamForwarder? = runBlocking {
         client.forwardStream(readChannel, writeChannel, remoteHost, remotePort, originAddr, originPort)
     }
@@ -260,7 +261,7 @@ class BlockingSshClient private constructor(
         remoteHost: String,
         remotePort: Int,
         originAddr: String = "127.0.0.1",
-        originPort: Int = 0
+        originPort: Int = 0,
     ): TransportFactory? = client.openDirectTcpipTransport(remoteHost, remotePort, originAddr, originPort)
 
     /**

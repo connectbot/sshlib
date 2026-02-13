@@ -21,7 +21,7 @@ import java.math.BigInteger
 
 internal class Curve25519KeyExchange(
     private val x25519Provider: X25519Provider = X25519ProviderFactory.provider,
-    private val presetPrivateKey: ByteArray? = null
+    private val presetPrivateKey: ByteArray? = null,
 ) : KexAlgorithm {
 
     override val hashAlgorithm: String = "SHA-256"

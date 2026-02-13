@@ -82,7 +82,7 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
         serverHostKey: ByteArray,
         clientPublicKey: ByteArray,
         serverPublicKey: ByteArray,
-        sharedSecret: ByteArray
+        sharedSecret: ByteArray,
     ): ByteArray {
         val p = this.p ?: throw SshException("DH group not set; call setGroup() first")
         val g = this.g ?: throw SshException("DH group not set; call setGroup() first")
@@ -91,22 +91,26 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
 
         fun writeString(data: ByteArray) {
             val len = data.size
-            transcript.write(byteArrayOf(
-                (len shr 24).toByte(),
-                (len shr 16).toByte(),
-                (len shr 8).toByte(),
-                len.toByte()
-            ))
+            transcript.write(
+                byteArrayOf(
+                    (len shr 24).toByte(),
+                    (len shr 16).toByte(),
+                    (len shr 8).toByte(),
+                    len.toByte()
+                )
+            )
             transcript.write(data)
         }
 
         fun writeUint32(value: Int) {
-            transcript.write(byteArrayOf(
-                (value shr 24).toByte(),
-                (value shr 16).toByte(),
-                (value shr 8).toByte(),
-                value.toByte()
-            ))
+            transcript.write(
+                byteArrayOf(
+                    (value shr 24).toByte(),
+                    (value shr 16).toByte(),
+                    (value shr 8).toByte(),
+                    value.toByte()
+                )
+            )
         }
 
         writeString(clientVersion)

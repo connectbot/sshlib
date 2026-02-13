@@ -20,8 +20,18 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.client.AgentProtocolHandler
 import org.connectbot.sshlib.client.AgentSessionInfo
-import org.connectbot.sshlib.protocol.*
-import org.junit.Assert.*
+import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
+import org.connectbot.sshlib.protocol.SshAgentMessage
+import org.connectbot.sshlib.protocol.SshAgentSignResponse
+import org.connectbot.sshlib.protocol.SshAgentcRequestIdentities
+import org.connectbot.sshlib.protocol.SshAgentcSignRequest
+import org.connectbot.sshlib.protocol.createByteString
+import org.connectbot.sshlib.protocol.toByteArray
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
@@ -92,16 +102,12 @@ class AgentProtocolTest {
     @Test
     fun `handler returns identities answer`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> {
-                return listOf(
-                    AgentIdentity(byteArrayOf(1, 2, 3), "key1"),
-                    AgentIdentity(byteArrayOf(4, 5, 6), "key2")
-                )
-            }
+            override suspend fun getIdentities(): List<AgentIdentity> = listOf(
+                AgentIdentity(byteArrayOf(1, 2, 3), "key1"),
+                AgentIdentity(byteArrayOf(4, 5, 6), "key2")
+            )
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? {
-                return null
-            }
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -115,7 +121,7 @@ class AgentProtocolTest {
         val response = handler.handleRequest(requestMessage)
 
         val (messageType, payload) = parseAgentMessage(response)
-        assertEquals(12, messageType)  // SSH_AGENT_IDENTITIES_ANSWER
+        assertEquals(12, messageType) // SSH_AGENT_IDENTITIES_ANSWER
 
         val stream = ByteBufferKaitaiStream(payload)
         val answer = SshAgentIdentitiesAnswer(stream)
@@ -132,9 +138,7 @@ class AgentProtocolTest {
         val testProvider = object : AgentProvider {
             override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? {
-                return byteArrayOf(9, 8, 7, 6, 5)
-            }
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = byteArrayOf(9, 8, 7, 6, 5)
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -156,7 +160,7 @@ class AgentProtocolTest {
         val response = handler.handleRequest(requestMessage)
 
         val (messageType, payload) = parseAgentMessage(response)
-        assertEquals(14, messageType)  // SSH_AGENT_SIGN_RESPONSE
+        assertEquals(14, messageType) // SSH_AGENT_SIGN_RESPONSE
 
         val stream = ByteBufferKaitaiStream(payload)
         val signResponse = SshAgentSignResponse(stream)
@@ -170,9 +174,7 @@ class AgentProtocolTest {
         val testProvider = object : AgentProvider {
             override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? {
-                return null
-            }
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -194,7 +196,7 @@ class AgentProtocolTest {
         val response = handler.handleRequest(requestMessage)
 
         val (messageType, _) = parseAgentMessage(response)
-        assertEquals(5, messageType)  // SSH_AGENT_FAILURE
+        assertEquals(5, messageType) // SSH_AGENT_FAILURE
     }
 
     @Test

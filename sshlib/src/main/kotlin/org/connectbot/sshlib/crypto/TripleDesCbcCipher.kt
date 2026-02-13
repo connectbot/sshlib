@@ -35,7 +35,7 @@ import javax.crypto.spec.SecretKeySpec
 internal class TripleDesCbcCipher(
     private val key: ByteArray,
     private val iv: ByteArray,
-    forEncryption: Boolean
+    forEncryption: Boolean,
 ) : PacketCipher {
     override val blockSize: Int = 8
 
@@ -55,11 +55,7 @@ internal class TripleDesCbcCipher(
         cipher.init(mode, keySpec, ivSpec)
     }
 
-    override fun encrypt(data: ByteArray): ByteArray {
-        return cipher.update(data)
-    }
+    override fun encrypt(data: ByteArray): ByteArray = cipher.update(data)
 
-    override fun decrypt(data: ByteArray): ByteArray {
-        return cipher.update(data)
-    }
+    override fun decrypt(data: ByteArray): ByteArray = cipher.update(data)
 }

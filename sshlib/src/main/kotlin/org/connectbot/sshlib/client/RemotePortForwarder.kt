@@ -16,10 +16,12 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.*
+import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.openReadChannel
+import io.ktor.network.sockets.openWriteChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.connectbot.sshlib.PortForwarder
 import org.slf4j.LoggerFactory
 
@@ -31,7 +33,7 @@ internal class RemotePortForwarder(
     private val remoteBindAddress: String,
     private val remoteBindPort: Int,
     override val boundHost: String,
-    override val boundPort: Int
+    override val boundPort: Int,
 ) : PortForwarder {
     companion object {
         private val logger = LoggerFactory.getLogger(RemotePortForwarder::class.java)
@@ -42,14 +44,20 @@ internal class RemotePortForwarder(
             remoteBindAddress: String,
             remoteBindPort: Int,
             localHost: String,
-            localPort: Int
+            localPort: Int,
         ): RemotePortForwarder? {
             val actualPort = connection.sendTcpipForwardRequest(remoteBindAddress, remoteBindPort)
                 ?: return null
 
             val forwarder = RemotePortForwarder(
-                scope, connection, localHost, localPort,
-                remoteBindAddress, actualPort, remoteBindAddress, actualPort
+                scope,
+                connection,
+                localHost,
+                localPort,
+                remoteBindAddress,
+                actualPort,
+                remoteBindAddress,
+                actualPort
             )
 
             val key = "$remoteBindAddress:$actualPort"
@@ -73,7 +81,7 @@ internal class RemotePortForwarder(
         originPort: Int,
         senderChannel: Int,
         initialWindow: Long,
-        maxPacketSize: Int
+        maxPacketSize: Int,
     ) {
         logger.debug("Incoming forwarded-tcpip from $originAddr:$originPort, connecting to $localHost:$localPort")
 

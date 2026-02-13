@@ -21,7 +21,8 @@ import org.connectbot.sshlib.crypto.PacketAead
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketCompressor
 import org.connectbot.sshlib.crypto.PacketMac
-import org.connectbot.sshlib.protocol.*
+import org.connectbot.sshlib.protocol.IdBanner
+import org.connectbot.sshlib.protocol.UnencryptedPacket
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -90,7 +91,7 @@ internal class PacketIO(private val transport: Transport) {
         serverToClientCipher: PacketCipher,
         serverToClientMac: PacketMac,
         clientToServerEtm: Boolean = false,
-        serverToClientEtm: Boolean = false
+        serverToClientEtm: Boolean = false,
     ) {
         this.sendCipher = clientToServerCipher
         this.sendMac = clientToServerMac
@@ -108,7 +109,7 @@ internal class PacketIO(private val transport: Transport) {
      */
     fun enableAead(
         clientToServerAead: PacketAead,
-        serverToClientAead: PacketAead
+        serverToClientAead: PacketAead,
     ) {
         this.sendAead = clientToServerAead
         this.receiveAead = serverToClientAead
@@ -141,7 +142,7 @@ internal class PacketIO(private val transport: Transport) {
     fun enableCompression(
         clientToServer: PacketCompressor?,
         serverToClient: PacketCompressor?,
-        immediateActivation: Boolean
+        immediateActivation: Boolean,
     ) {
         this.sendCompressor = clientToServer
         this.receiveCompressor = serverToClient
@@ -448,7 +449,7 @@ internal class PacketIO(private val transport: Transport) {
         messageType: Int,
         payload: ByteArray,
         cipher: PacketCipher,
-        mac: PacketMac
+        mac: PacketMac,
     ) {
         val payloadLength = 1 + payload.size
         val blockSize = cipher.blockSize
@@ -499,7 +500,7 @@ internal class PacketIO(private val transport: Transport) {
         messageType: Int,
         payload: ByteArray,
         cipher: PacketCipher,
-        mac: PacketMac
+        mac: PacketMac,
     ) {
         val payloadLength = 1 + payload.size
         val blockSize = cipher.blockSize
@@ -544,7 +545,7 @@ internal class PacketIO(private val transport: Transport) {
     private suspend fun writeAeadPacket(
         messageType: Int,
         payload: ByteArray,
-        aead: PacketAead
+        aead: PacketAead,
     ) {
         val payloadLength = 1 + payload.size // message type + payload
         val blockSize = if (aead.encryptsLength) 8 else 16
@@ -634,7 +635,8 @@ internal class PacketIO(private val transport: Transport) {
             if (bannerBytes.size() >= 2) {
                 val bytes = bannerBytes.toByteArray()
                 if (bytes[bytes.size - 2] == '\r'.code.toByte() &&
-                    bytes[bytes.size - 1] == '\n'.code.toByte()) {
+                    bytes[bytes.size - 1] == '\n'.code.toByte()
+                ) {
                     break
                 }
             }

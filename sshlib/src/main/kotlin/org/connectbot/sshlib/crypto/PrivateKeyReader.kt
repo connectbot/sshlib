@@ -21,9 +21,7 @@ import java.util.Base64
 
 internal object PrivateKeyReader {
 
-    fun read(keyData: ByteArray, passphrase: String? = null): SshPrivateKey {
-        return read(String(keyData, Charsets.UTF_8), passphrase)
-    }
+    fun read(keyData: ByteArray, passphrase: String? = null): SshPrivateKey = read(String(keyData, Charsets.UTF_8), passphrase)
 
     fun read(keyData: String, passphrase: String? = null): SshPrivateKey {
         val trimmed = keyData.trim()
@@ -33,18 +31,18 @@ internal object PrivateKeyReader {
                 val data = Base64.getDecoder().decode(base64)
                 OpenSshKeyReader.read(data, passphrase)
             }
+
             trimmed.startsWith("-----BEGIN RSA PRIVATE KEY-----") ||
-            trimmed.startsWith("-----BEGIN EC PRIVATE KEY-----") ||
-            trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> {
+                trimmed.startsWith("-----BEGIN EC PRIVATE KEY-----") ||
+                trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> {
                 PemKeyReader.read(trimmed, passphrase)
             }
+
             else -> throw SshException("Unrecognized private key format")
         }
     }
 
-    fun isEncrypted(keyData: ByteArray): Boolean {
-        return isEncrypted(String(keyData, Charsets.UTF_8))
-    }
+    fun isEncrypted(keyData: ByteArray): Boolean = isEncrypted(String(keyData, Charsets.UTF_8))
 
     fun isEncrypted(keyData: String): Boolean {
         val trimmed = keyData.trim()
@@ -54,11 +52,15 @@ internal object PrivateKeyReader {
                 val data = Base64.getDecoder().decode(base64)
                 OpenSshKeyReader.isEncrypted(data)
             }
+
             trimmed.startsWith("-----BEGIN RSA PRIVATE KEY-----") ||
-            trimmed.startsWith("-----BEGIN EC PRIVATE KEY-----") -> {
+                trimmed.startsWith("-----BEGIN EC PRIVATE KEY-----") -> {
                 PemKeyReader.isEncrypted(trimmed)
             }
-            trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> false // PKCS#8 unencrypted
+
+            trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> false
+
+            // PKCS#8 unencrypted
             else -> throw SshException("Unrecognized private key format")
         }
     }

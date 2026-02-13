@@ -21,5 +21,5 @@ import java.security.KeyPair
 internal class SshPrivateKey(
     val keyType: String,
     val jcaKeyPair: KeyPair,
-    val signatureAlgorithm: String
+    val signatureAlgorithm: String,
 )

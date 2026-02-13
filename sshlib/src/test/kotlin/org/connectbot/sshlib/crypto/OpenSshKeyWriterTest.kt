@@ -24,10 +24,8 @@ import kotlin.test.assertTrue
 
 class OpenSshKeyWriterTest {
 
-    private fun readKey(resourcePath: String): String {
-        return javaClass.getResourceAsStream("/keys/$resourcePath")!!
-            .bufferedReader().readText()
-    }
+    private fun readKey(resourcePath: String): String = javaClass.getResourceAsStream("/keys/$resourcePath")!!
+        .bufferedReader().readText()
 
     private fun roundTrip(keyResource: String, passphrase: String? = null) {
         val original = PrivateKeyReader.read(readKey(keyResource), passphrase).jcaKeyPair

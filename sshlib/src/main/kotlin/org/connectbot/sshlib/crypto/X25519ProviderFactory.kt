@@ -45,7 +45,5 @@ internal object X25519ProviderFactory {
         false
     }
 
-    private fun createTinkProvider(): X25519Provider {
-        return TinkX25519Provider()
-    }
+    private fun createTinkProvider(): X25519Provider = TinkX25519Provider()
 }

@@ -171,9 +171,14 @@ class DiffieHellmanTest {
     fun `exchange hash uses SHA-256`() {
         val dh = DiffieHellman("SHA-256", DhGroups.GROUP14_P, DhGroups.GENERATOR)
         val h = dh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(32, h.size)
     }
@@ -182,9 +187,14 @@ class DiffieHellmanTest {
     fun `exchange hash uses SHA-512`() {
         val dh = DiffieHellman("SHA-512", DhGroups.GROUP16_P, DhGroups.GENERATOR)
         val h = dh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(64, h.size)
     }
@@ -193,9 +203,14 @@ class DiffieHellmanTest {
     fun `exchange hash uses SHA-1`() {
         val dh = DiffieHellman("SHA-1", DhGroups.GROUP1_P, DhGroups.GENERATOR)
         val h = dh.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(20, h.size)
     }

@@ -17,12 +17,12 @@
 package org.connectbot.sshlib.client
 
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
-import org.connectbot.sshlib.protocol.SshMsgChannelRequest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionChannelTest {
@@ -35,7 +35,7 @@ class SessionChannelTest {
             localChannelNumber = 0,
             _remoteChannelNumber = 1,
             maxPacketSize = 32 * 1024,
-            remoteWindowSize = 64 * 1024L,
+            remoteWindowSize = 64 * 1024L
         )
         return channel to connection
     }
@@ -55,7 +55,7 @@ class SessionChannelTest {
             widthChars = 120,
             heightRows = 40,
             widthPixels = 960,
-            heightPixels = 640,
+            heightPixels = 640
         )
 
         assertTrue(result)
@@ -74,7 +74,7 @@ class SessionChannelTest {
             widthChars = 80,
             heightRows = 24,
             widthPixels = 0,
-            heightPixels = 0,
+            heightPixels = 0
         )
 
         assertFalse(result)

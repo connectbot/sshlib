@@ -36,21 +36,17 @@ class MlKemHybridKeyExchangeTest {
     private val fakeX25519SharedSecret = ByteArray(32) { ((it + 200) % 256).toByte() }
 
     private val mockMlKemProvider = object : MlKemProvider {
-        override fun generateKeyPair(): MlKemKeyPair =
-            MlKemKeyPair(fakeMlKemPublicKey.clone(), fakeMlKemPrivateKey.clone())
+        override fun generateKeyPair(): MlKemKeyPair = MlKemKeyPair(fakeMlKemPublicKey.clone(), fakeMlKemPrivateKey.clone())
 
-        override fun encapsulate(publicKey: ByteArray): MlKemEncapsulationResult =
-            MlKemEncapsulationResult(fakeMlKemCiphertext.clone(), fakeMlKemSharedSecret.clone())
+        override fun encapsulate(publicKey: ByteArray): MlKemEncapsulationResult = MlKemEncapsulationResult(fakeMlKemCiphertext.clone(), fakeMlKemSharedSecret.clone())
 
-        override fun decapsulate(privateKey: ByteArray, ciphertext: ByteArray): ByteArray =
-            fakeMlKemSharedSecret.clone()
+        override fun decapsulate(privateKey: ByteArray, ciphertext: ByteArray): ByteArray = fakeMlKemSharedSecret.clone()
     }
 
     private val mockX25519Provider = object : X25519Provider {
         override fun generatePrivateKey(): ByteArray = fakeX25519Private.clone()
         override fun publicFromPrivate(privateKey: ByteArray): ByteArray = fakeX25519Public.clone()
-        override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray =
-            fakeX25519SharedSecret.clone()
+        override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray = fakeX25519SharedSecret.clone()
     }
 
     @Test
@@ -120,8 +116,7 @@ class MlKemHybridKeyExchangeTest {
         val zeroX25519Provider = object : X25519Provider {
             override fun generatePrivateKey(): ByteArray = fakeX25519Private.clone()
             override fun publicFromPrivate(privateKey: ByteArray): ByteArray = fakeX25519Public.clone()
-            override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray =
-                ByteArray(32) // all zeros
+            override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray = ByteArray(32) // all zeros
         }
 
         val kex = MlKemHybridKeyExchange(mockMlKemProvider, zeroX25519Provider)

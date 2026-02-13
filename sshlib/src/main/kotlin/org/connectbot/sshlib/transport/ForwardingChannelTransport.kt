@@ -27,7 +27,7 @@ import org.connectbot.sshlib.client.ForwardingChannel
  * (jump host / ProxyJump) without transiting the kernel network stack.
  */
 internal class ForwardingChannelTransport(
-    private val channel: ForwardingChannel
+    private val channel: ForwardingChannel,
 ) : Transport {
 
     private var buffer = ByteArray(0)

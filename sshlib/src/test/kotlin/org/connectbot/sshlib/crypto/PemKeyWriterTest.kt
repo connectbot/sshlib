@@ -17,17 +17,15 @@
 package org.connectbot.sshlib.crypto
 
 import org.junit.Test
-import java.security.interfaces.RSAPublicKey
 import java.security.interfaces.ECPublicKey
+import java.security.interfaces.RSAPublicKey
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PemKeyWriterTest {
 
-    private fun readKey(resourcePath: String): String {
-        return javaClass.getResourceAsStream("/keys/$resourcePath")!!
-            .bufferedReader().readText()
-    }
+    private fun readKey(resourcePath: String): String = javaClass.getResourceAsStream("/keys/$resourcePath")!!
+        .bufferedReader().readText()
 
     private fun roundTrip(keyResource: String, passphrase: String? = null) {
         val original = PrivateKeyReader.read(readKey(keyResource), passphrase).jcaKeyPair

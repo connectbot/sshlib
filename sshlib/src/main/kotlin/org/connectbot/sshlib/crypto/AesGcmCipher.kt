@@ -36,7 +36,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 internal class AesGcmCipher(
     key: ByteArray,
-    private val iv: ByteArray
+    private val iv: ByteArray,
 ) : PacketAead {
     override val tagLength: Int = 16
 

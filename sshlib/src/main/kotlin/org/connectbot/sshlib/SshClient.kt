@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib
 
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,14 +26,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import io.ktor.utils.io.*
 import org.connectbot.sshlib.client.DynamicPortForwarder
 import org.connectbot.sshlib.client.LocalPortForwarder
 import org.connectbot.sshlib.client.RemotePortForwarder
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.transport.ForwardingChannelTransport
-import org.connectbot.sshlib.transport.KtorTcpTransportFactory
 import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.transport.TransportFactory
 import org.slf4j.LoggerFactory
@@ -70,7 +70,7 @@ import java.net.InetSocketAddress
  * For blocking Java compatibility, use [org.connectbot.sshlib.blocking.BlockingSshClient].
  */
 class SshClient private constructor(
-    private val config: SshClientConfig
+    private val config: SshClientConfig,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(SshClient::class.java)
@@ -85,7 +85,7 @@ class SshClient private constructor(
         operator fun invoke(
             host: String,
             port: Int = 22,
-            clientVersion: String = "SSH-2.0-CBSSH_1.0"
+            clientVersion: String = "SSH-2.0-CBSSH_1.0",
         ): SshClient {
             val config = SshClientConfig {
                 this.host = host
@@ -98,9 +98,7 @@ class SshClient private constructor(
         /**
          * Create an SshClient from a configuration.
          */
-        operator fun invoke(config: SshClientConfig): SshClient {
-            return SshClient(config)
-        }
+        operator fun invoke(config: SshClientConfig): SshClient = SshClient(config)
 
         /**
          * Create an SshClient with a custom transport factory.
@@ -110,7 +108,7 @@ class SshClient private constructor(
          */
         operator fun invoke(
             transportFactory: TransportFactory,
-            clientVersion: String = "SSH-2.0-CBSSH_1.0"
+            clientVersion: String = "SSH-2.0-CBSSH_1.0",
         ): SshClient {
             val config = SshClientConfig {
                 this.transportFactory = transportFactory
@@ -224,7 +222,7 @@ class SshClient private constructor(
      */
     suspend fun authenticateKeyboardInteractive(
         username: String,
-        callback: KeyboardInteractiveCallback
+        callback: KeyboardInteractiveCallback,
     ): Boolean {
         val conn = connection
         if (conn == null) {
@@ -261,10 +259,8 @@ class SshClient private constructor(
     suspend fun authenticatePublicKey(
         username: String,
         privateKeyData: ByteArray,
-        passphrase: String? = null
-    ): Boolean {
-        return authenticatePublicKey(username, String(privateKeyData, Charsets.UTF_8), passphrase)
-    }
+        passphrase: String? = null,
+    ): Boolean = authenticatePublicKey(username, String(privateKeyData, Charsets.UTF_8), passphrase)
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -277,7 +273,7 @@ class SshClient private constructor(
     suspend fun authenticatePublicKey(
         username: String,
         privateKeyData: String,
-        passphrase: String? = null
+        passphrase: String? = null,
     ): Boolean {
         val conn = connection
         if (conn == null) {
@@ -358,9 +354,7 @@ class SshClient private constructor(
      * @param privateKeyData Private key file contents
      * @return true if the key is encrypted
      */
-    fun isPrivateKeyEncrypted(privateKeyData: ByteArray): Boolean {
-        return isPrivateKeyEncrypted(String(privateKeyData, Charsets.UTF_8))
-    }
+    fun isPrivateKeyEncrypted(privateKeyData: ByteArray): Boolean = isPrivateKeyEncrypted(String(privateKeyData, Charsets.UTF_8))
 
     /**
      * Check if the provided private key data is encrypted and requires a passphrase.
@@ -368,13 +362,11 @@ class SshClient private constructor(
      * @param privateKeyData Private key file contents as a string
      * @return true if the key is encrypted
      */
-    fun isPrivateKeyEncrypted(privateKeyData: String): Boolean {
-        return try {
-            PrivateKeyReader.isEncrypted(privateKeyData)
-        } catch (e: Exception) {
-            logger.error("Failed to check if key is encrypted", e)
-            false
-        }
+    fun isPrivateKeyEncrypted(privateKeyData: String): Boolean = try {
+        PrivateKeyReader.isEncrypted(privateKeyData)
+    } catch (e: Exception) {
+        logger.error("Failed to check if key is encrypted", e)
+        false
     }
 
     /**
@@ -418,7 +410,7 @@ class SshClient private constructor(
     suspend fun localPortForward(
         bindAddress: InetSocketAddress,
         remoteHost: String,
-        remotePort: Int
+        remotePort: Int,
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
@@ -445,7 +437,7 @@ class SshClient private constructor(
     suspend fun localPortForward(
         bindPort: Int,
         remoteHost: String,
-        remotePort: Int
+        remotePort: Int,
     ): PortForwarder? = localPortForward(InetSocketAddress("127.0.0.1", bindPort), remoteHost, remotePort)
 
     /**
@@ -464,7 +456,7 @@ class SshClient private constructor(
         remoteBindAddress: String,
         remoteBindPort: Int,
         localHost: String,
-        localPort: Int
+        localPort: Int,
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
@@ -492,7 +484,7 @@ class SshClient private constructor(
      */
     suspend fun dynamicPortForward(
         bindAddress: InetSocketAddress,
-        authenticator: Socks5Authenticator? = null
+        authenticator: Socks5Authenticator? = null,
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
@@ -517,7 +509,7 @@ class SshClient private constructor(
      */
     suspend fun dynamicPortForward(
         bindPort: Int,
-        authenticator: Socks5Authenticator? = null
+        authenticator: Socks5Authenticator? = null,
     ): PortForwarder? = dynamicPortForward(InetSocketAddress("127.0.0.1", bindPort), authenticator)
 
     /**
@@ -540,7 +532,7 @@ class SshClient private constructor(
         remoteHost: String,
         remotePort: Int,
         originAddr: String = "127.0.0.1",
-        originPort: Int = 0
+        originPort: Int = 0,
     ): StreamForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
@@ -550,7 +542,13 @@ class SshClient private constructor(
 
         return try {
             org.connectbot.sshlib.client.StreamForwarder.create(
-                conn, readChannel, writeChannel, remoteHost, remotePort, originAddr, originPort
+                conn,
+                readChannel,
+                writeChannel,
+                remoteHost,
+                remotePort,
+                originAddr,
+                originPort
             )
         } catch (e: Exception) {
             logger.error("Failed to start stream forwarding", e)
@@ -589,7 +587,7 @@ class SshClient private constructor(
         remoteHost: String,
         remotePort: Int,
         originAddr: String = "127.0.0.1",
-        originPort: Int = 0
+        originPort: Int = 0,
     ): TransportFactory? {
         val conn = connection
         if (conn == null || !authenticated) {
@@ -599,7 +597,10 @@ class SshClient private constructor(
 
         return TransportFactory {
             val channel = conn.openDirectTcpipChannel(
-                remoteHost, remotePort, originAddr, originPort
+                remoteHost,
+                remotePort,
+                originAddr,
+                originPort
             ) ?: throw SshException("Failed to open direct-tcpip channel to $remoteHost:$remotePort")
             ForwardingChannelTransport(channel)
         }

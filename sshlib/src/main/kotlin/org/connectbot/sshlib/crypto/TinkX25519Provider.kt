@@ -21,9 +21,7 @@ import com.google.crypto.tink.subtle.X25519
 internal class TinkX25519Provider : X25519Provider {
     override fun generatePrivateKey(): ByteArray = X25519.generatePrivateKey()
 
-    override fun publicFromPrivate(privateKey: ByteArray): ByteArray =
-        X25519.publicFromPrivate(privateKey)
+    override fun publicFromPrivate(privateKey: ByteArray): ByteArray = X25519.publicFromPrivate(privateKey)
 
-    override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray =
-        X25519.computeSharedSecret(privateKey, publicKey)
+    override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray = X25519.computeSharedSecret(privateKey, publicKey)
 }

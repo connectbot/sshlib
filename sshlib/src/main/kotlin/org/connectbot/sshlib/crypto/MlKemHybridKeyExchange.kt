@@ -31,7 +31,7 @@ import java.security.MessageDigest
  */
 internal class MlKemHybridKeyExchange(
     private val mlKemProvider: MlKemProvider = MlKemProviderFactory.provider,
-    private val x25519Provider: X25519Provider = X25519ProviderFactory.provider
+    private val x25519Provider: X25519Provider = X25519ProviderFactory.provider,
 ) : KexAlgorithm {
     companion object {
         private const val MLKEM768_PUBLIC_KEY_SIZE = 1184

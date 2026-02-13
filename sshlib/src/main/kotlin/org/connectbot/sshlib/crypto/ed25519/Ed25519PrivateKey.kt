@@ -25,7 +25,9 @@ import java.security.spec.PKCS8EncodedKeySpec
 import javax.security.auth.DestroyFailedException
 import javax.security.auth.Destroyable
 
-internal class Ed25519PrivateKey : PrivateKey, Destroyable {
+internal class Ed25519PrivateKey :
+    PrivateKey,
+    Destroyable {
     private val seed: ByteArray
     private var destroyed = false
 

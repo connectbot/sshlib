@@ -17,13 +17,22 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
-import org.connectbot.sshlib.protocol.*
+import org.connectbot.sshlib.protocol.readByteString
+import org.connectbot.sshlib.protocol.readMpintUnsigned
+import org.connectbot.sshlib.protocol.readString
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.KeyPair
-import java.security.spec.*
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.ECPrivateKeySpec
+import java.security.spec.ECPublicKeySpec
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.RSAPrivateCrtKeySpec
+import java.security.spec.RSAPublicKeySpec
+import java.security.spec.X509EncodedKeySpec
 
 internal object OpenSshKeyReader {
 

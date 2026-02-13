@@ -19,9 +19,11 @@ package org.connectbot.sshlib.client
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.slot
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ForwardingChannelTest {
@@ -30,7 +32,7 @@ class ForwardingChannelTest {
         connection: SshConnection = mockk(relaxed = true),
         remoteWindowSize: Long = 64 * 1024,
         maxPacketSize: Int = 32 * 1024,
-        initialWindowSize: Int = 256 * 1024
+        initialWindowSize: Int = 256 * 1024,
     ): Pair<ForwardingChannel, SshConnection> {
         val channel = ForwardingChannel(
             connection = connection,

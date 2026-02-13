@@ -67,7 +67,11 @@ internal object OpenSshKeyWriter {
         }
 
         val binaryData = buildBinaryData(
-            cipherName, kdfName, kdfOptions, publicKeyBlob, encryptedSection
+            cipherName,
+            kdfName,
+            kdfOptions,
+            publicKeyBlob,
+            encryptedSection
         )
 
         return formatOutput(binaryData)
@@ -78,7 +82,7 @@ internal object OpenSshKeyWriter {
         kdfName: String,
         kdfOptions: ByteArray,
         publicKeyBlob: ByteArray,
-        encryptedSection: ByteArray
+        encryptedSection: ByteArray,
     ): ByteArray {
         val out = ByteArrayOutputStream()
         out.write(OPENSSH_V1_MAGIC)
@@ -144,6 +148,7 @@ internal object OpenSshKeyWriter {
             privKey is java.security.interfaces.EdECPrivateKey -> {
                 privKey.bytes.orElseThrow { SshException("Cannot extract Ed25519 seed") }
             }
+
             privKey.javaClass.name.contains("Ed25519PrivateKey") -> {
                 // Our Ed25519PrivateKey or similar — extract from PKCS#8 encoding
                 val encoded = privKey.encoded
@@ -156,6 +161,7 @@ internal object OpenSshKeyWriter {
                     innerReader.readOctetString()
                 }
             }
+
             else -> throw SshException("Cannot extract Ed25519 seed from ${privKey.javaClass}")
         }
     }
@@ -194,14 +200,12 @@ internal object OpenSshKeyWriter {
         out.write(encodeMpint(rsaPriv.primeQ.toByteArray()))
     }
 
-    private fun encodeUint32(value: Int): ByteArray {
-        return byteArrayOf(
-            (value ushr 24).toByte(),
-            (value ushr 16).toByte(),
-            (value ushr 8).toByte(),
-            value.toByte()
-        )
-    }
+    private fun encodeUint32(value: Int): ByteArray = byteArrayOf(
+        (value ushr 24).toByte(),
+        (value ushr 16).toByte(),
+        (value ushr 8).toByte(),
+        value.toByte()
+    )
 
     private fun formatOutput(data: ByteArray): String {
         val sb = StringBuilder()

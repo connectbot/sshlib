@@ -53,7 +53,7 @@ interface AgentProvider {
  */
 data class AgentIdentity(
     val publicKeyBlob: ByteArray,
-    val comment: String
+    val comment: String,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -94,7 +94,7 @@ data class AgentSigningContext(
     val serverHostKey: ByteArray,
 
     /** Whether session-bind extension was used */
-    val isBound: Boolean
+    val isBound: Boolean,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

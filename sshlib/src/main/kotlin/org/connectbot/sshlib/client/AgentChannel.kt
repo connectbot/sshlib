@@ -25,7 +25,7 @@ internal class AgentChannel(
     private val localChannelNumber: Int,
     private var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
-    private var remoteWindowSize: Long
+    private var remoteWindowSize: Long,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(AgentChannel::class.java)

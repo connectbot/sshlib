@@ -17,7 +17,6 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
-
 import java.math.BigInteger
 import java.security.SecureRandom
 
@@ -27,7 +26,7 @@ import java.security.SecureRandom
 internal class DiffieHellman(
     override val hashAlgorithm: String = "SHA-256",
     private val p: BigInteger = DhGroups.GROUP14_P,
-    private val g: BigInteger = DhGroups.GENERATOR
+    private val g: BigInteger = DhGroups.GENERATOR,
 ) : KexAlgorithm {
     companion object {
         private val secureRandom = SecureRandom()

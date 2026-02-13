@@ -55,6 +55,6 @@ internal object Ed25519SignatureAlgorithm : SshSignatureAlgorithm {
         signer.update(data)
         val sigBytes = signer.sign()
         return encodeSshString("ssh-ed25519".toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(sigBytes)
+            encodeSshString(sigBytes)
     }
 }

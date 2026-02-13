@@ -110,7 +110,5 @@ class Curve25519KeyExchangeTest {
         assertEquals("SHA-256", kex.hashAlgorithm)
     }
 
-    private fun hexToBytes(hex: String): ByteArray {
-        return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    }
+    private fun hexToBytes(hex: String): ByteArray = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 }

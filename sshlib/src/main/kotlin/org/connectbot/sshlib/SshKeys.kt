@@ -45,9 +45,7 @@ object SshKeys {
      * @return JCA [KeyPair] containing both public and private keys
      * @throws SshException if the key format is unrecognized or decryption fails
      */
-    fun decodePemPrivateKey(pem: String, password: String? = null): KeyPair {
-        return PrivateKeyReader.read(pem, password).jcaKeyPair
-    }
+    fun decodePemPrivateKey(pem: String, password: String? = null): KeyPair = PrivateKeyReader.read(pem, password).jcaKeyPair
 
     /**
      * Encode a [KeyPair] to PEM format.
@@ -61,9 +59,7 @@ object SshKeys {
      * @return PEM-encoded private key string
      * @throws SshException if the key type is unsupported
      */
-    fun encodePemPrivateKey(keyPair: KeyPair, password: String? = null): String {
-        return PemKeyWriter.write(keyPair, password)
-    }
+    fun encodePemPrivateKey(keyPair: KeyPair, password: String? = null): String = PemKeyWriter.write(keyPair, password)
 
     /**
      * Encode a [KeyPair] to OpenSSH format (`BEGIN OPENSSH PRIVATE KEY`).
@@ -73,9 +69,7 @@ object SshKeys {
      * @return OpenSSH-formatted private key string
      * @throws SshException if the key type is unsupported
      */
-    fun encodeOpenSshPrivateKey(keyPair: KeyPair, password: String? = null): String {
-        return OpenSshKeyWriter.write(keyPair, password)
-    }
+    fun encodeOpenSshPrivateKey(keyPair: KeyPair, password: String? = null): String = OpenSshKeyWriter.write(keyPair, password)
 
     /**
      * Ensure Ed25519 JCA support is available.
