@@ -17,7 +17,14 @@
 package org.connectbot.sshlib.protocol
 
 import ru.nsk.kstatemachine.event.Event
-import ru.nsk.kstatemachine.state.*
+import ru.nsk.kstatemachine.state.activeStates
+import ru.nsk.kstatemachine.state.finalState
+import ru.nsk.kstatemachine.state.initialState
+import ru.nsk.kstatemachine.state.invoke
+import ru.nsk.kstatemachine.state.onEntry
+import ru.nsk.kstatemachine.state.onExit
+import ru.nsk.kstatemachine.state.state
+import ru.nsk.kstatemachine.state.transition
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStdLibStateMachine
 import ru.nsk.kstatemachine.statemachine.processEventBlocking
@@ -44,7 +51,7 @@ import ru.nsk.kstatemachine.transition.onTriggered
  * state management, a separate SshServerStateMachine would be needed.
  */
 internal class SshClientStateMachine(
-    private val callbacks: SshClientCallbacks
+    private val callbacks: SshClientCallbacks,
 ) {
     sealed class SshEvent : Event {
         object Connect : SshEvent()
@@ -65,7 +72,7 @@ internal class SshClientStateMachine(
             val channelType: String,
             val localChannelNumber: Int,
             val initialWindowSize: Int,
-            val maxPacketSize: Int
+            val maxPacketSize: Int,
         ) : SshEvent()
         data class ReceiveChannelOpenConfirmation(val msg: SshMsgChannelOpenConfirmation) : SshEvent()
         data class ReceiveChannelOpenFailure(val msg: SshMsgChannelOpenFailure) : SshEvent()
@@ -73,7 +80,7 @@ internal class SshClientStateMachine(
             val recipientChannel: Int,
             val requestType: String,
             val wantReply: Boolean,
-            val message: SshMsgChannelRequest
+            val message: SshMsgChannelRequest,
         ) : SshEvent()
         object ReceiveChannelSuccess : SshEvent()
         object ReceiveChannelFailure : SshEvent()
@@ -319,9 +326,7 @@ internal class SshClientStateMachine(
     val currentState: String
         get() = stateMachine.activeStates().firstOrNull()?.name ?: "Unknown"
 
-    fun isInState(stateName: String): Boolean {
-        return stateMachine.activeStates().any { it.name == stateName }
-    }
+    fun isInState(stateName: String): Boolean = stateMachine.activeStates().any { it.name == stateName }
 }
 
 internal interface SshClientCallbacks {

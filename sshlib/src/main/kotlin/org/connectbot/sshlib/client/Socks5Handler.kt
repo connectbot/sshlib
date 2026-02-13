@@ -16,7 +16,12 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.readByte
+import io.ktor.utils.io.readFully
+import io.ktor.utils.io.writeByte
+import io.ktor.utils.io.writeFully
 import org.connectbot.sshlib.Socks5Authenticator
 import org.slf4j.LoggerFactory
 
@@ -27,7 +32,7 @@ import org.slf4j.LoggerFactory
  * the target host and port for dynamic port forwarding.
  */
 internal class Socks5Handler(
-    private val authenticator: Socks5Authenticator? = null
+    private val authenticator: Socks5Authenticator? = null,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(Socks5Handler::class.java)
@@ -98,7 +103,7 @@ internal class Socks5Handler(
 
     private suspend fun handleUsernamePasswordAuth(
         read: ByteReadChannel,
-        write: ByteWriteChannel
+        write: ByteWriteChannel,
     ): Boolean {
         val authVersion = read.readByte()
         if (authVersion != 0x01.toByte()) {
@@ -134,7 +139,7 @@ internal class Socks5Handler(
 
     private suspend fun handleConnectRequest(
         read: ByteReadChannel,
-        write: ByteWriteChannel
+        write: ByteWriteChannel,
     ): ConnectRequest? {
         val ver = read.readByte()
         if (ver != SOCKS5_VERSION) {
@@ -158,12 +163,14 @@ internal class Socks5Handler(
                 read.readFully(addr, 0, 4)
                 "${addr[0].toInt() and 0xFF}.${addr[1].toInt() and 0xFF}.${addr[2].toInt() and 0xFF}.${addr[3].toInt() and 0xFF}"
             }
+
             ATYP_DOMAIN -> {
                 val domainLen = read.readByte().toInt() and 0xFF
                 val domainBytes = ByteArray(domainLen)
                 read.readFully(domainBytes, 0, domainLen)
                 String(domainBytes, Charsets.US_ASCII)
             }
+
             ATYP_IPV6 -> {
                 val addr = ByteArray(16)
                 read.readFully(addr, 0, 16)
@@ -174,6 +181,7 @@ internal class Socks5Handler(
                     }
                 }
             }
+
             else -> {
                 logger.warn("Unsupported address type: $atyp")
                 sendReply(write, REPLY_ADDRESS_TYPE_NOT_SUPPORTED)

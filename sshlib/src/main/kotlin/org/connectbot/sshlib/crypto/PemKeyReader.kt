@@ -21,7 +21,15 @@ import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.KeyPair
-import java.security.spec.*
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.ECPrivateKeySpec
+import java.security.spec.ECPublicKeySpec
+import java.security.spec.InvalidKeySpecException
+import java.security.spec.NamedParameterSpec
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.RSAPrivateCrtKeySpec
+import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 
 internal object PemKeyReader {
@@ -32,7 +40,7 @@ internal object PemKeyReader {
         val type: PemType,
         var data: ByteArray,
         var procType: List<String>?,
-        var dekInfo: List<String>?
+        var dekInfo: List<String>?,
     )
 
     fun isEncrypted(text: String): Boolean {
@@ -70,10 +78,12 @@ internal object PemKeyReader {
                     type = PemType.RSA
                     endMarker = "-----END RSA PRIVATE KEY-----"
                 }
+
                 line.startsWith("-----BEGIN EC PRIVATE KEY-----") -> {
                     type = PemType.EC
                     endMarker = "-----END EC PRIVATE KEY-----"
                 }
+
                 line.startsWith("-----BEGIN PRIVATE KEY-----") -> {
                     type = PemType.PKCS8
                     endMarker = "-----END PRIVATE KEY-----"
@@ -280,6 +290,7 @@ internal object PemKeyReader {
                             )
                             return@readSequence KeyFactory.getInstance("EC").generatePublic(pubKeySpec)
                         }
+
                         else -> seq.skipTag()
                     }
                 }
@@ -288,16 +299,17 @@ internal object PemKeyReader {
         }
     }
 
-    internal fun oidToCurve(oid: ByteArray): Pair<ECGenParameterSpec, String> {
-        return when {
-            oid.contentEquals(SECP256R1_OID) ->
-                ECGenParameterSpec("secp256r1") to "ecdsa-sha2-nistp256"
-            oid.contentEquals(SECP384R1_OID) ->
-                ECGenParameterSpec("secp384r1") to "ecdsa-sha2-nistp384"
-            oid.contentEquals(SECP521R1_OID) ->
-                ECGenParameterSpec("secp521r1") to "ecdsa-sha2-nistp521"
-            else -> throw SshException("Unknown EC curve OID")
-        }
+    internal fun oidToCurve(oid: ByteArray): Pair<ECGenParameterSpec, String> = when {
+        oid.contentEquals(SECP256R1_OID) ->
+            ECGenParameterSpec("secp256r1") to "ecdsa-sha2-nistp256"
+
+        oid.contentEquals(SECP384R1_OID) ->
+            ECGenParameterSpec("secp384r1") to "ecdsa-sha2-nistp384"
+
+        oid.contentEquals(SECP521R1_OID) ->
+            ECGenParameterSpec("secp521r1") to "ecdsa-sha2-nistp521"
+
+        else -> throw SshException("Unknown EC curve OID")
     }
 
     internal val SECP256R1_OID = byteArrayOf(0x2a, 0x86.toByte(), 0x48, 0xce.toByte(), 0x3d, 0x03, 0x01, 0x07)

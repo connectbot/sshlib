@@ -31,19 +31,19 @@ internal class PlatformX25519Provider : X25519Provider {
         private const val ALGORITHM = "X25519"
 
         private val PKCS8_PREFIX = byteArrayOf(
-            0x30, 0x2e,                         // SEQUENCE (46 bytes)
-            0x02, 0x01, 0x00,                   // INTEGER 0 (version)
-            0x30, 0x05,                         // SEQUENCE (5 bytes)
-            0x06, 0x03, 0x2b, 0x65, 0x6e,      // OID 1.3.101.110 (X25519)
-            0x04, 0x22,                         // OCTET STRING (34 bytes)
-            0x04, 0x20                          // OCTET STRING (32 bytes)
+            0x30, 0x2e, // SEQUENCE (46 bytes)
+            0x02, 0x01, 0x00, // INTEGER 0 (version)
+            0x30, 0x05, // SEQUENCE (5 bytes)
+            0x06, 0x03, 0x2b, 0x65, 0x6e, // OID 1.3.101.110 (X25519)
+            0x04, 0x22, // OCTET STRING (34 bytes)
+            0x04, 0x20 // OCTET STRING (32 bytes)
         )
 
         private val X509_PREFIX = byteArrayOf(
-            0x30, 0x2a,                         // SEQUENCE (42 bytes)
-            0x30, 0x05,                         // SEQUENCE (5 bytes)
-            0x06, 0x03, 0x2b, 0x65, 0x6e,      // OID 1.3.101.110 (X25519)
-            0x03, 0x21, 0x00                    // BIT STRING (33 bytes, 0 unused bits)
+            0x30, 0x2a, // SEQUENCE (42 bytes)
+            0x30, 0x05, // SEQUENCE (5 bytes)
+            0x06, 0x03, 0x2b, 0x65, 0x6e, // OID 1.3.101.110 (X25519)
+            0x03, 0x21, 0x00 // BIT STRING (33 bytes, 0 unused bits)
         )
 
         private val BASE_POINT = ByteArray(X25519Provider.KEY_SIZE).apply { this[0] = 9 }

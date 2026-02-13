@@ -16,10 +16,19 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.*
+import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.ServerSocket
+import io.ktor.network.sockets.Socket
+import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.openReadChannel
+import io.ktor.network.sockets.openWriteChannel
+import io.ktor.network.sockets.toJavaAddress
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.connectbot.sshlib.PortForwarder
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
@@ -31,7 +40,7 @@ internal class LocalPortForwarder(
     private val remotePort: Int,
     private val serverSocket: ServerSocket,
     override val boundHost: String,
-    override val boundPort: Int
+    override val boundPort: Int,
 ) : PortForwarder {
     companion object {
         private val logger = LoggerFactory.getLogger(LocalPortForwarder::class.java)
@@ -41,15 +50,20 @@ internal class LocalPortForwarder(
             connection: SshConnection,
             bindAddress: InetSocketAddress,
             remoteHost: String,
-            remotePort: Int
+            remotePort: Int,
         ): LocalPortForwarder {
             val selectorManager = SelectorManager(Dispatchers.IO)
             val serverSocket = aSocket(selectorManager).tcp().bind(bindAddress.hostString, bindAddress.port)
             val actualAddress = serverSocket.localAddress.toJavaAddress() as java.net.InetSocketAddress
 
             val forwarder = LocalPortForwarder(
-                scope, connection, remoteHost, remotePort, serverSocket,
-                actualAddress.hostString, actualAddress.port
+                scope,
+                connection,
+                remoteHost,
+                remotePort,
+                serverSocket,
+                actualAddress.hostString,
+                actualAddress.port
             )
             forwarder.startAcceptLoop()
             return forwarder
@@ -85,7 +99,10 @@ internal class LocalPortForwarder(
         logger.debug("Accepted connection from $originAddr:$originPort, forwarding to $remoteHost:$remotePort")
 
         val sshChannel = connection.openDirectTcpipChannel(
-            remoteHost, remotePort, originAddr, originPort
+            remoteHost,
+            remotePort,
+            originAddr,
+            originPort
         )
 
         if (sshChannel == null) {

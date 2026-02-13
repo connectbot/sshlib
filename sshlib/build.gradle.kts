@@ -92,6 +92,24 @@ spotless {
         ktlint()
     }
 
+    kotlin {
+        ktlint("1.8.0")
+            .editorConfigOverride(
+                mapOf(
+                    "ij_kotlin_imports_layout" to "*,java.**,javax.**,kotlin.**,^",
+                    "ij_kotlin_allow_trailing_comma" to "true",
+                    "ktlint_code_style" to "android_studio",
+                    "ktlint_function_naming_ignore_when_annotated_with" to "Composable",
+                    "ktlint_standard_property-naming" to "disabled",
+                    "ktlint_standard_backing-property-naming" to "disabled",
+                    "ktlint_standard_filename" to "disabled",
+                    "ktlint_standard_discouraged-comment-location" to "disabled",
+                    "ktlint_standard_max-line-length" to "disabled",
+                    "ktlint_standard_kdoc" to "disabled",
+                ),
+            )
+    }
+
     format("xml") {
         target(
             fileTree(".") {

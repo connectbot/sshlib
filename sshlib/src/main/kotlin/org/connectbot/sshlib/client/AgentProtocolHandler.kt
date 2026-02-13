@@ -20,12 +20,19 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AgentSigningContext
-import org.connectbot.sshlib.protocol.*
+import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
+import org.connectbot.sshlib.protocol.SshAgentMessage
+import org.connectbot.sshlib.protocol.SshAgentSignResponse
+import org.connectbot.sshlib.protocol.SshAgentcExtension
+import org.connectbot.sshlib.protocol.SshAgentcSessionBind
+import org.connectbot.sshlib.protocol.SshAgentcSignRequest
+import org.connectbot.sshlib.protocol.createByteString
+import org.connectbot.sshlib.protocol.toByteArray
 import org.slf4j.LoggerFactory
 
 internal class AgentProtocolHandler(
     private val provider: AgentProvider,
-    private val sessionInfo: AgentSessionInfo
+    private val sessionInfo: AgentSessionInfo,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(AgentProtocolHandler::class.java)
@@ -54,8 +61,11 @@ internal class AgentProtocolHandler(
 
         return when (messageType) {
             SSH_AGENTC_REQUEST_IDENTITIES -> handleRequestIdentities()
+
             SSH_AGENTC_SIGN_REQUEST -> handleSignRequest(message)
+
             SSH_AGENTC_EXTENSION -> handleExtension(message)
+
             else -> {
                 logger.warn("Unknown agent message type: $messageType")
                 createFailureResponse()
@@ -181,18 +191,14 @@ internal class AgentProtocolHandler(
         return buffer
     }
 
-    private fun createFailureResponse(): ByteArray {
-        return buildAgentMessage(SSH_AGENT_FAILURE, ByteArray(0))
-    }
+    private fun createFailureResponse(): ByteArray = buildAgentMessage(SSH_AGENT_FAILURE, ByteArray(0))
 
-    private fun createSuccessResponse(): ByteArray {
-        return buildAgentMessage(SSH_AGENT_SUCCESS, ByteArray(0))
-    }
+    private fun createSuccessResponse(): ByteArray = buildAgentMessage(SSH_AGENT_SUCCESS, ByteArray(0))
 }
 
 internal data class AgentSessionInfo(
     val sessionId: ByteArray,
-    val serverHostKey: ByteArray
+    val serverHostKey: ByteArray,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

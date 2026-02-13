@@ -64,12 +64,10 @@ internal fun ByteBuffer.readMpintUnsigned(): BigInteger {
  * Utility functions for creating Kaitai Structs for SSH protocol types.
  */
 
-internal fun createAsciiString(str: String): AsciiString {
-    return AsciiString().apply {
-        setLen(str.length.toLong())
-        setValue(str)
-        _check()
-    }
+internal fun createAsciiString(str: String): AsciiString = AsciiString().apply {
+    setLen(str.length.toLong())
+    setValue(str)
+    _check()
 }
 
 internal fun createUtf8String(str: String): Utf8String {
@@ -81,12 +79,10 @@ internal fun createUtf8String(str: String): Utf8String {
     }
 }
 
-internal fun createByteString(data: ByteArray): ByteString {
-    return ByteString().apply {
-        setLenData(data.size.toLong())
-        setData(data)
-        _check()
-    }
+internal fun createByteString(data: ByteArray): ByteString = ByteString().apply {
+    setLenData(data.size.toLong())
+    setData(data)
+    _check()
 }
 
 internal fun createNameList(names: String): NameList {

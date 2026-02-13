@@ -26,11 +26,15 @@ import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
-import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshClient
+import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSigning
 import org.connectbot.sshlib.blocking.BlockingSshClient
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -78,7 +82,7 @@ class SshClientIntegrationTest {
             "aes256-ctr",
             "aes128-cbc",
             "aes256-cbc",
-            "3des-cbc",
+            "3des-cbc"
         )
 
         @JvmStatic
@@ -92,13 +96,13 @@ class SshClientIntegrationTest {
             "diffie-hellman-group14-sha256",
             "diffie-hellman-group14-sha1",
             "diffie-hellman-group-exchange-sha1",
-            "diffie-hellman-group1-sha1",
+            "diffie-hellman-group1-sha1"
         )
 
         @JvmStatic
         fun hostKeyAlgorithms() = listOf(
             "rsa-sha2-256",
-            "rsa-sha2-512",
+            "rsa-sha2-512"
         )
 
         @JvmStatic
@@ -106,7 +110,7 @@ class SshClientIntegrationTest {
             "hmac-sha2-256-etm@openssh.com",
             "hmac-sha2-512-etm@openssh.com",
             "hmac-sha2-256",
-            "hmac-sha2-512",
+            "hmac-sha2-512"
         )
     }
 
@@ -367,7 +371,7 @@ class SshClientIntegrationTest {
                     name: String,
                     instruction: String,
                     prompts: List<KeyboardInteractiveCallback.Prompt>,
-                    respond: suspend (responses: List<String>) -> Unit
+                    respond: suspend (responses: List<String>) -> Unit,
                 ) {
                     respond(prompts.map { PASSWORD })
                 }
@@ -396,7 +400,7 @@ class SshClientIntegrationTest {
                     name: String,
                     instruction: String,
                     prompts: List<KeyboardInteractiveCallback.Prompt>,
-                    respond: suspend (responses: List<String>) -> Unit
+                    respond: suspend (responses: List<String>) -> Unit,
                 ) {
                     respond(prompts.map { "wrongpassword" })
                 }
@@ -412,10 +416,8 @@ class SshClientIntegrationTest {
 
     // --- AuthHandler integration tests ---
 
-    private fun readTestKey(): String {
-        return javaClass.getResourceAsStream("/openssh-server/test_ed25519")!!
-            .bufferedReader().readText()
-    }
+    private fun readTestKey(): String = javaClass.getResourceAsStream("/openssh-server/test_ed25519")!!
+        .bufferedReader().readText()
 
     @Test
     fun `auth handler should authenticate with password fallback`() {
@@ -439,8 +441,9 @@ class SshClientIntegrationTest {
                 override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
 
                 override suspend fun onKeyboardInteractivePrompt(
-                    name: String, instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
                 ): List<String>? = null
 
                 override suspend fun onPasswordNeeded(): String = PASSWORD
@@ -472,8 +475,9 @@ class SshClientIntegrationTest {
                 override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
 
                 override suspend fun onKeyboardInteractivePrompt(
-                    name: String, instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
                 ): List<String> = prompts.map { PASSWORD }
 
                 override suspend fun onPasswordNeeded(): String? = null
@@ -503,13 +507,12 @@ class SshClientIntegrationTest {
             val handler = object : AuthHandler {
                 override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = listOf(pubKey)
 
-                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray {
-                    return SshSigning.sign(key.algorithmName, keyData, null, dataToSign)
-                }
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray = SshSigning.sign(key.algorithmName, keyData, null, dataToSign)
 
                 override suspend fun onKeyboardInteractivePrompt(
-                    name: String, instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
                 ): List<String>? = null
 
                 override suspend fun onPasswordNeeded(): String? = null
@@ -552,8 +555,9 @@ class SshClientIntegrationTest {
                 }
 
                 override suspend fun onKeyboardInteractivePrompt(
-                    name: String, instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
                 ): List<String>? {
                     callSequence.add("kbd")
                     // Skip keyboard-interactive
@@ -599,8 +603,9 @@ class SshClientIntegrationTest {
                 override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
 
                 override suspend fun onKeyboardInteractivePrompt(
-                    name: String, instruction: String,
-                    prompts: List<KeyboardInteractiveCallback.Prompt>
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
                 ): List<String>? = null
 
                 override suspend fun onPasswordNeeded(): String = PASSWORD

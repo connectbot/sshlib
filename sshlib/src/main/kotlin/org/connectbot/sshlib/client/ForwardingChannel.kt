@@ -27,7 +27,7 @@ internal class ForwardingChannel(
     var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
     private var remoteWindowSize: Long,
-    private val initialWindowSize: Int = 256 * 1024
+    private val initialWindowSize: Int = 256 * 1024,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(ForwardingChannel::class.java)

@@ -51,7 +51,7 @@ interface AuthHandler {
     suspend fun onKeyboardInteractivePrompt(
         name: String,
         instruction: String,
-        prompts: List<KeyboardInteractiveCallback.Prompt>
+        prompts: List<KeyboardInteractiveCallback.Prompt>,
     ): List<String>?
 
     /**

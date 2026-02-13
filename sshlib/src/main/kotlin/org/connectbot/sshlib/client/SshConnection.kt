@@ -18,24 +18,104 @@ package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
-import org.connectbot.sshlib.KeyboardInteractiveCallback
-import org.connectbot.sshlib.crypto.*
-import org.connectbot.sshlib.protocol.*
-import org.connectbot.sshlib.transport.PacketIO
-import org.connectbot.sshlib.transport.Transport
 import org.connectbot.sshlib.HostKeyVerifier
+import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.crypto.CipherEntry
+import org.connectbot.sshlib.crypto.CompressionEntry
+import org.connectbot.sshlib.crypto.DiffieHellmanGroupExchange
+import org.connectbot.sshlib.crypto.EncryptionInstance
+import org.connectbot.sshlib.crypto.KexAlgorithm
+import org.connectbot.sshlib.crypto.KexEntry
+import org.connectbot.sshlib.crypto.KexType
+import org.connectbot.sshlib.crypto.KeyDerivation
+import org.connectbot.sshlib.crypto.MacEntry
+import org.connectbot.sshlib.crypto.SignatureEntry
+import org.connectbot.sshlib.crypto.SignatureVerifier
+import org.connectbot.sshlib.crypto.SshPrivateKey
+import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
+import org.connectbot.sshlib.protocol.AsciiString
+import org.connectbot.sshlib.protocol.ChannelOpenDirectTcpip
+import org.connectbot.sshlib.protocol.ChannelOpenForwardedTcpip
+import org.connectbot.sshlib.protocol.ChannelOpenSession
+import org.connectbot.sshlib.protocol.GlobalRequestCancelTcpipForward
+import org.connectbot.sshlib.protocol.GlobalRequestResponseTcpipForward
+import org.connectbot.sshlib.protocol.GlobalRequestTcpipForward
+import org.connectbot.sshlib.protocol.IdBanner
+import org.connectbot.sshlib.protocol.KexDhGexPayload
+import org.connectbot.sshlib.protocol.KexEcdhPayload
+import org.connectbot.sshlib.protocol.KexdhPayload
+import org.connectbot.sshlib.protocol.SshClientCallbacks
+import org.connectbot.sshlib.protocol.SshClientStateMachine
+import org.connectbot.sshlib.protocol.SshEnums
+import org.connectbot.sshlib.protocol.SshMsgChannelClose
+import org.connectbot.sshlib.protocol.SshMsgChannelData
+import org.connectbot.sshlib.protocol.SshMsgChannelEof
+import org.connectbot.sshlib.protocol.SshMsgChannelExtendedData
+import org.connectbot.sshlib.protocol.SshMsgChannelOpen
+import org.connectbot.sshlib.protocol.SshMsgChannelOpenConfirmation
+import org.connectbot.sshlib.protocol.SshMsgChannelOpenFailure
+import org.connectbot.sshlib.protocol.SshMsgChannelRequest
+import org.connectbot.sshlib.protocol.SshMsgChannelWindowAdjust
+import org.connectbot.sshlib.protocol.SshMsgDebug
+import org.connectbot.sshlib.protocol.SshMsgDisconnect
+import org.connectbot.sshlib.protocol.SshMsgGlobalRequest
+import org.connectbot.sshlib.protocol.SshMsgKexDhGexGroup
+import org.connectbot.sshlib.protocol.SshMsgKexDhGexInit
+import org.connectbot.sshlib.protocol.SshMsgKexDhGexReply
+import org.connectbot.sshlib.protocol.SshMsgKexDhGexRequest
+import org.connectbot.sshlib.protocol.SshMsgKexEcdhInit
+import org.connectbot.sshlib.protocol.SshMsgKexEcdhReply
+import org.connectbot.sshlib.protocol.SshMsgKexdhInit
+import org.connectbot.sshlib.protocol.SshMsgKexdhReply
+import org.connectbot.sshlib.protocol.SshMsgKexinit
+import org.connectbot.sshlib.protocol.SshMsgServiceAccept
+import org.connectbot.sshlib.protocol.SshMsgServiceRequest
+import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
+import org.connectbot.sshlib.protocol.SshMsgUserauthFailure
+import org.connectbot.sshlib.protocol.SshMsgUserauthInfoRequest
+import org.connectbot.sshlib.protocol.SshMsgUserauthInfoResponse
+import org.connectbot.sshlib.protocol.SshMsgUserauthPkOk
+import org.connectbot.sshlib.protocol.SshMsgUserauthRequest
+import org.connectbot.sshlib.protocol.UnencryptedPacket
+import org.connectbot.sshlib.protocol.UserauthPublickeySignatureData
+import org.connectbot.sshlib.protocol.UserauthRequestKeyboardInteractive
+import org.connectbot.sshlib.protocol.UserauthRequestNone
+import org.connectbot.sshlib.protocol.UserauthRequestPassword
+import org.connectbot.sshlib.protocol.UserauthRequestPublickey
+import org.connectbot.sshlib.protocol.createAsciiString
+import org.connectbot.sshlib.protocol.createByteString
+import org.connectbot.sshlib.protocol.createMpint
+import org.connectbot.sshlib.protocol.createNameList
+import org.connectbot.sshlib.protocol.createUtf8String
+import org.connectbot.sshlib.protocol.toByteArray
+import org.connectbot.sshlib.transport.PacketIO
+import org.connectbot.sshlib.transport.Transport
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
 import java.security.SecureRandom
@@ -58,7 +138,7 @@ class SshConnection(
     private val hostKeyAlgorithms: String = SignatureEntry.defaultString,
     private val encryptionAlgorithms: String = CipherEntry.defaultString,
     private val macAlgorithms: String = MacEntry.defaultString,
-    private val compressionAlgorithms: String = CompressionEntry.defaultString
+    private val compressionAlgorithms: String = CompressionEntry.defaultString,
 ) {
 
     companion object {
@@ -66,6 +146,7 @@ class SshConnection(
     }
 
     private val packetIO = PacketIO(transport)
+
     @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     private val stateMachineDispatcher = newSingleThreadContext("ssh-state-machine")
 
@@ -145,7 +226,7 @@ class SshConnection(
     private class PendingChannelOpen(
         val deferred: CompletableDeferred<ForwardingChannel?>,
         val maxPacketSize: Int,
-        val initialWindowSize: Int
+        val initialWindowSize: Int,
     )
     private val pendingChannelOpens = ConcurrentHashMap<Int, PendingChannelOpen>()
     private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
@@ -210,6 +291,7 @@ class SshConnection(
                     val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
                 }
+
                 KexType.DH -> {
                     val kexdhStream = ByteBufferKaitaiStream(rawBody)
                     val kexdhPayload = KexdhPayload(kexdhStream)
@@ -217,6 +299,7 @@ class SshConnection(
                     val dhReply = kexdhPayload.body() as SshMsgKexdhReply
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
                 }
+
                 KexType.DH_GEX -> {
                     // First packet is SSH_MSG_KEX_DH_GEX_GROUP
                     val groupStream = ByteBufferKaitaiStream(rawBody)
@@ -322,7 +405,7 @@ class SshConnection(
      */
     suspend fun authenticateKeyboardInteractive(
         username: String,
-        callback: KeyboardInteractiveCallback
+        callback: KeyboardInteractiveCallback,
     ): Boolean {
         try {
             val req = SshMsgUserauthRequest().apply {
@@ -364,10 +447,12 @@ class SshConnection(
                     callback.onInfoRequest(name, instruction, prompts) { responses ->
                         val responseMsg = SshMsgUserauthInfoResponse().apply {
                             setNumResponses(responses.size.toLong())
-                            setResponses(responses.map { response ->
-                                val bytes = response.toByteArray(Charsets.UTF_8)
-                                createByteString(bytes)
-                            })
+                            setResponses(
+                                responses.map { response ->
+                                    val bytes = response.toByteArray(Charsets.UTF_8)
+                                    createByteString(bytes)
+                                }
+                            )
                             _check()
                         }
 
@@ -411,12 +496,18 @@ class SshConnection(
 
             // Build the data to sign per RFC 4252 §7
             val signatureData = buildSignatureData(
-                sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob
+                sid,
+                username,
+                "ssh-connection",
+                sigAlgorithmName,
+                publicKeyBlob
             )
 
             // Sign the data
             val signature = sigEntry.algorithm.sign(
-                sigAlgorithmName, privateKey.jcaKeyPair.private, signatureData
+                sigAlgorithmName,
+                privateKey.jcaKeyPair.private,
+                signatureData
             )
 
             // Build the SSH_MSG_USERAUTH_REQUEST
@@ -457,7 +548,7 @@ class SshConnection(
         username: String,
         serviceName: String,
         algorithmName: String,
-        publicKeyBlob: ByteArray
+        publicKeyBlob: ByteArray,
     ): ByteArray {
         val data = UserauthPublickeySignatureData().apply {
             setSessionIdentifier(createByteString(sessionId))
@@ -494,7 +585,7 @@ class SshConnection(
     private suspend fun doAuthenticate(
         username: String,
         handler: AuthHandler,
-        channel: Channel<AuthResult>
+        channel: Channel<AuthResult>,
     ): Boolean {
         // Step 1: Send "none" auth to discover allowed methods
         currentAuthMethod = "none"
@@ -543,7 +634,7 @@ class SshConnection(
     private suspend fun probePublicKey(
         username: String,
         key: AuthPublicKey,
-        channel: Channel<AuthResult>
+        channel: Channel<AuthResult>,
     ): AuthResult {
         currentAuthMethod = "publickey"
         sendAuthRequest(username, "publickey") {
@@ -562,11 +653,15 @@ class SshConnection(
         username: String,
         key: AuthPublicKey,
         handler: AuthHandler,
-        channel: Channel<AuthResult>
+        channel: Channel<AuthResult>,
     ): Boolean {
         val sid = sessionId ?: throw SshException("Session ID not established")
         val signatureData = buildSignatureData(
-            sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob
+            sid,
+            username,
+            "ssh-connection",
+            key.algorithmName,
+            key.publicKeyBlob
         )
 
         val signature = handler.onSignatureRequest(key, signatureData) ?: return false
@@ -592,7 +687,7 @@ class SshConnection(
     private suspend fun doKeyboardInteractive(
         username: String,
         handler: AuthHandler,
-        channel: Channel<AuthResult>
+        channel: Channel<AuthResult>,
     ): Boolean {
         currentAuthMethod = "keyboard-interactive"
         sendAuthRequest(username, "keyboard-interactive") {
@@ -607,17 +702,23 @@ class SshConnection(
         while (true) {
             when (val result = channel.receive()) {
                 is AuthResult.Success -> return true
+
                 is AuthResult.Failure -> return false
+
                 is AuthResult.InfoRequest -> {
                     val responses = handler.onKeyboardInteractivePrompt(
-                        result.name, result.instruction, result.prompts
+                        result.name,
+                        result.instruction,
+                        result.prompts
                     ) ?: return false
 
                     val responseMsg = SshMsgUserauthInfoResponse().apply {
                         setNumResponses(responses.size.toLong())
-                        setResponses(responses.map { response ->
-                            createByteString(response.toByteArray(Charsets.UTF_8))
-                        })
+                        setResponses(
+                            responses.map { response ->
+                                createByteString(response.toByteArray(Charsets.UTF_8))
+                            }
+                        )
                         _check()
                     }
 
@@ -626,6 +727,7 @@ class SshConnection(
                         responseMsg.toByteArray()
                     )
                 }
+
                 is AuthResult.PkOk -> {
                     // Unexpected during keyboard-interactive
                     return false
@@ -637,7 +739,7 @@ class SshConnection(
     private suspend fun doPasswordAuth(
         username: String,
         password: String,
-        channel: Channel<AuthResult>
+        channel: Channel<AuthResult>,
     ): Boolean {
         currentAuthMethod = "password"
         sendAuthRequest(username, "password") {
@@ -658,7 +760,7 @@ class SshConnection(
     private suspend fun sendAuthRequest(
         username: String,
         method: String,
-        configure: SshMsgUserauthRequest.() -> Unit
+        configure: SshMsgUserauthRequest.() -> Unit,
     ) {
         val req = SshMsgUserauthRequest().apply {
             setUserName(createAsciiString(username))
@@ -1229,9 +1331,11 @@ class SshConnection(
                     )
                     logger.info("Accepted agent channel: local=$localChannelNumber, remote=$senderChannel")
                 }
+
                 "forwarded-tcpip" -> {
                     handleForwardedTcpip(msg, senderChannel, initialWindow, maxPacketSize)
                 }
+
                 else -> {
                     rejectChannelOpen(senderChannel, channelType)
                 }
@@ -1245,7 +1349,7 @@ class SshConnection(
         msg: SshMsgChannelOpen,
         senderChannel: Int,
         initialWindow: Long,
-        maxPacketSize: Int
+        maxPacketSize: Int,
     ) {
         try {
             val channelData = msg.channelSpecificData()
@@ -1289,7 +1393,7 @@ class SshConnection(
         recipientChannel: Int,
         senderChannel: Int,
         initialWindowSize: Int,
-        maximumPacketSize: Int
+        maximumPacketSize: Int,
     ) {
         val msg = SshMsgChannelOpenConfirmation()
         msg.setRecipientChannel(recipientChannel.toLong())
@@ -1308,7 +1412,7 @@ class SshConnection(
         recipientChannel: Int,
         reasonCode: Int,
         description: String,
-        languageTag: String
+        languageTag: String,
     ) {
         val msg = SshMsgChannelOpenFailure()
         msg.setRecipientChannel(recipientChannel.toLong())
@@ -1427,7 +1531,7 @@ class SshConnection(
         originAddr: String,
         originPort: Int,
         initialWindowSize: Int = 256 * 1024,
-        maxPacketSize: Int = 32 * 1024
+        maxPacketSize: Int = 32 * 1024,
     ): ForwardingChannel? {
         val localChannelNumber = allocateChannelNumber()
 
@@ -1550,7 +1654,7 @@ class SshConnection(
         recipientChannel: Int,
         senderChannel: Int,
         initialWindowSize: Int,
-        maximumPacketSize: Int
+        maximumPacketSize: Int,
     ) {
         sendChannelOpenConfirmation(recipientChannel, senderChannel, initialWindowSize, maximumPacketSize)
     }
@@ -1559,7 +1663,7 @@ class SshConnection(
         recipientChannel: Int,
         reasonCode: Int,
         description: String,
-        languageTag: String
+        languageTag: String,
     ) {
         sendChannelOpenFailure(recipientChannel, reasonCode, description, languageTag)
     }
@@ -1578,9 +1682,11 @@ class SshConnection(
             SshEnums.MessageType.SSH_MSG_IGNORE -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
             }
+
             SshEnums.MessageType.SSH_MSG_DEBUG -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveDebug(packet.body() as SshMsgDebug))
             }
+
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
                 try {
                     val rawBody = packet._raw_body()
@@ -1592,9 +1698,11 @@ class SshConnection(
                     logger.error("Failed to parse SSH_MSG_GLOBAL_REQUEST", e)
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN -> {
                 handleIncomingChannelOpen(packet)
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
                 val confirmationMsg = parseBody<SshMsgChannelOpenConfirmation>(packet)
                 val recipientChannel = confirmationMsg.recipientChannel().toInt()
@@ -1617,6 +1725,7 @@ class SshConnection(
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
                 val failureMsg = parseBody<SshMsgChannelOpenFailure>(packet)
                 val recipientChannel = failureMsg.recipientChannel().toInt()
@@ -1627,6 +1736,7 @@ class SshConnection(
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
                 val msg = parseBody<SshMsgChannelData>(packet)
                 val recipientChannel = msg.recipientChannel().toInt()
@@ -1640,6 +1750,7 @@ class SshConnection(
                     else -> logger.warn("Data for unknown channel $recipientChannel")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA -> {
                 val msg = parseBody<SshMsgChannelExtendedData>(packet)
                 val channel = channelsByRemote[msg.recipientChannel().toInt()]
@@ -1649,6 +1760,7 @@ class SshConnection(
                     logger.warn("Extended data for unknown channel ${msg.recipientChannel()}")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
                 val msg = parseBody<SshMsgChannelWindowAdjust>(packet)
                 val recipientChannel = msg.recipientChannel().toInt()
@@ -1662,6 +1774,7 @@ class SshConnection(
                     else -> logger.warn("Window adjust for unknown channel $recipientChannel")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF -> {
                 val msg = parseBody<SshMsgChannelEof>(packet)
                 val recipientChannel = msg.recipientChannel().toInt()
@@ -1675,6 +1788,7 @@ class SshConnection(
                     else -> logger.warn("EOF for unknown channel $recipientChannel")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
                 val msg = parseBody<SshMsgChannelClose>(packet)
                 val recipientChannel = msg.recipientChannel().toInt()
@@ -1683,15 +1797,19 @@ class SshConnection(
                 val fwdChannel = forwardingChannelsByRemote[recipientChannel]
                 when {
                     channel != null -> channel.onClose()
+
                     agentChannel != null -> agentChannel.onClose()
+
                     fwdChannel != null -> {
                         fwdChannel.onClose()
                         unregisterForwardingChannel(fwdChannel)
                     }
+
                     else -> logger.warn("Close for unknown channel $recipientChannel")
                 }
                 checkAllChannelsClosed()
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
                 val rawBody = packet._raw_body()
                 val stream = ByteBufferKaitaiStream(rawBody)
@@ -1699,12 +1817,15 @@ class SshConnection(
                 msg._read()
                 logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
             }
+
             SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
             }
+
             SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
                 val ch = authResultChannel
                 if (ch != null) {
@@ -1712,6 +1833,7 @@ class SshConnection(
                 }
                 dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
             }
+
             SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
                 val ch = authResultChannel
                 if (ch != null) {
@@ -1723,18 +1845,22 @@ class SshConnection(
                     dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER -> {
                 val msg = parseBody<SshMsgUserauthBanner>(packet)
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthBanner(msg))
             }
+
             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
                 val ch = authResultChannel
                 if (ch != null && currentAuthMethod == "publickey") {
                     val msg = parseBody<SshMsgUserauthPkOk>(packet)
-                    ch.trySend(AuthResult.PkOk(
-                        msg.publicKeyAlgorithmName().value(),
-                        msg.publicKeyBlob().data()
-                    ))
+                    ch.trySend(
+                        AuthResult.PkOk(
+                            msg.publicKeyAlgorithmName().value(),
+                            msg.publicKeyBlob().data()
+                        )
+                    )
                 } else if (ch != null && currentAuthMethod == "keyboard-interactive") {
                     val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
                     val name = String(msg.name().data(), Charsets.UTF_8)
@@ -1751,6 +1877,7 @@ class SshConnection(
                     dispatchEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_REQUEST_SUCCESS -> {
                 val pending = pendingGlobalRequest
                 if (pending != null) {
@@ -1761,6 +1888,7 @@ class SshConnection(
                     logger.warn("Received REQUEST_SUCCESS with no pending global request")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE -> {
                 val pending = pendingGlobalRequest
                 if (pending != null) {
@@ -1770,9 +1898,11 @@ class SshConnection(
                     logger.warn("Received REQUEST_FAILURE with no pending global request")
                 }
             }
+
             SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.Disconnect)
             }
+
             else -> {
                 logger.warn("Unhandled message type: ${packet.messageType()}")
             }
@@ -1794,13 +1924,16 @@ class SshConnection(
                     logger.debug("Received SSH_MSG_IGNORE, skipping")
                     continue
                 }
+
                 SshEnums.MessageType.SSH_MSG_DEBUG -> {
                     logger.debug("Received SSH_MSG_DEBUG, skipping")
                     continue
                 }
+
                 expectedType -> {
                     return packet.body() as T
                 }
+
                 else -> {
                     throw SshException("Expected $expectedType but got $messageType")
                 }
@@ -1821,13 +1954,16 @@ class SshConnection(
                     logger.debug("Received SSH_MSG_IGNORE, skipping")
                     continue
                 }
+
                 SshEnums.MessageType.SSH_MSG_DEBUG -> {
                     logger.debug("Received SSH_MSG_DEBUG, skipping")
                     continue
                 }
+
                 in expectedTypes -> {
                     return packet as T
                 }
+
                 else -> {
                     throw SshException("Expected one of ${expectedTypes.joinToString()} but got $messageType")
                 }
@@ -1927,8 +2063,12 @@ class SshConnection(
                 }
                 _disconnectedFlow.tryEmit(e)
             } finally {
-                for (ch in channels.values) { ch.onClose() }
-                for (ch in forwardingChannels.values) { ch.onClose() }
+                for (ch in channels.values) {
+                    ch.onClose()
+                }
+                for (ch in forwardingChannels.values) {
+                    ch.onClose()
+                }
             }
         }
     }
@@ -1946,8 +2086,8 @@ class SshConnection(
      * @return SessionChannel instance if successful, null otherwise
      */
     suspend fun openSessionChannel(
-        initialWindowSize: Int = 64 * 1024, // 64KiB
-        maxPacketSize: Int = 32 * 1024  // 32KiB
+        initialWindowSize: Int = 64 * 1024,
+        maxPacketSize: Int = 32 * 1024,
     ): SessionChannel? {
         val localChannelNumber = allocateChannelNumber()
 
@@ -1956,12 +2096,14 @@ class SshConnection(
         val deferred = CompletableDeferred<SshMsgChannelOpenConfirmation?>()
         pendingChannelOpen = deferred
 
-        dispatchEvent(SshClientStateMachine.SshEvent.OpenChannel(
-            channelType = "session",
-            localChannelNumber = localChannelNumber,
-            initialWindowSize = initialWindowSize,
-            maxPacketSize = maxPacketSize
-        ))
+        dispatchEvent(
+            SshClientStateMachine.SshEvent.OpenChannel(
+                channelType = "session",
+                localChannelNumber = localChannelNumber,
+                initialWindowSize = initialWindowSize,
+                maxPacketSize = maxPacketSize
+            )
+        )
 
         val confirmationMsg = deferred.await() ?: return null
 
@@ -1996,7 +2138,7 @@ class SshConnection(
         recipientChannel: Int,
         requestType: String,
         wantReply: Boolean,
-        configureRequest: (SshMsgChannelRequest) -> Unit
+        configureRequest: (SshMsgChannelRequest) -> Unit,
     ): Boolean {
         val msg = SshMsgChannelRequest().apply {
             setRecipientChannel(recipientChannel.toLong())
@@ -2009,14 +2151,18 @@ class SshConnection(
 
         val deferred = if (wantReply) {
             CompletableDeferred<Boolean>().also { pendingChannelRequest = it }
-        } else null
+        } else {
+            null
+        }
 
-        dispatchEvent(SshClientStateMachine.SshEvent.SendChannelRequest(
-            recipientChannel = recipientChannel,
-            requestType = requestType,
-            wantReply = wantReply,
-            message = msg
-        ))
+        dispatchEvent(
+            SshClientStateMachine.SshEvent.SendChannelRequest(
+                recipientChannel = recipientChannel,
+                requestType = requestType,
+                wantReply = wantReply,
+                message = msg
+            )
+        )
 
         if (deferred == null) {
             return true

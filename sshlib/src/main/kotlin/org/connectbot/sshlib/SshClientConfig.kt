@@ -52,7 +52,7 @@ class SshClientConfig private constructor(
     val hostKeyAlgorithms: String,
     val encryptionAlgorithms: String,
     val macAlgorithms: String,
-    internal val compressionAlgorithms: String
+    internal val compressionAlgorithms: String,
 ) {
     class Builder {
         /**
@@ -116,16 +116,19 @@ class SshClientConfig private constructor(
             }
 
             return SshClientConfig(
-                factory, clientVersion, verifier,
-                kexAlgorithms, hostKeyAlgorithms, encryptionAlgorithms, macAlgorithms,
+                factory,
+                clientVersion,
+                verifier,
+                kexAlgorithms,
+                hostKeyAlgorithms,
+                encryptionAlgorithms,
+                macAlgorithms,
                 compressionAlgorithms
             )
         }
     }
 
     companion object {
-        operator fun invoke(block: Builder.() -> Unit): SshClientConfig {
-            return Builder().apply(block).build()
-        }
+        operator fun invoke(block: Builder.() -> Unit): SshClientConfig = Builder().apply(block).build()
     }
 }

@@ -57,18 +57,20 @@ internal interface KexAlgorithm {
         serverHostKey: ByteArray,
         clientPublicKey: ByteArray,
         serverPublicKey: ByteArray,
-        sharedSecret: ByteArray
+        sharedSecret: ByteArray,
     ): ByteArray {
         val transcript = ByteArrayOutputStream()
 
         fun writeString(data: ByteArray) {
             val len = data.size
-            transcript.write(byteArrayOf(
-                (len shr 24).toByte(),
-                (len shr 16).toByte(),
-                (len shr 8).toByte(),
-                len.toByte()
-            ))
+            transcript.write(
+                byteArrayOf(
+                    (len shr 24).toByte(),
+                    (len shr 16).toByte(),
+                    (len shr 8).toByte(),
+                    len.toByte()
+                )
+            )
             transcript.write(data)
         }
 

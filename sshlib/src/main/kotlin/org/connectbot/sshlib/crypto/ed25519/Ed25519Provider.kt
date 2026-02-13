@@ -25,10 +25,12 @@ import java.security.Security
 internal class Ed25519Provider : Provider(NAME, 1.0, "ConnectBot Ed25519 JCA Provider") {
     init {
         @Suppress("DEPRECATION", "removal")
-        AccessController.doPrivileged(PrivilegedAction {
-            setup()
-            null
-        })
+        AccessController.doPrivileged(
+            PrivilegedAction {
+                setup()
+                null
+            }
+        )
     }
 
     private fun setup() {

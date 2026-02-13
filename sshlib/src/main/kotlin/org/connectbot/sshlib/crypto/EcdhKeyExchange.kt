@@ -106,13 +106,17 @@ internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
         val result = ByteArray(1 + 2 * fieldSize)
         result[0] = 0x04
         System.arraycopy(
-            x, maxOf(0, x.size - fieldSize),
-            result, 1 + fieldSize - minOf(x.size, fieldSize),
+            x,
+            maxOf(0, x.size - fieldSize),
+            result,
+            1 + fieldSize - minOf(x.size, fieldSize),
             minOf(x.size, fieldSize)
         )
         System.arraycopy(
-            y, maxOf(0, y.size - fieldSize),
-            result, 1 + 2 * fieldSize - minOf(y.size, fieldSize),
+            y,
+            maxOf(0, y.size - fieldSize),
+            result,
+            1 + 2 * fieldSize - minOf(y.size, fieldSize),
             minOf(y.size, fieldSize)
         )
         return result

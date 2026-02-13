@@ -71,10 +71,12 @@ class CaptureTest {
                     println("  KEX algorithms: ${kexInit.kexAlgorithms().entries().data()}")
                     println("  Host key algorithms: ${kexInit.serverHostKeyAlgorithms().entries().data()}")
                 }
+
                 SshEnums.MessageType.SSH_MSG_NEWKEYS -> {
                     println("  NEWKEYS received - switching to encrypted mode")
                     break
                 }
+
                 else -> {
                     // KEX method specific messages need special handling
                     if (packet.messageType().id() in 30..49) {
@@ -163,6 +165,7 @@ class CaptureTest {
                     val channelData = decryptedPacket.payload().body() as SshMsgChannelData
                     println("  Channel ${channelData.recipientChannel()}: ${String(channelData.data().data())}")
                 }
+
                 else -> {}
             }
 
@@ -189,10 +192,12 @@ class CaptureTest {
                 val init = kexdhPayload.body() as SshMsgKexdhInit
                 println("  e: ${BigInteger(1, init.e().body()).toString(16).take(32)}...")
             }
+
             SshEnums.KexDh.SSH_MSG_KEXDH_REPLY -> {
                 val reply = kexdhPayload.body() as SshMsgKexdhReply
                 println("  f: ${BigInteger(1, reply.f().body()).toString(16).take(32)}...")
             }
+
             else -> {}
         }
     }

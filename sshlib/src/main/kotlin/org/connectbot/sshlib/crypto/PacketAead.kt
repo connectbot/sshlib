@@ -50,9 +50,7 @@ internal interface PacketAead {
      */
     fun decrypt(packetLength: ByteArray, ciphertext: ByteArray, tag: ByteArray): ByteArray
 
-    fun encryptLength(sequenceNumber: Long, plainLength: ByteArray): ByteArray =
-        throw UnsupportedOperationException("This cipher does not encrypt the length field")
+    fun encryptLength(sequenceNumber: Long, plainLength: ByteArray): ByteArray = throw UnsupportedOperationException("This cipher does not encrypt the length field")
 
-    fun decryptLength(sequenceNumber: Long, encryptedLength: ByteArray): ByteArray =
-        throw UnsupportedOperationException("This cipher does not encrypt the length field")
+    fun decryptLength(sequenceNumber: Long, encryptedLength: ByteArray): ByteArray = throw UnsupportedOperationException("This cipher does not encrypt the length field")
 }

@@ -17,7 +17,10 @@
 package org.connectbot.sshlib
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AgentProviderTest {
@@ -77,25 +80,21 @@ class AgentProviderTest {
     @Test
     fun `AgentProvider can be implemented with custom logic`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> {
-                return listOf(
-                    AgentIdentity(
-                        publicKeyBlob = byteArrayOf(1, 2, 3),
-                        comment = "test-key-1"
-                    ),
-                    AgentIdentity(
-                        publicKeyBlob = byteArrayOf(4, 5, 6),
-                        comment = "test-key-2"
-                    )
+            override suspend fun getIdentities(): List<AgentIdentity> = listOf(
+                AgentIdentity(
+                    publicKeyBlob = byteArrayOf(1, 2, 3),
+                    comment = "test-key-1"
+                ),
+                AgentIdentity(
+                    publicKeyBlob = byteArrayOf(4, 5, 6),
+                    comment = "test-key-2"
                 )
-            }
+            )
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? {
-                return if (context.isBound) {
-                    byteArrayOf(1, 2, 3, 4)
-                } else {
-                    null
-                }
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = if (context.isBound) {
+                byteArrayOf(1, 2, 3, 4)
+            } else {
+                null
             }
         }
 

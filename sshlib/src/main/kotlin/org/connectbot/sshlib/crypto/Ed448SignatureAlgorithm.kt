@@ -55,6 +55,6 @@ internal object Ed448SignatureAlgorithm : SshSignatureAlgorithm {
         signer.update(data)
         val sigBytes = signer.sign()
         return encodeSshString("ssh-ed448".toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(sigBytes)
+            encodeSshString(sigBytes)
     }
 }

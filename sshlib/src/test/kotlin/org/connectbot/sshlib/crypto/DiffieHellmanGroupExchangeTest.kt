@@ -127,9 +127,14 @@ class DiffieHellmanGroupExchangeTest {
         gex.setGroup(DhGroups.GROUP14_P, DhGroups.GENERATOR)
 
         val h = gex.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(32, h.size)
     }
@@ -140,9 +145,14 @@ class DiffieHellmanGroupExchangeTest {
         gex.setGroup(DhGroups.GROUP14_P, DhGroups.GENERATOR)
 
         val h = gex.computeExchangeHash(
-            "V_C".toByteArray(), "V_S".toByteArray(),
-            ByteArray(1), ByteArray(1),
-            ByteArray(1), ByteArray(1), ByteArray(1), ByteArray(1)
+            "V_C".toByteArray(),
+            "V_S".toByteArray(),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1),
+            ByteArray(1)
         )
         assertEquals(20, h.size)
     }

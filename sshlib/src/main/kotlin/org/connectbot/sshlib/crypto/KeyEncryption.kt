@@ -28,7 +28,7 @@ internal object KeyEncryption {
         data: ByteArray,
         password: ByteArray,
         salt: ByteArray,
-        cipherName: String
+        cipherName: String,
     ): ByteArray {
         val (jcaCipher, keySize) = when (cipherName.uppercase()) {
             "DES-EDE3-CBC" -> "DESede/CBC/NoPadding" to 24
@@ -62,7 +62,7 @@ internal object KeyEncryption {
         password: ByteArray,
         salt: ByteArray,
         rounds: Int,
-        cipherName: String
+        cipherName: String,
     ): ByteArray {
         val (jcaCipher, keySize, ivSize) = when (cipherName.lowercase()) {
             "aes256-ctr" -> Triple("AES/CTR/NoPadding", 32, 16)
@@ -93,7 +93,5 @@ internal object KeyEncryption {
         return padded
     }
 
-    fun byteArrayToHex(bytes: ByteArray): String {
-        return bytes.joinToString("") { "%02X".format(it) }
-    }
+    fun byteArrayToHex(bytes: ByteArray): String = bytes.joinToString("") { "%02X".format(it) }
 }

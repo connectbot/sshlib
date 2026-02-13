@@ -30,7 +30,7 @@ internal object KeyDecryption {
         password: ByteArray,
         salt: ByteArray,
         rounds: Int,
-        cipherName: String
+        cipherName: String,
     ): ByteArray {
         val (jcaCipher, keySize, ivSize) = when (cipherName.lowercase()) {
             "aes256-ctr" -> Triple("AES/CTR/NoPadding", 32, 16)
@@ -57,7 +57,7 @@ internal object KeyDecryption {
         data: ByteArray,
         password: ByteArray,
         salt: ByteArray,
-        cipherName: String
+        cipherName: String,
     ): ByteArray {
         val (jcaCipher, keySize) = when (cipherName.uppercase()) {
             "DES-EDE3-CBC" -> "DESede/CBC/NoPadding" to 24
@@ -98,7 +98,7 @@ internal object KeyDecryption {
     internal fun generateKeyFromPasswordSaltWithMD5(
         password: ByteArray,
         salt: ByteArray,
-        keyLen: Int
+        keyLen: Int,
     ): ByteArray {
         val md5 = MessageDigest.getInstance("MD5")
         val key = ByteArray(keyLen)

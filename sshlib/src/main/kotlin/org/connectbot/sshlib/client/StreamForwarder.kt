@@ -16,14 +16,15 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.slf4j.LoggerFactory
 
 internal class StreamForwarder private constructor(
-    private val dataForwarder: DataForwarder
+    private val dataForwarder: DataForwarder,
 ) : org.connectbot.sshlib.StreamForwarder {
     companion object {
         private val logger = LoggerFactory.getLogger(StreamForwarder::class.java)
@@ -35,10 +36,13 @@ internal class StreamForwarder private constructor(
             remoteHost: String,
             remotePort: Int,
             originAddr: String = "127.0.0.1",
-            originPort: Int = 0
+            originPort: Int = 0,
         ): StreamForwarder? {
             val sshChannel = connection.openDirectTcpipChannel(
-                remoteHost, remotePort, originAddr, originPort
+                remoteHost,
+                remotePort,
+                originAddr,
+                originPort
             )
             if (sshChannel == null) {
                 logger.warn("Failed to open direct-tcpip channel for $remoteHost:$remotePort")

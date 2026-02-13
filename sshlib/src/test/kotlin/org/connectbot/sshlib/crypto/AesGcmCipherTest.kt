@@ -31,8 +31,7 @@ class AesGcmCipherTest {
         return iv
     }
 
-    private fun packetLengthBytes(length: Int): ByteArray =
-        ByteBuffer.allocate(4).putInt(length).array()
+    private fun packetLengthBytes(length: Int): ByteArray = ByteBuffer.allocate(4).putInt(length).array()
 
     @Test
     fun roundTripAes128() {

@@ -16,15 +16,17 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.writeFully
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class StreamForwarderTest {
@@ -45,7 +47,11 @@ class StreamForwarderTest {
         val output = ByteChannel(autoFlush = true)
 
         val forwarder = StreamForwarder.create(
-            connection, input, output, "example.com", 80
+            connection,
+            input,
+            output,
+            "example.com",
+            80
         )
         assertNotNull(forwarder)
         assertTrue(forwarder!!.isActive)
@@ -67,7 +73,11 @@ class StreamForwarderTest {
         val output = ByteChannel(autoFlush = true)
 
         val forwarder = StreamForwarder.create(
-            connection, input, output, "example.com", 80
+            connection,
+            input,
+            output,
+            "example.com",
+            80
         )
         assertNull(forwarder)
     }
@@ -82,7 +92,11 @@ class StreamForwarderTest {
         val output = ByteChannel(autoFlush = true)
 
         val forwarder = StreamForwarder.create(
-            connection, input, output, "example.com", 80
+            connection,
+            input,
+            output,
+            "example.com",
+            80
         )!!
 
         forwarder.stop()

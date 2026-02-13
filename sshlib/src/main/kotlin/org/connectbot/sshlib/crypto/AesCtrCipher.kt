@@ -35,7 +35,7 @@ import javax.crypto.spec.SecretKeySpec
 internal class AesCtrCipher(
     private val key: ByteArray,
     private val iv: ByteArray,
-    forEncryption: Boolean
+    forEncryption: Boolean,
 ) : PacketCipher {
     override val blockSize: Int = 16
 
@@ -55,11 +55,7 @@ internal class AesCtrCipher(
         cipher.init(mode, keySpec, ivSpec)
     }
 
-    override fun encrypt(data: ByteArray): ByteArray {
-        return cipher.update(data)
-    }
+    override fun encrypt(data: ByteArray): ByteArray = cipher.update(data)
 
-    override fun decrypt(data: ByteArray): ByteArray {
-        return cipher.update(data)
-    }
+    override fun decrypt(data: ByteArray): ByteArray = cipher.update(data)
 }

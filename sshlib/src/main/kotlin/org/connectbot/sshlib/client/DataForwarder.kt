@@ -16,8 +16,17 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.utils.io.*
-import kotlinx.coroutines.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.cancel
+import io.ktor.utils.io.readAvailable
+import io.ktor.utils.io.writeFully
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -31,7 +40,7 @@ internal class DataForwarder(
     private val scope: CoroutineScope,
     private val sshChannel: ForwardingChannel,
     private val tcpRead: ByteReadChannel,
-    private val tcpWrite: ByteWriteChannel
+    private val tcpWrite: ByteWriteChannel,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(DataForwarder::class.java)

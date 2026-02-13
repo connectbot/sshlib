@@ -41,9 +41,7 @@ internal class Ed25519KeyFactory : KeyFactorySpi() {
         throw InvalidKeySpecException("Unrecognized key spec: ${keySpec.javaClass}")
     }
 
-    override fun <T : KeySpec> engineGetKeySpec(key: Key, keySpec: Class<T>): T {
-        throw InvalidKeySpecException("Not implemented: $key $keySpec")
-    }
+    override fun <T : KeySpec> engineGetKeySpec(key: Key, keySpec: Class<T>): T = throw InvalidKeySpecException("Not implemented: $key $keySpec")
 
     override fun engineTranslateKey(key: Key): Key {
         if (key is Ed25519PublicKey || key is Ed25519PrivateKey) {

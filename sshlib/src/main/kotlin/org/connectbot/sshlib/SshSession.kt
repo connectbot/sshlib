@@ -38,7 +38,7 @@ interface SshSession : AutoCloseable {
         heightRows: Int = 24,
         widthPixels: Int = 0,
         heightPixels: Int = 0,
-        terminalModes: ByteArray = byteArrayOf(0)
+        terminalModes: ByteArray = byteArrayOf(0),
     ): Boolean
 
     suspend fun resizeTerminal(

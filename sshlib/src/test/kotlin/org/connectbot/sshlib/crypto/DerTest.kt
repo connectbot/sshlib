@@ -33,7 +33,7 @@ class DerTest {
                 integer(BigInteger.valueOf(20))
             }
         }
-        
+
         // Expected:
         // 0x30 (SEQUENCE)
         // 0x06 (Length: 2 + 1 + 1 + 2)
@@ -44,7 +44,7 @@ class DerTest {
         //   0x01 (Length)
         //   0x14 (20)
         val expected = byteArrayOf(0x30, 0x06, 0x02, 0x01, 0x0A, 0x02, 0x01, 0x14)
-        
+
         assertArrayEquals(expected, encoded)
     }
 
@@ -62,7 +62,7 @@ class DerTest {
         val expected = byteArrayOf(0x30, 0x05, 0x30, 0x03, 0x02, 0x01, 0x01)
         assertArrayEquals(expected, encoded)
     }
-    
+
     @Test
     fun testReader() {
         val data = byteArrayOf(0x30, 0x06, 0x02, 0x01, 0x0A, 0x02, 0x01, 0x14)

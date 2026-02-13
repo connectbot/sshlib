@@ -16,12 +16,21 @@
 
 package org.connectbot.sshlib.transport
 
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.*
+import io.ktor.network.selector.SelectorManager
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.cancel
+import io.ktor.utils.io.readFully
+import io.ktor.utils.io.writeFully
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -41,7 +50,7 @@ class KtorTcpTransport internal constructor(
     private val port: Int,
     private val addressResolver: AddressResolver,
     private val socketFactory: TcpSocketFactory? = null,
-    private val ipVersion: IpVersion = IpVersion.AUTO
+    private val ipVersion: IpVersion = IpVersion.AUTO,
 ) : Transport {
 
     constructor(host: String, port: Int = 22, ipVersion: IpVersion = IpVersion.AUTO) : this(
@@ -86,20 +95,22 @@ class KtorTcpTransport internal constructor(
             }
 
             val addresses = when (ipVersion) {
-                IpVersion.IPv4_ONLY -> {
+                IpVersion.IPV4_ONLY -> {
                     val filtered = allAddresses.filterIsInstance<Inet4Address>()
                     if (filtered.isEmpty()) {
                         throw TransportException("No IPv4 addresses found for host: $host")
                     }
                     filtered
                 }
-                IpVersion.IPv6_ONLY -> {
+
+                IpVersion.IPV6_ONLY -> {
                     val filtered = allAddresses.filterIsInstance<Inet6Address>()
                     if (filtered.isEmpty()) {
                         throw TransportException("No IPv6 addresses found for host: $host")
                     }
                     filtered
                 }
+
                 IpVersion.AUTO -> {
                     // Happy Eyeballs (RFC 8305): interleave IPv6 and IPv4
                     val ipv6 = allAddresses.filterIsInstance<Inet6Address>()
@@ -136,7 +147,7 @@ class KtorTcpTransport internal constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun connectHappyEyeballs(
         factory: TcpSocketFactory,
-        addresses: List<InetAddress>
+        addresses: List<InetAddress>,
     ): TransportSocket = supervisorScope {
         val resultChannel = Channel<TransportSocket>(capacity = 1)
         val failures = Collections.synchronizedList(mutableListOf<Throwable>())

@@ -32,12 +32,12 @@ internal class JavaMlKemProvider : MlKemProvider {
 
         // X.509 wrapper for ML-KEM-768 public keys
         private val X509_PREFIX = byteArrayOf(
-            0x30, 0x82.toByte(), 0x04, 0xb2.toByte(),  // SEQUENCE
-            0x30, 0x0b,                                 // SEQUENCE
-            0x06, 0x09,                                 // OID
+            0x30, 0x82.toByte(), 0x04, 0xb2.toByte(), // SEQUENCE
+            0x30, 0x0b, // SEQUENCE
+            0x06, 0x09, // OID
             0x60, 0x86.toByte(), 0x48, 0x01, 0x65, 0x03, 0x04, 0x04, 0x02,
-            0x03, 0x82.toByte(), 0x04, 0xa1.toByte(),   // BIT STRING
-            0x00                                        // no unused bits
+            0x03, 0x82.toByte(), 0x04, 0xa1.toByte(), // BIT STRING
+            0x00 // no unused bits
         )
     }
 

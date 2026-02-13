@@ -36,7 +36,7 @@ interface KeyboardInteractiveCallback {
         name: String,
         instruction: String,
         prompts: List<Prompt>,
-        respond: suspend (responses: List<String>) -> Unit
+        respond: suspend (responses: List<String>) -> Unit,
     )
 
     data class Prompt(val text: String, val echo: Boolean)

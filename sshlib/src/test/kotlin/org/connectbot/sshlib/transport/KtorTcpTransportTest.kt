@@ -16,7 +16,9 @@
 
 package org.connectbot.sshlib.transport
 
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -151,7 +153,7 @@ class KtorTcpTransportTest {
             )
         )
 
-        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
         transport.connect()
 
         assertEquals(1, factory.connectionAttempts.size)
@@ -171,7 +173,7 @@ class KtorTcpTransportTest {
             )
         )
 
-        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv6_ONLY)
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV6_ONLY)
         transport.connect()
 
         assertEquals(1, factory.connectionAttempts.size)
@@ -185,7 +187,7 @@ class KtorTcpTransportTest {
         val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv6)))
         val factory = MockTcpSocketFactory(mapOf(ipv6 to { MockSocket() }))
 
-        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
         val ex = assertFailsWith<TransportException> {
             transport.connect()
         }
@@ -199,7 +201,7 @@ class KtorTcpTransportTest {
         val resolver = MockAddressResolver(mapOf("example.com" to listOf(ipv4)))
         val factory = MockTcpSocketFactory(mapOf(ipv4 to { MockSocket() }))
 
-        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv6_ONLY)
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV6_ONLY)
         val ex = assertFailsWith<TransportException> {
             transport.connect()
         }
@@ -221,7 +223,7 @@ class KtorTcpTransportTest {
             )
         )
 
-        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPv4_ONLY)
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
         transport.connect()
 
         assertTrue(factory.connectionAttempts.all { it is java.net.Inet4Address })
@@ -249,13 +251,11 @@ class KtorTcpTransportTest {
 }
 
 class MockAddressResolver(private val hosts: Map<String, List<InetAddress>>) : AddressResolver {
-    override suspend fun resolve(host: String): List<InetAddress> {
-        return hosts[host] ?: emptyList()
-    }
+    override suspend fun resolve(host: String): List<InetAddress> = hosts[host] ?: emptyList()
 }
 
 class MockTcpSocketFactory(
-    private val behaviors: Map<InetAddress, suspend () -> TransportSocket>
+    private val behaviors: Map<InetAddress, suspend () -> TransportSocket>,
 ) : TcpSocketFactory {
     val connectionAttempts = mutableListOf<InetAddress>()
 

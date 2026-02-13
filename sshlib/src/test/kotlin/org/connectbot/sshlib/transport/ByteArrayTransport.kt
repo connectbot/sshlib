@@ -27,7 +27,7 @@ import java.io.ByteArrayOutputStream
  * @param inputData Initial data available for reading
  */
 class ByteArrayTransport(
-    inputData: ByteArray = byteArrayOf()
+    inputData: ByteArray = byteArrayOf(),
 ) : Transport {
 
     private var readBuffer = inputData

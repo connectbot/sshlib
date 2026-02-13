@@ -26,9 +26,20 @@ internal class Poly1305 {
         private const val BLOCK_SIZE = 16
     }
 
-    private var h0 = 0; private var h1 = 0; private var h2 = 0; private var h3 = 0; private var h4 = 0
-    private var r0 = 0; private var r1 = 0; private var r2 = 0; private var r3 = 0; private var r4 = 0
-    private var s0 = 0; private var s1 = 0; private var s2 = 0; private var s3 = 0
+    private var h0 = 0
+    private var h1 = 0
+    private var h2 = 0
+    private var h3 = 0
+    private var h4 = 0
+    private var r0 = 0
+    private var r1 = 0
+    private var r2 = 0
+    private var r3 = 0
+    private var r4 = 0
+    private var s0 = 0
+    private var s1 = 0
+    private var s2 = 0
+    private var s3 = 0
 
     private var buffer = ByteArray(BLOCK_SIZE)
     private var bufferPos = 0
@@ -53,7 +64,11 @@ internal class Poly1305 {
         s2 = readIntLE(key, 24)
         s3 = readIntLE(key, 28)
 
-        h0 = 0; h1 = 0; h2 = 0; h3 = 0; h4 = 0
+        h0 = 0
+        h1 = 0
+        h2 = 0
+        h3 = 0
+        h4 = 0
         buffer = ByteArray(BLOCK_SIZE)
         bufferPos = 0
         finished = false
@@ -155,9 +170,20 @@ internal class Poly1305 {
     }
 
     fun reset() {
-        r0 = 0; r1 = 0; r2 = 0; r3 = 0; r4 = 0
-        s0 = 0; s1 = 0; s2 = 0; s3 = 0
-        h0 = 0; h1 = 0; h2 = 0; h3 = 0; h4 = 0
+        r0 = 0
+        r1 = 0
+        r2 = 0
+        r3 = 0
+        r4 = 0
+        s0 = 0
+        s1 = 0
+        s2 = 0
+        s3 = 0
+        h0 = 0
+        h1 = 0
+        h2 = 0
+        h3 = 0
+        h4 = 0
         buffer.fill(0)
         bufferPos = 0
     }
@@ -228,11 +254,10 @@ internal class Poly1305 {
         h0 = h0 and 0x03ffffff
     }
 
-    private fun readIntLE(buf: ByteArray, offset: Int): Int =
-        (buf[offset].toInt() and 0xff) or
-            ((buf[offset + 1].toInt() and 0xff) shl 8) or
-            ((buf[offset + 2].toInt() and 0xff) shl 16) or
-            ((buf[offset + 3].toInt() and 0xff) shl 24)
+    private fun readIntLE(buf: ByteArray, offset: Int): Int = (buf[offset].toInt() and 0xff) or
+        ((buf[offset + 1].toInt() and 0xff) shl 8) or
+        ((buf[offset + 2].toInt() and 0xff) shl 16) or
+        ((buf[offset + 3].toInt() and 0xff) shl 24)
 
     private fun writeIntLE(value: Int, buf: ByteArray, offset: Int) {
         buf[offset] = value.toByte()

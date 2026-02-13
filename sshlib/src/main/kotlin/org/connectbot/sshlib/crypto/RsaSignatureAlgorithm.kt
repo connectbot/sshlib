@@ -57,6 +57,6 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
         val sigBytes = signer.sign()
 
         return encodeSshString(algorithmName.toByteArray(Charsets.US_ASCII)) +
-                encodeSshString(sigBytes)
+            encodeSshString(sigBytes)
     }
 }

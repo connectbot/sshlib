@@ -23,7 +23,10 @@ import io.mockk.mockk
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.client.ForwardingChannel
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class ForwardingChannelTransportTest {
@@ -143,7 +146,7 @@ class ForwardingChannelTransportTest {
 
         every { fwdChannel.isOpen } returns false
         coEvery { fwdChannel.sendData(any()) } throws
-                kotlinx.coroutines.channels.ClosedSendChannelException("closed")
+            kotlinx.coroutines.channels.ClosedSendChannelException("closed")
 
         transport.close()
 

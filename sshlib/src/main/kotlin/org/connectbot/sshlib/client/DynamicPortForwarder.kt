@@ -16,10 +16,19 @@
 
 package org.connectbot.sshlib.client
 
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.*
+import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.ServerSocket
+import io.ktor.network.sockets.Socket
+import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.openReadChannel
+import io.ktor.network.sockets.openWriteChannel
+import io.ktor.network.sockets.toJavaAddress
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.connectbot.sshlib.PortForwarder
 import org.connectbot.sshlib.Socks5Authenticator
 import org.slf4j.LoggerFactory
@@ -31,7 +40,7 @@ internal class DynamicPortForwarder(
     private val socks5Handler: Socks5Handler,
     private val serverSocket: ServerSocket,
     override val boundHost: String,
-    override val boundPort: Int
+    override val boundPort: Int,
 ) : PortForwarder {
     companion object {
         private val logger = LoggerFactory.getLogger(DynamicPortForwarder::class.java)
@@ -40,7 +49,7 @@ internal class DynamicPortForwarder(
             scope: CoroutineScope,
             connection: SshConnection,
             bindAddress: InetSocketAddress,
-            authenticator: Socks5Authenticator? = null
+            authenticator: Socks5Authenticator? = null,
         ): DynamicPortForwarder {
             val selectorManager = SelectorManager(Dispatchers.IO)
             val serverSocket = aSocket(selectorManager).tcp().bind(bindAddress.hostString, bindAddress.port)
@@ -48,8 +57,12 @@ internal class DynamicPortForwarder(
 
             val handler = Socks5Handler(authenticator)
             val forwarder = DynamicPortForwarder(
-                scope, connection, handler, serverSocket,
-                actualAddress.hostString, actualAddress.port
+                scope,
+                connection,
+                handler,
+                serverSocket,
+                actualAddress.hostString,
+                actualAddress.port
             )
             forwarder.startAcceptLoop()
             return forwarder
@@ -102,7 +115,10 @@ internal class DynamicPortForwarder(
         logger.debug("SOCKS5 CONNECT to ${request.host}:${request.port}")
 
         val sshChannel = connection.openDirectTcpipChannel(
-            request.host, request.port, originAddr, originPort
+            request.host,
+            request.port,
+            originAddr,
+            originPort
         )
 
         if (sshChannel == null) {

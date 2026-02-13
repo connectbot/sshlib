@@ -31,7 +31,7 @@ internal class KeyDerivation(
     private val sharedSecret: ByteArray,
     private val exchangeHash: ByteArray,
     private val sessionId: ByteArray,
-    private val hashAlgorithm: String = "SHA-1"
+    private val hashAlgorithm: String = "SHA-1",
 ) {
     /**
      * Derived encryption/MAC keys for both directions.
@@ -42,7 +42,7 @@ internal class KeyDerivation(
         val encryptionKeyClientToServer: ByteArray,
         val encryptionKeyServerToClient: ByteArray,
         val integrityKeyClientToServer: ByteArray,
-        val integrityKeyServerToClient: ByteArray
+        val integrityKeyServerToClient: ByteArray,
     )
 
     /**
@@ -53,16 +53,14 @@ internal class KeyDerivation(
      * @param macKeyLength Required MAC key length in bytes
      * @return Derived keys
      */
-    fun deriveKeys(ivLength: Int, keyLength: Int, macKeyLength: Int): Keys {
-        return Keys(
-            initialIvClientToServer = deriveKey('A', ivLength),
-            initialIvServerToClient = deriveKey('B', ivLength),
-            encryptionKeyClientToServer = deriveKey('C', keyLength),
-            encryptionKeyServerToClient = deriveKey('D', keyLength),
-            integrityKeyClientToServer = deriveKey('E', macKeyLength),
-            integrityKeyServerToClient = deriveKey('F', macKeyLength)
-        )
-    }
+    fun deriveKeys(ivLength: Int, keyLength: Int, macKeyLength: Int): Keys = Keys(
+        initialIvClientToServer = deriveKey('A', ivLength),
+        initialIvServerToClient = deriveKey('B', ivLength),
+        encryptionKeyClientToServer = deriveKey('C', keyLength),
+        encryptionKeyServerToClient = deriveKey('D', keyLength),
+        integrityKeyClientToServer = deriveKey('E', macKeyLength),
+        integrityKeyServerToClient = deriveKey('F', macKeyLength)
+    )
 
     /**
      * Derive a single key according to RFC 4253 section 7.2.
