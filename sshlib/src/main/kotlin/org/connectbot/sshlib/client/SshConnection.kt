@@ -2048,6 +2048,7 @@ class SshConnection(
     private fun startPacketLoop() {
         if (packetLoopJob != null) return
         packetLoopJob = connectionScope.launch {
+            var loopException: Exception? = null
             try {
                 while (isActive) {
                     processNextPacket()
@@ -2061,13 +2062,16 @@ class SshConnection(
                 } else {
                     logger.warn("Packet loop ended unexpectedly", e)
                 }
-                _disconnectedFlow.tryEmit(e)
+                loopException = e
             } finally {
                 for (ch in channels.values) {
                     ch.onClose()
                 }
                 for (ch in forwardingChannels.values) {
                     ch.onClose()
+                }
+                if (loopException != null) {
+                    _disconnectedFlow.tryEmit(loopException)
                 }
             }
         }
