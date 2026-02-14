@@ -150,7 +150,7 @@ mavenPublishing {
     signAllPublications()
 
     pom {
-        description.set("ConnectBot's SSH library written in Kotlin.")
+        description.set("ConnectBot's SSH library written with Kotlin suspend functions.")
         inceptionYear.set("2025")
         url.set(gitHubUrl)
         licenses {
