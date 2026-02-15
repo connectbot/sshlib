@@ -20,6 +20,7 @@ that runs in reaction to state changes.
   4419, 5656, 8308, 8709, 8731, 9142)
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
+- **Port Forwarding**: Local, remote, and dynamic (SOCKS5) port forwarding
 - **Agent Forwarding**: Forward SSH agent requests with session binding support
 - **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
 
@@ -60,6 +61,8 @@ that runs in reaction to state changes.
 - `aes128-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 - `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
+- `aes256-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
+- `aes128-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
 - `3des-cbc` ([RFC 4253](https://datatracker.ietf.org/doc/html/rfc4253#section-6.3))
 
 ### MACs
@@ -158,9 +161,21 @@ session.requestShell()
 // When you SSH from bastion to another server, it can request signatures
 ```
 
+## Compatibility Testing
+
+The library is tested against multiple SSH server implementations using Docker
+(via Testcontainers):
+
+- **OpenSSH** 9.9p2 — full integration tests including port forwarding
+- **AsyncSSH** (Python) — compatibility tests for ciphers, key exchange, MACs,
+  and public key auth
+- **Dropbear** — compatibility tests including ML-KEM post-quantum key exchange
+
+Run integration tests with: `./gradlew :sshlib:test` (requires Docker).
+
 ## Current Limitations
 
-- No SFTP or port forwarding
+- No SFTP
 - Client-only (no server implementation)
 
 ## License
