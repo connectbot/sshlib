@@ -16,8 +16,9 @@
 
 package org.connectbot.sshlib
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -113,9 +114,11 @@ class SshKeysTest {
         assertEquals("EC", keyPair.public.algorithm)
     }
 
-    @Test(expected = SshException::class)
+    @Test
     fun `decodePemPrivateKey invalid data throws`() {
-        SshKeys.decodePemPrivateKey("not a valid key")
+        assertFailsWith<SshException> {
+            SshKeys.decodePemPrivateKey("not a valid key")
+        }
     }
 
     @Test

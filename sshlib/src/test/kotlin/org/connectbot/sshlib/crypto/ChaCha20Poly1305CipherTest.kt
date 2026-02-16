@@ -17,7 +17,7 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.transport.TransportException
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

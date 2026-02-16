@@ -22,7 +22,7 @@ import io.ktor.utils.io.ByteWriteChannel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.net.InetAddress
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib.crypto.ed25519
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.security.InvalidKeyException
 import java.security.Key
 import java.security.KeyFactory

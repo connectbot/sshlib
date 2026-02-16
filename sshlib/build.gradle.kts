@@ -42,11 +42,9 @@ dependencies {
     implementation(libs.jbcrypt)
 
     // Unit tests
-    testImplementation(libs.junit)
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
-    testRuntimeOnly(libs.junit.vintage.engine)
 
     // Integration test dependencies
     testImplementation(libs.junit.jupiter.api)

@@ -19,7 +19,7 @@ package org.connectbot.sshlib.crypto
 import io.kaitai.struct.ByteBufferKaitaiStream
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 
 class SignatureGenerationTest {

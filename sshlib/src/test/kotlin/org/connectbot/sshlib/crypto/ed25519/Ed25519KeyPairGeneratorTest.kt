@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib.crypto.ed25519
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.security.SecureRandom
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

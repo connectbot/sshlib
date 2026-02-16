@@ -22,8 +22,8 @@ import org.connectbot.sshlib.crypto.AesCtrCipher
 import org.connectbot.sshlib.crypto.HmacSha256
 import org.connectbot.sshlib.crypto.TripleDesCbcCipher
 import org.connectbot.sshlib.protocol.SshEnums
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 
 class PacketIOEtmTest {
 
@@ -125,9 +125,9 @@ class PacketIOEtmTest {
             val wireData = writeTransport.getWrittenData()
             val encryptedPayloadSize = wireData.size - 4 - 32
             assertEquals(
-                "Encrypted payload not block-aligned for payloadSize=$payloadSize",
                 0,
-                encryptedPayloadSize % blockSize
+                encryptedPayloadSize % blockSize,
+                "Encrypted payload not block-aligned for payloadSize=$payloadSize"
             )
         }
     }

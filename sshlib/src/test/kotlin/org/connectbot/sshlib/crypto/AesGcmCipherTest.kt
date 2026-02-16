@@ -17,8 +17,8 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.transport.TransportException
-import org.junit.Assert.assertArrayEquals
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
 import kotlin.test.assertFailsWith
 
@@ -166,7 +166,7 @@ class AesGcmCipherTest {
             val result = encryptor.encrypt(packetLength, plaintext)
             val decrypted = decryptor.decrypt(packetLength, result.ciphertext, result.tag)
 
-            assertArrayEquals("Packet $i failed", plaintext, decrypted)
+            assertArrayEquals(plaintext, decrypted, "Packet $i failed")
         }
     }
 
