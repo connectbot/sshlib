@@ -16,8 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.junit.Assert.assertArrayEquals
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 

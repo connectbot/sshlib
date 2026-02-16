@@ -17,7 +17,7 @@
 package org.connectbot.sshlib.crypto.ed25519
 
 import org.connectbot.sshlib.crypto.DerReader
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.math.BigInteger
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.PKCS8EncodedKeySpec

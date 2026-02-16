@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

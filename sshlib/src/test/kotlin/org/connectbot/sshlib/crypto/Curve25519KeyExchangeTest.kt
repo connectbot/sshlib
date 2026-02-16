@@ -17,7 +17,7 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.math.BigInteger
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

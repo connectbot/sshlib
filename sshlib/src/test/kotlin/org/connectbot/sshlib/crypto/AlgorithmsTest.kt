@@ -16,13 +16,13 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
 class AlgorithmsTest {
 
@@ -124,8 +124,8 @@ class AlgorithmsTest {
     fun `CipherEntry defaults contain all entries`() {
         for (entry in CipherEntry.entries) {
             assertTrue(
-                "${entry.sshName} not found in defaultString",
-                CipherEntry.defaultString.contains(entry.sshName)
+                CipherEntry.defaultString.contains(entry.sshName),
+                "${entry.sshName} not found in defaultString"
             )
         }
     }
@@ -189,8 +189,8 @@ class AlgorithmsTest {
     fun `MacEntry defaults contain all entries`() {
         for (entry in MacEntry.entries) {
             assertTrue(
-                "${entry.sshName} not found in defaultString",
-                MacEntry.defaultString.contains(entry.sshName)
+                MacEntry.defaultString.contains(entry.sshName),
+                "${entry.sshName} not found in defaultString"
             )
         }
     }
@@ -266,8 +266,8 @@ class AlgorithmsTest {
     fun `KexEntry defaultString contains all default entries`() {
         for (entry in KexEntry.defaults) {
             assertTrue(
-                "${entry.sshName} not found in defaultString",
-                KexEntry.defaultString.contains(entry.sshName)
+                KexEntry.defaultString.contains(entry.sshName),
+                "${entry.sshName} not found in defaultString"
             )
         }
     }
@@ -306,8 +306,8 @@ class AlgorithmsTest {
     fun `SignatureEntry defaults contain all entries`() {
         for (entry in SignatureEntry.entries) {
             assertTrue(
-                "${entry.sshName} not found in defaultString",
-                SignatureEntry.defaultString.contains(entry.sshName)
+                SignatureEntry.defaultString.contains(entry.sshName),
+                "${entry.sshName} not found in defaultString"
             )
         }
     }

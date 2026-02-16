@@ -17,7 +17,7 @@
 package org.connectbot.sshlib
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.io.File
 import java.util.Base64
 import kotlin.test.assertFalse

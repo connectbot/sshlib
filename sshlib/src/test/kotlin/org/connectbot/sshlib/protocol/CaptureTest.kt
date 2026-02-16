@@ -20,7 +20,7 @@ import io.kaitai.struct.ByteBufferKaitaiStream
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.transport.ByteArrayTransport
 import org.connectbot.sshlib.transport.PacketIO
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.math.BigInteger
 import javax.crypto.Cipher
 import javax.crypto.Mac

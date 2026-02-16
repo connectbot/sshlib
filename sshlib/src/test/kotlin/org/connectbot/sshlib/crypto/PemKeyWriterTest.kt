@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib.crypto
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import kotlin.test.assertEquals

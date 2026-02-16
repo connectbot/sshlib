@@ -22,10 +22,11 @@ import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -98,10 +99,12 @@ class SshSigningTest {
         assertTrue(pubKey.publicKeyBlob.isNotEmpty())
     }
 
-    @Test(expected = SshException::class)
+    @Test
     fun `sign with unknown algorithm throws`() {
         val keyData = readKey("ed25519_unencrypted")
-        SshSigning.sign("unknown-algorithm", keyData, null, "data".toByteArray())
+        assertFailsWith<SshException> {
+            SshSigning.sign("unknown-algorithm", keyData, null, "data".toByteArray())
+        }
     }
 
     private fun loadKeyPair(keyResource: String, passphrase: String? = null): java.security.KeyPair {
@@ -153,11 +156,13 @@ class SshSigningTest {
         assertEquals(fromPrivate, authPubKey)
     }
 
-    @Test(expected = SshException::class)
+    @Test
     fun `encodePublicKey unsupported key type throws`() {
         val kpg = KeyPairGenerator.getInstance("DSA")
         kpg.initialize(2048)
-        SshSigning.encodePublicKey(kpg.generateKeyPair())
+        assertFailsWith<SshException> {
+            SshSigning.encodePublicKey(kpg.generateKeyPair())
+        }
     }
 
     @Test
@@ -232,10 +237,12 @@ class SshSigningTest {
         assertTrue(sigEntry.algorithm.verify(parsedPubKey, parsedSig, data))
     }
 
-    @Test(expected = SshException::class)
+    @Test
     fun `signWithKeyPair unknown algorithm throws`() {
         val keyPair = loadKeyPair("ed25519_unencrypted")
-        SshSigning.signWithKeyPair("unknown-algorithm", keyPair, "data".toByteArray())
+        assertFailsWith<SshException> {
+            SshSigning.signWithKeyPair("unknown-algorithm", keyPair, "data".toByteArray())
+        }
     }
 
     @Test
