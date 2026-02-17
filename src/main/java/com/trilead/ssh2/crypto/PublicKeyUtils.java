@@ -15,6 +15,7 @@ import java.security.PublicKey;
 import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Locale;
 
 /**
  * Utilities for working with SSH public keys.
@@ -58,7 +59,7 @@ public class PublicKeyUtils {
 			keyType = ECDSASHA2Verify.getSshKeyType(ecKey);
 			SSHSignature verifier = ECDSASHA2Verify.getVerifierForKey(ecKey);
 			encoded = verifier.encodePublicKey(ecKey);
-		} else if ("EdDSA".equals(publicKey.getAlgorithm()) || "Ed25519".equals(publicKey.getAlgorithm())) {
+		} else if (isEd25519Key(publicKey)) {
 			Ed25519PublicKey ed25519Key = Ed25519Verify.convertPublicKey(publicKey);
 			keyType = Ed25519Verify.ED25519_ID;
 			encoded = Ed25519Verify.get().encodePublicKey(ed25519Key);
@@ -88,12 +89,27 @@ public class PublicKeyUtils {
 			ECPublicKey ecKey = (ECPublicKey) publicKey;
 			SSHSignature verifier = ECDSASHA2Verify.getVerifierForKey(ecKey);
 			return verifier.encodePublicKey(ecKey);
-		} else if ("EdDSA".equals(publicKey.getAlgorithm()) || "Ed25519".equals(publicKey.getAlgorithm())) {
+		} else if (isEd25519Key(publicKey)) {
 			Ed25519PublicKey ed25519Key = Ed25519Verify.convertPublicKey(publicKey);
 			return Ed25519Verify.get().encodePublicKey(ed25519Key);
 		} else {
 			throw new InvalidKeyException("Unknown key type: " + publicKey.getClass().getName());
 		}
+	}
+
+	/**
+	 * Checks whether the given key is an Ed25519 key. This handles keys from different providers
+	 * (e.g., JDK, Conscrypt/Google Play Services) which may use different algorithm names or
+	 * class names for Ed25519 keys.
+	 */
+	static boolean isEd25519Key(PublicKey publicKey) {
+		String algorithm = publicKey.getAlgorithm();
+		if ("EdDSA".equals(algorithm) || "Ed25519".equals(algorithm) || "1.3.101.112".equals(algorithm)) {
+			return true;
+		}
+
+		String className = publicKey.getClass().getName().toLowerCase(Locale.ROOT);
+		return className.contains("ed25519") || className.contains("eddsa");
 	}
 
 	/**
