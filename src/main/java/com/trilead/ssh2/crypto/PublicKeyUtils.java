@@ -102,7 +102,7 @@ public class PublicKeyUtils {
 	 * (e.g., JDK, Conscrypt/Google Play Services) which may use different algorithm names or
 	 * class names for Ed25519 keys.
 	 */
-	static boolean isEd25519Key(PublicKey publicKey) {
+	public static boolean isEd25519Key(PublicKey publicKey) {
 		String algorithm = publicKey.getAlgorithm();
 		if ("EdDSA".equals(algorithm) || "Ed25519".equals(algorithm) || "1.3.101.112".equals(algorithm)) {
 			return true;
