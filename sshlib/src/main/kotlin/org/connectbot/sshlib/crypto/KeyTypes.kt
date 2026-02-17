@@ -42,7 +42,22 @@ internal fun inferKeyType(publicKey: PublicKey): String = when (publicKey.algori
 
     "RSA" -> "ssh-rsa"
 
-    else -> throw SshException("Unsupported key type: ${publicKey.algorithm}")
+    else -> {
+        if (isEd25519Key(publicKey)) {
+            "ssh-ed25519"
+        } else {
+            throw SshException("Unsupported key type: ${publicKey.algorithm}")
+        }
+    }
+}
+
+internal fun isEd25519Key(publicKey: PublicKey): Boolean {
+    val algorithm = publicKey.algorithm
+    if (algorithm == "EdDSA" || algorithm == "Ed25519" || algorithm == "1.3.101.112") {
+        return true
+    }
+    val className = publicKey.javaClass.name.lowercase()
+    return className.contains("ed25519") || className.contains("eddsa")
 }
 
 internal fun inferKeyType(keyPair: KeyPair): String = inferKeyType(keyPair.public)

@@ -48,19 +48,25 @@ internal class Ed25519KeyFactory : KeyFactorySpi() {
             return key
         }
 
-        if (key is PublicKey && key.format == "X.509") {
-            try {
-                return Ed25519PublicKey(X509EncodedKeySpec(key.encoded))
-            } catch (e: InvalidKeySpecException) {
-                throw InvalidKeyException(e)
+        if (key is PublicKey) {
+            val encoded = key.encoded
+            if (encoded != null) {
+                try {
+                    return Ed25519PublicKey(X509EncodedKeySpec(encoded))
+                } catch (e: InvalidKeySpecException) {
+                    throw InvalidKeyException(e)
+                }
             }
         }
 
-        if (key is PrivateKey && key.format == "PKCS#8") {
-            try {
-                return Ed25519PrivateKey(PKCS8EncodedKeySpec(key.encoded))
-            } catch (e: InvalidKeySpecException) {
-                throw InvalidKeyException(e)
+        if (key is PrivateKey) {
+            val encoded = key.encoded
+            if (encoded != null) {
+                try {
+                    return Ed25519PrivateKey(PKCS8EncodedKeySpec(encoded))
+                } catch (e: InvalidKeySpecException) {
+                    throw InvalidKeyException(e)
+                }
             }
         }
 
