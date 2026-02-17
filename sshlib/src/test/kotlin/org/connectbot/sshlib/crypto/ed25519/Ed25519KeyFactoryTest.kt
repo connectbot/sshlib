@@ -121,11 +121,36 @@ class Ed25519KeyFactoryTest {
     }
 
     @Test
-    fun `translateKey rejects public key with wrong format`() {
+    fun `translateKey converts public key with non-standard format`() {
+        val original = generateKeyPair().public as Ed25519PublicKey
+        val foreignKey = object : PublicKey {
+            override fun getAlgorithm() = "1.3.101.112"
+            override fun getFormat() = "RAW"
+            override fun getEncoded() = original.encoded
+        }
+        val result = factory.translateKey(foreignKey)
+        assertIs<Ed25519PublicKey>(result)
+        assertEquals(original, result)
+    }
+
+    @Test
+    fun `translateKey converts private key with non-standard format`() {
+        val original = Ed25519PrivateKey(testSeed)
+        val foreignKey = object : PrivateKey {
+            override fun getAlgorithm() = "1.3.101.112"
+            override fun getFormat() = "RAW"
+            override fun getEncoded() = original.encoded
+        }
+        val resultKey = assertIs<Ed25519PrivateKey>(factory.translateKey(foreignKey))
+        assertContentEquals(testSeed, resultKey.getSeed())
+    }
+
+    @Test
+    fun `translateKey rejects public key with null encoded`() {
         val foreignKey = object : PublicKey {
             override fun getAlgorithm() = "EdDSA"
             override fun getFormat() = "RAW"
-            override fun getEncoded() = ByteArray(32)
+            override fun getEncoded(): ByteArray? = null
         }
         assertFailsWith<InvalidKeyException> {
             factory.translateKey(foreignKey)
@@ -133,11 +158,11 @@ class Ed25519KeyFactoryTest {
     }
 
     @Test
-    fun `translateKey rejects private key with wrong format`() {
+    fun `translateKey rejects private key with null encoded`() {
         val foreignKey = object : PrivateKey {
             override fun getAlgorithm() = "EdDSA"
             override fun getFormat() = "RAW"
-            override fun getEncoded() = ByteArray(32)
+            override fun getEncoded(): ByteArray? = null
         }
         assertFailsWith<InvalidKeyException> {
             factory.translateKey(foreignKey)
