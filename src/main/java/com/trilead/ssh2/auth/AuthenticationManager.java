@@ -1,6 +1,7 @@
 
 package com.trilead.ssh2.auth;
 
+import com.trilead.ssh2.crypto.PublicKeyUtils;
 import com.trilead.ssh2.crypto.keys.Ed25519PrivateKey;
 import com.trilead.ssh2.signature.RSASHA256Verify;
 import com.trilead.ssh2.signature.RSASHA512Verify;
@@ -316,7 +317,7 @@ public class AuthenticationManager implements MessageHandler
 
 				tm.sendMessage(ua.getPayload());
 			}
-			else if ("EdDSA".equals(publicKey.getAlgorithm()))
+			else if (PublicKeyUtils.isEd25519Key(publicKey))
 			{
 				final String algo = Ed25519Verify.ED25519_ID;
 
