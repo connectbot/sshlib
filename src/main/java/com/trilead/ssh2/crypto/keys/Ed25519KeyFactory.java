@@ -47,21 +47,25 @@ public class Ed25519KeyFactory extends KeyFactorySpi {
 			return key;
 		}
 
-		if (key instanceof PublicKey && key.getFormat().equals("X.509")) {
+		if (key instanceof PublicKey) {
 			byte[] encoded = key.getEncoded();
-			try {
-				return new Ed25519PublicKey(new X509EncodedKeySpec(encoded));
-			} catch (InvalidKeySpecException e) {
-				throw new InvalidKeyException(e);
+			if (encoded != null) {
+				try {
+					return new Ed25519PublicKey(new X509EncodedKeySpec(encoded));
+				} catch (InvalidKeySpecException e) {
+					throw new InvalidKeyException(e);
+				}
 			}
 		}
 
-		if (key instanceof PrivateKey && key.getFormat().equals("PKCS#8")) {
+		if (key instanceof PrivateKey) {
 			byte[] encoded = key.getEncoded();
-			try {
-				return new Ed25519PrivateKey(new PKCS8EncodedKeySpec(encoded));
-			} catch (InvalidKeySpecException e) {
-				throw new InvalidKeyException(e);
+			if (encoded != null) {
+				try {
+					return new Ed25519PrivateKey(new PKCS8EncodedKeySpec(encoded));
+				} catch (InvalidKeySpecException e) {
+					throw new InvalidKeyException(e);
+				}
 			}
 		}
 

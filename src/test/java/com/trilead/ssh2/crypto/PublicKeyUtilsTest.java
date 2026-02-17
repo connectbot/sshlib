@@ -10,6 +10,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -240,6 +241,76 @@ class PublicKeyUtilsTest {
 		assertNotNull(result);
 		assertTrue(result.startsWith("ssh-ed25519 "));
 		assertTrue(result.endsWith(" native-eddsa-key"));
+	}
+
+	@Test
+	void testExtractPublicKeyBlobWithOidAlgorithmName() throws Exception {
+		String keyPath = TEST_RESOURCES + "openssh_ed25519";
+		KeyPair keyPair = loadKeyPair(keyPath);
+		PublicKey originalKey = keyPair.getPublic();
+
+		PublicKey wrappedKey = new PublicKey() {
+			@Override
+			public String getAlgorithm() {
+				return "1.3.101.112";
+			}
+
+			@Override
+			public String getFormat() {
+				return originalKey.getFormat();
+			}
+
+			@Override
+			public byte[] getEncoded() {
+				return originalKey.getEncoded();
+			}
+		};
+
+		byte[] blob = assertDoesNotThrow(() -> PublicKeyUtils.extractPublicKeyBlob(wrappedKey));
+		assertNotNull(blob);
+		assertTrue(blob.length > 0);
+
+		byte[] expectedBlob = PublicKeyUtils.extractPublicKeyBlob(originalKey);
+		assertEquals(expectedBlob.length, blob.length);
+		for (int i = 0; i < expectedBlob.length; i++) {
+			assertEquals(expectedBlob[i], blob[i]);
+		}
+	}
+
+	@Test
+	void testExtractPublicKeyBlobWithEdDsaClassName() throws Exception {
+		String keyPath = TEST_RESOURCES + "openssh_ed25519";
+		KeyPair keyPair = loadKeyPair(keyPath);
+		PublicKey originalKey = keyPair.getPublic();
+
+		PublicKey wrappedKey = new OpenSslEdDsaPublicKeyStub(originalKey);
+
+		byte[] blob = assertDoesNotThrow(() -> PublicKeyUtils.extractPublicKeyBlob(wrappedKey));
+		assertNotNull(blob);
+		assertTrue(blob.length > 0);
+	}
+
+	private static class OpenSslEdDsaPublicKeyStub implements PublicKey {
+		private final PublicKey delegate;
+
+		OpenSslEdDsaPublicKeyStub(PublicKey delegate) {
+			this.delegate = delegate;
+		}
+
+		@Override
+		public String getAlgorithm() {
+			return "UnknownAlgorithm";
+		}
+
+		@Override
+		public String getFormat() {
+			return delegate.getFormat();
+		}
+
+		@Override
+		public byte[] getEncoded() {
+			return delegate.getEncoded();
+		}
 	}
 
 	private KeyPair loadKeyPair(String path) throws Exception {
