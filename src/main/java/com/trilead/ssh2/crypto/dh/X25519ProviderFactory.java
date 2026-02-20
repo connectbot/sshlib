@@ -46,6 +46,7 @@ public class X25519ProviderFactory {
 	private static boolean isPlatformNativeAvailable() {
 		try {
 			KeyPairGenerator.getInstance("X25519");
+			Class.forName("java.security.spec.XECPrivateKeySpec");
 			return true;
 		} catch (Exception e) {
 			return false;
