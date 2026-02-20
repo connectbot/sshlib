@@ -40,6 +40,7 @@ internal object X25519ProviderFactory {
 
     private fun isPlatformNativeAvailable(): Boolean = try {
         KeyPairGenerator.getInstance("X25519")
+        Class.forName("java.security.spec.XECPrivateKeySpec")
         true
     } catch (_: Exception) {
         false
