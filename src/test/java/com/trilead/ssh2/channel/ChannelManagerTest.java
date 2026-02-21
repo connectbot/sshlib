@@ -1,7 +1,10 @@
 package com.trilead.ssh2.channel;
 
 import com.trilead.ssh2.ChannelCondition;
+import com.trilead.ssh2.ExtendedServerHostKeyVerifier;
+import com.trilead.ssh2.packets.PacketGlobalHostkeys;
 import com.trilead.ssh2.packets.Packets;
+import com.trilead.ssh2.packets.TypesWriter;
 import com.trilead.ssh2.transport.ITransportConnection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test coverage for ChannelManager.
@@ -712,6 +717,33 @@ public class ChannelManagerTest {
 				e.getMessage().contains("cookie") ||
 				e.getMessage().contains("open"));
 		}
+	}
+
+	/**
+	 * Regression test: if getKnownKeyAlgorithmsForHost returns a list with null entries,
+	 * processHostkeysAdvertisement must not NPE when calling removeServerHostKey.
+	 * This reproduces the crash reported via Android Play Console at source line 1905.
+	 */
+	@Test
+	public void testHostkeysAdvertisementWithNullKnownAlgorithmDoesNotThrow() throws IOException {
+		ExtendedServerHostKeyVerifier extVerifier = mock(ExtendedServerHostKeyVerifier.class);
+		when(mockTransportConnection.getServerHostKeyVerifier()).thenReturn(extVerifier);
+		when(mockTransportConnection.getHostname()).thenReturn("example.com");
+		when(mockTransportConnection.getPort()).thenReturn(22);
+		// Return a list that contains a null entry alongside a real algorithm
+		when(extVerifier.getKnownKeyAlgorithmsForHost("example.com", 22))
+				.thenReturn(Arrays.asList("ssh-rsa", null));
+		// Build a hostkeys-00@openssh.com global request with no advertised keys
+		TypesWriter tw = new TypesWriter();
+		tw.writeByte(Packets.SSH_MSG_GLOBAL_REQUEST);
+		tw.writeString(PacketGlobalHostkeys.HOSTKEYS_VENDOR);
+		tw.writeBoolean(false);
+		byte[] msg = tw.getBytes();
+
+		channelManager.msgGlobalRequest(msg, msg.length);
+
+		// The null entry must not be passed to removeServerHostKey
+		verify(extVerifier, never()).removeServerHostKey(any(), any(int.class), (String) org.mockito.ArgumentMatchers.isNull(), any());
 	}
 
 	@Test
