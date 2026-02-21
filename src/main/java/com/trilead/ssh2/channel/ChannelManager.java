@@ -1901,6 +1901,8 @@ public class ChannelManager implements MessageHandler
 
 		if (knownAlgos != null) {
 			for (String knownAlgo : knownAlgos) {
+				if (knownAlgo == null)
+					continue;
 				if (!advertisedAlgoSet.contains(knownAlgo)) {
 					extVerifier.removeServerHostKey(hostname, port, knownAlgo, null);
 					if (log.isEnabled())
