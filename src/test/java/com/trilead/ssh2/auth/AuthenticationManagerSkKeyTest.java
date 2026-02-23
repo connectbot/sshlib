@@ -53,11 +53,17 @@ public class AuthenticationManagerSkKeyTest {
 	 */
 	static class TestSkPublicKey implements SkPublicKey {
 		private final String keyType;
+		private final String algorithm;
 		private final String application;
 		private final byte[] keyData;
 
 		TestSkPublicKey(String keyType, String application, byte[] keyData) {
+			this(keyType, keyType, application, keyData);
+		}
+
+		TestSkPublicKey(String keyType, String algorithm, String application, byte[] keyData) {
 			this.keyType = keyType;
+			this.algorithm = algorithm;
 			this.application = application;
 			this.keyData = keyData.clone();
 		}
@@ -79,7 +85,7 @@ public class AuthenticationManagerSkKeyTest {
 
 		@Override
 		public String getAlgorithm() {
-			return keyType;
+			return algorithm;
 		}
 
 		@Override
@@ -236,6 +242,45 @@ public class AuthenticationManagerSkKeyTest {
 		// At least one message should have been sent
 		assertTrue(messageCaptor.getAllValues().size() > 0,
 			"Authentication should send at least one message");
+	}
+
+	/**
+	 * Regression test: SK Ed25519 key with "Ed25519" algorithm must use the SK
+	 * code path, not the generic Ed25519 path. The real SkEd25519PublicKey returns
+	 * "Ed25519" from getAlgorithm(), which matches isEd25519Key(). Without the
+	 * fix, this causes Ed25519Verify.encodePublicKey() to attempt DER decoding
+	 * and fail with InvalidKeySpecException.
+	 */
+	@Test
+	public void authenticateSkEd25519Key_WithEd25519Algorithm_UsesSkPath() throws Exception {
+		TestSkPublicKey skKey = new TestSkPublicKey(SK_ED25519_KEY_TYPE, "Ed25519", DEFAULT_APPLICATION, TEST_KEY_DATA);
+		TestSignatureProxy signatureProxy = new TestSignatureProxy(skKey, TEST_SIGNATURE);
+
+		setupMocksForAuthentication();
+		setupMockForAuthSuccess();
+
+		authManager.authenticatePublicKey(TEST_USER, signatureProxy);
+
+		assertEquals(SignatureProxy.SHA512, signatureProxy.getLastHashAlgorithm(),
+			"SK Ed25519 key with Ed25519 algorithm should use SK path with SHA512");
+	}
+
+	/**
+	 * Regression test: SK ECDSA key with "EC" algorithm must use the SK
+	 * code path, not the generic ECDSA path.
+	 */
+	@Test
+	public void authenticateSkEcdsaKey_WithEcAlgorithm_UsesSkPath() throws Exception {
+		TestSkPublicKey skKey = new TestSkPublicKey(SK_ECDSA_KEY_TYPE, "EC", DEFAULT_APPLICATION, TEST_KEY_DATA);
+		TestSignatureProxy signatureProxy = new TestSignatureProxy(skKey, TEST_SIGNATURE);
+
+		setupMocksForAuthentication();
+		setupMockForAuthSuccess();
+
+		authManager.authenticatePublicKey(TEST_USER, signatureProxy);
+
+		assertEquals(SignatureProxy.SHA256, signatureProxy.getLastHashAlgorithm(),
+			"SK ECDSA key with EC algorithm should use SK path with SHA256");
 	}
 
 	private void setupMocksForAuthentication() throws IOException {
