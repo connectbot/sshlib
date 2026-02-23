@@ -317,34 +317,11 @@ public class AuthenticationManager implements MessageHandler
 
 				tm.sendMessage(ua.getPayload());
 			}
-			else if (PublicKeyUtils.isEd25519Key(publicKey))
-			{
-				final String algo = Ed25519Verify.ED25519_ID;
-
-				byte[] pk_enc = Ed25519Verify.get().encodePublicKey(publicKey);
-
-				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
-
-				byte[] ed_sig_enc;
-				if (signatureProxy != null)
-				{
-					ed_sig_enc = signatureProxy.sign(msg, SignatureProxy.SHA512);
-				}
-				else
-				{
-					Ed25519PrivateKey pk = Ed25519Verify.convertPrivateKey(privateKey);
-					ed_sig_enc = Ed25519Verify.get().generateSignature(msg, pk, rnd);
-				}
-
-				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
-						algo, pk_enc, ed_sig_enc);
-
-				tm.sendMessage(ua.getPayload());
-			}
 			else if (publicKey instanceof SkPublicKey)
 			{
 				// FIDO2 Security Key (SK) authentication
-				// SK keys require external signing via SignatureProxy
+				// This check must come before the Ed25519 check because
+				// SK Ed25519 keys match isEd25519Key() but require SK-specific encoding.
 				if (signatureProxy == null)
 				{
 					throw new IOException("SK key authentication requires a SignatureProxy for signing.");
@@ -377,6 +354,30 @@ public class AuthenticationManager implements MessageHandler
 
 				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
 						algo, pk_enc, sk_sig_enc);
+
+				tm.sendMessage(ua.getPayload());
+			}
+			else if (PublicKeyUtils.isEd25519Key(publicKey))
+			{
+				final String algo = Ed25519Verify.ED25519_ID;
+
+				byte[] pk_enc = Ed25519Verify.get().encodePublicKey(publicKey);
+
+				byte[] msg = this.generatePublicKeyUserAuthenticationRequest(user, algo, pk_enc);
+
+				byte[] ed_sig_enc;
+				if (signatureProxy != null)
+				{
+					ed_sig_enc = signatureProxy.sign(msg, SignatureProxy.SHA512);
+				}
+				else
+				{
+					Ed25519PrivateKey pk = Ed25519Verify.convertPrivateKey(privateKey);
+					ed_sig_enc = Ed25519Verify.get().generateSignature(msg, pk, rnd);
+				}
+
+				PacketUserauthRequestPublicKey ua = new PacketUserauthRequestPublicKey("ssh-connection", user,
+						algo, pk_enc, ed_sig_enc);
 
 				tm.sendMessage(ua.getPayload());
 			}
