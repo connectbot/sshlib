@@ -165,6 +165,23 @@ public class OpenSSHKeyDecoderTest {
 	}
 
 	@Test
+	public void testDecodeNonAeadEncryptedWithTrailingBytes() throws IOException {
+		// Verify that trailing bytes after the private section blob do not
+		// get appended to the ciphertext for non-AEAD ciphers (aes256-ctr).
+		// This is the scenario the reviewer flagged: without the ciphername
+		// check, extra bytes would corrupt decryption for non-AEAD keys.
+		byte[] data = getKeyData("/key-encoder-decoder-tests/openssh_ed25519_encrypted");
+		byte[] dataWithTrailing = new byte[data.length + 16];
+		System.arraycopy(data, 0, dataWithTrailing, 0, data.length);
+
+		KeyPair kp = OpenSSHKeyDecoder.decode(dataWithTrailing, "testpassword");
+
+		assertNotNull(kp);
+		assertTrue(kp.getPrivate() instanceof Ed25519PrivateKey);
+		assertTrue(kp.getPublic() instanceof Ed25519PublicKey);
+	}
+
+	@Test
 	public void testIsEncryptedRSA() throws IOException {
 		byte[] dataUnencrypted = getKeyData("/key-encoder-decoder-tests/openssh_rsa_2048");
 		assertFalse(OpenSSHKeyDecoder.isEncrypted(dataUnencrypted));
