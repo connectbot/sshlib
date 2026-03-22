@@ -2,9 +2,14 @@ package com.trilead.ssh2.crypto;
 
 import java.io.IOException;
 import java.security.DigestException;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -19,11 +24,19 @@ import com.trilead.ssh2.crypto.cipher.DESede;
  * @author Kenny Root
  */
 class CommonDecoder {
+	private static final int GCM_TAG_SIZE = 16;
+	private static final int GCM_NONCE_SIZE = 12;
+
 	static byte[] decryptData(byte[] data, byte[] pw, byte[] salt, int rounds, String algo) throws IOException {
+		String algoLower = algo.toLowerCase(Locale.US);
+
+		if (algoLower.equals("aes128-gcm@openssh.com") || algoLower.equals("aes256-gcm@openssh.com")) {
+			return decryptDataGcm(data, pw, salt, rounds, algoLower);
+		}
+
 		BlockCipher bc;
 		int keySize;
 
-		String algoLower = algo.toLowerCase(Locale.US);
 		if (algoLower.equals("des-ede3-cbc")) {
 			bc = new DESede.CBC();
 			keySize = 24;
@@ -85,6 +98,34 @@ class CommonDecoder {
 		} else {
 			/* New style is to check the padding after reading the comment. */
 			return dz;
+		}
+	}
+
+	private static byte[] decryptDataGcm(byte[] data, byte[] pw, byte[] salt, int rounds, String algo)
+			throws IOException {
+		int keySize = algo.equals("aes256-gcm@openssh.com") ? 32 : 16;
+
+		if (rounds <= 0) {
+			throw new IOException("AES-GCM is only supported for OpenSSH format keys (bcrypt KDF)");
+		}
+
+		byte[] key = new byte[keySize];
+		byte[] iv = new byte[GCM_NONCE_SIZE];
+		byte[] keyAndIV = new byte[key.length + iv.length];
+
+		new BCrypt().pbkdf(pw, salt, rounds, keyAndIV);
+
+		System.arraycopy(keyAndIV, 0, key, 0, key.length);
+		System.arraycopy(keyAndIV, key.length, iv, 0, iv.length);
+
+		try {
+			Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+			SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+			GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_SIZE * 8, iv);
+			cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
+			return cipher.doFinal(data);
+		} catch (GeneralSecurityException e) {
+			throw new IOException("GCM decryption failed", e);
 		}
 	}
 
