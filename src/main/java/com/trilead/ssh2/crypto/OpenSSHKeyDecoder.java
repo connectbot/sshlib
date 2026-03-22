@@ -118,7 +118,7 @@ public class OpenSSHKeyDecoder {
 		// For AEAD ciphers (e.g., aes256-gcm@openssh.com), the authentication
 		// tag is stored after the private section blob in the key file.
 		// Read it and append to dataBytes so the cipher can verify it.
-		if (tr.remain() > 0) {
+		if (isAeadCipher(ciphername) && tr.remain() > 0) {
 			byte[] authTag = tr.readBytes(tr.remain());
 			byte[] combined = new byte[dataBytes.length + authTag.length];
 			System.arraycopy(dataBytes, 0, combined, 0, dataBytes.length);
@@ -242,6 +242,13 @@ public class OpenSSHKeyDecoder {
 		// decryption.
 
 		return keyPair;
+	}
+
+	private static boolean isAeadCipher(String ciphername) {
+		String lower = ciphername.toLowerCase(java.util.Locale.US);
+		return lower.equals("aes128-gcm@openssh.com")
+				|| lower.equals("aes256-gcm@openssh.com")
+				|| lower.equals("chacha20-poly1305@openssh.com");
 	}
 
 	/**
