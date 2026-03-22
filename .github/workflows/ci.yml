@@ -15,6 +15,7 @@ jobs:
   build:
     name: Build and test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         java: [17, 21]

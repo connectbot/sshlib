@@ -18,6 +18,7 @@ package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.Socks5Authenticator
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Timeout
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
@@ -44,8 +44,11 @@ import java.net.ServerSocket
 import java.net.Socket
 
 @Testcontainers
-@Timeout(30)
 class PortForwardingIntegrationTest {
+
+    private fun <T> runTest(block: suspend () -> T): T = runBlocking {
+        withTimeout(30_000) { block() }
+    }
 
     companion object {
         private val logger = LoggerFactory.getLogger(PortForwardingIntegrationTest::class.java)
@@ -71,7 +74,7 @@ class PortForwardingIntegrationTest {
         override suspend fun verify(key: PublicKey): Boolean = true
     }
 
-    private fun createAuthenticatedClient(): SshClient {
+    private suspend fun createAuthenticatedClient(): SshClient {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
@@ -81,15 +84,13 @@ class PortForwardingIntegrationTest {
             this.hostKeyVerifier = acceptAllVerifier
         }
         val client = SshClient(config)
-        runBlocking {
-            assertTrue(client.connect(), "Should connect")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
-        }
+        assertTrue(client.connect(), "Should connect")
+        assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
         return client
     }
 
     @Test
-    fun `local port forwarding should forward TCP data`() = runBlocking {
+    fun `local port forwarding should forward TCP data`() = runTest {
         val client = createAuthenticatedClient()
 
         try {
@@ -121,7 +122,7 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
-    fun `local port forward convenience method binds to localhost`() = runBlocking {
+    fun `local port forward convenience method binds to localhost`() = runTest {
         val client = createAuthenticatedClient()
 
         try {
@@ -136,7 +137,7 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
-    fun `remote port forwarding should forward to local service`() = runBlocking {
+    fun `remote port forwarding should forward to local service`() = runTest {
         val client = createAuthenticatedClient()
 
         // Start a local TCP server that sends a greeting and reads back
@@ -188,7 +189,7 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
-    fun `dynamic port forwarding should handle SOCKS5 connect`() = runBlocking {
+    fun `dynamic port forwarding should handle SOCKS5 connect`() = runTest {
         val client = createAuthenticatedClient()
 
         try {
@@ -247,7 +248,7 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
-    fun `jump host should connect second SSH client through first`() = runBlocking {
+    fun `jump host should connect second SSH client through first`() = runTest {
         val jumpClient = createAuthenticatedClient()
 
         try {
@@ -294,7 +295,7 @@ class PortForwardingIntegrationTest {
     }
 
     @Test
-    fun `dynamic port forwarding with authenticator`() = runBlocking {
+    fun `dynamic port forwarding with authenticator`() = runTest {
         val client = createAuthenticatedClient()
 
         try {
