@@ -139,6 +139,32 @@ public class OpenSSHKeyDecoderTest {
 	}
 
 	@Test
+	public void testDecodeEd25519Aes256GcmEncrypted() throws IOException {
+		byte[] data = getKeyData("/key-encoder-decoder-tests/openssh_ed25519_aes256gcm_encrypted");
+		KeyPair kp = OpenSSHKeyDecoder.decode(data, "testpassword");
+
+		assertNotNull(kp);
+		assertTrue(kp.getPrivate() instanceof Ed25519PrivateKey);
+		assertTrue(kp.getPublic() instanceof Ed25519PublicKey);
+	}
+
+	@Test
+	public void testDecodeEd25519Aes256GcmEncryptedWrongPassword() throws IOException {
+		byte[] data = getKeyData("/key-encoder-decoder-tests/openssh_ed25519_aes256gcm_encrypted");
+		assertThrows(IOException.class, () -> OpenSSHKeyDecoder.decode(data, "wrongpassword"));
+	}
+
+	@Test
+	public void testDecodeEd25519Aes128GcmEncrypted() throws IOException {
+		byte[] data = getKeyData("/key-encoder-decoder-tests/openssh_ed25519_aes128gcm_encrypted");
+		KeyPair kp = OpenSSHKeyDecoder.decode(data, "testpassword");
+
+		assertNotNull(kp);
+		assertTrue(kp.getPrivate() instanceof Ed25519PrivateKey);
+		assertTrue(kp.getPublic() instanceof Ed25519PublicKey);
+	}
+
+	@Test
 	public void testIsEncryptedRSA() throws IOException {
 		byte[] dataUnencrypted = getKeyData("/key-encoder-decoder-tests/openssh_rsa_2048");
 		assertFalse(OpenSSHKeyDecoder.isEncrypted(dataUnencrypted));

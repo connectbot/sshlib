@@ -115,6 +115,17 @@ public class OpenSSHKeyDecoder {
 
 		byte[] dataBytes = tr.readByteString();
 
+		// For AEAD ciphers (e.g., aes256-gcm@openssh.com), the authentication
+		// tag is stored after the private section blob in the key file.
+		// Read it and append to dataBytes so the cipher can verify it.
+		if (tr.remain() > 0) {
+			byte[] authTag = tr.readBytes(tr.remain());
+			byte[] combined = new byte[dataBytes.length + authTag.length];
+			System.arraycopy(dataBytes, 0, combined, 0, dataBytes.length);
+			System.arraycopy(authTag, 0, combined, dataBytes.length, authTag.length);
+			dataBytes = combined;
+		}
+
 		if ("bcrypt".equals(kdfname)) {
 			if (password == null) {
 				throw new IOException("OpenSSH key is encrypted");
