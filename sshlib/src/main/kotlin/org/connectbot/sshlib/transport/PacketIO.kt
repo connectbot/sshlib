@@ -396,6 +396,7 @@ internal class PacketIO(private val transport: Transport) {
     }
 
     private suspend fun writeRawPacket(messageType: Int, payload: ByteArray = byteArrayOf()) {
+        logger.debug("Writing packet type $messageType (seq=$sendSequenceNumber)")
         val currentAead = sendAead
         if (currentAead != null) {
             writeAeadPacket(messageType, payload, currentAead)
