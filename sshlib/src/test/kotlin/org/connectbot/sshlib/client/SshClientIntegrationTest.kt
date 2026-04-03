@@ -59,14 +59,27 @@ class SshClientIntegrationTest {
         private const val USERNAME = "testuser"
         private const val PASSWORD = "testpass"
 
-        /**
-         * Create OpenSSH server container.
-         */
+        // The OpenSSH version to test against; matches the default ARG in the Dockerfile.
+        // To test a different version, change this constant and the cached image will be rebuilt.
+        // To enable KEX/PK debug logging, set DEBUG_CFLAGS to e.g.:
+        //   "-DDEBUG_KEX -DDEBUG_KEXECDH -DDEBUG_KEXDH -DDEBUG_PK"
+        private const val OPENSSH_VERSION = "9.9p2"
+        private const val DEBUG_CFLAGS = ""
+
+        private fun opensshImageName(): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest("$OPENSSH_VERSION:$DEBUG_CFLAGS".toByteArray())
+            val hash = digest.take(4).joinToString("") { "%02x".format(it) }
+            return "openssh-server-test-$hash"
+        }
+
         @Container
         @JvmStatic
         val opensshContainer: GenericContainer<*> = GenericContainer(
-            ImageFromDockerfile("openssh-server-test", false)
+            ImageFromDockerfile(opensshImageName(), false)
                 .withFileFromClasspath(".", "openssh-server")
+                .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
+                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS)
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)

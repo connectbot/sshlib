@@ -1,5 +1,11 @@
 FROM alpine:edge
 
+# renovate: datasource=github-tags depName=openssh/openssh-portable extractVersion=^V_(?<major>\d+)_(?<minor>\d+)_P(?<patch>\d+)$ versioning=regex:^(?<major>\d+)\.(?<minor>\d+)p(?<patch>\d+)$
+ARG OPENSSH_VERSION=9.9p2
+# To enable KEX/PK debug logging, pass e.g.:
+#   --build-arg DEBUG_CFLAGS="-DDEBUG_KEX -DDEBUG_KEXECDH -DDEBUG_KEXDH -DDEBUG_PK"
+ARG DEBUG_CFLAGS=""
+
 ENV USERNAME testuser
 ENV PASSWORD testpass
 
@@ -17,13 +23,13 @@ RUN apk update && apk add --no-cache \
     linux-headers && \
     \
     # Download and extract OpenSSH
-    SSH_VERSION="9.9p2" && \
+    SSH_VERSION="${OPENSSH_VERSION}" && \
     wget "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-${SSH_VERSION}.tar.gz" -O "/tmp/openssh-${SSH_VERSION}.tar.gz" && \
     tar -xzf "/tmp/openssh-${SSH_VERSION}.tar.gz" -C /tmp && \
     cd "/tmp/openssh-${SSH_VERSION}" && \
     \
-    # Configure with debug flags and install
-    CFLAGS="-DDEBUG_KEX -DDEBUG_KEXECDH -DDEBUG_KEXDH -DDEBUG_PK" ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/empty --with-pam && \
+    # Configure with optional debug flags and install
+    CFLAGS="${DEBUG_CFLAGS}" ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/empty --with-pam && \
     make && \
     make install && \
     \
