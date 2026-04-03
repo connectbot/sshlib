@@ -883,4 +883,110 @@ class SshClientIntegrationTest {
             client.disconnect()
         }
     }
+
+    @Test
+    fun `should open shell after failed then successful auth handler authenticate`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = SshClient(SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            // Restricted config to remove possible culprits
+            this.encryptionAlgorithms = "aes128-ctr"
+            this.macAlgorithms = "hmac-sha2-256"
+            this.kexAlgorithms = "ecdh-sha2-nistp256"
+            this.enableCompression = false
+        })
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val failingHandler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                ): List<String> = prompts.map { "wrongpassword" }
+                override suspend fun onPasswordNeeded(): String? = null
+            }
+
+            val firstResult = withTimeout(10_000) { client.authenticate(USERNAME, failingHandler) }
+            assertFalse(firstResult, "First authenticate should fail with wrong password")
+            assertFalse(client.isAuthenticated, "Client should not be authenticated after first failure")
+
+            val succeedingHandler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray? = null
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                ): List<String> = prompts.map { PASSWORD }
+                override suspend fun onPasswordNeeded(): String = PASSWORD
+            }
+
+            val secondResult = withTimeout(10_000) { client.authenticate(USERNAME, succeedingHandler) }
+            assertTrue(secondResult, "Second authenticate should succeed with correct password")
+            assertTrue(client.isAuthenticated, "Client should be authenticated after second attempt")
+
+            val session = withTimeout(10_000) { client.openSession() }
+            assertNotNull(session, "Should open session after retry authentication")
+
+            val ptyGranted = withTimeout(10_000) { session!!.requestPty() }
+            assertTrue(ptyGranted, "Should grant PTY after retry authentication")
+
+            val shellGranted = withTimeout(10_000) { session!!.requestShell() }
+            assertTrue(shellGranted, "Should spawn shell after retry authentication")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should open shell after failed then successful authenticatePassword`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = SshClient(SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            // Restricted config to remove possible culprits
+            this.encryptionAlgorithms = "aes128-ctr"
+            this.macAlgorithms = "hmac-sha2-256"
+            this.kexAlgorithms = "ecdh-sha2-nistp256"
+            this.enableCompression = false
+        })
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+
+            val firstResult = withTimeout(10_000) { client.authenticatePassword(USERNAME, "wrongpassword") }
+            assertFalse(firstResult, "First authenticate should fail with wrong password")
+            assertFalse(client.isAuthenticated, "Client should not be authenticated after first failure")
+
+            val secondResult = withTimeout(10_000) { client.authenticatePassword(USERNAME, PASSWORD) }
+            assertTrue(secondResult, "Second authenticate should succeed with correct password")
+            assertTrue(client.isAuthenticated, "Client should be authenticated after second attempt")
+
+            val session = withTimeout(10_000) { client.openSession() }
+            assertNotNull(session, "Should open session after retry authentication")
+
+            val ptyGranted = withTimeout(10_000) { session!!.requestPty() }
+            assertTrue(ptyGranted, "Should grant PTY after retry authentication")
+
+            val shellGranted = withTimeout(10_000) { session!!.requestShell() }
+            assertTrue(shellGranted, "Should spawn shell after retry authentication")
+
+            session!!.close()
+        } finally {
+            client.disconnect()
+        }
+    }
 }

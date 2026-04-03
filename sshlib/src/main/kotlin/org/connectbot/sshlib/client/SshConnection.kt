@@ -2084,6 +2084,19 @@ class SshConnection(
                 for (ch in forwardingChannels.values) {
                     ch.onClose()
                 }
+                val loopError = loopException ?: Exception("Packet loop terminated")
+                pendingAuth?.completeExceptionally(loopError)
+                pendingAuth = null
+                pendingChannelOpen?.completeExceptionally(loopError)
+                pendingChannelOpen = null
+                pendingChannelRequest?.completeExceptionally(loopError)
+                pendingChannelRequest = null
+                pendingGlobalRequest?.completeExceptionally(loopError)
+                pendingGlobalRequest = null
+                for ((_, pending) in pendingChannelOpens) {
+                    pending.deferred.completeExceptionally(loopError)
+                }
+                pendingChannelOpens.clear()
                 if (loopException != null) {
                     _disconnectedFlow.tryEmit(loopException)
                 }

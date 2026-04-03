@@ -49,7 +49,8 @@ RUN mkdir -p /run/openssh && \
     echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "UsePAM yes" >> /etc/ssh/sshd_config && \
     echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config && \
-    echo "GatewayPorts yes" >> /etc/ssh/sshd_config
+    echo "GatewayPorts yes" >> /etc/ssh/sshd_config && \
+    echo "MaxAuthTries 20" >> /etc/ssh/sshd_config
 
 # Set up public key authentication for test user
 COPY test_ed25519.pub /tmp/test_ed25519.pub
@@ -65,7 +66,7 @@ RUN mkdir -p /etc/pam.d && \
     echo "auth       required     pam_unix.so" > /etc/pam.d/sshd && \
     echo "account    required     pam_unix.so" >> /etc/pam.d/sshd && \
     echo "password   required     pam_unix.so" >> /etc/pam.d/sshd && \
-    echo "session    required     pam_unix.so" >> /etc/pam.d/sshd
+    echo "session    optional     pam_unix.so" >> /etc/pam.d/sshd
 
 EXPOSE 22
 
