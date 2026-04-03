@@ -260,6 +260,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public boolean isOpen();
     method public suspend java.lang.Object? read(kotlin.coroutines.Continuation<? super byte[]?>);
     method public suspend java.lang.Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<java.lang.Integer,byte[]>?>);
+    method public suspend java.lang.Object? requestExec(java.lang.String command, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestPty(optional java.lang.String terminalType, optional int widthChars, optional int heightRows, optional int widthPixels, optional int heightPixels, optional byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
@@ -343,6 +344,7 @@ package org.connectbot.sshlib.client {
     method @InaccessibleFromKotlin public boolean isOpen();
     method public suspend java.lang.Object? read(kotlin.coroutines.Continuation<? super byte[]?>);
     method public suspend java.lang.Object? readExtended(kotlin.coroutines.Continuation<? super kotlin.Pair<java.lang.Integer,byte[]>?>);
+    method public suspend java.lang.Object? requestExec(java.lang.String command, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestPty(java.lang.String terminalType, int widthChars, int heightRows, int widthPixels, int heightPixels, byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
