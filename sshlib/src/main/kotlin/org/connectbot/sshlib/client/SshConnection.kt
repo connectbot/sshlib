@@ -2031,8 +2031,9 @@ class SshConnection(
     private suspend fun checkAllChannelsClosed() {
         val allSessionsClosed = channels.values.all { !it.isOpen }
         val allForwardingClosed = forwardingChannels.values.all { !it.isOpen }
-        logger.debug("checkAllChannelsClosed: sessions=${channels.size} allSessionsClosed=$allSessionsClosed, forwarding=${forwardingChannels.size} allForwardingClosed=$allForwardingClosed")
-        if (allSessionsClosed && allForwardingClosed && channels.isNotEmpty()) {
+        val allAgentClosed = agentChannels.values.all { !it.isOpen }
+        logger.debug("checkAllChannelsClosed: sessions=${channels.size} allSessionsClosed=$allSessionsClosed, forwarding=${forwardingChannels.size} allForwardingClosed=$allForwardingClosed, agent=${agentChannels.size} allAgentClosed=$allAgentClosed")
+        if (allSessionsClosed && allForwardingClosed && allAgentClosed && channels.isNotEmpty()) {
             logger.info("All channels closed, sending disconnect")
             sendDisconnect()
         }
