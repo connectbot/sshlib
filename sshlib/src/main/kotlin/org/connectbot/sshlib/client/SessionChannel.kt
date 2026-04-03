@@ -16,9 +16,10 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestPtyReq
@@ -28,6 +29,7 @@ import org.slf4j.LoggerFactory
 
 class SessionChannel internal constructor(
     private val connection: SshConnection,
+    private val connectionScope: CoroutineScope,
     override val localChannelNumber: Int,
     private var _remoteChannelNumber: Int,
     private val maxPacketSize: Int,
@@ -52,19 +54,17 @@ class SessionChannel internal constructor(
     override val stdout: ReceiveChannel<ByteArray> get() = _stdout
     override val stderr: ReceiveChannel<ByteArray> get() = _stderr
 
-    internal fun onData(data: ByteArray) {
+    internal suspend fun onData(data: ByteArray) {
         _stdout.trySend(data)
         localWindowSize -= data.size
         if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
             val adjust = initialWindowSize - localWindowSize.toInt()
             localWindowSize += adjust
-            runBlocking {
-                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
-            }
+            connection.sendWindowAdjust(_remoteChannelNumber, adjust)
         }
     }
 
-    internal fun onExtendedData(dataType: Int, data: ByteArray) {
+    internal suspend fun onExtendedData(dataType: Int, data: ByteArray) {
         _extendedData.trySend(dataType to data)
         if (dataType == 1) {
             _stderr.trySend(data)
@@ -73,9 +73,7 @@ class SessionChannel internal constructor(
         if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
             val adjust = initialWindowSize - localWindowSize.toInt()
             localWindowSize += adjust
-            runBlocking {
-                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
-            }
+            connection.sendWindowAdjust(_remoteChannelNumber, adjust)
         }
     }
 
@@ -212,12 +210,16 @@ class SessionChannel internal constructor(
 
         logger.debug("Closing channel $localChannelNumber")
         closeSent = true
-        runBlocking {
-            connection.sendChannelClose(_remoteChannelNumber)
-        }
         _isOpen = false
         _stdout.close()
         _stderr.close()
         _extendedData.close()
+        connectionScope.launch {
+            try {
+                connection.sendChannelClose(_remoteChannelNumber)
+            } catch (e: Exception) {
+                logger.debug("Failed to send CHANNEL_CLOSE", e)
+            }
+        }
     }
 }

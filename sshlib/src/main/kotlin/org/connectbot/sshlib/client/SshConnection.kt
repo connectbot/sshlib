@@ -2169,6 +2169,7 @@ class SshConnection(
 
         val channel = SessionChannel(
             this,
+            connectionScope,
             localChannelNumber,
             remoteChannelNumber,
             maxPacketSize,

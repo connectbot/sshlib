@@ -18,7 +18,6 @@ package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 
 internal class ForwardingChannel(
@@ -43,15 +42,13 @@ internal class ForwardingChannel(
 
     val isOpen: Boolean get() = _isOpen
 
-    internal fun onData(data: ByteArray) {
+    internal suspend fun onData(data: ByteArray) {
         _incomingData.trySend(data)
         localWindowSize -= data.size
         if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
             val adjust = initialWindowSize - localWindowSize.toInt()
             localWindowSize += adjust
-            runBlocking {
-                connection.sendWindowAdjust(remoteChannelNumber, adjust)
-            }
+            connection.sendWindowAdjust(remoteChannelNumber, adjust)
         }
     }
 
