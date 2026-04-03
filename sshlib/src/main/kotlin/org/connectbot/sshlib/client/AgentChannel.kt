@@ -31,11 +31,13 @@ internal class AgentChannel(
         private val logger = LoggerFactory.getLogger(AgentChannel::class.java)
     }
 
-    private var isOpen = true
+    private var _isOpen = true
     private var closeSent = false
 
+    val isOpen: Boolean get() = _isOpen
+
     suspend fun handleData(data: ByteArray) {
-        if (!isOpen) {
+        if (!_isOpen) {
             logger.warn("Received data on closed agent channel")
             return
         }
@@ -67,7 +69,7 @@ internal class AgentChannel(
                 logger.debug("Failed to send CHANNEL_CLOSE reply", e)
             }
         }
-        isOpen = false
+        _isOpen = false
     }
 
     private suspend fun sendData(data: ByteArray) {
