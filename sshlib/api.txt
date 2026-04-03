@@ -181,6 +181,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public org.connectbot.sshlib.HostKeyVerifier getHostKeyVerifier();
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
+    method @InaccessibleFromKotlin public boolean getPreferPasswordAuth();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.TransportFactory getTransportFactory();
     property public String clientVersion;
     property public String encryptionAlgorithms;
@@ -188,6 +189,7 @@ package org.connectbot.sshlib {
     property public org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier;
     property public String kexAlgorithms;
     property public String macAlgorithms;
+    property public boolean preferPasswordAuth;
     property public org.connectbot.sshlib.transport.TransportFactory transportFactory;
     field public static final org.connectbot.sshlib.SshClientConfig.Companion Companion;
   }
@@ -205,6 +207,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
     method @InaccessibleFromKotlin public int getPort();
+    method @InaccessibleFromKotlin public boolean getPreferPasswordAuth();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.TransportFactory? getTransportFactory();
     method @InaccessibleFromKotlin public void setClientVersion(java.lang.String);
     method @InaccessibleFromKotlin public void setEnableCompression(boolean);
@@ -216,6 +219,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public void setKexAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setMacAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setPort(int);
+    method @InaccessibleFromKotlin public void setPreferPasswordAuth(boolean);
     method @InaccessibleFromKotlin public void setTransportFactory(org.connectbot.sshlib.transport.TransportFactory?);
     property public String clientVersion;
     property public boolean enableCompression;
@@ -227,6 +231,7 @@ package org.connectbot.sshlib {
     property public String kexAlgorithms;
     property public String macAlgorithms;
     property public int port;
+    property public boolean preferPasswordAuth;
     property public org.connectbot.sshlib.transport.TransportFactory? transportFactory;
   }
 
@@ -355,7 +360,7 @@ package org.connectbot.sshlib.client {
   }
 
   public final class SshConnection {
-    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional java.lang.String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String kexAlgorithms, optional java.lang.String hostKeyAlgorithms, optional java.lang.String encryptionAlgorithms, optional java.lang.String macAlgorithms, optional java.lang.String compressionAlgorithms);
+    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional java.lang.String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String kexAlgorithms, optional java.lang.String hostKeyAlgorithms, optional java.lang.String encryptionAlgorithms, optional java.lang.String macAlgorithms, optional java.lang.String compressionAlgorithms, optional boolean preferPasswordAuth);
     method public suspend java.lang.Object? authenticateKeyboardInteractive(java.lang.String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? authenticatePassword(java.lang.String username, java.lang.String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);

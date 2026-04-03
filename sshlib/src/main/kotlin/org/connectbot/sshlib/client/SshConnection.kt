@@ -139,6 +139,7 @@ class SshConnection(
     private val encryptionAlgorithms: String = CipherEntry.defaultString,
     private val macAlgorithms: String = MacEntry.defaultString,
     private val compressionAlgorithms: String = CompressionEntry.defaultString,
+    private val preferPasswordAuth: Boolean = false,
 ) {
 
     companion object {
@@ -240,6 +241,7 @@ class SshConnection(
     private var authResultChannel: Channel<AuthResult>? = null
     private var allowedAuthentications: Set<String>? = null
     private var currentAuthMethod: String? = null
+    private val triedPublicKeys = mutableSetOf<AuthPublicKey>()
 
     private var packetLoopJob: Job? = null
 
@@ -616,11 +618,15 @@ class SshConnection(
         if ("publickey" in allowedMethods) {
             val keys = handler.onPublicKeysNeeded()
             for (key in keys) {
+                if (key in triedPublicKeys) continue
                 val probeResult = probePublicKey(username, key, channel)
                 if (probeResult is AuthResult.Success) return true
                 if (probeResult is AuthResult.PkOk) {
+                    triedPublicKeys.add(key)
                     val signResult = signPublicKey(username, key, handler, channel)
                     if (signResult) return true
+                } else {
+                    triedPublicKeys.add(key)
                 }
                 if (probeResult is AuthResult.Failure) {
                     allowedAuthentications = probeResult.allowedMethods
@@ -629,17 +635,19 @@ class SshConnection(
             }
         }
 
-        // Step 3: Keyboard-interactive phase
-        if ("keyboard-interactive" in allowedMethods) {
-            val kbdResult = doKeyboardInteractive(username, handler, channel)
-            if (kbdResult) return true
-        }
+        for (method in selectPasswordMethods(allowedMethods, preferPasswordAuth)) {
+            when (method) {
+                "keyboard-interactive" -> {
+                    val kbdResult = doKeyboardInteractive(username, handler, channel)
+                    if (kbdResult) return true
+                }
 
-        // Step 4: Password phase
-        if ("password" in allowedMethods) {
-            val password = handler.onPasswordNeeded() ?: return false
-            val passResult = doPasswordAuth(username, password, channel)
-            if (passResult) return true
+                "password" -> {
+                    val password = handler.onPasswordNeeded() ?: return false
+                    val passResult = doPasswordAuth(username, password, channel)
+                    if (passResult) return true
+                }
+            }
         }
 
         return false
@@ -716,10 +724,12 @@ class SshConnection(
         while (true) {
             when (val result = channel.receive()) {
                 is AuthResult.Success -> return true
+
                 is AuthResult.Failure -> {
                     allowedAuthentications = result.allowedMethods
                     return false
                 }
+
                 is AuthResult.InfoRequest -> {
                     val responses = handler.onKeyboardInteractivePrompt(
                         result.name,
@@ -768,10 +778,12 @@ class SshConnection(
 
         return when (val result = channel.receive()) {
             is AuthResult.Success -> true
+
             is AuthResult.Failure -> {
                 allowedAuthentications = result.allowedMethods
                 false
             }
+
             else -> false
         }
     }
@@ -2229,5 +2241,28 @@ class SshConnection(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
             msg.toByteArray()
         )
+    }
+}
+
+/**
+ * Returns the list of password-based auth methods to attempt, in the order they should be tried.
+ *
+ * By default, `keyboard-interactive` is preferred when both methods are available.
+ * When [preferPasswordAuth] is true and `password` is available, `password` is tried first;
+ * `keyboard-interactive` is not tried when `password` is available and [preferPasswordAuth] is set.
+ */
+internal fun selectPasswordMethods(
+    allowedMethods: Set<String>,
+    preferPasswordAuth: Boolean,
+): List<String> {
+    val hasKbd = "keyboard-interactive" in allowedMethods
+    val hasPassword = "password" in allowedMethods
+
+    return when {
+        hasKbd && hasPassword && preferPasswordAuth -> listOf("password")
+        hasKbd && hasPassword -> listOf("keyboard-interactive")
+        hasKbd -> listOf("keyboard-interactive")
+        hasPassword -> listOf("password")
+        else -> emptyList()
     }
 }
