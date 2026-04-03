@@ -50,6 +50,17 @@ interface SshSession : AutoCloseable {
 
     suspend fun requestShell(): Boolean
 
+    /**
+     * Request execution of a command on this session channel (RFC 4254 section 6.5).
+     *
+     * Only one of [requestShell], [requestExec], or subsystem requests
+     * may succeed per session channel.
+     *
+     * @param command The command to execute on the remote server
+     * @return true if the server accepted the request
+     */
+    suspend fun requestExec(command: String): Boolean
+
     suspend fun write(data: ByteArray)
 
     suspend fun read(): ByteArray?

@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
+import org.connectbot.sshlib.protocol.ChannelRequestExec
 import org.connectbot.sshlib.protocol.ChannelRequestPtyReq
 import org.connectbot.sshlib.protocol.ChannelRequestShell
 import org.connectbot.sshlib.protocol.ChannelRequestWindowChange
@@ -204,6 +205,24 @@ class SessionChannel internal constructor(
             val shellReq = ChannelRequestShell()
             shellReq._check()
             msg.setRequestSpecificFields(shellReq)
+        }
+    }
+
+    override suspend fun requestExec(command: String): Boolean {
+        logger.debug("Requesting exec on channel $localChannelNumber: $command")
+        return connection.sendChannelRequest(
+            _remoteChannelNumber,
+            "exec",
+            wantReply = true
+        ) { msg ->
+            val execReq = ChannelRequestExec()
+            val cmdString = ByteString()
+            cmdString.setLenData(command.toByteArray(Charsets.UTF_8).size.toLong())
+            cmdString.setData(command.toByteArray(Charsets.UTF_8))
+            cmdString._check()
+            execReq.setCommand(cmdString)
+            execReq._check()
+            msg.setRequestSpecificFields(execReq)
         }
     }
 
