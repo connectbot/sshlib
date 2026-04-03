@@ -594,18 +594,22 @@ class SshConnection(
         handler: AuthHandler,
         channel: Channel<AuthResult>,
     ): Boolean {
-        // Step 1: Send "none" auth to discover allowed methods
-        currentAuthMethod = "none"
-        sendAuthRequest(username, "none") {
-            val noneAuth = UserauthRequestNone().apply { _check() }
-            setMethodSpecificFields(noneAuth)
+        if (allowedAuthentications == null) {
+            // Step 1: Send "none" auth to discover allowed methods
+            currentAuthMethod = "none"
+            sendAuthRequest(username, "none") {
+                val noneAuth = UserauthRequestNone().apply { _check() }
+                setMethodSpecificFields(noneAuth)
+            }
+
+            val noneResult = channel.receive()
+            if (noneResult is AuthResult.Success) return true
+            if (noneResult !is AuthResult.Failure) return false
+
+            allowedAuthentications = noneResult.allowedMethods
         }
 
-        val noneResult = channel.receive()
-        if (noneResult is AuthResult.Success) return true
-        if (noneResult !is AuthResult.Failure) return false
-
-        val allowedMethods = noneResult.allowedMethods
+        val allowedMethods = allowedAuthentications!!
         handler.onAuthMethodsAvailable(allowedMethods)
 
         // Step 2: Public key phase
@@ -617,6 +621,9 @@ class SshConnection(
                 if (probeResult is AuthResult.PkOk) {
                     val signResult = signPublicKey(username, key, handler, channel)
                     if (signResult) return true
+                }
+                if (probeResult is AuthResult.Failure) {
+                    allowedAuthentications = probeResult.allowedMethods
                 }
                 // AuthResult.Failure → try next key
             }
@@ -709,9 +716,10 @@ class SshConnection(
         while (true) {
             when (val result = channel.receive()) {
                 is AuthResult.Success -> return true
-
-                is AuthResult.Failure -> return false
-
+                is AuthResult.Failure -> {
+                    allowedAuthentications = result.allowedMethods
+                    return false
+                }
                 is AuthResult.InfoRequest -> {
                     val responses = handler.onKeyboardInteractivePrompt(
                         result.name,
@@ -758,8 +766,12 @@ class SshConnection(
             setMethodSpecificFields(passAuth)
         }
 
-        return when (channel.receive()) {
+        return when (val result = channel.receive()) {
             is AuthResult.Success -> true
+            is AuthResult.Failure -> {
+                allowedAuthentications = result.allowedMethods
+                false
+            }
             else -> false
         }
     }
