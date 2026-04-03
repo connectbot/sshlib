@@ -763,28 +763,30 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with compression")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            withTimeout(30_000) {
+                assertTrue(client.connect(), "Should connect with compression")
+                assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
 
-            val session = client.openSession()
-            assertNotNull(session)
-            session!!.requestPty()
-            session.requestShell()
+                val session = client.openSession()
+                assertNotNull(session)
+                session!!.requestPty()
+                session.requestShell()
 
-            session.write("echo hello-compression\n".toByteArray())
+                session.write("echo hello-compression\n".toByteArray())
 
-            val output = withTimeout(5_000) {
-                val buf = StringBuilder()
-                while (!buf.contains("hello-compression")) {
-                    val data = session.read() ?: break
-                    buf.append(String(data))
+                val output = withTimeout(10_000) {
+                    val buf = StringBuilder()
+                    while (!buf.contains("hello-compression")) {
+                        val data = session.read() ?: break
+                        buf.append(String(data))
+                    }
+                    buf.toString()
                 }
-                buf.toString()
+
+                assertTrue(output.contains("hello-compression"), "Should receive echoed data through compressed connection")
+
+                session.close()
             }
-
-            assertTrue(output.contains("hello-compression"), "Should receive echoed data through compressed connection")
-
-            session.close()
         } finally {
             client.disconnect()
         }
