@@ -154,32 +154,32 @@ class SshConnection(
     private val callbacks = object : SshClientCallbacks {
         override fun sendVersion() = this@SshConnection.sendVersion()
         override fun receiveVersion(banner: IdBanner) = this@SshConnection.receiveVersion(banner)
-        override fun sendKexInit() = this@SshConnection.sendKexInit()
+        override suspend fun sendKexInit() = this@SshConnection.sendKexInit()
         override fun receiveKexInit(msg: SshMsgKexinit) = this@SshConnection.receiveKexInit(msg)
-        override fun sendKexExchangeInit() = this@SshConnection.sendKexExchangeInit()
-        override fun receiveKexDhReply(msg: SshMsgKexdhReply) = this@SshConnection.receiveKexDhReply(msg)
-        override fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
-        override fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
-        override fun sendNewKeys() = this@SshConnection.sendNewKeys()
+        override suspend fun sendKexExchangeInit() = this@SshConnection.sendKexExchangeInit()
+        override suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) = this@SshConnection.receiveKexDhReply(msg)
+        override suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
+        override suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
+        override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
         override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
         override fun activateEncryption() = this@SshConnection.activateEncryption()
-        override fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
+        override suspend fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
         override fun receiveServiceAccept(service: String) = this@SshConnection.receiveServiceAccept(service)
         override fun startAuthentication() = this@SshConnection.startAuthentication()
         override fun authenticationSuccess() = this@SshConnection.authenticationSuccess()
         override fun authenticationFailure() = this@SshConnection.authenticationFailure()
         override fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) = this@SshConnection.receiveUserauthInfoRequest(msg)
         override fun receiveUserauthBanner(msg: SshMsgUserauthBanner) = this@SshConnection.receiveUserauthBanner(msg)
-        override fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) = this@SshConnection.sendChannelOpen(channelType, localChannelNumber, initialWindowSize, maxPacketSize)
+        override suspend fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) = this@SshConnection.sendChannelOpen(channelType, localChannelNumber, initialWindowSize, maxPacketSize)
         override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) = this@SshConnection.receiveChannelOpenConfirmation(msg)
         override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) = this@SshConnection.receiveChannelOpenFailure(msg)
-        override fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) = this@SshConnection.sendChannelRequest(recipientChannel, requestType, wantReply, message)
+        override suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) = this@SshConnection.sendChannelRequest(recipientChannel, requestType, wantReply, message)
         override fun receiveChannelSuccess() = this@SshConnection.receiveChannelSuccess()
         override fun receiveChannelFailure() = this@SshConnection.receiveChannelFailure()
-        override fun receiveGlobalRequest(msg: SshMsgGlobalRequest) = this@SshConnection.receiveGlobalRequest(msg)
+        override suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest) = this@SshConnection.receiveGlobalRequest(msg)
         override fun debug(msg: SshMsgDebug) = this@SshConnection.debug(msg)
         override fun ignore() = this@SshConnection.ignore()
-        override fun disconnect() = this@SshConnection.disconnect()
+        override suspend fun disconnect() = this@SshConnection.disconnect()
         override fun onStateEnter(stateName: String) = this@SshConnection.onStateEnter(stateName)
         override fun onStateExit(stateName: String) = this@SshConnection.onStateExit(stateName)
     }
@@ -821,7 +821,7 @@ class SshConnection(
         logger.info("Server version: $serverVersion")
     }
 
-    private fun sendKexInit() {
+    private suspend fun sendKexInit() {
         logger.debug("Sending KEX_INIT")
 
         val kexInit = SshMsgKexinit().apply {
@@ -850,9 +850,7 @@ class SshConnection(
 
         clientKexInit = byteArrayOf(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toByte()) + kexInitPayload
 
-        runBlocking {
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
-        }
+        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
     }
 
     private fun receiveKexInit(msg: SshMsgKexinit) {
@@ -931,7 +929,7 @@ class SshConnection(
         logger.info("  Negotiated compression s->c: $negotiatedCompressionS2C")
     }
 
-    private fun sendKexExchangeInit() {
+    private suspend fun sendKexExchangeInit() {
         val kexName = negotiatedKex ?: throw SshException("No KEX algorithm negotiated")
         val kexEntry = KexEntry.fromSshName(kexName)
             ?: throw SshException("Unknown KEX algorithm: $kexName")
@@ -942,7 +940,7 @@ class SshConnection(
         }
     }
 
-    private fun sendKexDhInit(kexEntry: KexEntry) {
+    private suspend fun sendKexDhInit(kexEntry: KexEntry) {
         logger.debug("Sending DH_INIT")
 
         val dh = kexEntry.create()
@@ -957,12 +955,10 @@ class SshConnection(
             _check()
         }
 
-        runBlocking {
-            packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), msg.toByteArray())
-        }
+        packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), msg.toByteArray())
     }
 
-    private fun sendKexEcdhInit(kexEntry: KexEntry) {
+    private suspend fun sendKexEcdhInit(kexEntry: KexEntry) {
         logger.debug("Sending ECDH_INIT (${kexEntry.sshName})")
 
         val ecdh = kexEntry.create()
@@ -977,12 +973,10 @@ class SshConnection(
             _check()
         }
 
-        runBlocking {
-            packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), msg.toByteArray())
-        }
+        packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), msg.toByteArray())
     }
 
-    private fun sendKexDhGexRequest(kexEntry: KexEntry) {
+    private suspend fun sendKexDhGexRequest(kexEntry: KexEntry) {
         logger.debug("Sending DH_GEX_REQUEST (${kexEntry.sshName})")
 
         val dhGex = kexEntry.create() as DiffieHellmanGroupExchange
@@ -995,12 +989,10 @@ class SshConnection(
             _check()
         }
 
-        runBlocking {
-            packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
-        }
+        packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
     }
 
-    private fun receiveKexDhReply(msg: SshMsgKexdhReply) {
+    private suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) {
         logger.info("Received DH_REPLY from server")
         completeKex(
             serverHostKey = msg.serverKey().data(),
@@ -1009,7 +1001,7 @@ class SshConnection(
         )
     }
 
-    private fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
+    private suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) {
         logger.info("Received ECDH_REPLY from server")
         completeKex(
             serverHostKey = msg.kS().data(),
@@ -1018,7 +1010,7 @@ class SshConnection(
         )
     }
 
-    private fun completeKex(serverHostKey: ByteArray, serverPublicKey: ByteArray, signature: ByteArray) {
+    private suspend fun completeKex(serverHostKey: ByteArray, serverPublicKey: ByteArray, signature: ByteArray) {
         val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
         val sv = serverVersion ?: throw SshException("Server version not received")
         val cki = clientKexInit ?: throw SshException("Client KEX_INIT not sent")
@@ -1062,9 +1054,7 @@ class SshConnection(
 
         serverHostKeyBlob = serverHostKey
 
-        val trusted = runBlocking {
-            hostKeyVerifier.verify(publicKey)
-        }
+        val trusted = hostKeyVerifier.verify(publicKey)
 
         if (!trusted) {
             logger.error("Host key verification failed")
@@ -1079,7 +1069,7 @@ class SshConnection(
         logger.info("Server signature verified")
     }
 
-    private fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
+    private suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
         logger.info("Received DH_GEX_REPLY from server")
         completeKex(
             serverHostKey = msg.serverPublicHostKey().data(),
@@ -1088,13 +1078,11 @@ class SshConnection(
         )
     }
 
-    private fun sendNewKeys() {
+    private suspend fun sendNewKeys() {
         logger.debug("Sending NEW_KEYS")
-        runBlocking {
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
-            if (strictKexEnabled) {
-                packetIO.resetSendSequenceNumber()
-            }
+        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
+        if (strictKexEnabled) {
+            packetIO.resetSendSequenceNumber()
         }
     }
 
@@ -1235,7 +1223,7 @@ class SshConnection(
         )
     }
 
-    private fun sendServiceRequest(service: String) {
+    private suspend fun sendServiceRequest(service: String) {
         logger.info("Requesting service: $service")
 
         val msg = SshMsgServiceRequest().apply {
@@ -1243,9 +1231,7 @@ class SshConnection(
             _check()
         }
 
-        runBlocking {
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), msg.toByteArray())
-        }
+        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), msg.toByteArray())
     }
 
     private fun receiveServiceAccept(service: String) {
@@ -1293,12 +1279,10 @@ class SshConnection(
         logger.trace("Received IGNORE message")
     }
 
-    private fun disconnect() {
+    private suspend fun disconnect() {
         logger.info("Disconnecting (received SSH_MSG_DISCONNECT from server)")
         _disconnectedFlow.tryEmit(null)
-        runBlocking {
-            transport.close()
-        }
+        transport.close()
     }
 
     /**
@@ -1475,7 +1459,7 @@ class SshConnection(
         // Not logging state exits to reduce verbosity
     }
 
-    private fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
+    private suspend fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int) {
         logger.debug("Sending CHANNEL_OPEN: $channelType (local=$localChannelNumber)")
 
         val msg = SshMsgChannelOpen().apply {
@@ -1491,12 +1475,10 @@ class SshConnection(
             _check()
         }
 
-        runBlocking {
-            packetIO.writePacket(
-                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
-                msg.toByteArray()
-            )
-        }
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
+            msg.toByteArray()
+        )
     }
 
     private fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
@@ -1511,15 +1493,12 @@ class SshConnection(
         pendingChannelOpen = null
     }
 
-    private fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
+    private suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
         logger.debug("Sending CHANNEL_REQUEST: $requestType (channel=$recipientChannel, wantReply=$wantReply)")
-
-        runBlocking {
-            packetIO.writePacket(
-                SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
-                message.toByteArray()
-            )
-        }
+        packetIO.writePacket(
+            SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
+            message.toByteArray()
+        )
     }
 
     private fun receiveChannelSuccess() {
@@ -1534,7 +1513,7 @@ class SshConnection(
         pendingChannelRequest = null
     }
 
-    private fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
+    private suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
         val requestName = msg.requestName().value()
         val wantReply = msg.wantReply() != 0
 
@@ -1542,9 +1521,7 @@ class SshConnection(
 
         if (wantReply) {
             logger.debug("Sending REQUEST_FAILURE for unhandled global request: $requestName")
-            runBlocking {
-                packetIO.writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE.id().toInt())
-            }
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE.id().toInt())
         }
     }
 
