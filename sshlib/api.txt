@@ -263,6 +263,7 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? requestExec(java.lang.String command, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestPty(optional java.lang.String terminalType, optional int widthChars, optional int heightRows, optional int widthPixels, optional int heightPixels, optional byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend java.lang.Object? requestSubsystem(java.lang.String name, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
@@ -347,6 +348,7 @@ package org.connectbot.sshlib.client {
     method public suspend java.lang.Object? requestExec(java.lang.String command, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestPty(java.lang.String terminalType, int widthChars, int heightRows, int widthPixels, int heightPixels, byte[] terminalModes, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? requestShell(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
+    method public suspend java.lang.Object? requestSubsystem(java.lang.String name, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
