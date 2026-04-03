@@ -17,25 +17,35 @@
 package org.connectbot.sshlib.client
 
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionChannelTest {
 
     private fun createChannel(
         connection: SshConnection = mockk(relaxed = true),
+        initialWindowSize: Int = 64 * 1024,
+        connectionScope: CoroutineScope = CoroutineScope(UnconfinedTestDispatcher()),
     ): Pair<SessionChannel, SshConnection> {
         val channel = SessionChannel(
             connection = connection,
+            connectionScope = connectionScope,
             localChannelNumber = 0,
             _remoteChannelNumber = 1,
             maxPacketSize = 32 * 1024,
-            remoteWindowSize = 64 * 1024L
+            remoteWindowSize = 64 * 1024L,
+            initialWindowSize = initialWindowSize,
         )
         return channel to connection
     }
@@ -93,5 +103,57 @@ class SessionChannelTest {
         channel.resizeTerminal(80, 24, 0, 0)
 
         assertEquals(1, channelSlot.captured)
+    }
+
+    @Test
+    fun `onData delivers data to stdout`() = runTest {
+        val (channel, _) = createChannel()
+        val testData = "hello".toByteArray()
+
+        channel.onData(testData)
+
+        val received = channel.stdout.tryReceive().getOrNull()
+        assertArrayEquals(testData, received)
+    }
+
+    @Test
+    fun `onData sends window adjust when local window drops below threshold`() = runTest {
+        val (channel, conn) = createChannel(initialWindowSize = 128)
+
+        channel.onData(ByteArray(100))
+
+        coVerify { conn.sendWindowAdjust(1, any()) }
+    }
+
+    @Test
+    fun `onExtendedData delivers data to stderr for type 1`() = runTest {
+        val (channel, _) = createChannel()
+        val testData = "err".toByteArray()
+
+        channel.onExtendedData(1, testData)
+
+        val received = channel.stderr.tryReceive().getOrNull()
+        assertArrayEquals(testData, received)
+    }
+
+    @Test
+    fun `close marks channel not open and sends channel close`() = runTest {
+        val (channel, conn) = createChannel()
+        assertTrue(channel.isOpen)
+
+        channel.close()
+
+        assertFalse(channel.isOpen)
+        coVerify { conn.sendChannelClose(1) }
+    }
+
+    @Test
+    fun `close is idempotent`() = runTest {
+        val (channel, conn) = createChannel()
+
+        channel.close()
+        channel.close()
+
+        coVerify(exactly = 1) { conn.sendChannelClose(1) }
     }
 }
