@@ -27,7 +27,6 @@ import ru.nsk.kstatemachine.state.state
 import ru.nsk.kstatemachine.state.transition
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStdLibStateMachine
-import ru.nsk.kstatemachine.statemachine.processEventBlocking
 import ru.nsk.kstatemachine.transition.onTriggered
 
 /**
@@ -319,8 +318,8 @@ internal class SshClientStateMachine(
         }
     }
 
-    fun processEvent(event: SshEvent) {
-        stateMachine.processEventBlocking(event)
+    suspend fun processEvent(event: SshEvent) {
+        stateMachine.processEvent(event)
     }
 
     val currentState: String
@@ -332,32 +331,32 @@ internal class SshClientStateMachine(
 internal interface SshClientCallbacks {
     fun sendVersion()
     fun receiveVersion(banner: IdBanner)
-    fun sendKexInit()
+    suspend fun sendKexInit()
     fun receiveKexInit(msg: SshMsgKexinit)
-    fun sendKexExchangeInit()
-    fun receiveKexDhReply(msg: SshMsgKexdhReply)
-    fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
-    fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply)
-    fun sendNewKeys()
+    suspend fun sendKexExchangeInit()
+    suspend fun receiveKexDhReply(msg: SshMsgKexdhReply)
+    suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
+    suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply)
+    suspend fun sendNewKeys()
     fun receiveNewKeys()
     fun activateEncryption()
-    fun sendServiceRequest(service: String)
+    suspend fun sendServiceRequest(service: String)
     fun receiveServiceAccept(service: String)
     fun startAuthentication()
     fun authenticationSuccess()
     fun authenticationFailure()
     fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest)
     fun receiveUserauthBanner(msg: SshMsgUserauthBanner)
-    fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int)
+    suspend fun sendChannelOpen(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int)
     fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation)
     fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure)
-    fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest)
+    suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest)
     fun receiveChannelSuccess()
     fun receiveChannelFailure()
-    fun receiveGlobalRequest(msg: SshMsgGlobalRequest)
+    suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest)
     fun debug(msg: SshMsgDebug)
     fun ignore()
-    fun disconnect()
+    suspend fun disconnect()
     fun onStateEnter(stateName: String)
     fun onStateExit(stateName: String)
 }
