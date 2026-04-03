@@ -1836,11 +1836,11 @@ class SshConnection(
             }
 
             SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
+                dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
                 val ch = authResultChannel
                 if (ch != null) {
                     ch.trySend(AuthResult.Success)
                 }
-                dispatchEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
             }
 
             SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
