@@ -238,14 +238,21 @@ class SshConnection(
 
     // Strategy-based authentication state
     private var authResultChannel: Channel<AuthResult>? = null
+    private var allowedAuthentications: Set<String>? = null
     private var currentAuthMethod: String? = null
 
     private var packetLoopJob: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
-        withContext(stateMachineDispatcher) {
-            stateMachine.processEvent(event)
+        logger.debug("Dispatching event: $event")
+        try {
+            withContext(stateMachineDispatcher) {
+                stateMachine.processEvent(event)
+            }
+        } catch (e: Exception) {
+            logger.error("State machine failed to process event: $event", e)
+            throw e
         }
     }
 
@@ -1263,7 +1270,7 @@ class SshConnection(
     }
 
     private fun disconnect() {
-        logger.info("Disconnecting")
+        logger.info("Disconnecting (received SSH_MSG_DISCONNECT from server)")
         _disconnectedFlow.tryEmit(null)
         runBlocking {
             transport.close()
@@ -1676,9 +1683,10 @@ class SshConnection(
      */
     private suspend fun processNextPacket() {
         val packet = packetIO.readPacket()
-        logger.debug("Received message type ${packet.messageType()}")
+        val msgType = packet.messageType()
+        logger.debug("Received packet: $msgType")
 
-        when (packet.messageType()) {
+        when (msgType) {
             SshEnums.MessageType.SSH_MSG_IGNORE -> {
                 dispatchEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
             }
@@ -1792,6 +1800,7 @@ class SshConnection(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
                 val msg = parseBody<SshMsgChannelClose>(packet)
                 val recipientChannel = msg.recipientChannel().toInt()
+                logger.debug("Received CHANNEL_CLOSE for remote channel $recipientChannel (channels: ${channels.size}, forwardingChannels: ${forwardingChannels.size})")
                 val channel = channelsByRemote[recipientChannel]
                 val agentChannel = agentChannelsByRemote[recipientChannel]
                 val fwdChannel = forwardingChannelsByRemote[recipientChannel]
@@ -1900,6 +1909,8 @@ class SshConnection(
             }
 
             SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
+                val msg = parseBody<SshMsgDisconnect>(packet)
+                logger.info("Received SSH_MSG_DISCONNECT from server: reason=${msg.reasonCode()}, description=${msg.description().value()}")
                 dispatchEvent(SshClientStateMachine.SshEvent.Disconnect)
             }
 
@@ -2020,6 +2031,7 @@ class SshConnection(
     private suspend fun checkAllChannelsClosed() {
         val allSessionsClosed = channels.values.all { !it.isOpen }
         val allForwardingClosed = forwardingChannels.values.all { !it.isOpen }
+        logger.debug("checkAllChannelsClosed: sessions=${channels.size} allSessionsClosed=$allSessionsClosed, forwarding=${forwardingChannels.size} allForwardingClosed=$allForwardingClosed")
         if (allSessionsClosed && allForwardingClosed && channels.isNotEmpty()) {
             logger.info("All channels closed, sending disconnect")
             sendDisconnect()
@@ -2027,6 +2039,7 @@ class SshConnection(
     }
 
     private suspend fun sendDisconnect() {
+        logger.info("Sending disconnect (client-initiated)")
         try {
             val msg = SshMsgDisconnect().apply {
                 setReasonCode(SshEnums.DisconnectReason.SSH_DISCONNECT_BY_APPLICATION)
@@ -2051,6 +2064,7 @@ class SshConnection(
             var loopException: Exception? = null
             try {
                 while (isActive) {
+                    logger.debug("Packet loop: waiting for next packet")
                     processNextPacket()
                 }
             } catch (_: CancellationException) {
@@ -2125,6 +2139,7 @@ class SshConnection(
         )
         channels[localChannelNumber] = channel
         channelsByRemote[localChannelNumber] = channel
+        logger.debug("Session channel registered: local=$localChannelNumber, remote=$remoteChannelNumber (total channels: ${channels.size})")
 
         return channel
     }
