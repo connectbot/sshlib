@@ -61,6 +61,18 @@ interface SshSession : AutoCloseable {
      */
     suspend fun requestExec(command: String): Boolean
 
+    /**
+     * Request a subsystem on this session channel (RFC 4254 section 6.5).
+     *
+     * Subsystems are named services that run over an SSH channel, such as
+     * SFTP ("sftp"). Only one of [requestShell], exec, or [requestSubsystem]
+     * may succeed per session channel.
+     *
+     * @param name The subsystem name (e.g. "sftp")
+     * @return true if the server accepted the request
+     */
+    suspend fun requestSubsystem(name: String): Boolean
+
     suspend fun write(data: ByteArray)
 
     suspend fun read(): ByteArray?

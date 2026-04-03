@@ -718,6 +718,91 @@ class SshClientIntegrationTest {
     }
 
     @Test
+    fun `should open sftp subsystem and exchange version`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            val subsystemResult = session!!.requestSubsystem("sftp")
+            assertTrue(subsystemResult, "Should successfully request sftp subsystem")
+
+            // Send SSH_FXP_INIT (type=1, length=5, version=3)
+            val initPacket = byteArrayOf(
+                0, 0, 0, 5, // length: 5 bytes (type + version)
+                1, // SSH_FXP_INIT
+                0, 0, 0, 3 // version 3
+            )
+            session.write(initPacket)
+
+            // Read SSH_FXP_VERSION response
+            val response = withTimeout(5_000) {
+                val buf = mutableListOf<Byte>()
+                while (buf.size < 9) {
+                    val data = session.read() ?: break
+                    buf.addAll(data.toList())
+                }
+                buf.toByteArray()
+            }
+
+            assertTrue(response.size >= 9, "Should receive at least 9 bytes (length + type + version)")
+            // type byte is at offset 4
+            val type = response[4].toInt() and 0xFF
+            assertTrue(type == 2, "Response type should be SSH_FXP_VERSION (2), got $type")
+            // version is at offset 5-8 (big-endian uint32)
+            val version = ((response[5].toInt() and 0xFF) shl 24) or
+                ((response[6].toInt() and 0xFF) shl 16) or
+                ((response[7].toInt() and 0xFF) shl 8) or
+                (response[8].toInt() and 0xFF)
+            assertTrue(version >= 3, "SFTP version should be >= 3, got $version")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should reject unknown subsystem`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            val result = session!!.requestSubsystem("nonexistent-subsystem")
+            assertFalse(result, "Should reject unknown subsystem")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun `should connect with compression enabled`() {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
