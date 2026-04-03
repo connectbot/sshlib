@@ -627,6 +627,84 @@ class SshClientIntegrationTest {
     }
 
     @Test
+    fun `should execute command with exec channel`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            val execResult = session!!.requestExec("echo hello-exec")
+            assertTrue(execResult, "Should successfully request exec")
+
+            val output = withTimeout(5_000) {
+                val buf = StringBuilder()
+                while (true) {
+                    val data = session.read() ?: break
+                    buf.append(String(data))
+                }
+                buf.toString()
+            }
+
+            assertTrue(output.contains("hello-exec"), "Should receive command output: $output")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should execute command with exec channel and read stderr`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+
+        try {
+            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            val execResult = session!!.requestExec("echo error-output >&2")
+            assertTrue(execResult, "Should successfully request exec")
+
+            val stderr = withTimeout(5_000) {
+                val buf = StringBuilder()
+                while (true) {
+                    val data = session.stderr.receiveCatching().getOrNull() ?: break
+                    buf.append(String(data))
+                }
+                buf.toString()
+            }
+
+            assertTrue(stderr.contains("error-output"), "Should receive stderr output: $stderr")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun `should connect with compression enabled`() {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
