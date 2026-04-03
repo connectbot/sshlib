@@ -53,6 +53,7 @@ class SshClientConfig private constructor(
     val encryptionAlgorithms: String,
     val macAlgorithms: String,
     internal val compressionAlgorithms: String,
+    val preferPasswordAuth: Boolean,
 ) {
     class Builder {
         /**
@@ -100,6 +101,12 @@ class SshClientConfig private constructor(
          */
         var enableCompression: Boolean = false
 
+        /**
+         * When true, prefer `password` over `keyboard-interactive` when both are available.
+         * By default, `keyboard-interactive` is preferred.
+         */
+        var preferPasswordAuth: Boolean = false
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -123,7 +130,8 @@ class SshClientConfig private constructor(
                 hostKeyAlgorithms,
                 encryptionAlgorithms,
                 macAlgorithms,
-                compressionAlgorithms
+                compressionAlgorithms,
+                preferPasswordAuth
             )
         }
     }

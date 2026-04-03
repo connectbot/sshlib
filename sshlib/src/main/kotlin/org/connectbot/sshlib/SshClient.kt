@@ -156,7 +156,8 @@ class SshClient private constructor(
                 hostKeyAlgorithms = config.hostKeyAlgorithms,
                 encryptionAlgorithms = config.encryptionAlgorithms,
                 macAlgorithms = config.macAlgorithms,
-                compressionAlgorithms = config.compressionAlgorithms
+                compressionAlgorithms = config.compressionAlgorithms,
+                preferPasswordAuth = config.preferPasswordAuth
             )
             val success = sshConnection.connect()
 

@@ -420,11 +420,17 @@ class SshClientIntegrationTest {
         .bufferedReader().readText()
 
     @Test
-    fun `auth handler should authenticate with password fallback`() {
+    fun `auth handler should authenticate with password when preferPasswordAuth is set`() {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = BlockingSshClient(host, port, acceptAllVerifier)
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.preferPasswordAuth = true
+        }
+        val client = BlockingSshClient(config)
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
@@ -450,7 +456,7 @@ class SshClientIntegrationTest {
             }
 
             val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via password fallback")
+            assertTrue(authenticated, "Should authenticate via password when preferPasswordAuth is set")
             assertTrue(client.isAuthenticated, "Client should be authenticated")
             assertNotNull(methodsReceived, "Should have received available methods")
             assertTrue(methodsReceived!!.isNotEmpty(), "Available methods should not be empty")
@@ -527,7 +533,7 @@ class SshClientIntegrationTest {
     }
 
     @Test
-    fun `auth handler should fall through pubkey to keyboard-interactive to password`() {
+    fun `auth handler should fall through pubkey to keyboard-interactive`() {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
@@ -558,24 +564,24 @@ class SshClientIntegrationTest {
                     name: String,
                     instruction: String,
                     prompts: List<KeyboardInteractiveCallback.Prompt>,
-                ): List<String>? {
+                ): List<String> {
                     callSequence.add("kbd")
-                    // Skip keyboard-interactive
-                    return null
+                    return prompts.map { PASSWORD }
                 }
 
-                override suspend fun onPasswordNeeded(): String {
+                override suspend fun onPasswordNeeded(): String? {
                     callSequence.add("password")
-                    return PASSWORD
+                    return null
                 }
             }
 
             val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via password after fallthrough")
+            assertTrue(authenticated, "Should authenticate via keyboard-interactive after pubkey fallthrough")
             assertTrue(client.isAuthenticated, "Client should be authenticated")
             assertTrue("methods" in callSequence, "onAuthMethodsAvailable should have been called")
             assertTrue("pubkeys" in callSequence, "onPublicKeysNeeded should have been called")
-            assertTrue("password" in callSequence, "onPasswordNeeded should have been called")
+            assertTrue("kbd" in callSequence, "onKeyboardInteractivePrompt should have been called")
+            assertTrue("password" !in callSequence, "onPasswordNeeded should not have been called")
         } finally {
             client.disconnect()
         }
@@ -889,16 +895,18 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(SshClientConfig {
-            this.host = host
-            this.port = port
-            this.hostKeyVerifier = acceptAllVerifier
-            // Restricted config to remove possible culprits
-            this.encryptionAlgorithms = "aes128-ctr"
-            this.macAlgorithms = "hmac-sha2-256"
-            this.kexAlgorithms = "ecdh-sha2-nistp256"
-            this.enableCompression = false
-        })
+        val client = SshClient(
+            SshClientConfig {
+                this.host = host
+                this.port = port
+                this.hostKeyVerifier = acceptAllVerifier
+                // Restricted config to remove possible culprits
+                this.encryptionAlgorithms = "aes128-ctr"
+                this.macAlgorithms = "hmac-sha2-256"
+                this.kexAlgorithms = "ecdh-sha2-nistp256"
+                this.enableCompression = false
+            }
+        )
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
@@ -953,16 +961,18 @@ class SshClientIntegrationTest {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = SshClient(SshClientConfig {
-            this.host = host
-            this.port = port
-            this.hostKeyVerifier = acceptAllVerifier
-            // Restricted config to remove possible culprits
-            this.encryptionAlgorithms = "aes128-ctr"
-            this.macAlgorithms = "hmac-sha2-256"
-            this.kexAlgorithms = "ecdh-sha2-nistp256"
-            this.enableCompression = false
-        })
+        val client = SshClient(
+            SshClientConfig {
+                this.host = host
+                this.port = port
+                this.hostKeyVerifier = acceptAllVerifier
+                // Restricted config to remove possible culprits
+                this.encryptionAlgorithms = "aes128-ctr"
+                this.macAlgorithms = "hmac-sha2-256"
+                this.kexAlgorithms = "ecdh-sha2-nistp256"
+                this.enableCompression = false
+            }
+        )
 
         try {
             assertTrue(client.connect(), "Should connect to SSH server")
