@@ -1725,7 +1725,7 @@ class SshConnection(
                         recipientChannel,
                         remoteChannelNumber,
                         pending.maxPacketSize,
-                        remoteWindowSize = remoteWindow,
+                        remoteWindowSizeInitial = remoteWindow,
                         initialWindowSize = pending.initialWindowSize
                     )
                     registerForwardingChannel(channel)
@@ -2150,7 +2150,7 @@ class SshConnection(
             localChannelNumber,
             remoteChannelNumber,
             maxPacketSize,
-            remoteWindowSize = remoteWindow,
+            remoteWindowSizeInitial = remoteWindow,
             initialWindowSize = initialWindowSize
         )
         channels[localChannelNumber] = channel

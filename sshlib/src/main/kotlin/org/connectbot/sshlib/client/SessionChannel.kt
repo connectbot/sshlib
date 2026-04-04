@@ -33,7 +33,7 @@ class SessionChannel internal constructor(
     override val localChannelNumber: Int,
     private var _remoteChannelNumber: Int,
     private val maxPacketSize: Int,
-    private var remoteWindowSize: Long = 0,
+    remoteWindowSizeInitial: Long = 0,
     private val initialWindowSize: Int = 64 * 1024,
 ) : SshSession {
     companion object {
@@ -44,6 +44,9 @@ class SessionChannel internal constructor(
     private var _isOpen = true
     private var closeSent = false
     private var localWindowSize: Long = initialWindowSize.toLong()
+
+    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val _stdout = Channel<ByteArray>(Channel.UNLIMITED)
     private val _stderr = Channel<ByteArray>(Channel.UNLIMITED)
@@ -80,6 +83,9 @@ class SessionChannel internal constructor(
     internal fun onWindowAdjust(bytesToAdd: Long) {
         remoteWindowSize += bytesToAdd
         logger.debug("Window adjust +$bytesToAdd, remote window now $remoteWindowSize")
+        if (remoteWindowSize > 0) {
+            windowAvailable.trySend(Unit)
+        }
     }
 
     internal fun onEof() {
@@ -103,6 +109,7 @@ class SessionChannel internal constructor(
         _stdout.close()
         _stderr.close()
         _extendedData.close()
+        windowAvailable.close()
     }
 
     override suspend fun write(data: ByteArray) {
@@ -110,7 +117,7 @@ class SessionChannel internal constructor(
         while (offset < data.size) {
             // Wait for remote window to have space
             while (remoteWindowSize <= 0) {
-                kotlinx.coroutines.delay(10)
+                windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,
