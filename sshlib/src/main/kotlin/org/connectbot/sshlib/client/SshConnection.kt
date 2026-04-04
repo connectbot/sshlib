@@ -258,6 +258,15 @@ class SshConnection(
     }
 
     /**
+     * Serialized write to the transport through the state machine dispatcher.
+     */
+    private suspend fun writePacket(messageType: Int, payload: ByteArray = byteArrayOf()) {
+        withContext(stateMachineDispatcher) {
+            packetIO.writePacket(messageType, payload)
+        }
+    }
+
+    /**
      * Initiate SSH connection.
      * This returns when authentication is complete.
      */
@@ -326,7 +335,7 @@ class SshConnection(
                         setE(createMpint(clientPublicKey!!))
                         _check()
                     }
-                    packetIO.writePacket(
+                    writePacket(
                         SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
                         initMsg.toByteArray()
                     )
@@ -392,7 +401,7 @@ class SshConnection(
             val deferred = CompletableDeferred<Boolean>()
             pendingAuth = deferred
 
-            packetIO.writePacket(
+            writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
                 req.toByteArray()
             )
@@ -436,7 +445,7 @@ class SshConnection(
             val channel = Channel<SshMsgUserauthInfoRequest>(Channel.UNLIMITED)
             infoRequestChannel = channel
 
-            packetIO.writePacket(
+            writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
                 req.toByteArray()
             )
@@ -464,7 +473,7 @@ class SshConnection(
                             _check()
                         }
 
-                        packetIO.writePacket(
+                        writePacket(
                             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
                             responseMsg.toByteArray()
                         )
@@ -539,7 +548,7 @@ class SshConnection(
             val deferred = CompletableDeferred<Boolean>()
             pendingAuth = deferred
 
-            packetIO.writePacket(
+            writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
                 req.toByteArray()
             )
@@ -746,7 +755,7 @@ class SshConnection(
                         _check()
                     }
 
-                    packetIO.writePacket(
+                    writePacket(
                         SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
                         responseMsg.toByteArray()
                     )
@@ -799,7 +808,7 @@ class SshConnection(
             configure()
             _check()
         }
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
             req.toByteArray()
         )
@@ -849,7 +858,7 @@ class SshConnection(
 
         clientKexInit = byteArrayOf(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toByte()) + kexInitPayload
 
-        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
+        writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
     }
 
     private fun receiveKexInit(msg: SshMsgKexinit) {
@@ -954,7 +963,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), msg.toByteArray())
+        writePacket(SshEnums.KexDh.SSH_MSG_KEXDH_INIT.id().toInt(), msg.toByteArray())
     }
 
     private suspend fun sendKexEcdhInit(kexEntry: KexEntry) {
@@ -972,7 +981,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), msg.toByteArray())
+        writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_INIT.id().toInt(), msg.toByteArray())
     }
 
     private suspend fun sendKexDhGexRequest(kexEntry: KexEntry) {
@@ -988,7 +997,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
+        writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
     }
 
     private suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) {
@@ -1079,7 +1088,7 @@ class SshConnection(
 
     private suspend fun sendNewKeys() {
         logger.debug("Sending NEW_KEYS")
-        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
+        writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
         if (strictKexEnabled) {
             packetIO.resetSendSequenceNumber()
         }
@@ -1230,7 +1239,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), msg.toByteArray())
+        writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), msg.toByteArray())
     }
 
     private fun receiveServiceAccept(service: String) {
@@ -1416,7 +1425,7 @@ class SshConnection(
         msg.setMaximumPacketSize(maximumPacketSize.toLong())
         msg._check()
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION.id().toInt(),
             msg.toByteArray()
         )
@@ -1435,7 +1444,7 @@ class SshConnection(
         msg.setLanguageTag(createByteString(languageTag.toByteArray(Charsets.UTF_8)))
         msg._check()
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE.id().toInt(),
             msg.toByteArray()
         )
@@ -1474,7 +1483,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
             msg.toByteArray()
         )
@@ -1494,7 +1503,7 @@ class SshConnection(
 
     private suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
         logger.debug("Sending CHANNEL_REQUEST: $requestType (channel=$recipientChannel, wantReply=$wantReply)")
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
             message.toByteArray()
         )
@@ -1520,7 +1529,7 @@ class SshConnection(
 
         if (wantReply) {
             logger.debug("Sending REQUEST_FAILURE for unhandled global request: $requestName")
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE.id().toInt())
+            writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE.id().toInt())
         }
     }
 
@@ -1564,7 +1573,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
             msg.toByteArray()
         )
@@ -1595,7 +1604,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
             msg.toByteArray()
         )
@@ -1633,7 +1642,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
             msg.toByteArray()
         )
@@ -1997,7 +2006,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(),
             msg.toByteArray()
         )
@@ -2010,7 +2019,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(),
             msg.toByteArray()
         )
@@ -2022,7 +2031,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(),
             msg.toByteArray()
         )
@@ -2048,7 +2057,7 @@ class SshConnection(
                 setLanguage(createAsciiString(""))
                 _check()
             }
-            packetIO.writePacket(
+            writePacket(
                 SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(),
                 msg.toByteArray()
             )
@@ -2214,7 +2223,7 @@ class SshConnection(
             _check()
         }
 
-        packetIO.writePacket(
+        writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
             msg.toByteArray()
         )
