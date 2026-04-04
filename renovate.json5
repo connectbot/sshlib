@@ -3,6 +3,9 @@
   "extends": [
     "config:recommended"
   ],
+  ignorePresets": [
+    "ignoreModulesAndTests"
+  ],
   "customManagers": [
     {
       "customType": "regex",
