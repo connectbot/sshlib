@@ -44,8 +44,8 @@ class SessionChannelTest {
             localChannelNumber = 0,
             _remoteChannelNumber = 1,
             maxPacketSize = 32 * 1024,
-            remoteWindowSize = 64 * 1024L,
-            initialWindowSize = initialWindowSize,
+            remoteWindowSizeInitial = 64 * 1024L,
+            initialWindowSize = initialWindowSize
         )
         return channel to connection
     }

@@ -96,7 +96,7 @@ internal class RemotePortForwarder(
                 localChannelNumber,
                 senderChannel,
                 maxPacketSize,
-                remoteWindowSize = initialWindow,
+                remoteWindowSizeInitial = initialWindow,
                 initialWindowSize = 256 * 1024
             )
             connection.registerForwardingChannel(fwdChannel)

@@ -25,7 +25,7 @@ internal class ForwardingChannel(
     val localChannelNumber: Int,
     var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
-    private var remoteWindowSize: Long,
+    remoteWindowSizeInitial: Long,
     private val initialWindowSize: Int = 256 * 1024,
 ) {
     companion object {
@@ -36,6 +36,9 @@ internal class ForwardingChannel(
     private var _isOpen = true
     private var closeSent = false
     private var localWindowSize: Long = initialWindowSize.toLong()
+
+    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val _incomingData = Channel<ByteArray>(Channel.UNLIMITED)
     val incomingData: ReceiveChannel<ByteArray> get() = _incomingData
@@ -55,6 +58,9 @@ internal class ForwardingChannel(
     internal fun onWindowAdjust(bytesToAdd: Long) {
         remoteWindowSize += bytesToAdd
         logger.debug("Forwarding channel window adjust +$bytesToAdd, remote window now $remoteWindowSize")
+        if (remoteWindowSize > 0) {
+            windowAvailable.trySend(Unit)
+        }
     }
 
     internal fun onEof() {
@@ -74,13 +80,14 @@ internal class ForwardingChannel(
         }
         _isOpen = false
         _incomingData.close()
+        windowAvailable.close()
     }
 
     suspend fun sendData(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
             while (remoteWindowSize <= 0) {
-                kotlinx.coroutines.delay(10)
+                windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,

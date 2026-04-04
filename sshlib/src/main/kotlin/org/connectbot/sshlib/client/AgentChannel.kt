@@ -16,7 +16,7 @@
 
 package org.connectbot.sshlib.client
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.channels.Channel
 import org.slf4j.LoggerFactory
 
 internal class AgentChannel(
@@ -25,7 +25,7 @@ internal class AgentChannel(
     private val localChannelNumber: Int,
     private var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
-    private var remoteWindowSize: Long,
+    remoteWindowSizeInitial: Long,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(AgentChannel::class.java)
@@ -33,6 +33,9 @@ internal class AgentChannel(
 
     private var _isOpen = true
     private var closeSent = false
+
+    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     val isOpen: Boolean get() = _isOpen
 
@@ -53,6 +56,9 @@ internal class AgentChannel(
     fun onWindowAdjust(bytesToAdd: Long) {
         remoteWindowSize += bytesToAdd
         logger.debug("Agent channel window adjust +$bytesToAdd, remote window now $remoteWindowSize")
+        if (remoteWindowSize > 0) {
+            windowAvailable.trySend(Unit)
+        }
     }
 
     fun onEof() {
@@ -70,13 +76,14 @@ internal class AgentChannel(
             }
         }
         _isOpen = false
+        windowAvailable.close()
     }
 
     private suspend fun sendData(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
             while (remoteWindowSize <= 0) {
-                kotlinx.coroutines.delay(10)
+                windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,
