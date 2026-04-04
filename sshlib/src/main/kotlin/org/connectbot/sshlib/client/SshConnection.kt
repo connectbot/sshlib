@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -260,9 +259,9 @@ class SshConnection(
 
     /**
      * Initiate SSH connection.
-     * This is a blocking call that returns when authentication is complete.
+     * This returns when authentication is complete.
      */
-    fun connect(): Boolean = runBlocking {
+    suspend fun connect(): Boolean {
         try {
             dispatchEvent(SshClientStateMachine.SshEvent.Connect)
 
@@ -359,10 +358,10 @@ class SshConnection(
 
             logger.info("SSH connection established successfully")
             startPacketLoop()
-            return@runBlocking true
+            return true
         } catch (e: Exception) {
             logger.error("SSH connection failed", e)
-            return@runBlocking false
+            return false
         }
     }
 
@@ -1754,7 +1753,7 @@ class SshConnection(
                 val fwdChannel = forwardingChannelsByRemote[recipientChannel]
                 when {
                     channel != null -> channel.onData(msg.data().data())
-                    agentChannel != null -> runBlocking { agentChannel.handleData(msg.data().data()) }
+                    agentChannel != null -> agentChannel.handleData(msg.data().data())
                     fwdChannel != null -> fwdChannel.onData(msg.data().data())
                     else -> logger.warn("Data for unknown channel $recipientChannel")
                 }

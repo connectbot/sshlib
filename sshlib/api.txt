@@ -364,7 +364,7 @@ package org.connectbot.sshlib.client {
     method public suspend java.lang.Object? authenticateKeyboardInteractive(java.lang.String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? authenticatePassword(java.lang.String username, java.lang.String password, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public boolean connect();
+    method public suspend java.lang.Object? connect(kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
     method @InaccessibleFromKotlin public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> getDisconnectedFlow();
     method public suspend java.lang.Object? openSessionChannel(optional int initialWindowSize, optional int maxPacketSize, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.client.SessionChannel?>);
