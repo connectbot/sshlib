@@ -17,7 +17,6 @@
 package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
-import java.util.Base64
 
 internal object PrivateKeyReader {
 
@@ -28,7 +27,7 @@ internal object PrivateKeyReader {
         return when {
             trimmed.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----") -> {
                 val base64 = extractBase64(trimmed, "-----BEGIN OPENSSH PRIVATE KEY-----", "-----END OPENSSH PRIVATE KEY-----")
-                val data = Base64.getDecoder().decode(base64)
+                val data = Base64Compat.decode(base64)
                 OpenSshKeyReader.read(data, passphrase)
             }
 
@@ -49,7 +48,7 @@ internal object PrivateKeyReader {
         return when {
             trimmed.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----") -> {
                 val base64 = extractBase64(trimmed, "-----BEGIN OPENSSH PRIVATE KEY-----", "-----END OPENSSH PRIVATE KEY-----")
-                val data = Base64.getDecoder().decode(base64)
+                val data = Base64Compat.decode(base64)
                 OpenSshKeyReader.isEncrypted(data)
             }
 
