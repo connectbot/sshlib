@@ -210,10 +210,10 @@ class SshConnection(
 
     private var nextLocalChannelNumber = 0
     private val channelNumberLock = Mutex()
-    private val channels = mutableMapOf<Int, SessionChannel>()
-    private val channelsByRemote = mutableMapOf<Int, SessionChannel>()
-    private val agentChannels = mutableMapOf<Int, AgentChannel>()
-    private val agentChannelsByRemote = mutableMapOf<Int, AgentChannel>()
+    private val channels = ConcurrentHashMap<Int, SessionChannel>()
+    private val channelsByRemote = ConcurrentHashMap<Int, SessionChannel>()
+    private val agentChannels = ConcurrentHashMap<Int, AgentChannel>()
+    private val agentChannelsByRemote = ConcurrentHashMap<Int, AgentChannel>()
     private val forwardingChannels = ConcurrentHashMap<Int, ForwardingChannel>()
     private val forwardingChannelsByRemote = ConcurrentHashMap<Int, ForwardingChannel>()
 
