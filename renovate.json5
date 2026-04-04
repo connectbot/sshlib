@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  ignorePresets": [
+  "ignorePresets": [
     "ignoreModulesAndTests"
   ],
   "customManagers": [
