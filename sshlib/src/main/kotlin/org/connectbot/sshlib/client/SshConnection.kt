@@ -221,16 +221,16 @@ class SshConnection(
     private var serverHostKeyBlob: ByteArray? = null
 
     // Pending async operations - completed by callbacks
-    private var pendingAuth: CompletableDeferred<Boolean>? = null
-    private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
+    @Volatile private var pendingAuth: CompletableDeferred<Boolean>? = null
+    @Volatile private var pendingChannelOpen: CompletableDeferred<SshMsgChannelOpenConfirmation?>? = null
     private class PendingChannelOpen(
         val deferred: CompletableDeferred<ForwardingChannel?>,
         val maxPacketSize: Int,
         val initialWindowSize: Int,
     )
     private val pendingChannelOpens = ConcurrentHashMap<Int, PendingChannelOpen>()
-    private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
-    private var pendingGlobalRequest: CompletableDeferred<ByteArray?>? = null
+    @Volatile private var pendingChannelRequest: CompletableDeferred<Boolean>? = null
+    @Volatile private var pendingGlobalRequest: CompletableDeferred<ByteArray?>? = null
 
     private val remoteForwarders = ConcurrentHashMap<String, suspend (connectedAddr: String, connectedPort: Int, originAddr: String, originPort: Int, senderChannel: Int, initialWindow: Long, maxPacketSize: Int) -> Unit>()
 
