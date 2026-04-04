@@ -83,12 +83,12 @@ class SshClientIntegrationTest {
             ImageFromDockerfile(opensshImageName(), false)
                 .withFileFromClasspath(".", "openssh-server")
                 .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
-                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS)
+                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS),
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)
             .waitingFor(
-                Wait.forLogMessage(".*Server listening.*", 1)
+                Wait.forLogMessage(".*Server listening.*", 1),
             )
 
         @JvmStatic
@@ -99,7 +99,7 @@ class SshClientIntegrationTest {
             "aes256-ctr",
             "aes128-cbc",
             "aes256-cbc",
-            "3des-cbc"
+            "3des-cbc",
         )
 
         @JvmStatic
@@ -113,13 +113,13 @@ class SshClientIntegrationTest {
             "diffie-hellman-group14-sha256",
             "diffie-hellman-group14-sha1",
             "diffie-hellman-group-exchange-sha1",
-            "diffie-hellman-group1-sha1"
+            "diffie-hellman-group1-sha1",
         )
 
         @JvmStatic
         fun hostKeyAlgorithms() = listOf(
             "rsa-sha2-256",
-            "rsa-sha2-512"
+            "rsa-sha2-512",
         )
 
         @JvmStatic
@@ -127,7 +127,7 @@ class SshClientIntegrationTest {
             "hmac-sha2-256-etm@openssh.com",
             "hmac-sha2-512-etm@openssh.com",
             "hmac-sha2-256",
-            "hmac-sha2-512"
+            "hmac-sha2-512",
         )
     }
 
@@ -724,7 +724,7 @@ class SshClientIntegrationTest {
             val initPacket = byteArrayOf(
                 0, 0, 0, 5, // length: 5 bytes (type + version)
                 1, // SSH_FXP_INIT
-                0, 0, 0, 3 // version 3
+                0, 0, 0, 3, // version 3
             )
             session.write(initPacket)
 
@@ -1061,7 +1061,7 @@ class SshClientIntegrationTest {
                 this.macAlgorithms = "hmac-sha2-256"
                 this.kexAlgorithms = "ecdh-sha2-nistp256"
                 this.enableCompression = false
-            }
+            },
         )
 
         try {
@@ -1127,7 +1127,7 @@ class SshClientIntegrationTest {
                 this.macAlgorithms = "hmac-sha2-256"
                 this.kexAlgorithms = "ecdh-sha2-nistp256"
                 this.enableCompression = false
-            }
+            },
         )
 
         try {

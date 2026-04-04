@@ -29,7 +29,7 @@ class ChaCha20Poly1305CipherTest {
     fun `Poly1305 RFC 8439 test vector`() {
         val key = hexToBytes(
             "85d6be7857556d337f4452fe42d506a8" +
-                "0103808afb0db2fd4abff6af4149f51b"
+                "0103808afb0db2fd4abff6af4149f51b",
         )
         val message = "Cryptographic Forum Research Group".toByteArray(Charsets.US_ASCII)
         val expectedTag = hexToBytes("a8061dc1305136c6c22b8baf0c0127a9")
@@ -47,7 +47,7 @@ class ChaCha20Poly1305CipherTest {
     fun `Poly1305 with multi-block input`() {
         val key = hexToBytes(
             "85d6be7857556d337f4452fe42d506a8" +
-                "0103808afb0db2fd4abff6af4149f51b"
+                "0103808afb0db2fd4abff6af4149f51b",
         )
         val message = "Cryptographic Forum Research Group".toByteArray(Charsets.US_ASCII)
 

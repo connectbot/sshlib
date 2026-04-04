@@ -43,7 +43,7 @@ internal class Curve25519KeyExchange(
 
         if (serverPublicKey.size != X25519Provider.KEY_SIZE) {
             throw SshException(
-                "Invalid server key length ${serverPublicKey.size} (expected ${X25519Provider.KEY_SIZE})"
+                "Invalid server key length ${serverPublicKey.size} (expected ${X25519Provider.KEY_SIZE})",
             )
         }
 

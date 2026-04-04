@@ -59,7 +59,7 @@ internal class KeyDerivation(
         encryptionKeyClientToServer = deriveKey('C', keyLength),
         encryptionKeyServerToClient = deriveKey('D', keyLength),
         integrityKeyClientToServer = deriveKey('E', macKeyLength),
-        integrityKeyServerToClient = deriveKey('F', macKeyLength)
+        integrityKeyServerToClient = deriveKey('F', macKeyLength),
     )
 
     /**

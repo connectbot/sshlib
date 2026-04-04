@@ -157,7 +157,7 @@ class SshClient private constructor(
             encryptionAlgorithms = config.encryptionAlgorithms,
             macAlgorithms = config.macAlgorithms,
             compressionAlgorithms = config.compressionAlgorithms,
-            preferPasswordAuth = config.preferPasswordAuth
+            preferPasswordAuth = config.preferPasswordAuth,
         )
         val result = sshConnection.connect()
 
@@ -553,7 +553,7 @@ class SshClient private constructor(
                 remoteHost,
                 remotePort,
                 originAddr,
-                originPort
+                originPort,
             )
         } catch (e: Exception) {
             logger.error("Failed to start stream forwarding", e)
@@ -605,7 +605,7 @@ class SshClient private constructor(
                 remoteHost,
                 remotePort,
                 originAddr,
-                originPort
+                originPort,
             ) ?: throw SshException("Failed to open direct-tcpip channel to $remoteHost:$remotePort")
             ForwardingChannelTransport(channel)
         }

@@ -45,7 +45,7 @@ class AuthMethodTest {
             AuthMethod.Password to "password",
             AuthMethod.PublicKey to "publickey",
             AuthMethod.KeyboardInteractive to "keyboard-interactive",
-            AuthMethod.Unknown("gssapi-with-mic") to "gssapi-with-mic"
+            AuthMethod.Unknown("gssapi-with-mic") to "gssapi-with-mic",
         ).forEach { (method, name) ->
             assertEquals(name, AuthMethod.toSshName(method))
         }

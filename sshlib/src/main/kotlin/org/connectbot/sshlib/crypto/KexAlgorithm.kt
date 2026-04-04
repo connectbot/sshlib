@@ -68,8 +68,8 @@ internal interface KexAlgorithm {
                     (len shr 24).toByte(),
                     (len shr 16).toByte(),
                     (len shr 8).toByte(),
-                    len.toByte()
-                )
+                    len.toByte(),
+                ),
             )
             transcript.write(data)
         }

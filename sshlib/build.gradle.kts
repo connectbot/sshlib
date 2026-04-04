@@ -78,7 +78,7 @@ spotless {
             fileTree(".") {
                 include("**/*.gradle.kts")
                 exclude("**/build", "**/out")
-            }
+            },
         )
         ktlint()
     }
@@ -92,7 +92,7 @@ spotless {
             fileTree(".") {
                 include("config/**/*.xml", "lib/**/*.xml", "test-app/**/*.xml")
                 exclude("**/build", "**/out")
-            }
+            },
         )
     }
 

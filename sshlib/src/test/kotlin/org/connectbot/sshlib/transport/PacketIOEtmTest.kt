@@ -46,7 +46,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         writeIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
@@ -61,7 +61,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         val parsed = readIO.readPacket()
@@ -80,7 +80,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCtrCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         writeIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
@@ -95,7 +95,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCtrCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         val parsed = readIO.readPacket()
@@ -116,7 +116,7 @@ class PacketIOEtmTest {
                 serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
                 serverToClientMac = HmacSha256(macKey.copyOf()),
                 clientToServerEtm = true,
-                serverToClientEtm = true
+                serverToClientEtm = true,
             )
 
             val payload = ByteArray(payloadSize)
@@ -127,7 +127,7 @@ class PacketIOEtmTest {
             assertEquals(
                 0,
                 encryptedPayloadSize % blockSize,
-                "Encrypted payload not block-aligned for payloadSize=$payloadSize"
+                "Encrypted payload not block-aligned for payloadSize=$payloadSize",
             )
         }
     }
@@ -146,7 +146,7 @@ class PacketIOEtmTest {
             serverToClientCipher = TripleDesCbcCipher(tripleDesKey, tripleDesIv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         writeIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
@@ -165,7 +165,7 @@ class PacketIOEtmTest {
             serverToClientCipher = TripleDesCbcCipher(tripleDesKey, tripleDesIv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         val parsed = readIO.readPacket()
@@ -184,7 +184,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         val messageType = SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()
@@ -202,7 +202,7 @@ class PacketIOEtmTest {
             serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
             serverToClientMac = HmacSha256(macKey.copyOf()),
             clientToServerEtm = true,
-            serverToClientEtm = true
+            serverToClientEtm = true,
         )
 
         for (i in 1..3) {

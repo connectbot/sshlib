@@ -125,7 +125,7 @@ class AlgorithmsTest {
         for (entry in CipherEntry.entries) {
             assertTrue(
                 CipherEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString"
+                "${entry.sshName} not found in defaultString",
             )
         }
     }
@@ -190,7 +190,7 @@ class AlgorithmsTest {
         for (entry in MacEntry.entries) {
             assertTrue(
                 MacEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString"
+                "${entry.sshName} not found in defaultString",
             )
         }
     }
@@ -267,7 +267,7 @@ class AlgorithmsTest {
         for (entry in KexEntry.defaults) {
             assertTrue(
                 KexEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString"
+                "${entry.sshName} not found in defaultString",
             )
         }
     }
@@ -307,7 +307,7 @@ class AlgorithmsTest {
         for (entry in SignatureEntry.entries) {
             assertTrue(
                 SignatureEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString"
+                "${entry.sshName} not found in defaultString",
             )
         }
     }

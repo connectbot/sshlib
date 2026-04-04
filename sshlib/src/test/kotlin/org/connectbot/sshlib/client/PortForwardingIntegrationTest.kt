@@ -63,12 +63,12 @@ class PortForwardingIntegrationTest {
         @JvmStatic
         val opensshContainer: GenericContainer<*> = GenericContainer(
             ImageFromDockerfile("openssh-server-fwd-test", false)
-                .withFileFromClasspath(".", "openssh-server")
+                .withFileFromClasspath(".", "openssh-server"),
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)
             .waitingFor(
-                Wait.forLogMessage(".*Server listening.*", 1)
+                Wait.forLogMessage(".*Server listening.*", 1),
             )
     }
 
@@ -100,7 +100,7 @@ class PortForwardingIntegrationTest {
             val forwarder = client.localPortForward(
                 InetSocketAddress("127.0.0.1", 0),
                 "127.0.0.1",
-                22
+                22,
             )
             assertNotNull(forwarder, "Should create local port forwarder")
             assertTrue(forwarder!!.isActive, "Forwarder should be active")
@@ -167,7 +167,7 @@ class PortForwardingIntegrationTest {
                 "127.0.0.1",
                 0,
                 "127.0.0.1",
-                localPort
+                localPort,
             )
             assertNotNull(forwarder, "Should create remote port forwarder")
             assertTrue(forwarder!!.isActive, "Forwarder should be active")
@@ -196,7 +196,7 @@ class PortForwardingIntegrationTest {
 
         try {
             val forwarder = client.dynamicPortForward(
-                InetSocketAddress("127.0.0.1", 0)
+                InetSocketAddress("127.0.0.1", 0),
             )
             assertNotNull(forwarder, "Should create dynamic port forwarder")
             assertTrue(forwarder!!.isActive)
@@ -226,8 +226,8 @@ class PortForwardingIntegrationTest {
                     0x05, 0x01, 0x00, // version, CMD_CONNECT, RSV
                     0x01, // ATYP IPv4
                     127, 0, 0, 1, // 127.0.0.1
-                    0x00, 0x16 // port 22
-                )
+                    0x00, 0x16, // port 22
+                ),
             )
             out.flush()
 
@@ -268,7 +268,7 @@ class PortForwardingIntegrationTest {
             assertTrue(targetClient.connect() is ConnectResult.Success, "Should connect through jump host")
             assertTrue(
                 targetClient.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success,
-                "Should authenticate through jump host"
+                "Should authenticate through jump host",
             )
 
             // Open a session on the target and run a command
@@ -286,7 +286,7 @@ class PortForwardingIntegrationTest {
             }
             assertTrue(
                 output.contains("jump-test-ok"),
-                "Should receive command output through jump host, got: $output"
+                "Should receive command output through jump host, got: $output",
             )
 
             session.close()
@@ -307,7 +307,7 @@ class PortForwardingIntegrationTest {
 
             val forwarder = client.dynamicPortForward(
                 InetSocketAddress("127.0.0.1", 0),
-                authenticator
+                authenticator,
             )
             assertNotNull(forwarder)
             assertTrue(forwarder!!.isActive)

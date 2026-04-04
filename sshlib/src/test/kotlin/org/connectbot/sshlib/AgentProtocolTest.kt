@@ -106,7 +106,7 @@ class AgentProtocolTest {
         val testProvider = object : AgentProvider {
             override suspend fun getIdentities(): List<AgentIdentity> = listOf(
                 AgentIdentity(byteArrayOf(1, 2, 3), "key1"),
-                AgentIdentity(byteArrayOf(4, 5, 6), "key2")
+                AgentIdentity(byteArrayOf(4, 5, 6), "key2"),
             )
 
             override suspend fun signData(context: AgentSigningContext): ByteArray? = null
@@ -114,7 +114,7 @@ class AgentProtocolTest {
 
         val sessionInfo = AgentSessionInfo(
             sessionId = byteArrayOf(1, 2, 3),
-            serverHostKey = byteArrayOf(4, 5, 6)
+            serverHostKey = byteArrayOf(4, 5, 6),
         )
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
@@ -145,7 +145,7 @@ class AgentProtocolTest {
 
         val sessionInfo = AgentSessionInfo(
             sessionId = byteArrayOf(1, 2, 3),
-            serverHostKey = byteArrayOf(4, 5, 6)
+            serverHostKey = byteArrayOf(4, 5, 6),
         )
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
@@ -181,7 +181,7 @@ class AgentProtocolTest {
 
         val sessionInfo = AgentSessionInfo(
             sessionId = byteArrayOf(1, 2, 3),
-            serverHostKey = byteArrayOf(4, 5, 6)
+            serverHostKey = byteArrayOf(4, 5, 6),
         )
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
@@ -216,7 +216,7 @@ class AgentProtocolTest {
 
         val sessionInfo = AgentSessionInfo(
             sessionId = byteArrayOf(10, 11, 12),
-            serverHostKey = byteArrayOf(13, 14, 15)
+            serverHostKey = byteArrayOf(13, 14, 15),
         )
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)

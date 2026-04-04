@@ -134,7 +134,7 @@ class DiffieHellmanGroupExchangeTest {
             ByteArray(1),
             ByteArray(1),
             ByteArray(1),
-            ByteArray(1)
+            ByteArray(1),
         )
         assertEquals(32, h.size)
     }
@@ -152,7 +152,7 @@ class DiffieHellmanGroupExchangeTest {
             ByteArray(1),
             ByteArray(1),
             ByteArray(1),
-            ByteArray(1)
+            ByteArray(1),
         )
         assertEquals(20, h.size)
     }

@@ -35,7 +35,7 @@ internal enum class CipherEntry(
         0,
         8,
         true,
-        { key, _, _ -> EncryptionInstance.Aead(ChaCha20Poly1305Cipher(key)) }
+        { key, _, _ -> EncryptionInstance.Aead(ChaCha20Poly1305Cipher(key)) },
     ),
     AES128_GCM(
         "aes128-gcm@openssh.com",
@@ -43,7 +43,7 @@ internal enum class CipherEntry(
         12,
         16,
         true,
-        { key, iv, _ -> EncryptionInstance.Aead(AesGcmCipher(key, iv)) }
+        { key, iv, _ -> EncryptionInstance.Aead(AesGcmCipher(key, iv)) },
     ),
     AES256_GCM(
         "aes256-gcm@openssh.com",
@@ -51,7 +51,7 @@ internal enum class CipherEntry(
         12,
         16,
         true,
-        { key, iv, _ -> EncryptionInstance.Aead(AesGcmCipher(key, iv)) }
+        { key, iv, _ -> EncryptionInstance.Aead(AesGcmCipher(key, iv)) },
     ),
     AES128_CTR(
         "aes128-ctr",
@@ -59,7 +59,7 @@ internal enum class CipherEntry(
         16,
         16,
         false,
-        { key, iv, enc -> EncryptionInstance.Cipher(AesCtrCipher(key, iv, enc)) }
+        { key, iv, enc -> EncryptionInstance.Cipher(AesCtrCipher(key, iv, enc)) },
     ),
     AES256_CTR(
         "aes256-ctr",
@@ -67,7 +67,7 @@ internal enum class CipherEntry(
         16,
         16,
         false,
-        { key, iv, enc -> EncryptionInstance.Cipher(AesCtrCipher(key, iv, enc)) }
+        { key, iv, enc -> EncryptionInstance.Cipher(AesCtrCipher(key, iv, enc)) },
     ),
     AES128_CBC(
         "aes128-cbc",
@@ -75,7 +75,7 @@ internal enum class CipherEntry(
         16,
         16,
         false,
-        { key, iv, enc -> EncryptionInstance.Cipher(AesCbcCipher(key, iv, enc)) }
+        { key, iv, enc -> EncryptionInstance.Cipher(AesCbcCipher(key, iv, enc)) },
     ),
     AES256_CBC(
         "aes256-cbc",
@@ -83,7 +83,7 @@ internal enum class CipherEntry(
         16,
         16,
         false,
-        { key, iv, enc -> EncryptionInstance.Cipher(AesCbcCipher(key, iv, enc)) }
+        { key, iv, enc -> EncryptionInstance.Cipher(AesCbcCipher(key, iv, enc)) },
     ),
     TRIPLE_DES_CBC(
         "3des-cbc",
@@ -91,7 +91,7 @@ internal enum class CipherEntry(
         8,
         8,
         false,
-        { key, iv, enc -> EncryptionInstance.Cipher(TripleDesCbcCipher(key, iv, enc)) }
+        { key, iv, enc -> EncryptionInstance.Cipher(TripleDesCbcCipher(key, iv, enc)) },
     ),
     ;
 
@@ -118,42 +118,42 @@ internal enum class MacEntry(
         32,
         32,
         true,
-        { key -> HmacSha256(key.copyOf(32)) }
+        { key -> HmacSha256(key.copyOf(32)) },
     ),
     HMAC_SHA2_512_ETM(
         "hmac-sha2-512-etm@openssh.com",
         64,
         64,
         true,
-        { key -> HmacSha512(key.copyOf(64)) }
+        { key -> HmacSha512(key.copyOf(64)) },
     ),
     HMAC_SHA2_256(
         "hmac-sha2-256",
         32,
         32,
         false,
-        { key -> HmacSha256(key.copyOf(32)) }
+        { key -> HmacSha256(key.copyOf(32)) },
     ),
     HMAC_SHA2_512(
         "hmac-sha2-512",
         64,
         64,
         false,
-        { key -> HmacSha512(key.copyOf(64)) }
+        { key -> HmacSha512(key.copyOf(64)) },
     ),
     HMAC_SHA1_ETM(
         "hmac-sha1-etm@openssh.com",
         20,
         20,
         true,
-        { key -> HmacSha1(key.copyOf(20)) }
+        { key -> HmacSha1(key.copyOf(20)) },
     ),
     HMAC_SHA1(
         "hmac-sha1",
         20,
         20,
         false,
-        { key -> HmacSha1(key.copyOf(20)) }
+        { key -> HmacSha1(key.copyOf(20)) },
     ),
     ;
 
@@ -180,73 +180,73 @@ internal enum class KexEntry(
         "mlkem768x25519-sha256",
         "SHA-256",
         KexType.ECDH,
-        { MlKemHybridKeyExchange() }
+        { MlKemHybridKeyExchange() },
     ),
     CURVE25519_SHA256(
         "curve25519-sha256",
         "SHA-256",
         KexType.ECDH,
-        { Curve25519KeyExchange() }
+        { Curve25519KeyExchange() },
     ),
     ECDH_SHA2_NISTP256(
         "ecdh-sha2-nistp256",
         "SHA-256",
         KexType.ECDH,
-        { EcdhKeyExchange("nistp256") }
+        { EcdhKeyExchange("nistp256") },
     ),
     ECDH_SHA2_NISTP384(
         "ecdh-sha2-nistp384",
         "SHA-384",
         KexType.ECDH,
-        { EcdhKeyExchange("nistp384") }
+        { EcdhKeyExchange("nistp384") },
     ),
     ECDH_SHA2_NISTP521(
         "ecdh-sha2-nistp521",
         "SHA-512",
         KexType.ECDH,
-        { EcdhKeyExchange("nistp521") }
+        { EcdhKeyExchange("nistp521") },
     ),
     DH_GROUP18_SHA512(
         "diffie-hellman-group18-sha512",
         "SHA-512",
         KexType.DH,
-        { DiffieHellman("SHA-512", DhGroups.GROUP18_P, DhGroups.GENERATOR) }
+        { DiffieHellman("SHA-512", DhGroups.GROUP18_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP16_SHA512(
         "diffie-hellman-group16-sha512",
         "SHA-512",
         KexType.DH,
-        { DiffieHellman("SHA-512", DhGroups.GROUP16_P, DhGroups.GENERATOR) }
+        { DiffieHellman("SHA-512", DhGroups.GROUP16_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP_EXCHANGE_SHA256(
         "diffie-hellman-group-exchange-sha256",
         "SHA-256",
         KexType.DH_GEX,
-        { DiffieHellmanGroupExchange("SHA-256") }
+        { DiffieHellmanGroupExchange("SHA-256") },
     ),
     DH_GROUP14_SHA256(
         "diffie-hellman-group14-sha256",
         "SHA-256",
         KexType.DH,
-        { DiffieHellman("SHA-256", DhGroups.GROUP14_P, DhGroups.GENERATOR) }
+        { DiffieHellman("SHA-256", DhGroups.GROUP14_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP14_SHA1(
         "diffie-hellman-group14-sha1",
         "SHA-1",
         KexType.DH,
-        { DiffieHellman("SHA-1", DhGroups.GROUP14_P, DhGroups.GENERATOR) }
+        { DiffieHellman("SHA-1", DhGroups.GROUP14_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP_EXCHANGE_SHA1(
         "diffie-hellman-group-exchange-sha1",
         "SHA-1",
         KexType.DH_GEX,
-        { DiffieHellmanGroupExchange("SHA-1") }
+        { DiffieHellmanGroupExchange("SHA-1") },
     ),
     DH_GROUP1_SHA1(
         "diffie-hellman-group1-sha1",
         "SHA-1",
         KexType.DH,
-        { DiffieHellman("SHA-1", DhGroups.GROUP1_P, DhGroups.GENERATOR) }
+        { DiffieHellman("SHA-1", DhGroups.GROUP1_P, DhGroups.GENERATOR) },
     ),
     ;
 

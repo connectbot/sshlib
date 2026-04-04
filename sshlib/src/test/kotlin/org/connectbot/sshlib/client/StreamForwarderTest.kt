@@ -51,7 +51,7 @@ class StreamForwarderTest {
             input,
             output,
             "example.com",
-            80
+            80,
         )
         assertNotNull(forwarder)
         assertTrue(forwarder!!.isActive)
@@ -77,7 +77,7 @@ class StreamForwarderTest {
             input,
             output,
             "example.com",
-            80
+            80,
         )
         assertNull(forwarder)
     }
@@ -96,7 +96,7 @@ class StreamForwarderTest {
             input,
             output,
             "example.com",
-            80
+            80,
         )!!
 
         forwarder.stop()

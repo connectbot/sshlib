@@ -40,7 +40,7 @@ class ForwardingChannelTest {
             remoteChannelNumber = 1,
             maxPacketSize = maxPacketSize,
             remoteWindowSizeInitial = remoteWindowSize,
-            initialWindowSize = initialWindowSize
+            initialWindowSize = initialWindowSize,
         )
         return channel to connection
     }
@@ -111,7 +111,7 @@ class ForwardingChannelTest {
             localChannelNumber = 0,
             remoteChannelNumber = 1,
             maxPacketSize = 10,
-            remoteWindowSizeInitial = 100
+            remoteWindowSizeInitial = 100,
         )
 
         val data = ByteArray(25) { it.toByte() }

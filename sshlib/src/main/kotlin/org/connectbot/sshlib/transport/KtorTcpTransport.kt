@@ -58,7 +58,7 @@ class KtorTcpTransport internal constructor(
         port,
         DefaultAddressResolver(),
         null,
-        ipVersion
+        ipVersion,
     )
 
     private var socket: TransportSocket? = null

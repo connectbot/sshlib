@@ -96,8 +96,8 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
                     (len shr 24).toByte(),
                     (len shr 16).toByte(),
                     (len shr 8).toByte(),
-                    len.toByte()
-                )
+                    len.toByte(),
+                ),
             )
             transcript.write(data)
         }
@@ -108,8 +108,8 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
                     (value shr 24).toByte(),
                     (value shr 16).toByte(),
                     (value shr 8).toByte(),
-                    value.toByte()
-                )
+                    value.toByte(),
+                ),
             )
         }
 

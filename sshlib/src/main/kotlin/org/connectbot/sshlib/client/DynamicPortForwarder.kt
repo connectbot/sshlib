@@ -62,7 +62,7 @@ internal class DynamicPortForwarder(
                 handler,
                 serverSocket,
                 actualAddress.hostString,
-                actualAddress.port
+                actualAddress.port,
             )
             forwarder.startAcceptLoop()
             return forwarder
@@ -118,7 +118,7 @@ internal class DynamicPortForwarder(
             request.host,
             request.port,
             originAddr,
-            originPort
+            originPort,
         )
 
         if (sshChannel == null) {

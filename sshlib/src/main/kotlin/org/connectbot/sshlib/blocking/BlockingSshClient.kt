@@ -81,7 +81,7 @@ class BlockingSshClient internal constructor(
             this.port = port
             this.hostKeyVerifier = hostKeyVerifier
             this.clientVersion = clientVersion
-        }
+        },
     )
 
     /**

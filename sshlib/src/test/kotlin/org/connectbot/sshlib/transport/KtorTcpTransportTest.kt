@@ -56,8 +56,8 @@ class KtorTcpTransportTest {
         val factory = MockTcpSocketFactory(
             mapOf(
                 ipv4 to { MockSocket() },
-                ipv6 to { MockSocket() }
-            )
+                ipv6 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory)
@@ -80,8 +80,8 @@ class KtorTcpTransportTest {
                     delay(500) // Simulates timeout/slow connection
                     MockSocket()
                 },
-                ipv4 to { MockSocket() }
-            )
+                ipv4 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory)
@@ -112,8 +112,8 @@ class KtorTcpTransportTest {
                 ipv4 to {
                     delay(100)
                     socket4
-                }
-            )
+                },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory)
@@ -130,8 +130,8 @@ class KtorTcpTransportTest {
         val resolver = MockAddressResolver(mapOf("example.com" to listOf(addr)))
         val factory = MockTcpSocketFactory(
             mapOf(
-                addr to { throw RuntimeException("Connection refused") }
-            )
+                addr to { throw RuntimeException("Connection refused") },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory)
@@ -149,8 +149,8 @@ class KtorTcpTransportTest {
         val factory = MockTcpSocketFactory(
             mapOf(
                 ipv4 to { MockSocket() },
-                ipv6 to { MockSocket() }
-            )
+                ipv6 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
@@ -169,8 +169,8 @@ class KtorTcpTransportTest {
         val factory = MockTcpSocketFactory(
             mapOf(
                 ipv4 to { MockSocket() },
-                ipv6 to { MockSocket() }
-            )
+                ipv6 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV6_ONLY)
@@ -219,8 +219,8 @@ class KtorTcpTransportTest {
             mapOf(
                 ipv4a to { throw RuntimeException("refused") },
                 ipv4b to { MockSocket() },
-                ipv6 to { MockSocket() }
-            )
+                ipv6 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
@@ -239,8 +239,8 @@ class KtorTcpTransportTest {
         val factory = MockTcpSocketFactory(
             mapOf(
                 ipv4 to { MockSocket() },
-                ipv6 to { MockSocket() }
-            )
+                ipv6 to { MockSocket() },
+            ),
         )
 
         val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.AUTO)

@@ -55,7 +55,7 @@ internal object OpenSshKeyWriter {
                 password.toByteArray(Charsets.UTF_8),
                 salt,
                 DEFAULT_ROUNDS,
-                cipherName
+                cipherName,
             )
         } else {
             encrypted = false
@@ -70,7 +70,7 @@ internal object OpenSshKeyWriter {
             kdfName,
             kdfOptions,
             publicKeyBlob,
-            encryptedSection
+            encryptedSection,
         )
 
         return formatOutput(binaryData)
@@ -203,7 +203,7 @@ internal object OpenSshKeyWriter {
         (value ushr 24).toByte(),
         (value ushr 16).toByte(),
         (value ushr 8).toByte(),
-        value.toByte()
+        value.toByte(),
     )
 
     private fun formatOutput(data: ByteArray): String {
