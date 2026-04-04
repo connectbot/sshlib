@@ -27,6 +27,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -71,8 +72,10 @@ internal class DataForwarder(
 
     private suspend fun awaitFirst(vararg jobs: Job) {
         try {
-            while (jobs.all { it.isActive }) {
-                delay(50)
+            select {
+                jobs.forEach { job ->
+                    job.onJoin { }
+                }
             }
         } finally {
             jobs.forEach { it.cancel() }
