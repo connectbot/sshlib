@@ -6,8 +6,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "(^|/)[Dd]ockerfile[^/]*$"
+      "managerFilePatterns": [
+        "/(^|/)[Dd]ockerfile[^/]*$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)(?: extractVersion=(?<extractVersion>[^\\s]+))?(?: versioning=(?<versioning>[^\\s]+))?\\nARG [A-Z0-9_]+_VERSION=(?<currentValue>[^\\s]+)"
