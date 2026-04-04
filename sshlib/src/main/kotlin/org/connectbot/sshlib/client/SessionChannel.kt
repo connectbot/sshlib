@@ -25,6 +25,7 @@ import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestExec
 import org.connectbot.sshlib.protocol.ChannelRequestPtyReq
 import org.connectbot.sshlib.protocol.ChannelRequestShell
+import org.connectbot.sshlib.protocol.ChannelRequestSubsystem
 import org.connectbot.sshlib.protocol.ChannelRequestWindowChange
 import org.slf4j.LoggerFactory
 
@@ -228,6 +229,24 @@ class SessionChannel internal constructor(
             execReq.setCommand(cmdString)
             execReq._check()
             msg.setRequestSpecificFields(execReq)
+        }
+    }
+
+    override suspend fun requestSubsystem(name: String): Boolean {
+        logger.debug("Requesting subsystem on channel $localChannelNumber: $name")
+        return connection.sendChannelRequest(
+            _remoteChannelNumber,
+            "subsystem",
+            wantReply = true
+        ) { msg ->
+            val subsysReq = ChannelRequestSubsystem()
+            val nameString = ByteString()
+            nameString.setLenData(name.toByteArray(Charsets.US_ASCII).size.toLong())
+            nameString.setData(name.toByteArray(Charsets.US_ASCII))
+            nameString._check()
+            subsysReq.setSubsystemName(nameString)
+            subsysReq._check()
+            msg.setRequestSpecificFields(subsysReq)
         }
     }
 
