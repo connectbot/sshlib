@@ -16,8 +16,8 @@
 
 package org.connectbot.sshlib
 
+import org.connectbot.sshlib.crypto.Base64Compat
 import java.io.File
-import java.util.Base64
 
 /**
  * Verifies the identity of a server by checking its host key.
@@ -127,7 +127,7 @@ class KnownHostsVerifier(
         val hosts = parts[0].split(",")
         val algorithm = parts[1]
         val keyData = try {
-            Base64.getDecoder().decode(parts[2])
+            Base64Compat.decode(parts[2])
         } catch (e: IllegalArgumentException) {
             return null
         }

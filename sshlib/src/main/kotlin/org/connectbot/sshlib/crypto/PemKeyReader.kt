@@ -30,7 +30,6 @@ import java.security.spec.NamedParameterSpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.RSAPrivateCrtKeySpec
 import java.security.spec.RSAPublicKeySpec
-import java.util.Base64
 
 internal object PemKeyReader {
 
@@ -121,7 +120,7 @@ internal object PemKeyReader {
             i++
         }
 
-        val data = Base64.getDecoder().decode(base64Builder.toString())
+        val data = Base64Compat.decode(base64Builder.toString())
         if (data.isEmpty()) throw SshException("Invalid PEM: no data")
 
         return PemStructure(type, data, procType, dekInfo)

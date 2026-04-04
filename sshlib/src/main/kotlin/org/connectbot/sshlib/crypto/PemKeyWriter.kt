@@ -23,7 +23,6 @@ import java.security.SecureRandom
 import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPrivateCrtKey
-import java.util.Base64
 
 internal object PemKeyWriter {
 
@@ -136,7 +135,7 @@ internal object PemKeyWriter {
     }
 
     private fun wrapBase64(data: ByteArray): String {
-        val base64 = Base64.getEncoder().encodeToString(data)
+        val base64 = Base64Compat.encodeWithPadding(data)
         return base64.chunked(LINE_LENGTH).joinToString("\n")
     }
 }

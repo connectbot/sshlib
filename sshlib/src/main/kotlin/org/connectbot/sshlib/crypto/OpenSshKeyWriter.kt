@@ -24,7 +24,6 @@ import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
-import java.util.Base64
 
 internal object OpenSshKeyWriter {
 
@@ -210,7 +209,7 @@ internal object OpenSshKeyWriter {
     private fun formatOutput(data: ByteArray): String {
         val sb = StringBuilder()
         sb.appendLine("-----BEGIN OPENSSH PRIVATE KEY-----")
-        val base64 = Base64.getEncoder().encodeToString(data)
+        val base64 = Base64Compat.encodeWithPadding(data)
         sb.appendLine(base64.chunked(LINE_LENGTH).joinToString("\n"))
         sb.appendLine("-----END OPENSSH PRIVATE KEY-----")
         return sb.toString()

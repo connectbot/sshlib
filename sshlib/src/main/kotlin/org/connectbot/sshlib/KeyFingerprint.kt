@@ -16,8 +16,8 @@
 
 package org.connectbot.sshlib
 
+import org.connectbot.sshlib.crypto.Base64Compat
 import java.security.MessageDigest
-import java.util.Base64
 
 /**
  * SSH key fingerprint utilities.
@@ -46,7 +46,7 @@ object KeyFingerprint {
      */
     fun sha256(publicKeyBlob: ByteArray): String {
         val hash = MessageDigest.getInstance("SHA-256").digest(publicKeyBlob)
-        val base64 = Base64.getEncoder().encodeToString(hash).trimEnd('=')
+        val base64 = Base64Compat.encode(hash)
         return "SHA256:$base64"
     }
 
