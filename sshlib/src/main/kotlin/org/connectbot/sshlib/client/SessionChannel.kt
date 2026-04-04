@@ -124,7 +124,7 @@ class SessionChannel internal constructor(
             val chunkSize = minOf(
                 data.size - offset,
                 remoteWindowSize.toInt(),
-                maxPacketSize
+                maxPacketSize,
             )
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(_remoteChannelNumber, chunk)
@@ -151,7 +151,7 @@ class SessionChannel internal constructor(
         return connection.sendChannelRequest(
             _remoteChannelNumber,
             "window-change",
-            wantReply = false
+            wantReply = false,
         ) { msg ->
             val windowChange = ChannelRequestWindowChange()
             windowChange.setTerminalWidth(widthChars.toLong())
@@ -175,7 +175,7 @@ class SessionChannel internal constructor(
         return connection.sendChannelRequest(
             _remoteChannelNumber,
             "pty-req",
-            wantReply = true
+            wantReply = true,
         ) { msg ->
             val ptyReq = ChannelRequestPtyReq()
 
@@ -206,7 +206,7 @@ class SessionChannel internal constructor(
         return connection.sendChannelRequest(
             _remoteChannelNumber,
             "shell",
-            wantReply = true
+            wantReply = true,
         ) { msg ->
             val shellReq = ChannelRequestShell()
             shellReq._check()
@@ -219,7 +219,7 @@ class SessionChannel internal constructor(
         return connection.sendChannelRequest(
             _remoteChannelNumber,
             "exec",
-            wantReply = true
+            wantReply = true,
         ) { msg ->
             val execReq = ChannelRequestExec()
             val cmdString = ByteString()
@@ -237,7 +237,7 @@ class SessionChannel internal constructor(
         return connection.sendChannelRequest(
             _remoteChannelNumber,
             "subsystem",
-            wantReply = true
+            wantReply = true,
         ) { msg ->
             val subsysReq = ChannelRequestSubsystem()
             val nameString = ByteString()

@@ -96,7 +96,7 @@ class PacketIOTest {
             ((length shr 24) and 0xFF).toByte(),
             ((length shr 16) and 0xFF).toByte(),
             ((length shr 8) and 0xFF).toByte(),
-            (length and 0xFF).toByte()
+            (length and 0xFF).toByte(),
         )
         val transport = ByteArrayTransport(invalidLength)
         val io = PacketIO(transport)

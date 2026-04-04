@@ -63,7 +63,7 @@ internal class LocalPortForwarder(
                 remotePort,
                 serverSocket,
                 actualAddress.hostString,
-                actualAddress.port
+                actualAddress.port,
             )
             forwarder.startAcceptLoop()
             return forwarder
@@ -102,7 +102,7 @@ internal class LocalPortForwarder(
             remoteHost,
             remotePort,
             originAddr,
-            originPort
+            originPort,
         )
 
         if (sshChannel == null) {

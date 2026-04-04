@@ -42,7 +42,7 @@ internal class StreamForwarder private constructor(
                 remoteHost,
                 remotePort,
                 originAddr,
-                originPort
+                originPort,
             )
             if (sshChannel == null) {
                 logger.warn("Failed to open direct-tcpip channel for $remoteHost:$remotePort")

@@ -38,7 +38,7 @@ internal class KyberKotlinMlKemProvider : MlKemProvider {
             val keyPair = KyberKeyGenerator.generate(KyberParameter.ML_KEM_768, randomProvider)
             return MlKemKeyPair(
                 publicKey = keyPair.encapsulationKey.fullBytes,
-                privateKey = keyPair.decapsulationKey.fullBytes
+                privateKey = keyPair.decapsulationKey.fullBytes,
             )
         } catch (e: Exception) {
             throw IOException("Failed to generate Kyber key pair", e)
@@ -51,7 +51,7 @@ internal class KyberKotlinMlKemProvider : MlKemProvider {
             val result = encapsKey.encapsulate(randomProvider)
             return MlKemEncapsulationResult(
                 ciphertext = result.cipherText.fullBytes,
-                sharedSecret = result.sharedSecretKey
+                sharedSecret = result.sharedSecretKey,
             )
         } catch (e: Exception) {
             throw IOException("Kyber encapsulation failed", e)

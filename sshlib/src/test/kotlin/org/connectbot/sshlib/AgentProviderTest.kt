@@ -29,15 +29,15 @@ class AgentProviderTest {
     fun `AgentIdentity equality works correctly`() {
         val key1 = AgentIdentity(
             publicKeyBlob = byteArrayOf(1, 2, 3),
-            comment = "test-key"
+            comment = "test-key",
         )
         val key2 = AgentIdentity(
             publicKeyBlob = byteArrayOf(1, 2, 3),
-            comment = "test-key"
+            comment = "test-key",
         )
         val key3 = AgentIdentity(
             publicKeyBlob = byteArrayOf(1, 2, 4),
-            comment = "test-key"
+            comment = "test-key",
         )
 
         assertEquals(key1, key2)
@@ -53,7 +53,7 @@ class AgentProviderTest {
             flags = 0,
             sessionId = byteArrayOf(7, 8, 9),
             serverHostKey = byteArrayOf(10, 11, 12),
-            isBound = true
+            isBound = true,
         )
         val context2 = AgentSigningContext(
             publicKeyBlob = byteArrayOf(1, 2, 3),
@@ -61,7 +61,7 @@ class AgentProviderTest {
             flags = 0,
             sessionId = byteArrayOf(7, 8, 9),
             serverHostKey = byteArrayOf(10, 11, 12),
-            isBound = true
+            isBound = true,
         )
         val context3 = AgentSigningContext(
             publicKeyBlob = byteArrayOf(1, 2, 3),
@@ -69,7 +69,7 @@ class AgentProviderTest {
             flags = 0,
             sessionId = byteArrayOf(7, 8, 9),
             serverHostKey = byteArrayOf(10, 11, 12),
-            isBound = false
+            isBound = false,
         )
 
         assertEquals(context1, context2)
@@ -83,12 +83,12 @@ class AgentProviderTest {
             override suspend fun getIdentities(): List<AgentIdentity> = listOf(
                 AgentIdentity(
                     publicKeyBlob = byteArrayOf(1, 2, 3),
-                    comment = "test-key-1"
+                    comment = "test-key-1",
                 ),
                 AgentIdentity(
                     publicKeyBlob = byteArrayOf(4, 5, 6),
-                    comment = "test-key-2"
-                )
+                    comment = "test-key-2",
+                ),
             )
 
             override suspend fun signData(context: AgentSigningContext): ByteArray? = if (context.isBound) {
@@ -109,7 +109,7 @@ class AgentProviderTest {
             flags = 0,
             sessionId = byteArrayOf(7, 8, 9),
             serverHostKey = byteArrayOf(10, 11, 12),
-            isBound = true
+            isBound = true,
         )
         assertNotNull(testProvider.signData(boundContext))
 

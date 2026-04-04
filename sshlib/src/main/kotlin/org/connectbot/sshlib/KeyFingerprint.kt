@@ -30,7 +30,7 @@ object KeyFingerprint {
     private val VOWELS = charArrayOf('a', 'e', 'i', 'o', 'u', 'y')
     private val CONSONANTS = charArrayOf(
         'b', 'c', 'd', 'f', 'g', 'h', 'k', 'l', 'm',
-        'n', 'p', 'r', 's', 't', 'v', 'z', 'x'
+        'n', 'p', 'r', 's', 't', 'v', 'z', 'x',
     )
 
     private const val FLDBASE = 8

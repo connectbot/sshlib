@@ -133,7 +133,7 @@ class BlockingSshClientTest {
         val ex = assertThrows<SshException> { client.connect() }
         assertTrue(
             ex.message!!.contains(cause.toString()),
-            "Expected message to contain '$cause' but was '${ex.message}'"
+            "Expected message to contain '$cause' but was '${ex.message}'",
         )
     }
 

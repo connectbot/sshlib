@@ -45,7 +45,7 @@ class SessionChannelTest {
             _remoteChannelNumber = 1,
             maxPacketSize = 32 * 1024,
             remoteWindowSizeInitial = 64 * 1024L,
-            initialWindowSize = initialWindowSize
+            initialWindowSize = initialWindowSize,
         )
         return channel to connection
     }
@@ -65,7 +65,7 @@ class SessionChannelTest {
             widthChars = 120,
             heightRows = 40,
             widthPixels = 960,
-            heightPixels = 640
+            heightPixels = 640,
         )
 
         assertTrue(result)
@@ -84,7 +84,7 @@ class SessionChannelTest {
             widthChars = 80,
             heightRows = 24,
             widthPixels = 0,
-            heightPixels = 0
+            heightPixels = 0,
         )
 
         assertFalse(result)

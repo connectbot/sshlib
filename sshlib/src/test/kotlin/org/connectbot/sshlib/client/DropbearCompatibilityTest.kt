@@ -51,7 +51,7 @@ class DropbearCompatibilityTest {
             "ecdsa256_unencrypted.pub",
             "ecdsa384_unencrypted.pub",
             "ecdsa521_unencrypted.pub",
-            "rsa_unencrypted.pub"
+            "rsa_unencrypted.pub",
         )
 
         private val baseImage = ImageFromDockerfile("dropbear-server-test", false)
@@ -75,7 +75,7 @@ class DropbearCompatibilityTest {
         fun encryptionAlgorithms() = listOf(
             "aes128-ctr",
             "aes256-ctr",
-            "chacha20-poly1305@openssh.com"
+            "chacha20-poly1305@openssh.com",
         )
 
         @JvmStatic
@@ -85,12 +85,12 @@ class DropbearCompatibilityTest {
             "ecdh-sha2-nistp256",
             "ecdh-sha2-nistp384",
             "ecdh-sha2-nistp521",
-            "diffie-hellman-group14-sha256"
+            "diffie-hellman-group14-sha256",
         )
 
         @JvmStatic
         fun macAlgorithms() = listOf(
-            "hmac-sha2-256"
+            "hmac-sha2-256",
         )
 
         @JvmStatic
@@ -98,14 +98,14 @@ class DropbearCompatibilityTest {
             "ed25519_unencrypted",
             "ecdsa256_unencrypted",
             "ecdsa384_unencrypted",
-            "ecdsa521_unencrypted"
+            "ecdsa521_unencrypted",
         )
 
         @JvmStatic
         fun hostKeyConfigs() = listOf(
             HostKeyConfig("/etc/dropbear/dropbear_ed25519_host_key", "ssh-ed25519"),
             HostKeyConfig("/etc/dropbear/dropbear_ecdsa_host_key", "ecdsa-sha2-nistp256"),
-            HostKeyConfig("/etc/dropbear/dropbear_rsa_host_key", "rsa-sha2-256")
+            HostKeyConfig("/etc/dropbear/dropbear_rsa_host_key", "rsa-sha2-256"),
         )
 
         data class HostKeyConfig(val path: String, val algorithm: String) {

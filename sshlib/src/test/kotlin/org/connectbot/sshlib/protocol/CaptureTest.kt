@@ -144,7 +144,7 @@ class CaptureTest {
             assertEquals(
                 BigInteger(1, msg.mac()).toString(16),
                 BigInteger(1, computedMac).toString(16),
-                "MAC verification failed for packet $encryptedPacketCount (seqNum=$seqNum)"
+                "MAC verification failed for packet $encryptedPacketCount (seqNum=$seqNum)",
             )
 
             // Decrypt
@@ -221,7 +221,7 @@ class CaptureTest {
             0x4a.toByte(), 0xd0.toByte(), 0x83.toByte(), 0x35.toByte(),
             0x66.toByte(), 0xc6.toByte(), 0x2e.toByte(), 0xda.toByte(),
             0x2b.toByte(), 0xf4.toByte(), 0x5b.toByte(), 0x44.toByte(),
-            0x79.toByte(), 0xda.toByte(), 0xcb.toByte(), 0xc2.toByte()
+            0x79.toByte(), 0xda.toByte(), 0xcb.toByte(), 0xc2.toByte(),
         )
 
         // Key 'D' - Encryption key server-to-client
@@ -229,7 +229,7 @@ class CaptureTest {
             0xf0.toByte(), 0x6f.toByte(), 0xc5.toByte(), 0x74.toByte(),
             0x24.toByte(), 0x38.toByte(), 0x6c.toByte(), 0x6c.toByte(),
             0x53.toByte(), 0x53.toByte(), 0xa0.toByte(), 0x2b.toByte(),
-            0xa2.toByte(), 0xc0.toByte(), 0x45.toByte(), 0x82.toByte()
+            0xa2.toByte(), 0xc0.toByte(), 0x45.toByte(), 0x82.toByte(),
         )
 
         // Key 'F' - MAC key server-to-client
@@ -241,7 +241,7 @@ class CaptureTest {
             0xb6.toByte(), 0xfb.toByte(), 0x21.toByte(), 0x0d.toByte(),
             0x6d.toByte(), 0xa6.toByte(), 0xfc.toByte(), 0x5a.toByte(),
             0xe4.toByte(), 0x86.toByte(), 0x61.toByte(), 0xac.toByte(),
-            0x00.toByte(), 0x33.toByte(), 0xc4.toByte(), 0xce.toByte()
+            0x00.toByte(), 0x33.toByte(), 0xc4.toByte(), 0xce.toByte(),
         )
 
         private fun computeHmacSha256(key: ByteArray, seqNum: Int, encryptedLength: Long, encryptedPayload: ByteArray): ByteArray {

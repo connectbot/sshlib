@@ -29,7 +29,7 @@ internal class Ed25519Provider : Provider(NAME, 1.0, "ConnectBot Ed25519 JCA Pro
             PrivilegedAction {
                 setup()
                 null
-            }
+            },
         )
     }
 

@@ -162,7 +162,7 @@ class EcdhKeyExchangeTest {
             ByteArray(1),
             ByteArray(1),
             ByteArray(1),
-            ByteArray(1)
+            ByteArray(1),
         )
         assertEquals(32, h.size) // SHA-256 output
     }
@@ -180,7 +180,7 @@ class EcdhKeyExchangeTest {
             ByteArray(1),
             ByteArray(1),
             ByteArray(1),
-            ByteArray(1)
+            ByteArray(1),
         )
         assertEquals(48, h.size) // SHA-384 output
     }
@@ -198,7 +198,7 @@ class EcdhKeyExchangeTest {
             ByteArray(1),
             ByteArray(1),
             ByteArray(1),
-            ByteArray(1)
+            ByteArray(1),
         )
         assertEquals(64, h.size) // SHA-512 output
     }

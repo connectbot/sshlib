@@ -41,7 +41,7 @@ class AgentChannelTest {
         localChannel,
         remoteChannel,
         maxPacketSize,
-        initialWindowSize
+        initialWindowSize,
     )
 
     @Test
@@ -65,7 +65,7 @@ class AgentChannelTest {
             localChannel,
             remoteChannel,
             maxPacketSize,
-            0L
+            0L,
         )
 
         val request = byteArrayOf(1, 2, 3)

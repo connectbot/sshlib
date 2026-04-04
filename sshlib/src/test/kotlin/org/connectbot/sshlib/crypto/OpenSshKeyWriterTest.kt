@@ -77,7 +77,7 @@ class OpenSshKeyWriterTest {
         val decoded = PrivateKeyReader.read(encoded, "testpass").jcaKeyPair
         assertEquals(
             (original.public as RSAPublicKey).modulus,
-            (decoded.public as RSAPublicKey).modulus
+            (decoded.public as RSAPublicKey).modulus,
         )
     }
 
@@ -89,7 +89,7 @@ class OpenSshKeyWriterTest {
         val decoded = PrivateKeyReader.read(encoded, "testpass").jcaKeyPair
         assertEquals(
             (original.public as ECPublicKey).w,
-            (decoded.public as ECPublicKey).w
+            (decoded.public as ECPublicKey).w,
         )
     }
 }

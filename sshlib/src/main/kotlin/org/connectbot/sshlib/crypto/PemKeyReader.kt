@@ -285,7 +285,7 @@ internal object PemKeyReader {
                             val pubPoint = seq.readContextTag(1) { it.readBitString() }
                             val pubKeySpec = ECPublicKeySpec(
                                 EcdsaSignatureAlgorithm.decodeEcPoint(pubPoint, privKey.params),
-                                privKey.params
+                                privKey.params,
                             )
                             return@readSequence KeyFactory.getInstance("EC").generatePublic(pubKeySpec)
                         }

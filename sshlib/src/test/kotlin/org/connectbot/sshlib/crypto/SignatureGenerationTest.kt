@@ -36,7 +36,7 @@ class SignatureGenerationTest {
         val signatureBlob = sigEntry.algorithm.sign(
             privateKey.signatureAlgorithm,
             privateKey.jcaKeyPair.private,
-            data
+            data,
         )
 
         val pubKeyBlob = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)

@@ -32,7 +32,7 @@ internal object DhGroups {
             "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
             "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381" +
             "FFFFFFFFFFFFFFFF",
-        16
+        16,
     )
 
     /** 2048-bit MODP Group (RFC 3526 Section 3) */
@@ -48,7 +48,7 @@ internal object DhGroups {
             "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9" +
             "DE2BCBF6955817183995497CEA956AE515D2261898FA0510" +
             "15728E5A8AACAA68FFFFFFFFFFFFFFFF",
-        16
+        16,
     )
 
     /** 4096-bit MODP Group (RFC 3526 Section 5) */
@@ -75,7 +75,7 @@ internal object DhGroups {
             "1F612970CEE2D7AFB81BDD762170481CD0069127D5B05AA9" +
             "93B4EA988D8FDDC186FFB7DC90A6C08F4DF435C934063199" +
             "FFFFFFFFFFFFFFFF",
-        16
+        16,
     )
 
     /** 8192-bit MODP Group (RFC 3526 Section 7) */
@@ -123,6 +123,6 @@ internal object DhGroups {
             "4009438B481C6CD7889A002ED5EE382BC9190DA6FC026E47" +
             "9558E4475677E9AA9E3050E2765694DFC81F56E880B96E71" +
             "60C980DD98EDD3DFFFFFFFFFFFFFFFFF",
-        16
+        16,
     )
 }

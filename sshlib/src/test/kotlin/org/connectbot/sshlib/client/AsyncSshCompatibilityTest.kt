@@ -47,7 +47,7 @@ class AsyncSshCompatibilityTest {
             "ecdsa256_unencrypted.pub",
             "ecdsa384_unencrypted.pub",
             "ecdsa521_unencrypted.pub",
-            "rsa_unencrypted.pub"
+            "rsa_unencrypted.pub",
         )
 
         private val baseImage = ImageFromDockerfile("asyncssh-server-test", false)
@@ -73,7 +73,7 @@ class AsyncSshCompatibilityTest {
             "aes256-ctr",
             "aes128-cbc",
             "aes256-cbc",
-            "3des-cbc"
+            "3des-cbc",
         )
 
         @JvmStatic
@@ -88,7 +88,7 @@ class AsyncSshCompatibilityTest {
             "diffie-hellman-group14-sha256",
             "diffie-hellman-group14-sha1",
             "diffie-hellman-group-exchange-sha1",
-            "diffie-hellman-group1-sha1"
+            "diffie-hellman-group1-sha1",
         )
 
         @JvmStatic
@@ -98,7 +98,7 @@ class AsyncSshCompatibilityTest {
             "hmac-sha2-256",
             "hmac-sha2-512",
             "hmac-sha1-etm@openssh.com",
-            "hmac-sha1"
+            "hmac-sha1",
         )
 
         @JvmStatic
@@ -107,7 +107,7 @@ class AsyncSshCompatibilityTest {
             "ecdsa256_unencrypted",
             "ecdsa384_unencrypted",
             "ecdsa521_unencrypted",
-            "rsa_unencrypted"
+            "rsa_unencrypted",
         )
     }
 

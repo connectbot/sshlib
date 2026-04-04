@@ -109,7 +109,7 @@ internal class AgentProtocolHandler(
             flags = payload.flags().toInt(),
             sessionId = boundSessionId ?: sessionInfo.sessionId,
             serverHostKey = sessionInfo.serverHostKey,
-            isBound = sessionBound
+            isBound = sessionBound,
         )
 
         logger.debug("Requesting signature from provider (bound=$sessionBound, flags=${context.flags})")

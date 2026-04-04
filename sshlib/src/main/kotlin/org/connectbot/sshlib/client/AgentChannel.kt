@@ -88,7 +88,7 @@ internal class AgentChannel(
             val chunkSize = minOf(
                 data.size - offset,
                 remoteWindowSize.toInt(),
-                maxPacketSize
+                maxPacketSize,
             )
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(remoteChannelNumber, chunk)

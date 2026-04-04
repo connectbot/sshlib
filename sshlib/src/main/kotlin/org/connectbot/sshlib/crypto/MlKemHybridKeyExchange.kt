@@ -52,7 +52,7 @@ internal class MlKemHybridKeyExchange(
 
         if (mlKemPublicKey.size != MLKEM768_PUBLIC_KEY_SIZE) {
             throw SshException(
-                "Unexpected ML-KEM-768 public key size: ${mlKemPublicKey.size} (expected $MLKEM768_PUBLIC_KEY_SIZE)"
+                "Unexpected ML-KEM-768 public key size: ${mlKemPublicKey.size} (expected $MLKEM768_PUBLIC_KEY_SIZE)",
             )
         }
 
@@ -65,7 +65,7 @@ internal class MlKemHybridKeyExchange(
 
         if (x25519PublicKey.size != X25519_KEY_SIZE) {
             throw SshException(
-                "Unexpected X25519 public key size: ${x25519PublicKey.size} (expected $X25519_KEY_SIZE)"
+                "Unexpected X25519 public key size: ${x25519PublicKey.size} (expected $X25519_KEY_SIZE)",
             )
         }
 
@@ -84,7 +84,7 @@ internal class MlKemHybridKeyExchange(
         val expectedSize = MLKEM768_CIPHERTEXT_SIZE + X25519_KEY_SIZE
         if (serverPublicKey.size != expectedSize) {
             throw SshException(
-                "Invalid S_REPLY length: ${serverPublicKey.size} (expected $expectedSize)"
+                "Invalid S_REPLY length: ${serverPublicKey.size} (expected $expectedSize)",
             )
         }
 

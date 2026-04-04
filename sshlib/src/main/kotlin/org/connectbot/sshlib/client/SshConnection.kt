@@ -388,7 +388,7 @@ class SshConnection(
                     val dhGex = kex as DiffieHellmanGroupExchange
                     dhGex.setGroup(
                         BigInteger(1, group.p().body()),
-                        BigInteger(1, group.g().body())
+                        BigInteger(1, group.g().body()),
                     )
                     clientPublicKey = dhGex.generateClientKeys()
 
@@ -398,7 +398,7 @@ class SshConnection(
                     }
                     writePacket(
                         SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
-                        initMsg.toByteArray()
+                        initMsg.toByteArray(),
                     )
 
                     // Second packet is SSH_MSG_KEX_DH_GEX_REPLY
@@ -420,10 +420,10 @@ class SshConnection(
             // Service request (ssh-userauth)
             // Loop until we get SERVICE_ACCEPT (skip IGNORE/DEBUG messages)
             val serviceAccept = readExpectedMessage<SshMsgServiceAccept>(
-                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT
+                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT,
             )
             dispatchEvent(
-                SshClientStateMachine.SshEvent.ReceiveServiceAccept(serviceAccept.serviceName().value())
+                SshClientStateMachine.SshEvent.ReceiveServiceAccept(serviceAccept.serviceName().value()),
             )
 
             logger.info("SSH connection established successfully")
@@ -477,7 +477,7 @@ class SshConnection(
 
             writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                req.toByteArray()
+                req.toByteArray(),
             )
 
             try {
@@ -530,7 +530,7 @@ class SshConnection(
 
             writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                req.toByteArray()
+                req.toByteArray(),
             )
 
             val consumerJob = connectionScope.launch {
@@ -540,7 +540,7 @@ class SshConnection(
                     val prompts = infoRequest.prompts().map { prompt ->
                         KeyboardInteractiveCallback.Prompt(
                             text = String(prompt.prompt().data(), Charsets.UTF_8),
-                            echo = prompt.echo() != 0
+                            echo = prompt.echo() != 0,
                         )
                     }
 
@@ -551,14 +551,14 @@ class SshConnection(
                                 responses.map { response ->
                                     val bytes = response.toByteArray(Charsets.UTF_8)
                                     createByteString(bytes)
-                                }
+                                },
                             )
                             _check()
                         }
 
                         writePacket(
                             SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
-                            responseMsg.toByteArray()
+                            responseMsg.toByteArray(),
                         )
                     }
                 }
@@ -609,14 +609,14 @@ class SshConnection(
                 username,
                 "ssh-connection",
                 sigAlgorithmName,
-                publicKeyBlob
+                publicKeyBlob,
             )
 
             // Sign the data
             val signature = sigEntry.algorithm.sign(
                 sigAlgorithmName,
                 privateKey.jcaKeyPair.private,
-                signatureData
+                signatureData,
             )
 
             // Build the SSH_MSG_USERAUTH_REQUEST
@@ -642,7 +642,7 @@ class SshConnection(
 
             writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                req.toByteArray()
+                req.toByteArray(),
             )
 
             try {
@@ -800,7 +800,7 @@ class SshConnection(
             username,
             "ssh-connection",
             key.algorithmName,
-            key.publicKeyBlob
+            key.publicKeyBlob,
         )
 
         val signature = handler.onSignatureRequest(key, signatureData) ?: return false
@@ -849,7 +849,7 @@ class SshConnection(
                     val responses = handler.onKeyboardInteractivePrompt(
                         result.name,
                         result.instruction,
-                        result.prompts
+                        result.prompts,
                     ) ?: return false
 
                     val responseMsg = SshMsgUserauthInfoResponse().apply {
@@ -857,14 +857,14 @@ class SshConnection(
                         setResponses(
                             responses.map { response ->
                                 createByteString(response.toByteArray(Charsets.UTF_8))
-                            }
+                            },
                         )
                         _check()
                     }
 
                     writePacket(
                         SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_61.id().toInt(),
-                        responseMsg.toByteArray()
+                        responseMsg.toByteArray(),
                     )
                 }
 
@@ -918,7 +918,7 @@ class SshConnection(
             currentAuthMethod = AuthMethod.fromString(method)
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                req.toByteArray()
+                req.toByteArray(),
             )
         }
     }
@@ -1114,7 +1114,7 @@ class SshConnection(
         completeKex(
             serverHostKey = msg.serverKey().data(),
             serverPublicKey = msg.f().body(),
-            signature = msg.signatureH().data()
+            signature = msg.signatureH().data(),
         )
     }
 
@@ -1123,7 +1123,7 @@ class SshConnection(
         completeKex(
             serverHostKey = msg.kS().data(),
             serverPublicKey = msg.qS().data(),
-            signature = msg.signatureH().data()
+            signature = msg.signatureH().data(),
         )
     }
 
@@ -1147,7 +1147,7 @@ class SshConnection(
             serverHostKey,
             cpk,
             serverPublicKey,
-            secret
+            secret,
         )
 
         val hash = exchangeHash
@@ -1191,7 +1191,7 @@ class SshConnection(
         completeKex(
             serverHostKey = msg.serverPublicHostKey().data(),
             serverPublicKey = msg.f().body(),
-            signature = msg.signatureH().data()
+            signature = msg.signatureH().data(),
         )
     }
 
@@ -1264,13 +1264,13 @@ class SshConnection(
             secret,
             hash,
             sid,
-            kexAlg.hashAlgorithm
+            kexAlg.hashAlgorithm,
         )
 
         val keys = keyDerivation.deriveKeys(
             ivLength = ivLength,
             keyLength = keyLength,
-            macKeyLength = 0
+            macKeyLength = 0,
         )
 
         val c2sKey = keys.encryptionKeyClientToServer.copyOf(entryC2S.keyLength)
@@ -1315,13 +1315,13 @@ class SshConnection(
             secret,
             hash,
             sid,
-            kexAlg.hashAlgorithm
+            kexAlg.hashAlgorithm,
         )
 
         val keys = keyDerivation.deriveKeys(
             ivLength = ivLength,
             keyLength = keyLength,
-            macKeyLength = macKeyLength
+            macKeyLength = macKeyLength,
         )
 
         val c2sCipherKey = keys.encryptionKeyClientToServer.copyOf(cipherEntryC2S.keyLength)
@@ -1343,7 +1343,7 @@ class SshConnection(
                 serverToClientCipher,
                 serverToClientMac,
                 clientToServerEtm = macEntryC2S.isEtm,
-                serverToClientEtm = macEntryS2C.isEtm
+                serverToClientEtm = macEntryS2C.isEtm,
             )
         }
     }
@@ -1446,7 +1446,7 @@ class SshConnection(
 
                     val sessionInfo = AgentSessionInfo(
                         sessionId = sessionId ?: ByteArray(0),
-                        serverHostKey = serverHostKeyBlob ?: ByteArray(0)
+                        serverHostKey = serverHostKeyBlob ?: ByteArray(0),
                     )
                     val handler = AgentProtocolHandler(agentProvider!!, sessionInfo)
                     val agentChannel = AgentChannel(
@@ -1455,7 +1455,7 @@ class SshConnection(
                         localChannelNumber,
                         senderChannel,
                         maxPacketSize,
-                        initialWindow
+                        initialWindow,
                     )
 
                     agentChannels[localChannelNumber] = agentChannel
@@ -1465,7 +1465,7 @@ class SshConnection(
                         recipientChannel = senderChannel,
                         senderChannel = localChannelNumber,
                         initialWindowSize = 64 * 1024,
-                        maximumPacketSize = 32 * 1024
+                        maximumPacketSize = 32 * 1024,
                     )
                     logger.info("Accepted agent channel: local=$localChannelNumber, remote=$senderChannel")
                 }
@@ -1523,7 +1523,7 @@ class SshConnection(
             recipientChannel = senderChannel,
             reasonCode = 3,
             description = "Channel type not supported",
-            languageTag = ""
+            languageTag = "",
         )
     }
 
@@ -1542,7 +1542,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -1561,7 +1561,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -1599,7 +1599,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -1617,7 +1617,7 @@ class SshConnection(
         logger.debug("Sending CHANNEL_REQUEST: $requestType (channel=$recipientChannel, wantReply=$wantReply)")
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(),
-            message.toByteArray()
+            message.toByteArray(),
         )
     }
 
@@ -1685,7 +1685,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
 
         return try {
@@ -1717,7 +1717,7 @@ class SshConnection(
         }
         writePacket(
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
 
         val responseData = try {
@@ -1755,7 +1755,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -1846,7 +1846,7 @@ class SshConnection(
                             remoteChannelNumber,
                             pending.maxPacketSize,
                             remoteWindowSizeInitial = remoteWindow,
-                            initialWindowSize = pending.initialWindowSize
+                            initialWindowSize = pending.initialWindowSize,
                         )
                         registerForwardingChannel(channel)
                         pending.deferred.complete(channel)
@@ -1988,8 +1988,8 @@ class SshConnection(
                         ch.trySend(
                             InternalAuthResult.PkOk(
                                 msg.publicKeyAlgorithmName().value(),
-                                msg.publicKeyBlob().data()
-                            )
+                                msg.publicKeyBlob().data(),
+                            ),
                         )
                     } else if (ch != null && currentAuthMethod is AuthMethod.KeyboardInteractive) {
                         val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
@@ -1998,7 +1998,7 @@ class SshConnection(
                         val prompts = msg.prompts().map { prompt ->
                             KeyboardInteractiveCallback.Prompt(
                                 text = String(prompt.prompt().data(), Charsets.UTF_8),
-                                echo = prompt.echo() != 0
+                                echo = prompt.echo() != 0,
                             )
                         }
                         ch.trySend(InternalAuthResult.InfoRequest(name, instruction, prompts))
@@ -2113,7 +2113,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -2126,7 +2126,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -2138,7 +2138,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 
@@ -2164,7 +2164,7 @@ class SshConnection(
             }
             writePacket(
                 SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(),
-                msg.toByteArray()
+                msg.toByteArray(),
             )
         } catch (e: Exception) {
             logger.debug("Failed to send disconnect", e)
@@ -2245,8 +2245,8 @@ class SshConnection(
                     channelType = "session",
                     localChannelNumber = localChannelNumber,
                     initialWindowSize = initialWindowSize,
-                    maxPacketSize = maxPacketSize
-                )
+                    maxPacketSize = maxPacketSize,
+                ),
             )
         }
 
@@ -2267,7 +2267,7 @@ class SshConnection(
             remoteChannelNumber,
             maxPacketSize,
             remoteWindowSizeInitial = remoteWindow,
-            initialWindowSize = initialWindowSize
+            initialWindowSize = initialWindowSize,
         )
         channels[localChannelNumber] = channel
         channelsByRemote[localChannelNumber] = channel
@@ -2310,8 +2310,8 @@ class SshConnection(
                     recipientChannel = recipientChannel,
                     requestType = requestType,
                     wantReply = wantReply,
-                    message = msg
-                )
+                    message = msg,
+                ),
             )
         }
 
@@ -2337,7 +2337,7 @@ class SshConnection(
 
         writePacket(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
-            msg.toByteArray()
+            msg.toByteArray(),
         )
     }
 }

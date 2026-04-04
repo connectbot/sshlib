@@ -63,7 +63,7 @@ class ZlibCompressorTest {
         val messages = listOf(
             "first message".toByteArray(),
             "second message".toByteArray(),
-            "third message with repeated content: message message message".toByteArray()
+            "third message with repeated content: message message message".toByteArray(),
         )
 
         for (original in messages) {

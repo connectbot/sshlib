@@ -115,7 +115,7 @@ internal object PemKeyWriter {
                 data,
                 password.toByteArray(Charsets.ISO_8859_1),
                 salt,
-                cipherName
+                cipherName,
             )
             val saltHex = KeyEncryption.byteArrayToHex(salt)
 

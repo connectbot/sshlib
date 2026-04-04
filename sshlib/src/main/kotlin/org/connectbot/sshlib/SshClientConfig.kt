@@ -131,7 +131,7 @@ class SshClientConfig private constructor(
                 encryptionAlgorithms,
                 macAlgorithms,
                 compressionAlgorithms,
-                preferPasswordAuth
+                preferPasswordAuth,
             )
         }
     }

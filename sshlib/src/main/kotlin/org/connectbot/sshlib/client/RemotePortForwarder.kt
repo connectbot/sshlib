@@ -57,7 +57,7 @@ internal class RemotePortForwarder(
                 remoteBindAddress,
                 actualPort,
                 remoteBindAddress,
-                actualPort
+                actualPort,
             )
 
             val key = "$remoteBindAddress:$actualPort"
@@ -97,7 +97,7 @@ internal class RemotePortForwarder(
                 senderChannel,
                 maxPacketSize,
                 remoteWindowSizeInitial = initialWindow,
-                initialWindowSize = 256 * 1024
+                initialWindowSize = 256 * 1024,
             )
             connection.registerForwardingChannel(fwdChannel)
 
@@ -105,7 +105,7 @@ internal class RemotePortForwarder(
                 recipientChannel = senderChannel,
                 senderChannel = localChannelNumber,
                 initialWindowSize = 256 * 1024,
-                maximumPacketSize = 32 * 1024
+                maximumPacketSize = 32 * 1024,
             )
 
             val readChannel = socket.openReadChannel()
@@ -120,7 +120,7 @@ internal class RemotePortForwarder(
                 recipientChannel = senderChannel,
                 reasonCode = 2, // SSH_OPEN_CONNECT_FAILED
                 description = "Failed to connect to local target: ${e.message}",
-                languageTag = ""
+                languageTag = "",
             )
         }
     }
