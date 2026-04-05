@@ -295,7 +295,7 @@ class SshConnection(
 
     @Volatile private var allowedAuthentications: Set<String>? = null
 
-    @Volatile private var currentAuthMethod: String? = null
+    @Volatile private var currentAuthMethod: AuthMethod? = null
     private val triedPublicKeys: MutableSet<AuthPublicKey> = Collections.synchronizedSet(mutableSetOf())
 
     private var packetLoopJob: Job? = null
@@ -717,15 +717,21 @@ class SshConnection(
 
         for (method in selectPasswordMethods(allowedMethods, preferPasswordAuth)) {
             when (method) {
-                "keyboard-interactive" -> {
+                is AuthMethod.KeyboardInteractive -> {
                     val kbdResult = doKeyboardInteractive(username, handler, channel)
                     if (kbdResult) return true
                 }
 
-                "password" -> {
+                is AuthMethod.Password -> {
                     val password = handler.onPasswordNeeded() ?: return false
                     val passResult = doPasswordAuth(username, password, channel)
                     if (passResult) return true
+                }
+
+                is AuthMethod.PublicKey,
+                is AuthMethod.Unknown,
+                -> {
+                    logger.warn("Skipping unexpected auth method: ${AuthMethod.toSshName(method)}")
                 }
             }
         }
@@ -877,7 +883,7 @@ class SshConnection(
             _check()
         }
         withContext(stateMachineDispatcher) {
-            currentAuthMethod = method
+            currentAuthMethod = AuthMethod.fromString(method)
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
                 req.toByteArray()
@@ -1937,7 +1943,7 @@ class SshConnection(
 
                 SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
                     val ch = authResultChannel
-                    if (ch != null && currentAuthMethod == "publickey") {
+                    if (ch != null && currentAuthMethod is AuthMethod.PublicKey) {
                         val msg = parseBody<SshMsgUserauthPkOk>(packet)
                         ch.trySend(
                             AuthResult.PkOk(
@@ -1945,7 +1951,7 @@ class SshConnection(
                                 msg.publicKeyBlob().data()
                             )
                         )
-                    } else if (ch != null && currentAuthMethod == "keyboard-interactive") {
+                    } else if (ch != null && currentAuthMethod is AuthMethod.KeyboardInteractive) {
                         val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
                         val name = String(msg.name().data(), Charsets.UTF_8)
                         val instruction = String(msg.instruction().data(), Charsets.UTF_8)
@@ -2306,15 +2312,16 @@ class SshConnection(
 internal fun selectPasswordMethods(
     allowedMethods: Set<String>,
     preferPasswordAuth: Boolean,
-): List<String> {
-    val hasKbd = "keyboard-interactive" in allowedMethods
-    val hasPassword = "password" in allowedMethods
+): List<AuthMethod> {
+    val parsed = allowedMethods.mapTo(mutableSetOf(), AuthMethod::fromString)
+    val hasKbd = AuthMethod.KeyboardInteractive in parsed
+    val hasPassword = AuthMethod.Password in parsed
 
     return when {
-        hasKbd && hasPassword && preferPasswordAuth -> listOf("password")
-        hasKbd && hasPassword -> listOf("keyboard-interactive")
-        hasKbd -> listOf("keyboard-interactive")
-        hasPassword -> listOf("password")
+        hasKbd && hasPassword && preferPasswordAuth -> listOf(AuthMethod.Password)
+        hasKbd && hasPassword -> listOf(AuthMethod.KeyboardInteractive)
+        hasKbd -> listOf(AuthMethod.KeyboardInteractive)
+        hasPassword -> listOf(AuthMethod.Password)
         else -> emptyList()
     }
 }

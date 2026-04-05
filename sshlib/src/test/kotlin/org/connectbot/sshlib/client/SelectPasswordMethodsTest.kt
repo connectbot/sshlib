@@ -24,42 +24,48 @@ class SelectPasswordMethodsTest {
     @Test
     fun `only password offered - preferPasswordAuth false - uses password`() {
         val result = selectPasswordMethods(setOf("password"), preferPasswordAuth = false)
-        assertEquals(listOf("password"), result)
+        assertEquals(listOf(AuthMethod.Password), result)
     }
 
     @Test
     fun `only password offered - preferPasswordAuth true - uses password`() {
         val result = selectPasswordMethods(setOf("password"), preferPasswordAuth = true)
-        assertEquals(listOf("password"), result)
+        assertEquals(listOf(AuthMethod.Password), result)
     }
 
     @Test
     fun `only keyboard-interactive offered - preferPasswordAuth false - uses keyboard-interactive`() {
         val result = selectPasswordMethods(setOf("keyboard-interactive"), preferPasswordAuth = false)
-        assertEquals(listOf("keyboard-interactive"), result)
+        assertEquals(listOf(AuthMethod.KeyboardInteractive), result)
     }
 
     @Test
     fun `only keyboard-interactive offered - preferPasswordAuth true - uses keyboard-interactive`() {
         val result = selectPasswordMethods(setOf("keyboard-interactive"), preferPasswordAuth = true)
-        assertEquals(listOf("keyboard-interactive"), result)
+        assertEquals(listOf(AuthMethod.KeyboardInteractive), result)
     }
 
     @Test
     fun `both offered - preferPasswordAuth false - keyboard-interactive is preferred`() {
         val result = selectPasswordMethods(setOf("keyboard-interactive", "password"), preferPasswordAuth = false)
-        assertEquals(listOf("keyboard-interactive"), result)
+        assertEquals(listOf(AuthMethod.KeyboardInteractive), result)
     }
 
     @Test
-    fun `both offered - preferPasswordAuth true - password is used and keyboard-interactive is skipped`() {
+    fun `both offered - preferPasswordAuth true - password is used`() {
         val result = selectPasswordMethods(setOf("keyboard-interactive", "password"), preferPasswordAuth = true)
-        assertEquals(listOf("password"), result)
+        assertEquals(listOf(AuthMethod.Password), result)
     }
 
     @Test
     fun `neither offered - returns empty`() {
         val result = selectPasswordMethods(setOf("publickey"), preferPasswordAuth = false)
-        assertEquals(emptyList<String>(), result)
+        assertEquals(emptyList<AuthMethod>(), result)
+    }
+
+    @Test
+    fun `unknown method in set - ignored by selectPasswordMethods`() {
+        val result = selectPasswordMethods(setOf("gssapi-with-mic"), preferPasswordAuth = false)
+        assertEquals(emptyList<AuthMethod>(), result)
     }
 }
