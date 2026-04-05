@@ -22,8 +22,7 @@ package org.connectbot.sshlib
  * Handles are server-assigned and should be closed when no longer needed.
  */
 class SftpFileHandle internal constructor(internal val handle: ByteArray) {
-    override fun equals(other: Any?): Boolean =
-        other is SftpFileHandle && handle.contentEquals(other.handle)
+    override fun equals(other: Any?): Boolean = other is SftpFileHandle && handle.contentEquals(other.handle)
 
     override fun hashCode(): Int = handle.contentHashCode()
 }
@@ -83,10 +82,10 @@ enum class SftpStatusCode(val code: Int) {
     BAD_MESSAGE(5),
     NO_CONNECTION(6),
     CONNECTION_LOST(7),
-    OP_UNSUPPORTED(8);
+    OP_UNSUPPORTED(8),
+    ;
 
     companion object {
-        fun fromCode(code: Int): SftpStatusCode =
-            entries.firstOrNull { it.code == code } ?: FAILURE
+        fun fromCode(code: Int): SftpStatusCode = entries.firstOrNull { it.code == code } ?: FAILURE
     }
 }

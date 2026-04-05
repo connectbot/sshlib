@@ -89,11 +89,16 @@ internal class SftpClientImpl private constructor(
         val response = dispatcher.request(SSH_FXP_READ, payload.array())
         return when (response.type) {
             SSH_FXP_DATA -> extractString(ByteBuffer.wrap(response.payload))
+
             SSH_FXP_STATUS -> {
                 val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.EOF) null
-                else throw decodeStatusException(response.payload)
+                if (status == SftpStatusCode.EOF) {
+                    null
+                } else {
+                    throw decodeStatusException(response.payload)
+                }
             }
+
             else -> throw SftpProtocolException("Unexpected response type ${response.type} for READ")
         }
     }
@@ -113,13 +118,9 @@ internal class SftpClientImpl private constructor(
 
     // --- Stat operations ---
 
-    override suspend fun stat(path: String): SftpAttributes {
-        return statRequest(SSH_FXP_STAT, path)
-    }
+    override suspend fun stat(path: String): SftpAttributes = statRequest(SSH_FXP_STAT, path)
 
-    override suspend fun lstat(path: String): SftpAttributes {
-        return statRequest(SSH_FXP_LSTAT, path)
-    }
+    override suspend fun lstat(path: String): SftpAttributes = statRequest(SSH_FXP_LSTAT, path)
 
     private suspend fun statRequest(type: Int, path: String): SftpAttributes {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
@@ -195,11 +196,16 @@ internal class SftpClientImpl private constructor(
         val response = dispatcher.request(SSH_FXP_READDIR, payload.array())
         return when (response.type) {
             SSH_FXP_NAME -> decodeName(response.payload)
+
             SSH_FXP_STATUS -> {
                 val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.EOF) null
-                else throw decodeStatusException(response.payload)
+                if (status == SftpStatusCode.EOF) {
+                    null
+                } else {
+                    throw decodeStatusException(response.payload)
+                }
             }
+
             else -> throw SftpProtocolException("Unexpected response type ${response.type} for READDIR")
         }
     }
@@ -256,7 +262,9 @@ internal class SftpClientImpl private constructor(
                 entries.firstOrNull()?.filename
                     ?: throw SftpProtocolException("REALPATH returned empty NAME")
             }
+
             SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
+
             else -> throw SftpProtocolException("Unexpected response type ${response.type} for REALPATH")
         }
     }
@@ -273,7 +281,9 @@ internal class SftpClientImpl private constructor(
                 entries.firstOrNull()?.filename
                     ?: throw SftpProtocolException("READLINK returned empty NAME")
             }
+
             SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
+
             else -> throw SftpProtocolException("Unexpected response type ${response.type} for READLINK")
         }
     }
