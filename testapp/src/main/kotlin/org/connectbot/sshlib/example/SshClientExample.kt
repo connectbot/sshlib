@@ -19,6 +19,8 @@ package org.connectbot.sshlib.example
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import kotlinx.coroutines.*
+import org.connectbot.sshlib.AuthResult
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.KnownHostsVerifier
@@ -54,8 +56,9 @@ fun main(args: Array<String>) =
         }
         val client = SshClient(config)
         try {
-            if (!client.connect()) {
-                System.err.println("Failed to connect to $host:$port")
+            val connectResult = client.connect()
+            if (connectResult !is ConnectResult.Success) {
+                System.err.println("Failed to connect to $host:$port: $connectResult")
                 return@runBlocking
             }
 
@@ -76,7 +79,7 @@ fun main(args: Array<String>) =
                     }
                 }
 
-                if (client.authenticatePublicKey(user, keyData, passphrase)) {
+                if (client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) {
                     authenticated = true
                 } else if (passphrase == null && !authenticated) {
                     // Try one more time with a prompt if it failed and we didn't have a passphrase
@@ -88,7 +91,7 @@ fun main(args: Array<String>) =
                         System.err.flush()
                         readlnOrNull() ?: ""
                     }
-                    if (passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase)) {
+                    if (passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) {
                         authenticated = true
                     }
                 }
@@ -122,7 +125,7 @@ fun main(args: Array<String>) =
                     }
                 }
 
-                if (!client.authenticateKeyboardInteractive(user, kbdCallback)) {
+                if (client.authenticateKeyboardInteractive(user, kbdCallback) !is AuthResult.Success) {
                     // Fall back to password auth
                     val password = if (console != null) {
                         String(console.readPassword("Password: "))
@@ -135,7 +138,7 @@ fun main(args: Array<String>) =
                         }
                     }
 
-                    if (!client.authenticatePassword(user, password)) {
+                    if (client.authenticatePassword(user, password) !is AuthResult.Success) {
                         System.err.println("Authentication failed")
                         return@runBlocking
                     }

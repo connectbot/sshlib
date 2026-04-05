@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.client
+package org.connectbot.sshlib
 
-import org.connectbot.sshlib.KeyboardInteractiveCallback
+/**
+ * Result of [SshClient.authenticatePassword], [SshClient.authenticatePublicKey],
+ * [SshClient.authenticateKeyboardInteractive], and [SshClient.authenticate].
+ */
+sealed interface AuthResult {
+    data object Success : AuthResult
 
-internal sealed class InternalAuthResult {
-    object Success : InternalAuthResult()
-    data class Failure(val allowedMethods: Set<String>, val partialSuccess: Boolean) : InternalAuthResult()
-    data class PkOk(val algorithmName: String, val publicKeyBlob: ByteArray) : InternalAuthResult()
-    data class InfoRequest(
-        val name: String,
-        val instruction: String,
-        val prompts: List<KeyboardInteractiveCallback.Prompt>,
-    ) : InternalAuthResult()
+    /** Server rejected credentials. [allowedMethods] lists methods still available to try. */
+    data class Failure(val allowedMethods: Set<String>) : AuthResult
+
+    /** Protocol or state error — not a credentials problem. */
+    data class Error(val message: String, val cause: Throwable? = null) : AuthResult
 }
