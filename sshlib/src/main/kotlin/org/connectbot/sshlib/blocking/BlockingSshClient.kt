@@ -30,6 +30,7 @@ import org.connectbot.sshlib.PortForwarder
 import org.connectbot.sshlib.Socks5Authenticator
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.StreamForwarder
 import org.connectbot.sshlib.transport.TransportFactory
@@ -45,13 +46,15 @@ import java.net.InetSocketAddress
  * Usage from Java:
  * ```java
  * BlockingSshClient client = new BlockingSshClient("example.com", 22, myHostKeyVerifier);
- * if (client.connect()) {
- *     if (client.authenticatePassword("user", "password")) {
- *         SshSession session = client.openSession();
- *         // ...
- *         session.close();
- *     }
+ * try {
+ *     client.connect();
+ *     client.authenticatePassword("user", "password");
+ *     SshSession session = client.openSession();
+ *     // ...
+ *     session.close();
  *     client.disconnect();
+ * } catch (SshException e) {
+ *     // handle connection or auth failure
  * }
  * ```
  *
@@ -97,39 +100,66 @@ class BlockingSshClient private constructor(
     /**
      * Connect to the SSH server and perform key exchange.
      *
-     * @return true if connection succeeded
+     * @throws SshException if the connection fails
      */
-    fun connect(): Boolean = runBlocking { client.connect() } is ConnectResult.Success
+    @Throws(SshException::class)
+    fun connect() {
+        when (val result = runBlocking { client.connect() }) {
+            is ConnectResult.Success -> Unit
+            is ConnectResult.HostKeyRejected -> throw SshException("Host key rejected for key: ${result.key.type}")
+            is ConnectResult.AlgorithmMismatch -> throw SshException(result.message)
+            is ConnectResult.TransportError -> throw SshException("Transport error: ${result.cause}", result.cause)
+            is ConnectResult.ProtocolError -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Authenticate using password authentication.
      *
      * @param username SSH username
      * @param password SSH password
-     * @return true if authentication succeeded
+     * @throws SshException if authentication fails or an error occurs
      */
-    fun authenticatePassword(username: String, password: String): Boolean = runBlocking { client.authenticatePassword(username, password) } is AuthResult.Success
+    @Throws(SshException::class)
+    fun authenticatePassword(username: String, password: String) {
+        when (val result = runBlocking { client.authenticatePassword(username, password) }) {
+            is AuthResult.Success -> Unit
+            is AuthResult.Failure -> throw SshException("Authentication failed; allowed methods: ${result.allowedMethods}")
+            is AuthResult.Error -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
      *
      * @param username SSH username
      * @param handler Callback handler providing authentication materials
-     * @return true if authentication succeeded
+     * @throws SshException if authentication fails or an error occurs
      */
-    fun authenticate(username: String, handler: AuthHandler): Boolean = runBlocking { client.authenticate(username, handler) } is AuthResult.Success
+    @Throws(SshException::class)
+    fun authenticate(username: String, handler: AuthHandler) {
+        when (val result = runBlocking { client.authenticate(username, handler) }) {
+            is AuthResult.Success -> Unit
+            is AuthResult.Failure -> throw SshException("Authentication failed; allowed methods: ${result.allowedMethods}")
+            is AuthResult.Error -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Authenticate using keyboard-interactive authentication (RFC 4256).
      *
      * @param username SSH username
      * @param callback Receives prompts from the server and provides responses
-     * @return true if authentication succeeded
+     * @throws SshException if authentication fails or an error occurs
      */
-    fun authenticateKeyboardInteractive(
-        username: String,
-        callback: KeyboardInteractiveCallback,
-    ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) } is AuthResult.Success
+    @Throws(SshException::class)
+    fun authenticateKeyboardInteractive(username: String, callback: KeyboardInteractiveCallback) {
+        when (val result = runBlocking { client.authenticateKeyboardInteractive(username, callback) }) {
+            is AuthResult.Success -> Unit
+            is AuthResult.Failure -> throw SshException("Authentication failed; allowed methods: ${result.allowedMethods}")
+            is AuthResult.Error -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -137,14 +167,21 @@ class BlockingSshClient private constructor(
      * @param username SSH username
      * @param privateKeyData Private key file contents
      * @param passphrase Passphrase for encrypted keys, or null
-     * @return true if authentication succeeded
+     * @throws SshException if authentication fails or an error occurs
      */
     @JvmOverloads
+    @Throws(SshException::class)
     fun authenticatePublicKey(
         username: String,
         privateKeyData: ByteArray,
         passphrase: String? = null,
-    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) } is AuthResult.Success
+    ) {
+        when (val result = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }) {
+            is AuthResult.Success -> Unit
+            is AuthResult.Failure -> throw SshException("Authentication failed; allowed methods: ${result.allowedMethods}")
+            is AuthResult.Error -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -152,14 +189,21 @@ class BlockingSshClient private constructor(
      * @param username SSH username
      * @param privateKeyData Private key file contents as a string
      * @param passphrase Passphrase for encrypted keys, or null
-     * @return true if authentication succeeded
+     * @throws SshException if authentication fails or an error occurs
      */
     @JvmOverloads
+    @Throws(SshException::class)
     fun authenticatePublicKey(
         username: String,
         privateKeyData: String,
         passphrase: String? = null,
-    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) } is AuthResult.Success
+    ) {
+        when (val result = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }) {
+            is AuthResult.Success -> Unit
+            is AuthResult.Failure -> throw SshException("Authentication failed; allowed methods: ${result.allowedMethods}")
+            is AuthResult.Error -> throw SshException(result.message, result.cause)
+        }
+    }
 
     /**
      * Enable SSH agent forwarding with the provided agent.

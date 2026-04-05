@@ -126,17 +126,14 @@ class AsyncSshCompatibilityTest {
             configure?.invoke(this)
         }
         val client = BlockingSshClient(config)
-        assertTrue(client.connect(), "Should connect to AsyncSSH server")
+        client.connect()
         return client
     }
 
     private fun authenticateWithPassword(configure: (SshClientConfig.Builder.() -> Unit)? = null) {
         val client = connectToServer(configure)
         try {
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with password"
-            )
+            client.authenticatePassword(USERNAME, PASSWORD)
         } finally {
             client.disconnect()
         }
@@ -154,10 +151,7 @@ class AsyncSshCompatibilityTest {
             .bufferedReader().readText()
         val client = connectToServer()
         try {
-            assertTrue(
-                client.authenticatePublicKey(USERNAME, keyData),
-                "Should authenticate with $keyFilename"
-            )
+            client.authenticatePublicKey(USERNAME, keyData)
         } finally {
             client.disconnect()
         }

@@ -19,10 +19,12 @@ package org.connectbot.sshlib.client
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.slf4j.LoggerFactory
@@ -126,7 +128,7 @@ class DropbearCompatibilityTest {
             configure?.invoke(this)
         }
         val client = BlockingSshClient(config)
-        assertTrue(client.connect(), "Should connect to Dropbear server")
+        client.connect()
         return client
     }
 
@@ -148,11 +150,8 @@ class DropbearCompatibilityTest {
             }
             val client = BlockingSshClient(config)
             try {
-                assertTrue(client.connect(), "Should connect to Dropbear server with options: $options")
-                assertTrue(
-                    client.authenticatePassword(USERNAME, PASSWORD),
-                    "Should authenticate with password"
-                )
+                client.connect()
+                client.authenticatePassword(USERNAME, PASSWORD)
             } finally {
                 client.disconnect()
             }
@@ -164,10 +163,7 @@ class DropbearCompatibilityTest {
     private fun authenticateWithPassword(configure: (SshClientConfig.Builder.() -> Unit)? = null) {
         val client = connectToServer(configure)
         try {
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with password"
-            )
+            client.authenticatePassword(USERNAME, PASSWORD)
         } finally {
             client.disconnect()
         }
@@ -182,10 +178,7 @@ class DropbearCompatibilityTest {
     fun `wrong password fails`() {
         val client = connectToServer()
         try {
-            assertFalse(
-                client.authenticatePassword(USERNAME, "wrongpassword"),
-                "Should fail with wrong password"
-            )
+            assertThrows<SshException> { client.authenticatePassword(USERNAME, "wrongpassword") }
         } finally {
             client.disconnect()
         }
@@ -198,10 +191,7 @@ class DropbearCompatibilityTest {
             .bufferedReader().readText()
         val client = connectToServer()
         try {
-            assertTrue(
-                client.authenticatePublicKey(USERNAME, keyData),
-                "Should authenticate with $keyFilename"
-            )
+            client.authenticatePublicKey(USERNAME, keyData)
         } finally {
             client.disconnect()
         }

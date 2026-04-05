@@ -23,11 +23,14 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
+import org.connectbot.sshlib.AuthResult
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSigning
 import org.connectbot.sshlib.blocking.BlockingSshClient
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.slf4j.LoggerFactory
@@ -139,8 +143,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            val connected = client.connect()
-            assertTrue(connected, "Should successfully connect to SSH server")
+            client.connect()
         } finally {
             client.disconnect()
         }
@@ -154,10 +157,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-
-            val authenticated = client.authenticatePassword(USERNAME, PASSWORD)
-            assertTrue(authenticated, "Should authenticate with correct password")
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
         } finally {
             client.disconnect()
@@ -172,10 +173,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-
-            val authenticated = client.authenticatePassword(USERNAME, "wrongpassword")
-            assertFalse(authenticated, "Should fail authentication with wrong password")
+            client.connect()
+            assertThrows<SshException> { client.authenticatePassword(USERNAME, "wrongpassword") }
             assertFalse(client.isAuthenticated, "Client should not be authenticated")
         } finally {
             client.disconnect()
@@ -193,13 +192,10 @@ class SshClientIntegrationTest {
         assertFalse(client.isAuthenticated, "Should not be authenticated initially")
 
         // Connect
-        assertTrue(client.connect(), "Should connect successfully")
+        client.connect()
 
         // Authenticate
-        assertTrue(
-            client.authenticatePassword(USERNAME, PASSWORD),
-            "Should authenticate successfully"
-        )
+        client.authenticatePassword(USERNAME, PASSWORD)
         assertTrue(client.isAuthenticated, "Should be authenticated after successful auth")
 
         // Disconnect
@@ -215,11 +211,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate successfully"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should successfully open session channel")
@@ -250,11 +243,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with encryption $algorithm")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with encryption $algorithm"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should open session with encryption $algorithm")
@@ -283,11 +273,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with kex $algorithm")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with kex $algorithm"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should open session with kex $algorithm")
@@ -316,11 +303,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with host key $algorithm")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with host key $algorithm"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should open session with host key $algorithm")
@@ -351,11 +335,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with MAC $algorithm")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with MAC $algorithm"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should open session with MAC $algorithm")
@@ -377,7 +358,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             val callback = object : KeyboardInteractiveCallback {
                 override suspend fun onInfoRequest(
@@ -390,8 +371,7 @@ class SshClientIntegrationTest {
                 }
             }
 
-            val authenticated = client.authenticateKeyboardInteractive(USERNAME, callback)
-            assertTrue(authenticated, "Should authenticate via keyboard-interactive")
+            client.authenticateKeyboardInteractive(USERNAME, callback)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
         } finally {
             client.disconnect()
@@ -406,7 +386,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             val callback = object : KeyboardInteractiveCallback {
                 override suspend fun onInfoRequest(
@@ -419,8 +399,7 @@ class SshClientIntegrationTest {
                 }
             }
 
-            val authenticated = client.authenticateKeyboardInteractive(USERNAME, callback)
-            assertFalse(authenticated, "Should fail keyboard-interactive with wrong password")
+            assertThrows<SshException> { client.authenticateKeyboardInteractive(USERNAME, callback) }
             assertFalse(client.isAuthenticated, "Client should not be authenticated")
         } finally {
             client.disconnect()
@@ -446,7 +425,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             var methodsReceived: Set<String>? = null
 
@@ -468,8 +447,7 @@ class SshClientIntegrationTest {
                 override suspend fun onPasswordNeeded(): String = PASSWORD
             }
 
-            val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via password when preferPasswordAuth is set")
+            client.authenticate(USERNAME, handler)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
             assertNotNull(methodsReceived, "Should have received available methods")
             assertTrue(methodsReceived!!.isNotEmpty(), "Available methods should not be empty")
@@ -486,7 +464,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             val handler = object : AuthHandler {
                 override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
@@ -502,8 +480,7 @@ class SshClientIntegrationTest {
                 override suspend fun onPasswordNeeded(): String? = null
             }
 
-            val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via keyboard-interactive")
+            client.authenticate(USERNAME, handler)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
         } finally {
             client.disconnect()
@@ -518,7 +495,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             val keyData = readTestKey()
             val pubKey = SshSigning.getPublicKey("ssh-ed25519", keyData, null)
@@ -537,8 +514,7 @@ class SshClientIntegrationTest {
                 override suspend fun onPasswordNeeded(): String? = null
             }
 
-            val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via public key")
+            client.authenticate(USERNAME, handler)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
         } finally {
             client.disconnect()
@@ -553,7 +529,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             val callSequence = mutableListOf<String>()
 
@@ -588,8 +564,7 @@ class SshClientIntegrationTest {
                 }
             }
 
-            val authenticated = client.authenticate(USERNAME, handler)
-            assertTrue(authenticated, "Should authenticate via keyboard-interactive after pubkey fallthrough")
+            client.authenticate(USERNAME, handler)
             assertTrue(client.isAuthenticated, "Client should be authenticated")
             assertTrue("methods" in callSequence, "onAuthMethodsAvailable should have been called")
             assertTrue("pubkeys" in callSequence, "onPublicKeysNeeded should have been called")
@@ -608,7 +583,7 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(host, port, acceptAllVerifier)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            client.connect()
 
             var receivedMethods: Set<String>? = null
 
@@ -652,8 +627,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -691,8 +666,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -730,8 +705,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -787,8 +762,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -816,11 +791,8 @@ class SshClientIntegrationTest {
         val client = BlockingSshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect with compression enabled")
-            assertTrue(
-                client.authenticatePassword(USERNAME, PASSWORD),
-                "Should authenticate with compression enabled"
-            )
+            client.connect()
+            client.authenticatePassword(USERNAME, PASSWORD)
 
             val session = client.openSession()
             assertNotNull(session, "Should open session with compression enabled")
@@ -849,8 +821,8 @@ class SshClientIntegrationTest {
 
         try {
             withTimeout(30_000) {
-                assertTrue(client.connect(), "Should connect with compression")
-                assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+                assertTrue(client.connect() is ConnectResult.Success, "Should connect with compression")
+                assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
                 val session = client.openSession()
                 assertNotNull(session)
@@ -890,8 +862,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val disconnectDeferred = async {
                 withTimeout(10_000) {
@@ -927,8 +899,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val disconnectDeferred = async {
                 withTimeout(10_000) {
@@ -966,8 +938,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -1000,8 +972,8 @@ class SshClientIntegrationTest {
         }
         val client = SshClient(config)
 
-        assertTrue(client.connect(), "Should connect to SSH server")
-        assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+        assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+        assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
         val session = client.openSession()
         assertNotNull(session)
@@ -1038,8 +1010,8 @@ class SshClientIntegrationTest {
         val client = SshClient(config)
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
-            assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
 
             val session = client.openSession()
             assertNotNull(session)
@@ -1087,7 +1059,7 @@ class SshClientIntegrationTest {
         )
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
 
             val failingHandler = object : AuthHandler {
                 override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = emptyList()
@@ -1101,7 +1073,7 @@ class SshClientIntegrationTest {
             }
 
             val firstResult = withTimeout(10_000) { client.authenticate(USERNAME, failingHandler) }
-            assertFalse(firstResult, "First authenticate should fail with wrong password")
+            assertTrue(firstResult is AuthResult.Failure, "First authenticate should fail with wrong password")
             assertFalse(client.isAuthenticated, "Client should not be authenticated after first failure")
 
             val succeedingHandler = object : AuthHandler {
@@ -1116,7 +1088,7 @@ class SshClientIntegrationTest {
             }
 
             val secondResult = withTimeout(10_000) { client.authenticate(USERNAME, succeedingHandler) }
-            assertTrue(secondResult, "Second authenticate should succeed with correct password")
+            assertTrue(secondResult is AuthResult.Success, "Second authenticate should succeed with correct password")
             assertTrue(client.isAuthenticated, "Client should be authenticated after second attempt")
 
             val session = withTimeout(10_000) { client.openSession() }
@@ -1153,14 +1125,14 @@ class SshClientIntegrationTest {
         )
 
         try {
-            assertTrue(client.connect(), "Should connect to SSH server")
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
 
             val firstResult = withTimeout(10_000) { client.authenticatePassword(USERNAME, "wrongpassword") }
-            assertFalse(firstResult, "First authenticate should fail with wrong password")
+            assertTrue(firstResult is AuthResult.Failure, "First authenticate should fail with wrong password")
             assertFalse(client.isAuthenticated, "Client should not be authenticated after first failure")
 
             val secondResult = withTimeout(10_000) { client.authenticatePassword(USERNAME, PASSWORD) }
-            assertTrue(secondResult, "Second authenticate should succeed with correct password")
+            assertTrue(secondResult is AuthResult.Success, "Second authenticate should succeed with correct password")
             assertTrue(client.isAuthenticated, "Client should be authenticated after second attempt")
 
             val session = withTimeout(10_000) { client.openSession() }
