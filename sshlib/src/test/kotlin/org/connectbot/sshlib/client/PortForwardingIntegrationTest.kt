@@ -19,6 +19,8 @@ package org.connectbot.sshlib.client
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.connectbot.sshlib.AuthResult
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.Socks5Authenticator
@@ -84,8 +86,8 @@ class PortForwardingIntegrationTest {
             this.hostKeyVerifier = acceptAllVerifier
         }
         val client = SshClient(config)
-        assertTrue(client.connect(), "Should connect")
-        assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+        assertTrue(client.connect() is ConnectResult.Success, "Should connect")
+        assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
         return client
     }
 
@@ -263,9 +265,9 @@ class PortForwardingIntegrationTest {
             }
             val targetClient = SshClient(targetConfig)
 
-            assertTrue(targetClient.connect(), "Should connect through jump host")
+            assertTrue(targetClient.connect() is ConnectResult.Success, "Should connect through jump host")
             assertTrue(
-                targetClient.authenticatePassword(USERNAME, PASSWORD),
+                targetClient.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success,
                 "Should authenticate through jump host"
             )
 
