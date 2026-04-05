@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
+import org.connectbot.sshlib.AuthResult
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PortForwarder
@@ -97,7 +99,7 @@ class BlockingSshClient private constructor(
      *
      * @return true if connection succeeded
      */
-    fun connect(): Boolean = runBlocking { client.connect() }
+    fun connect(): Boolean = runBlocking { client.connect() } is ConnectResult.Success
 
     /**
      * Authenticate using password authentication.
@@ -106,7 +108,7 @@ class BlockingSshClient private constructor(
      * @param password SSH password
      * @return true if authentication succeeded
      */
-    fun authenticatePassword(username: String, password: String): Boolean = runBlocking { client.authenticatePassword(username, password) }
+    fun authenticatePassword(username: String, password: String): Boolean = runBlocking { client.authenticatePassword(username, password) } is AuthResult.Success
 
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
@@ -115,7 +117,7 @@ class BlockingSshClient private constructor(
      * @param handler Callback handler providing authentication materials
      * @return true if authentication succeeded
      */
-    fun authenticate(username: String, handler: AuthHandler): Boolean = runBlocking { client.authenticate(username, handler) }
+    fun authenticate(username: String, handler: AuthHandler): Boolean = runBlocking { client.authenticate(username, handler) } is AuthResult.Success
 
     /**
      * Authenticate using keyboard-interactive authentication (RFC 4256).
@@ -127,7 +129,7 @@ class BlockingSshClient private constructor(
     fun authenticateKeyboardInteractive(
         username: String,
         callback: KeyboardInteractiveCallback,
-    ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) }
+    ): Boolean = runBlocking { client.authenticateKeyboardInteractive(username, callback) } is AuthResult.Success
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -142,7 +144,7 @@ class BlockingSshClient private constructor(
         username: String,
         privateKeyData: ByteArray,
         passphrase: String? = null,
-    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
+    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) } is AuthResult.Success
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -157,7 +159,7 @@ class BlockingSshClient private constructor(
         username: String,
         privateKeyData: String,
         passphrase: String? = null,
-    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) }
+    ): Boolean = runBlocking { client.authenticatePublicKey(username, privateKeyData, passphrase) } is AuthResult.Success
 
     /**
      * Enable SSH agent forwarding with the provided agent.

@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
@@ -120,6 +121,7 @@ import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import org.connectbot.sshlib.AuthResult as PublicAuthResult
 
 /**
  * SSH connection handler that manages the protocol flow.
@@ -146,6 +148,8 @@ class SshConnection(
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
     }
+
+    private class HostKeyRejectedException(val key: PublicKey) : Exception("Host key rejected")
 
     private val packetIO = PacketIO(transport)
 
@@ -291,7 +295,7 @@ class SshConnection(
     private var infoRequestChannel: Channel<SshMsgUserauthInfoRequest>? = null
 
     // Strategy-based authentication state
-    @Volatile private var authResultChannel: Channel<AuthResult>? = null
+    @Volatile private var authResultChannel: Channel<InternalAuthResult>? = null
 
     @Volatile private var allowedAuthentications: Set<String>? = null
 
@@ -323,9 +327,10 @@ class SshConnection(
 
     /**
      * Initiate SSH connection.
-     * This returns when authentication is complete.
+     * Performs SSH version exchange, key exchange, and service negotiation.
+     * Returns [ConnectResult.Success] when the transport is ready for authentication calls.
      */
-    suspend fun connect(): Boolean {
+    suspend fun connect(): ConnectResult {
         try {
             dispatchEvent(SshClientStateMachine.SshEvent.Connect)
 
@@ -422,10 +427,24 @@ class SshConnection(
 
             logger.info("SSH connection established successfully")
             startPacketLoop()
-            return true
+            return ConnectResult.Success
+        } catch (e: HostKeyRejectedException) {
+            logger.error("Host key rejected")
+            return ConnectResult.HostKeyRejected(e.key)
+        } catch (e: SshException) {
+            logger.error("SSH connection failed", e)
+            return when {
+                e.message?.startsWith("No matching") == true ||
+                    e.message?.startsWith("No KEX") == true ||
+                    e.message?.startsWith("Unknown KEX") == true -> ConnectResult.AlgorithmMismatch(e.message ?: "Algorithm mismatch")
+
+                e.message?.contains("host key", ignoreCase = true) == true -> ConnectResult.ProtocolError(e.message ?: "Host key error", e)
+
+                else -> ConnectResult.ProtocolError(e.message ?: "Protocol error", e)
+            }
         } catch (e: Exception) {
             logger.error("SSH connection failed", e)
-            return false
+            return ConnectResult.TransportError(e)
         }
     }
 
@@ -434,9 +453,8 @@ class SshConnection(
      *
      * @param username Username
      * @param password Password
-     * @return true if authentication succeeded
      */
-    suspend fun authenticatePassword(username: String, password: String): Boolean {
+    suspend fun authenticatePassword(username: String, password: String): PublicAuthResult {
         try {
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
@@ -462,13 +480,18 @@ class SshConnection(
             )
 
             try {
-                return deferred.await()
+                val success = deferred.await()
+                return if (success) {
+                    PublicAuthResult.Success
+                } else {
+                    PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
+                }
             } finally {
                 pendingAuth.clearIfSame(deferred)
             }
         } catch (e: Exception) {
             logger.error("Authentication error", e)
-            return false
+            return PublicAuthResult.Error(e.message ?: "Authentication error", e)
         }
     }
 
@@ -477,12 +500,11 @@ class SshConnection(
      *
      * @param username Username
      * @param callback Callback that receives prompts and provides responses
-     * @return true if authentication succeeded
      */
     suspend fun authenticateKeyboardInteractive(
         username: String,
         callback: KeyboardInteractiveCallback,
-    ): Boolean {
+    ): PublicAuthResult {
         try {
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
@@ -542,7 +564,12 @@ class SshConnection(
             }
 
             try {
-                return deferred.await()
+                val success = deferred.await()
+                return if (success) {
+                    PublicAuthResult.Success
+                } else {
+                    PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
+                }
             } finally {
                 channel.close()
                 consumerJob.cancel()
@@ -555,7 +582,7 @@ class SshConnection(
             }
         } catch (e: Exception) {
             logger.error("Keyboard-interactive authentication error", e)
-            return false
+            return PublicAuthResult.Error(e.message ?: "Keyboard-interactive error", e)
         }
     }
 
@@ -564,9 +591,8 @@ class SshConnection(
      *
      * @param username Username
      * @param privateKey Parsed private key
-     * @return true if authentication succeeded
      */
-    internal suspend fun authenticatePublicKey(username: String, privateKey: SshPrivateKey): Boolean {
+    internal suspend fun authenticatePublicKey(username: String, privateKey: SshPrivateKey): PublicAuthResult {
         try {
             val sid = sessionId ?: throw SshException("Session ID not established")
 
@@ -619,13 +645,18 @@ class SshConnection(
             )
 
             try {
-                return deferred.await()
+                val success = deferred.await()
+                return if (success) {
+                    PublicAuthResult.Success
+                } else {
+                    PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
+                }
             } finally {
                 pendingAuth.clearIfSame(deferred)
             }
         } catch (e: Exception) {
             logger.error("Public key authentication error", e)
-            return false
+            return PublicAuthResult.Error(e.message ?: "Public key authentication error", e)
         }
     }
 
@@ -656,8 +687,8 @@ class SshConnection(
      * Drives the authentication per RFC 4252: none → publickey probe → sign →
      * keyboard-interactive → password.
      */
-    internal suspend fun authenticate(username: String, handler: AuthHandler): Boolean {
-        val channel = Channel<AuthResult>(Channel.UNLIMITED)
+    internal suspend fun authenticate(username: String, handler: AuthHandler): PublicAuthResult {
+        val channel = Channel<InternalAuthResult>(Channel.UNLIMITED)
         withContext(stateMachineDispatcher) {
             authResultChannel = channel
         }
@@ -675,8 +706,8 @@ class SshConnection(
     private suspend fun doAuthenticate(
         username: String,
         handler: AuthHandler,
-        channel: Channel<AuthResult>,
-    ): Boolean {
+        channel: Channel<InternalAuthResult>,
+    ): PublicAuthResult {
         if (allowedAuthentications == null) {
             // Step 1: Send "none" auth to discover allowed methods
             sendAuthRequest(username, "none") {
@@ -685,8 +716,8 @@ class SshConnection(
             }
 
             val noneResult = channel.receive()
-            if (noneResult is AuthResult.Success) return true
-            if (noneResult !is AuthResult.Failure) return false
+            if (noneResult is InternalAuthResult.Success) return PublicAuthResult.Success
+            if (noneResult !is InternalAuthResult.Failure) return PublicAuthResult.Error("Unexpected response to 'none' auth: $noneResult")
 
             allowedAuthentications = noneResult.allowedMethods
         }
@@ -700,18 +731,18 @@ class SshConnection(
             for (key in keys) {
                 if (key in triedPublicKeys) continue
                 val probeResult = probePublicKey(username, key, channel)
-                if (probeResult is AuthResult.Success) return true
-                if (probeResult is AuthResult.PkOk) {
+                if (probeResult is InternalAuthResult.Success) return PublicAuthResult.Success
+                if (probeResult is InternalAuthResult.PkOk) {
                     triedPublicKeys.add(key)
                     val signResult = signPublicKey(username, key, handler, channel)
-                    if (signResult) return true
+                    if (signResult) return PublicAuthResult.Success
                 } else {
                     triedPublicKeys.add(key)
                 }
-                if (probeResult is AuthResult.Failure) {
+                if (probeResult is InternalAuthResult.Failure) {
                     allowedAuthentications = probeResult.allowedMethods
                 }
-                // AuthResult.Failure → try next key
+                // InternalAuthResult.Failure → try next key
             }
         }
 
@@ -719,13 +750,13 @@ class SshConnection(
             when (method) {
                 is AuthMethod.KeyboardInteractive -> {
                     val kbdResult = doKeyboardInteractive(username, handler, channel)
-                    if (kbdResult) return true
+                    if (kbdResult) return PublicAuthResult.Success
                 }
 
                 is AuthMethod.Password -> {
-                    val password = handler.onPasswordNeeded() ?: return false
+                    val password = handler.onPasswordNeeded() ?: return PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
                     val passResult = doPasswordAuth(username, password, channel)
-                    if (passResult) return true
+                    if (passResult) return PublicAuthResult.Success
                 }
 
                 is AuthMethod.PublicKey,
@@ -736,14 +767,14 @@ class SshConnection(
             }
         }
 
-        return false
+        return PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
     }
 
     private suspend fun probePublicKey(
         username: String,
         key: AuthPublicKey,
-        channel: Channel<AuthResult>,
-    ): AuthResult {
+        channel: Channel<InternalAuthResult>,
+    ): InternalAuthResult {
         sendAuthRequest(username, "publickey") {
             val pubkeyAuth = UserauthRequestPublickey().apply {
                 setHasSignature(0)
@@ -760,7 +791,7 @@ class SshConnection(
         username: String,
         key: AuthPublicKey,
         handler: AuthHandler,
-        channel: Channel<AuthResult>,
+        channel: Channel<InternalAuthResult>,
     ): Boolean {
         val sid = sessionId ?: throw SshException("Session ID not established")
         val signatureData = buildSignatureData(
@@ -785,7 +816,7 @@ class SshConnection(
         }
 
         return when (channel.receive()) {
-            is AuthResult.Success -> true
+            is InternalAuthResult.Success -> true
             else -> false
         }
     }
@@ -793,7 +824,7 @@ class SshConnection(
     private suspend fun doKeyboardInteractive(
         username: String,
         handler: AuthHandler,
-        channel: Channel<AuthResult>,
+        channel: Channel<InternalAuthResult>,
     ): Boolean {
         sendAuthRequest(username, "keyboard-interactive") {
             val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
@@ -806,14 +837,14 @@ class SshConnection(
 
         while (true) {
             when (val result = channel.receive()) {
-                is AuthResult.Success -> return true
+                is InternalAuthResult.Success -> return true
 
-                is AuthResult.Failure -> {
+                is InternalAuthResult.Failure -> {
                     allowedAuthentications = result.allowedMethods
                     return false
                 }
 
-                is AuthResult.InfoRequest -> {
+                is InternalAuthResult.InfoRequest -> {
                     val responses = handler.onKeyboardInteractivePrompt(
                         result.name,
                         result.instruction,
@@ -836,7 +867,7 @@ class SshConnection(
                     )
                 }
 
-                is AuthResult.PkOk -> {
+                is InternalAuthResult.PkOk -> {
                     // Unexpected during keyboard-interactive
                     return false
                 }
@@ -847,7 +878,7 @@ class SshConnection(
     private suspend fun doPasswordAuth(
         username: String,
         password: String,
-        channel: Channel<AuthResult>,
+        channel: Channel<InternalAuthResult>,
     ): Boolean {
         sendAuthRequest(username, "password") {
             val passAuth = UserauthRequestPassword().apply {
@@ -859,9 +890,9 @@ class SshConnection(
         }
 
         return when (val result = channel.receive()) {
-            is AuthResult.Success -> true
+            is InternalAuthResult.Success -> true
 
-            is AuthResult.Failure -> {
+            is InternalAuthResult.Failure -> {
                 allowedAuthentications = result.allowedMethods
                 false
             }
@@ -1143,7 +1174,7 @@ class SshConnection(
 
         if (!trusted) {
             logger.error("Host key verification failed")
-            throw SshException("Host key verification failed")
+            throw HostKeyRejectedException(publicKey)
         }
         logger.info("Host key verified")
 
@@ -1920,7 +1951,7 @@ class SshConnection(
                     stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
                     val ch = authResultChannel
                     if (ch != null) {
-                        ch.trySend(AuthResult.Success)
+                        ch.trySend(InternalAuthResult.Success)
                     }
                 }
 
@@ -1930,7 +1961,7 @@ class SshConnection(
                         val msg = parseBody<SshMsgUserauthFailure>(packet)
                         val methods = msg.validAuthentications().entries().data().toSet()
                         val partial = msg.partialSuccess() != 0
-                        ch.trySend(AuthResult.Failure(methods, partial))
+                        ch.trySend(InternalAuthResult.Failure(methods, partial))
                     } else {
                         stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
                     }
@@ -1946,7 +1977,7 @@ class SshConnection(
                     if (ch != null && currentAuthMethod is AuthMethod.PublicKey) {
                         val msg = parseBody<SshMsgUserauthPkOk>(packet)
                         ch.trySend(
-                            AuthResult.PkOk(
+                            InternalAuthResult.PkOk(
                                 msg.publicKeyAlgorithmName().value(),
                                 msg.publicKeyBlob().data()
                             )
@@ -1961,7 +1992,7 @@ class SshConnection(
                                 echo = prompt.echo() != 0
                             )
                         }
-                        ch.trySend(AuthResult.InfoRequest(name, instruction, prompts))
+                        ch.trySend(InternalAuthResult.InfoRequest(name, instruction, prompts))
                     } else {
                         val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
                         stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))

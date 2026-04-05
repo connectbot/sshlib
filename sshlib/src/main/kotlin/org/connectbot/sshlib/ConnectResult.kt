@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package org.connectbot.sshlib.client
+package org.connectbot.sshlib
 
-import org.connectbot.sshlib.KeyboardInteractiveCallback
-
-internal sealed class InternalAuthResult {
-    object Success : InternalAuthResult()
-    data class Failure(val allowedMethods: Set<String>, val partialSuccess: Boolean) : InternalAuthResult()
-    data class PkOk(val algorithmName: String, val publicKeyBlob: ByteArray) : InternalAuthResult()
-    data class InfoRequest(
-        val name: String,
-        val instruction: String,
-        val prompts: List<KeyboardInteractiveCallback.Prompt>,
-    ) : InternalAuthResult()
+/**
+ * Result of [SshClient.connect].
+ */
+sealed interface ConnectResult {
+    data object Success : ConnectResult
+    data class HostKeyRejected(val key: PublicKey) : ConnectResult
+    data class AlgorithmMismatch(val message: String) : ConnectResult
+    data class TransportError(val cause: Throwable) : ConnectResult
+    data class ProtocolError(val message: String, val cause: Throwable? = null) : ConnectResult
 }

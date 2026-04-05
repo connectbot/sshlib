@@ -46,15 +46,16 @@ import java.net.InetSocketAddress
  * Usage with TCP (default):
  * ```kotlin
  * val client = SshClient("example.com")
- * client.connect()
- * if (client.authenticatePassword("user", "password")) {
- *     val session = client.openSession()
- *     session.requestPty()
- *     session.requestShell()
- *     // read/write
- *     session.close()
+ * if (client.connect() is ConnectResult.Success) {
+ *     if (client.authenticatePassword("user", "password") is AuthResult.Success) {
+ *         val session = client.openSession()
+ *         session?.requestPty()
+ *         session?.requestShell()
+ *         // read/write
+ *         session?.close()
+ *     }
+ *     client.disconnect()
  * }
- * client.disconnect()
  * ```
  *
  * Usage with custom transport:
@@ -139,47 +140,45 @@ class SshClient private constructor(
     /**
      * Connect to the SSH server and perform key exchange.
      *
-     * @return true if connection succeeded
+     * @return [ConnectResult] indicating success or failure
      */
-    suspend fun connect(): Boolean {
-        try {
-            logger.info("Connecting via transport factory")
+    suspend fun connect(): ConnectResult = try {
+        logger.info("Connecting via transport factory")
 
-            val newTransport = config.transportFactory.create()
-            transport = newTransport
+        val newTransport = config.transportFactory.create()
+        transport = newTransport
 
-            val sshConnection = SshConnection(
-                transport = newTransport,
-                clientVersion = config.clientVersion,
-                hostKeyVerifier = config.hostKeyVerifier,
-                kexAlgorithms = config.kexAlgorithms,
-                hostKeyAlgorithms = config.hostKeyAlgorithms,
-                encryptionAlgorithms = config.encryptionAlgorithms,
-                macAlgorithms = config.macAlgorithms,
-                compressionAlgorithms = config.compressionAlgorithms,
-                preferPasswordAuth = config.preferPasswordAuth
-            )
-            val success = sshConnection.connect()
+        val sshConnection = SshConnection(
+            transport = newTransport,
+            clientVersion = config.clientVersion,
+            hostKeyVerifier = config.hostKeyVerifier,
+            kexAlgorithms = config.kexAlgorithms,
+            hostKeyAlgorithms = config.hostKeyAlgorithms,
+            encryptionAlgorithms = config.encryptionAlgorithms,
+            macAlgorithms = config.macAlgorithms,
+            compressionAlgorithms = config.compressionAlgorithms,
+            preferPasswordAuth = config.preferPasswordAuth
+        )
+        val result = sshConnection.connect()
 
-            if (success) {
-                connection = sshConnection
-                disconnectForwardJob = forwardingScope.launch {
-                    sshConnection.disconnectedFlow.collect { cause ->
-                        _disconnectedFlow.tryEmit(cause)
-                    }
+        if (result is ConnectResult.Success) {
+            connection = sshConnection
+            disconnectForwardJob = forwardingScope.launch {
+                sshConnection.disconnectedFlow.collect { cause ->
+                    _disconnectedFlow.tryEmit(cause)
                 }
-                logger.info("Successfully connected")
-            } else {
-                disconnect()
-                logger.error("Connection failed")
             }
-
-            return success
-        } catch (e: Exception) {
-            logger.error("Connection failed", e)
+            logger.info("Successfully connected")
+        } else {
             disconnect()
-            return false
+            logger.error("Connection failed: $result")
         }
+
+        result
+    } catch (e: Exception) {
+        logger.error("Connection failed", e)
+        disconnect()
+        ConnectResult.TransportError(e)
     }
 
     /**
@@ -187,30 +186,31 @@ class SshClient private constructor(
      *
      * @param username SSH username
      * @param password SSH password
-     * @return true if authentication succeeded
+     * @return [AuthResult] indicating success or failure
+     * @return [AuthResult.Error] if [connect] has not been called successfully
      */
-    suspend fun authenticatePassword(username: String, password: String): Boolean {
+    suspend fun authenticatePassword(username: String, password: String): AuthResult {
         val conn = connection
         if (conn == null) {
             logger.error("Not connected - call connect() first")
-            return false
+            return AuthResult.Error("Not connected")
         }
 
         return try {
             logger.info("Authenticating as $username")
-            val success = conn.authenticatePassword(username, password)
+            val result = conn.authenticatePassword(username, password)
 
-            if (success) {
+            if (result is AuthResult.Success) {
                 authenticated = true
                 logger.info("Authentication successful")
             } else {
-                logger.warn("Authentication failed")
+                logger.warn("Authentication failed: $result")
             }
 
-            success
+            result
         } catch (e: Exception) {
             logger.error("Authentication error", e)
-            false
+            AuthResult.Error(e.message ?: "Authentication error", e)
         }
     }
 
@@ -219,33 +219,34 @@ class SshClient private constructor(
      *
      * @param username SSH username
      * @param callback Receives prompts from the server and provides responses
-     * @return true if authentication succeeded
+     * @return [AuthResult] indicating success or failure
+     * @return [AuthResult.Error] if [connect] has not been called successfully
      */
     suspend fun authenticateKeyboardInteractive(
         username: String,
         callback: KeyboardInteractiveCallback,
-    ): Boolean {
+    ): AuthResult {
         val conn = connection
         if (conn == null) {
             logger.error("Not connected - call connect() first")
-            return false
+            return AuthResult.Error("Not connected")
         }
 
         return try {
             logger.info("Authenticating as $username via keyboard-interactive")
-            val success = conn.authenticateKeyboardInteractive(username, callback)
+            val result = conn.authenticateKeyboardInteractive(username, callback)
 
-            if (success) {
+            if (result is AuthResult.Success) {
                 authenticated = true
                 logger.info("Keyboard-interactive authentication successful")
             } else {
-                logger.warn("Keyboard-interactive authentication failed")
+                logger.warn("Keyboard-interactive authentication failed: $result")
             }
 
-            success
+            result
         } catch (e: Exception) {
             logger.error("Keyboard-interactive authentication error", e)
-            false
+            AuthResult.Error(e.message ?: "Keyboard-interactive error", e)
         }
     }
 
@@ -255,13 +256,14 @@ class SshClient private constructor(
      * @param username SSH username
      * @param privateKeyData Private key file contents
      * @param passphrase Passphrase for encrypted keys, or null
-     * @return true if authentication succeeded
+     * @return [AuthResult] indicating success or failure
+     * @return [AuthResult.Error] if [connect] has not been called successfully
      */
     suspend fun authenticatePublicKey(
         username: String,
         privateKeyData: ByteArray,
         passphrase: String? = null,
-    ): Boolean = authenticatePublicKey(username, String(privateKeyData, Charsets.UTF_8), passphrase)
+    ): AuthResult = authenticatePublicKey(username, String(privateKeyData, Charsets.UTF_8), passphrase)
 
     /**
      * Authenticate using public key authentication (RFC 4252 §7).
@@ -269,35 +271,36 @@ class SshClient private constructor(
      * @param username SSH username
      * @param privateKeyData Private key file contents as a string
      * @param passphrase Passphrase for encrypted keys, or null
-     * @return true if authentication succeeded
+     * @return [AuthResult] indicating success or failure
+     * @return [AuthResult.Error] if [connect] has not been called successfully
      */
     suspend fun authenticatePublicKey(
         username: String,
         privateKeyData: String,
         passphrase: String? = null,
-    ): Boolean {
+    ): AuthResult {
         val conn = connection
         if (conn == null) {
             logger.error("Not connected - call connect() first")
-            return false
+            return AuthResult.Error("Not connected")
         }
 
         return try {
             logger.info("Authenticating as $username via public key")
             val privateKey = PrivateKeyReader.read(privateKeyData, passphrase)
-            val success = conn.authenticatePublicKey(username, privateKey)
+            val result = conn.authenticatePublicKey(username, privateKey)
 
-            if (success) {
+            if (result is AuthResult.Success) {
                 authenticated = true
                 logger.info("Public key authentication successful")
             } else {
-                logger.warn("Public key authentication failed")
+                logger.warn("Public key authentication failed: $result")
             }
 
-            success
+            result
         } catch (e: Exception) {
             logger.error("Public key authentication error", e)
-            false
+            AuthResult.Error(e.message ?: "Public key authentication error", e)
         }
     }
 
@@ -310,30 +313,31 @@ class SshClient private constructor(
      *
      * @param username SSH username
      * @param handler Callback handler providing authentication materials
-     * @return true if authentication succeeded
+     * @return [AuthResult] indicating success or failure
+     * @return [AuthResult.Error] if [connect] has not been called successfully
      */
-    suspend fun authenticate(username: String, handler: AuthHandler): Boolean {
+    suspend fun authenticate(username: String, handler: AuthHandler): AuthResult {
         val conn = connection
         if (conn == null) {
             logger.error("Not connected - call connect() first")
-            return false
+            return AuthResult.Error("Not connected")
         }
 
         return try {
             logger.info("Authenticating as $username via auth handler")
-            val success = conn.authenticate(username, handler)
+            val result = conn.authenticate(username, handler)
 
-            if (success) {
+            if (result is AuthResult.Success) {
                 authenticated = true
                 logger.info("Auth handler authentication successful")
             } else {
-                logger.warn("Auth handler authentication failed")
+                logger.warn("Auth handler authentication failed: $result")
             }
 
-            success
+            result
         } catch (e: Exception) {
             logger.error("Auth handler authentication error", e)
-            false
+            AuthResult.Error(e.message ?: "Auth handler error", e)
         }
     }
 
