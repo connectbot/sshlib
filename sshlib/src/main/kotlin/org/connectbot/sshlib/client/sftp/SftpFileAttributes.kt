@@ -68,7 +68,7 @@ internal object SftpFileAttributes {
             gid = gid,
             permissions = permissions,
             atime = atime,
-            mtime = mtime,
+            mtime = mtime
         )
     }
 

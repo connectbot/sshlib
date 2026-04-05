@@ -139,7 +139,7 @@ class SftpClientIntegrationTest {
             // Create and write
             val handle = sftp.open(
                 testPath,
-                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE)
             )
             sftp.write(handle, 0, testData)
             sftp.close(handle)
@@ -273,7 +273,7 @@ class SftpClientIntegrationTest {
 
             val writeHandle = sftp.open(
                 testPath,
-                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE)
             )
             sftp.write(writeHandle, 0, testData)
             sftp.close(writeHandle)
@@ -292,7 +292,7 @@ class SftpClientIntegrationTest {
             assertEquals(testData.size, readBuffer.size, "Should read back all bytes")
             assertTrue(
                 testData.contentEquals(readBuffer.toByteArray()),
-                "Read data should match written data",
+                "Read data should match written data"
             )
 
             sftp.remove(testPath)
@@ -319,7 +319,7 @@ class SftpClientIntegrationTest {
             assertEquals(
                 0b110_100_100,
                 (attrs.permissions ?: 0) and 0x1FF,
-                "Permissions should be 0644",
+                "Permissions should be 0644"
             )
 
             sftp.remove(testPath)

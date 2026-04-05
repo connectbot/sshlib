@@ -116,8 +116,7 @@ internal class SftpPacketIO(private val session: SshSession) {
  * Raw SFTP packet with type byte and payload (without the length prefix).
  */
 internal data class SftpRawPacket(val type: Int, val payload: ByteArray) {
-    override fun equals(other: Any?): Boolean =
-        other is SftpRawPacket && type == other.type && payload.contentEquals(other.payload)
+    override fun equals(other: Any?): Boolean = other is SftpRawPacket && type == other.type && payload.contentEquals(other.payload)
 
     override fun hashCode(): Int = 31 * type + payload.contentHashCode()
 }
