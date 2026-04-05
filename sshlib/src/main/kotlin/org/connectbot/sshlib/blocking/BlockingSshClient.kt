@@ -27,6 +27,7 @@ import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PortForwarder
+import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.Socks5Authenticator
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
@@ -237,6 +238,11 @@ class BlockingSshClient internal constructor(
      * @return SshSession instance if successful, null otherwise
      */
     fun openSession(): SshSession? = runBlocking { client.openSession() }
+
+    /**
+     * Open an SFTP session for file transfer (blocking wrapper).
+     */
+    fun openSftp(): SftpClient? = runBlocking { client.openSftp() }
 
     /**
      * Start local port forwarding.

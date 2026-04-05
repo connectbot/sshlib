@@ -412,6 +412,36 @@ class SshClient private constructor(
     }
 
     /**
+     * Open an SFTP session for file transfer.
+     *
+     * Opens a new session channel, starts the "sftp" subsystem, and performs
+     * SFTP version negotiation.
+     *
+     * @return SftpClient instance, or null if not authenticated or connection fails
+     */
+    suspend fun openSftp(): SftpClient? {
+        val conn = connection
+        if (conn == null || !authenticated) {
+            logger.error("Not authenticated - call connect() and authenticate first")
+            return null
+        }
+
+        return try {
+            logger.info("Opening SFTP session")
+            val session = conn.openSessionChannel()
+                ?: throw SshException("Failed to open session channel for SFTP")
+            if (!session.requestSubsystem("sftp")) {
+                session.close()
+                throw SshException("Server rejected SFTP subsystem request")
+            }
+            org.connectbot.sshlib.client.sftp.SftpClientImpl.create(session)
+        } catch (e: Exception) {
+            logger.error("Failed to open SFTP session", e)
+            null
+        }
+    }
+
+    /**
      * Start local port forwarding (RFC 4254 section 7.2).
      *
      * Listens on [bindAddress] locally and forwards each connection through SSH
