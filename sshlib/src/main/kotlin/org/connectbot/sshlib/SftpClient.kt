@@ -117,8 +117,11 @@ interface SftpClient : AutoCloseable {
                         if (batch.value == null) break
                         entries.addAll(batch.value)
                     }
+
                     is SftpResult.ServerError -> return batch
+
                     is SftpResult.ProtocolError -> return batch
+
                     is SftpResult.IoError -> return batch
                 }
             }

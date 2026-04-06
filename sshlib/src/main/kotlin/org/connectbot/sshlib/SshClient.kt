@@ -28,9 +28,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.connectbot.sshlib.client.DynamicPortForwarder
 import org.connectbot.sshlib.client.LocalPortForwarder
-import org.connectbot.sshlib.client.sftp.SftpClientImpl
 import org.connectbot.sshlib.client.RemotePortForwarder
 import org.connectbot.sshlib.client.SshConnection
+import org.connectbot.sshlib.client.sftp.SftpClientImpl
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.transport.ForwardingChannelTransport
 import org.connectbot.sshlib.transport.Transport
