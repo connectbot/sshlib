@@ -29,17 +29,10 @@ import com.github.ajalt.clikt.parameters.types.int
 import kotlinx.coroutines.*
 import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.ConnectResult
-import org.connectbot.sshlib.HostKeyVerifier
-import org.connectbot.sshlib.KeyboardInteractiveCallback
-import org.connectbot.sshlib.KnownHostsVerifier
-import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
 import org.slf4j.LoggerFactory
-import java.io.File
-import java.security.MessageDigest
-import java.util.Base64
 
 fun main(args: Array<String>) = SshCommand().main(args)
 
@@ -55,40 +48,44 @@ private class SshCommand : CliktCommand(name = "ssh") {
             val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
             root.level = Level.DEBUG
         }
+        runSsh()
+    }
 
+    private suspend fun CoroutineScope.runSsh() {
         val atIndex = target.indexOf('@')
         if (atIndex < 0) {
             System.err.println("Target must be in user@host format")
-            return@runBlocking
+            return
         }
         val user = target.substring(0, atIndex)
         val host = target.substring(atIndex + 1)
 
-        val config = SshClientConfig {
-            this.host = host
-            this.port = port
-            hostKeyVerifier = InteractiveHostKeyVerifier(host, port)
-        }
-        val client = SshClient(config)
+        val client = SshClient(buildConfig(host))
         try {
-            val connectResult = client.connect()
-            if (connectResult !is ConnectResult.Success) {
-                System.err.println("Failed to connect to $host:$port: $connectResult")
-                return@runBlocking
-            }
-
-            if (!authenticate(client, user)) {
-                System.err.println("Authentication failed")
-                return@runBlocking
-            }
-
-            coroutineScope { runSession(client) }
-        } catch (e: Exception) {
-            System.err.println("Error: ${e.message}")
+            connectAndRun(client, host, user)
         } finally {
             restoreTerminal()
             client.disconnect()
         }
+    }
+
+    private fun buildConfig(host: String) = SshClientConfig {
+        this.host = host
+        this.port = port
+        hostKeyVerifier = InteractiveHostKeyVerifier(host, port)
+    }
+
+    private suspend fun CoroutineScope.connectAndRun(client: SshClient, host: String, user: String) {
+        val connectResult = client.connect()
+        if (connectResult !is ConnectResult.Success) {
+            System.err.println("Failed to connect to $host:$port: $connectResult")
+            return
+        }
+        if (!authenticate(client, user)) {
+            System.err.println("Authentication failed")
+            return
+        }
+        coroutineScope { runSession(client) }
     }
 
     private suspend fun authenticate(client: SshClient, user: String): Boolean {
@@ -99,69 +96,18 @@ private class SshCommand : CliktCommand(name = "ssh") {
     private suspend fun authenticateWithKey(client: SshClient, user: String): Boolean {
         val keyData = keyFile!!.readText()
         val console = System.console()
-        var passphrase = keyPassphrase
-
-        if (passphrase == null && client.isPrivateKeyEncrypted(keyData)) {
-            passphrase = readPassphrase(console, "Enter passphrase for $keyFile: ")
-        }
-
+        val passphrase = resolvePassphrase(client, keyData, console)
         if (client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) return true
-
         if (passphrase != null) return false
-
-        passphrase = readPassphrase(console, "Enter passphrase for $keyFile (optional): ")
-        return passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success
-    }
-}
-
-private fun readPassphrase(console: java.io.Console?, prompt: String): String =
-    if (console != null) {
-        String(console.readPassword(prompt))
-    } else {
-        System.err.print(prompt)
-        System.err.flush()
-        readlnOrNull() ?: ""
+        val retry = readPassphrase(console, "Enter passphrase for $keyFile (optional): ")
+        return retry.isNotEmpty() && client.authenticatePublicKey(user, keyData, retry) is AuthResult.Success
     }
 
-private suspend fun authenticateInteractive(client: SshClient, user: String): Boolean {
-    val console = System.console()
-    val kbdCallback = object : KeyboardInteractiveCallback {
-        override suspend fun onInfoRequest(
-            name: String,
-            instruction: String,
-            prompts: List<KeyboardInteractiveCallback.Prompt>,
-            respond: suspend (responses: List<String>) -> Unit
-        ) {
-            if (name.isNotEmpty()) System.err.println(name)
-            if (instruction.isNotEmpty()) System.err.println(instruction)
-
-            val responses = prompts.map { prompt ->
-                if (prompt.echo) {
-                    System.err.print(prompt.text)
-                    System.err.flush()
-                    readlnOrNull() ?: ""
-                } else {
-                    readPassphrase(console, prompt.text)
-                }
-            }
-            respond(responses)
-        }
+    private suspend fun resolvePassphrase(client: SshClient, keyData: String, console: java.io.Console?): String? {
+        if (keyPassphrase != null) return keyPassphrase
+        if (client.isPrivateKeyEncrypted(keyData)) return readPassphrase(console, "Enter passphrase for $keyFile: ")
+        return null
     }
-
-    if (client.authenticateKeyboardInteractive(user, kbdCallback) is AuthResult.Success) return true
-
-    return authenticatePassword(client, user, console)
-}
-
-private suspend fun authenticatePassword(client: SshClient, user: String, console: java.io.Console?): Boolean {
-    val password = if (console != null) {
-        String(console.readPassword("Password: "))
-    } else {
-        System.err.println("Warning: no console available, reading password from stdin")
-        print("Password: ")
-        readlnOrNull() ?: return false
-    }
-    return client.authenticatePassword(user, password) is AuthResult.Success
 }
 
 private suspend fun CoroutineScope.runSession(client: SshClient) {
@@ -169,10 +115,8 @@ private suspend fun CoroutineScope.runSession(client: SshClient) {
         System.err.println("Failed to open session")
         return
     }
-
     session.requestPty()
     session.requestShell()
-
     setRawMode()
     Runtime.getRuntime().addShutdownHook(Thread { restoreTerminal() })
 
@@ -183,115 +127,63 @@ private suspend fun CoroutineScope.runSession(client: SshClient) {
     stdoutJob.join()
     stdinJob.cancel()
     stderrJob.cancel()
-
     session.close()
 }
 
-private suspend fun CoroutineScope.runStdin(session: SshSession) {
-    try {
+private suspend fun CoroutineScope.runStdin(session: SshSession) =
+    suppressingExceptions {
         val buf = ByteArray(1024)
-        while (isActive) {
-            if (System.`in`.available() > 0) {
-                val n = System.`in`.read(buf)
-                if (n < 0) {
-                    session.sendEof()
-                    break
-                }
-                session.write(buf.copyOf(n))
-            } else {
-                delay(10)
-            }
-        }
-    } catch (_: Exception) {
+        while (isActive && pumpStdin(session, buf)) { /* loop */ }
     }
+
+private suspend fun pumpStdin(session: SshSession, buf: ByteArray): Boolean {
+    if (System.`in`.available() == 0) { delay(10); return true }
+    val n = System.`in`.read(buf)
+    if (n < 0) { session.sendEof(); return false }
+    session.write(buf.copyOf(n))
+    return true
 }
 
-private suspend fun CoroutineScope.runStdout(session: SshSession) {
-    try {
+private suspend fun CoroutineScope.runStdout(session: SshSession) =
+    suppressingExceptions {
         while (isActive) {
             val data = session.read() ?: break
             System.out.write(data)
             System.out.flush()
         }
-    } catch (_: Exception) {
     }
-}
 
-private suspend fun CoroutineScope.runStderr(session: SshSession) {
-    try {
+private suspend fun CoroutineScope.runStderr(session: SshSession) =
+    suppressingExceptions {
         while (isActive) {
             val (_, data) = session.readExtended() ?: break
             System.err.write(data)
             System.err.flush()
         }
+    }
+
+private inline fun suppressingExceptions(block: () -> Unit) {
+    try {
+        block()
     } catch (_: Exception) {
-    }
-}
-
-private class InteractiveHostKeyVerifier(
-    private val hostname: String,
-    private val port: Int
-) : HostKeyVerifier {
-    private val knownHostsFile = File(System.getProperty("user.home"), ".ssh/known_hosts")
-    private val delegate = KnownHostsVerifier(knownHostsFile, hostname, port)
-
-    override suspend fun verify(key: PublicKey): Boolean {
-        if (delegate.verify(key)) return true
-
-        val fingerprint = MessageDigest.getInstance("SHA-256").digest(key.encoded)
-        val fingerprintStr = Base64.getEncoder().encodeToString(fingerprint).trimEnd('=')
-
-        System.err.println("The authenticity of host '$hostname ($hostname)' can't be established.")
-        System.err.println("${key.type} key fingerprint is SHA256:$fingerprintStr.")
-        System.err.print("Are you sure you want to continue connecting (yes/no)? ")
-        System.err.flush()
-
-        val answer = readlnOrNull()?.trim()?.lowercase()
-        if (answer != "yes") return false
-
-        appendToKnownHosts(key)
-        System.err.println("Warning: Permanently added '$hostname' to the list of known hosts.")
-        return true
-    }
-
-    private fun appendToKnownHosts(key: PublicKey) {
-        val hostEntry = if (port == 22) hostname else "[$hostname]:$port"
-        val keyBase64 = Base64.getEncoder().encodeToString(key.encoded)
-        val line = "$hostEntry ${key.type} $keyBase64\n"
-
-        knownHostsFile.parentFile?.mkdirs()
-        knownHostsFile.appendText(line)
     }
 }
 
 private var savedStty: String? = null
 
-private fun setRawMode() {
-    try {
-        savedStty =
-            String(
-                ProcessBuilder("stty", "-g")
-                    .redirectInput(ProcessBuilder.Redirect.INHERIT)
-                    .start()
-                    .inputStream
-                    .readAllBytes(),
-            ).trim()
-        ProcessBuilder("stty", "-icanon", "-echo", "min", "1")
-            .redirectInput(ProcessBuilder.Redirect.INHERIT)
-            .start()
-            .waitFor()
-    } catch (_: Exception) {
+private fun stty(vararg args: String) =
+    ProcessBuilder("stty", *args)
+        .redirectInput(ProcessBuilder.Redirect.INHERIT)
+        .start()
+
+private fun setRawMode() =
+    suppressingExceptions {
+        savedStty = String(stty("-g").inputStream.readAllBytes()).trim()
+        stty("-icanon", "-echo", "min", "1").waitFor()
     }
-}
 
 private fun restoreTerminal() {
     val stty = savedStty ?: return
     savedStty = null
-    try {
-        ProcessBuilder("stty", stty)
-            .redirectInput(ProcessBuilder.Redirect.INHERIT)
-            .start()
-            .waitFor()
-    } catch (_: Exception) {
-    }
+    suppressingExceptions { stty(stty).waitFor() }
 }
