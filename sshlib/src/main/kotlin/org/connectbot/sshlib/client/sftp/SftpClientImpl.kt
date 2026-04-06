@@ -77,8 +77,11 @@ internal class SftpClientImpl private constructor(
         return dispatchRequest(SSH_FXP_CLOSE, payload.array()) { response ->
             if (response.type == SSH_FXP_STATUS) {
                 val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.OK) SftpResult.Success(Unit)
-                else decodeStatusError(response.payload)
+                if (status == SftpStatusCode.OK) {
+                    SftpResult.Success(Unit)
+                } else {
+                    decodeStatusError(response.payload)
+                }
             } else {
                 SftpResult.Success(Unit)
             }
@@ -94,11 +97,16 @@ internal class SftpClientImpl private constructor(
         return dispatchRequest(SSH_FXP_READ, payload.array()) { response ->
             when (response.type) {
                 SSH_FXP_DATA -> SftpResult.Success(extractString(ByteBuffer.wrap(response.payload)))
+
                 SSH_FXP_STATUS -> {
                     val status = decodeStatus(response.payload)
-                    if (status == SftpStatusCode.EOF) SftpResult.Success(null)
-                    else decodeStatusError(response.payload)
+                    if (status == SftpStatusCode.EOF) {
+                        SftpResult.Success(null)
+                    } else {
+                        decodeStatusError(response.payload)
+                    }
                 }
+
                 else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READ")
             }
         }
@@ -188,11 +196,16 @@ internal class SftpClientImpl private constructor(
         return dispatchRequest(SSH_FXP_READDIR, payload.array()) { response ->
             when (response.type) {
                 SSH_FXP_NAME -> SftpResult.Success(decodeName(response.payload))
+
                 SSH_FXP_STATUS -> {
                     val status = decodeStatus(response.payload)
-                    if (status == SftpStatusCode.EOF) SftpResult.Success(null)
-                    else decodeStatusError(response.payload)
+                    if (status == SftpStatusCode.EOF) {
+                        SftpResult.Success(null)
+                    } else {
+                        decodeStatusError(response.payload)
+                    }
                 }
+
                 else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READDIR")
             }
         }
@@ -236,10 +249,15 @@ internal class SftpClientImpl private constructor(
                 SSH_FXP_NAME -> {
                     val entries = decodeName(response.payload)
                     val filename = entries.firstOrNull()?.filename
-                    if (filename != null) SftpResult.Success(filename)
-                    else SftpResult.ProtocolError("REALPATH returned empty NAME")
+                    if (filename != null) {
+                        SftpResult.Success(filename)
+                    } else {
+                        SftpResult.ProtocolError("REALPATH returned empty NAME")
+                    }
                 }
+
                 SSH_FXP_STATUS -> decodeStatusError(response.payload)
+
                 else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for REALPATH")
             }
         }
@@ -255,10 +273,15 @@ internal class SftpClientImpl private constructor(
                 SSH_FXP_NAME -> {
                     val entries = decodeName(response.payload)
                     val filename = entries.firstOrNull()?.filename
-                    if (filename != null) SftpResult.Success(filename)
-                    else SftpResult.ProtocolError("READLINK returned empty NAME")
+                    if (filename != null) {
+                        SftpResult.Success(filename)
+                    } else {
+                        SftpResult.ProtocolError("READLINK returned empty NAME")
+                    }
                 }
+
                 SSH_FXP_STATUS -> decodeStatusError(response.payload)
+
                 else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READLINK")
             }
         }
@@ -295,29 +318,28 @@ internal class SftpClientImpl private constructor(
         type: Int,
         payload: ByteArray,
         map: (SftpRawPacket) -> SftpResult<T>,
-    ): SftpResult<T> {
-        return try {
-            val response = dispatcher.request(type, payload)
-            map(response)
-        } catch (e: SftpProtocolException) {
-            SftpResult.ProtocolError(e.message ?: "Protocol error")
-        } catch (e: Exception) {
-            SftpResult.IoError(e)
-        }
+    ): SftpResult<T> = try {
+        val response = dispatcher.request(type, payload)
+        map(response)
+    } catch (e: SftpProtocolException) {
+        SftpResult.ProtocolError(e.message ?: "Protocol error")
+    } catch (e: Exception) {
+        SftpResult.IoError(e)
     }
 
     /**
      * Send a request that expects SSH_FXP_STATUS with OK.
      */
-    private suspend fun dispatchStatusRequest(type: Int, payload: ByteArray): SftpResult<Unit> {
-        return dispatchRequest(type, payload) { response ->
-            if (response.type == SSH_FXP_STATUS) {
-                val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.OK) SftpResult.Success(Unit)
-                else decodeStatusError(response.payload)
-            } else {
+    private suspend fun dispatchStatusRequest(type: Int, payload: ByteArray): SftpResult<Unit> = dispatchRequest(type, payload) { response ->
+        if (response.type == SSH_FXP_STATUS) {
+            val status = decodeStatus(response.payload)
+            if (status == SftpStatusCode.OK) {
                 SftpResult.Success(Unit)
+            } else {
+                decodeStatusError(response.payload)
             }
+        } else {
+            SftpResult.Success(Unit)
         }
     }
 
