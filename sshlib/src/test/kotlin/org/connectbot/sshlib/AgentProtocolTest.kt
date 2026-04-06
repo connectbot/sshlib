@@ -23,7 +23,9 @@ import org.connectbot.sshlib.client.AgentSessionInfo
 import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
 import org.connectbot.sshlib.protocol.SshAgentMessage
 import org.connectbot.sshlib.protocol.SshAgentSignResponse
+import org.connectbot.sshlib.protocol.SshAgentcExtension
 import org.connectbot.sshlib.protocol.SshAgentcRequestIdentities
+import org.connectbot.sshlib.protocol.SshAgentcSessionBind
 import org.connectbot.sshlib.protocol.SshAgentcSignRequest
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.toByteArray
@@ -237,5 +239,138 @@ class AgentProtocolTest {
         assertArrayEquals(byteArrayOf(10, 11, 12), capturedContext.sessionId)
         assertArrayEquals(byteArrayOf(13, 14, 15), capturedContext.serverHostKey)
         assertFalse(capturedContext.isBound)
+    }
+
+    @Test
+    fun `handler handles session bind extension`() = runTest {
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+        }
+
+        val sessionId = byteArrayOf(1, 2, 3)
+        val hostKey = byteArrayOf(4, 5, 6)
+        val sessionInfo = AgentSessionInfo(sessionId, hostKey)
+
+        val handler = AgentProtocolHandler(testProvider, sessionInfo)
+
+        val bind = SshAgentcSessionBind()
+        bind.setHostkey(createByteString(hostKey))
+        bind.setSessionIdentifier(createByteString(sessionId))
+        bind.setSignature(createByteString(byteArrayOf(1, 2, 3)))
+        bind.setIsForwarding(1)
+        bind._check()
+
+        val nameBytes = createByteString("session-bind@openssh.com".toByteArray()).toByteArray()
+        val bindBytes = bind.toByteArray()
+        val extBytes = ByteArray(nameBytes.size + bindBytes.size)
+        System.arraycopy(nameBytes, 0, extBytes, 0, nameBytes.size)
+        System.arraycopy(bindBytes, 0, extBytes, nameBytes.size, bindBytes.size)
+
+        val requestMessage = buildAgentMessage(27, extBytes) // SSH_AGENTC_EXTENSION
+        val response = handler.handleRequest(requestMessage)
+
+        val (messageType, _) = parseAgentMessage(response)
+        assertEquals(6, messageType) // SSH_AGENT_SUCCESS
+    }
+
+    @Test
+    fun `handler rejects duplicate session bind`() = runTest {
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+        }
+
+        val sessionId = byteArrayOf(1, 2, 3)
+        val hostKey = byteArrayOf(4, 5, 6)
+        val sessionInfo = AgentSessionInfo(sessionId, hostKey)
+
+        val handler = AgentProtocolHandler(testProvider, sessionInfo)
+
+        val bind = SshAgentcSessionBind()
+        bind.setHostkey(createByteString(hostKey))
+        bind.setSessionIdentifier(createByteString(sessionId))
+        bind.setSignature(createByteString(byteArrayOf(1, 2, 3)))
+        bind.setIsForwarding(1)
+        bind._check()
+
+        val nameBytes = createByteString("session-bind@openssh.com".toByteArray()).toByteArray()
+        val bindBytes = bind.toByteArray()
+        val extBytes = ByteArray(nameBytes.size + bindBytes.size)
+        System.arraycopy(nameBytes, 0, extBytes, 0, nameBytes.size)
+        System.arraycopy(bindBytes, 0, extBytes, nameBytes.size, bindBytes.size)
+
+        val requestMessage = buildAgentMessage(27, extBytes)
+        handler.handleRequest(requestMessage)
+        val response = handler.handleRequest(requestMessage)
+
+        val (messageType, _) = parseAgentMessage(response)
+        assertEquals(5, messageType) // SSH_AGENT_FAILURE
+    }
+
+    @Test
+    fun `handler rejects session bind with mismatched hostkey`() = runTest {
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+        }
+
+        val sessionInfo = AgentSessionInfo(byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+        val handler = AgentProtocolHandler(testProvider, sessionInfo)
+
+        val bind = SshAgentcSessionBind()
+        bind.setHostkey(createByteString(byteArrayOf(9, 9, 9))) // Mismatched
+        bind.setSessionIdentifier(createByteString(byteArrayOf(1, 2, 3)))
+        bind.setSignature(createByteString(byteArrayOf(1, 2, 3)))
+        bind.setIsForwarding(1)
+        bind._check()
+
+        val nameBytes = createByteString("session-bind@openssh.com".toByteArray()).toByteArray()
+        val bindBytes = bind.toByteArray()
+        val extBytes = ByteArray(nameBytes.size + bindBytes.size)
+        System.arraycopy(nameBytes, 0, extBytes, 0, nameBytes.size)
+        System.arraycopy(bindBytes, 0, extBytes, nameBytes.size, bindBytes.size)
+
+        val requestMessage = buildAgentMessage(27, extBytes)
+        val response = handler.handleRequest(requestMessage)
+
+        val (messageType, _) = parseAgentMessage(response)
+        assertEquals(5, messageType) // SSH_AGENT_FAILURE
+    }
+
+    @Test
+    fun `handler returns failure for unknown extension`() = runTest {
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+        }
+        val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(), byteArrayOf()))
+
+        val nameBytes = createByteString("unknown@example.com".toByteArray()).toByteArray()
+        val dataBytes = byteArrayOf(1, 2, 3)
+        val extBytes = ByteArray(nameBytes.size + dataBytes.size)
+        System.arraycopy(nameBytes, 0, extBytes, 0, nameBytes.size)
+        System.arraycopy(dataBytes, 0, extBytes, nameBytes.size, dataBytes.size)
+
+        val requestMessage = buildAgentMessage(27, extBytes)
+        val response = handler.handleRequest(requestMessage)
+
+        val (messageType, _) = parseAgentMessage(response)
+        assertEquals(5, messageType)
+    }
+
+    @Test
+    fun `handler returns failure for unknown message type`() = runTest {
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+        }
+        val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(), byteArrayOf()))
+
+        val requestMessage = buildAgentMessage(99, byteArrayOf(1, 2, 3))
+        val response = handler.handleRequest(requestMessage)
+
+        val (messageType, _) = parseAgentMessage(response)
+        assertEquals(5, messageType)
     }
 }

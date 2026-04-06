@@ -63,7 +63,7 @@ import java.net.InetSocketAddress
  * BlockingSshClient client = new BlockingSshClient(myTransportFactory);
  * ```
  */
-class BlockingSshClient private constructor(
+class BlockingSshClient internal constructor(
     private val client: SshClient,
 ) {
     /**

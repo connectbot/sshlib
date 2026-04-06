@@ -16,8 +16,13 @@
 
 package org.connectbot.sshlib.blocking
 
+import io.mockk.coEvery
+import io.mockk.mockk
+import org.connectbot.sshlib.AuthResult
+import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.transport.ByteArrayTransport
@@ -41,6 +46,73 @@ class BlockingSshClientTest {
             hostKeyVerifier = acceptAllVerifier
         }
         return BlockingSshClient(config)
+    }
+
+    @Test
+    fun `connect handles HostKeyRejected`() {
+        val client = mockk<SshClient>(relaxed = true)
+        val key = mockk<PublicKey>(relaxed = true)
+        coEvery { key.type } returns "ssh-rsa"
+        coEvery { client.connect() } returns ConnectResult.HostKeyRejected(key)
+
+        val blockingClient = BlockingSshClient(client)
+        val ex = assertThrows<SshException> {
+            blockingClient.connect()
+        }
+        assertTrue(ex.message!!.contains("Host key rejected"))
+    }
+
+    @Test
+    fun `connect handles AlgorithmMismatch`() {
+        val client = mockk<SshClient>(relaxed = true)
+        coEvery { client.connect() } returns ConnectResult.AlgorithmMismatch("test mismatch")
+
+        val blockingClient = BlockingSshClient(client)
+        val ex = assertThrows<SshException> {
+            blockingClient.connect()
+        }
+        assertEquals("test mismatch", ex.message)
+    }
+
+    @Test
+    fun `connect handles ProtocolError`() {
+        val client = mockk<SshClient>(relaxed = true)
+        val cause = Exception("proto error")
+        coEvery { client.connect() } returns ConnectResult.ProtocolError("proto error msg", cause)
+
+        val blockingClient = BlockingSshClient(client)
+        val ex = assertThrows<SshException> {
+            blockingClient.connect()
+        }
+        assertEquals("proto error msg", ex.message)
+        assertEquals(cause, ex.cause)
+    }
+
+    @Test
+    fun `authenticatePassword handles Failure`() {
+        val client = mockk<SshClient>(relaxed = true)
+        coEvery { client.authenticatePassword(any(), any()) } returns AuthResult.Failure(setOf("publickey"))
+
+        val blockingClient = BlockingSshClient(client)
+        val ex = assertThrows<SshException> {
+            blockingClient.authenticatePassword("user", "pass")
+        }
+        assertTrue(ex.message!!.contains("Authentication failed"))
+        assertTrue(ex.message!!.contains("publickey"))
+    }
+
+    @Test
+    fun `authenticatePassword handles Error`() {
+        val client = mockk<SshClient>(relaxed = true)
+        val cause = Exception("auth error")
+        coEvery { client.authenticatePassword(any(), any()) } returns AuthResult.Error("auth error msg", cause)
+
+        val blockingClient = BlockingSshClient(client)
+        val ex = assertThrows<SshException> {
+            blockingClient.authenticatePassword("user", "pass")
+        }
+        assertEquals("auth error msg", ex.message)
+        assertEquals(cause, ex.cause)
     }
 
     @Test
