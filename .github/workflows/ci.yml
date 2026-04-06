@@ -38,6 +38,11 @@ jobs:
           dependency-graph: generate-and-submit
           validate-wrappers: true
 
+      - name: Configure Docker mirror
+        run: |
+          echo '{"registry-mirrors": ["https://mirror.gcr.io"]}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+
       - name: Build with Gradle
         run: ./gradlew build koverXmlReport --info -PjdkVersion=${{ matrix.java }}
 
