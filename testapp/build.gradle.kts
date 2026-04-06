@@ -26,4 +26,5 @@ application {
 dependencies {
     implementation(project(":sshlib"))
     implementation(libs.logback.classic)
+    implementation(libs.clikt)
 }

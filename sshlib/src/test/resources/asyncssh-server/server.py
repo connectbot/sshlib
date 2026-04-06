@@ -1,4 +1,6 @@
-import asyncio, asyncssh, sys, logging
+import asyncio
+import asyncssh
+import sys
 
 passwords = {
              'testuser': 'testpass'
@@ -16,7 +18,7 @@ class MySSHServer(asyncssh.SSHServer):
     def connection_made(self, conn):
         print('SSH connection received from %s.' %
                   conn.get_extra_info('peername')[0])
-        self._conn = conn;
+        self._conn = conn
 
     def connection_lost(self, exc):
         if exc:

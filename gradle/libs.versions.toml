@@ -1,5 +1,6 @@
 [versions]
 kotlin = "2.3.0"
+clikt = "5.0.3"
 spotless = "8.4.0"
 kaitai = "0.11"
 coroutines = "1.10.2"
@@ -31,6 +32,7 @@ tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 kyber = { module = "asia.hombre:kyber", version.ref = "kyber" }
 jbcrypt = { module = "org.connectbot:jbcrypt", version.ref = "jbcrypt" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
