@@ -167,7 +167,7 @@ class SshConnection(
         override suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
         override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
         override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
-        override fun activateEncryption() = this@SshConnection.activateEncryption()
+        override suspend fun activateEncryption() = this@SshConnection.activateEncryption()
         override suspend fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
         override fun receiveServiceAccept(service: String) = this@SshConnection.receiveServiceAccept(service)
         override fun startAuthentication() = this@SshConnection.startAuthentication()
@@ -191,6 +191,7 @@ class SshConnection(
 
     private val stateMachine = SshClientStateMachine(callbacks)
     private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val writeMutex = Mutex()
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
     val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
@@ -317,10 +318,10 @@ class SshConnection(
     }
 
     /**
-     * Serialized write to the transport through the state machine dispatcher.
+     * Serialized write to the transport.
      */
     private suspend fun writePacket(messageType: Int, payload: ByteArray = byteArrayOf()) {
-        withContext(stateMachineDispatcher) {
+        writeMutex.withLock {
             packetIO.writePacket(messageType, payload)
         }
     }
@@ -913,7 +914,7 @@ class SshConnection(
             configure()
             _check()
         }
-        withContext(stateMachineDispatcher) {
+        writeMutex.withLock {
             currentAuthMethod = AuthMethod.fromString(method)
             packetIO.writePacket(
                 SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
@@ -1195,10 +1196,12 @@ class SshConnection(
     }
 
     private suspend fun sendNewKeys() {
-        logger.debug("Sending NEW_KEYS")
-        writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
-        if (strictKexEnabled) {
-            packetIO.resetSendSequenceNumber()
+        logger.info("Sending NEW_KEYS")
+        writeMutex.withLock {
+            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
+            if (strictKexEnabled) {
+                packetIO.resetSendSequenceNumber()
+            }
         }
     }
 
@@ -1209,7 +1212,7 @@ class SshConnection(
         }
     }
 
-    private fun activateEncryption() {
+    private suspend fun activateEncryption() {
         logger.info("Activating encryption")
 
         val encC2S = negotiatedEncryptionC2S
@@ -1235,13 +1238,15 @@ class SshConnection(
             val compS2C = CompressionEntry.fromSshName(compS2CName)
             if (compC2S != null && compS2C != null) {
                 val immediateActivation = !compC2S.delayedActivation && !compS2C.delayedActivation
-                packetIO.enableCompression(compC2S.create(), compS2C.create(), immediateActivation)
+                writeMutex.withLock {
+                    packetIO.enableCompression(compC2S.create(), compS2C.create(), immediateActivation)
+                }
                 logger.info("Compression configured: c2s=$compC2SName, s2c=$compS2CName, immediate=$immediateActivation")
             }
         }
     }
 
-    private fun activateAeadEncryption(encC2S: String, encS2C: String) {
+    private suspend fun activateAeadEncryption(encC2S: String, encS2C: String) {
         val entryC2S = CipherEntry.fromSshName(encC2S)
             ?: throw SshException("Unknown AEAD cipher: $encC2S")
         val entryS2C = CipherEntry.fromSshName(encS2C)
@@ -1276,10 +1281,12 @@ class SshConnection(
         val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
         val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
 
-        packetIO.enableAead(c2sAead, s2cAead)
+        writeMutex.withLock {
+            packetIO.enableAead(c2sAead, s2cAead)
+        }
     }
 
-    private fun activateNonAeadEncryption(encC2S: String, encS2C: String) {
+    private suspend fun activateNonAeadEncryption(encC2S: String, encS2C: String) {
         val cipherEntryC2S = CipherEntry.fromSshName(encC2S)
             ?: throw SshException("Unknown cipher: $encC2S")
         val cipherEntryS2C = CipherEntry.fromSshName(encS2C)
@@ -1329,14 +1336,16 @@ class SshConnection(
         val clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
         val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
 
-        packetIO.enableEncryption(
-            clientToServerCipher,
-            clientToServerMac,
-            serverToClientCipher,
-            serverToClientMac,
-            clientToServerEtm = macEntryC2S.isEtm,
-            serverToClientEtm = macEntryS2C.isEtm
-        )
+        writeMutex.withLock {
+            packetIO.enableEncryption(
+                clientToServerCipher,
+                clientToServerMac,
+                serverToClientCipher,
+                serverToClientMac,
+                clientToServerEtm = macEntryC2S.isEtm,
+                serverToClientEtm = macEntryS2C.isEtm
+            )
+        }
     }
 
     private suspend fun sendServiceRequest(service: String) {
@@ -1705,11 +1714,11 @@ class SshConnection(
         val deferred = CompletableDeferred<ByteArray?>()
         withContext(stateMachineDispatcher) {
             pendingGlobalRequest.setDirect(deferred)
-            packetIO.writePacket(
-                SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
-                msg.toByteArray()
-            )
         }
+        writePacket(
+            SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(),
+            msg.toByteArray()
+        )
 
         val responseData = try {
             deferred.await()
