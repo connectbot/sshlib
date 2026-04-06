@@ -20,13 +20,18 @@ plugins {
     alias(libs.plugins.spotless)
     alias(libs.plugins.release)
     alias(libs.plugins.publish) apply false
+    alias(libs.plugins.kover)
 }
 
-subprojects {
+allprojects {
     group = "org.connectbot.sshlib"
 
     repositories {
         google()
         mavenCentral()
     }
+}
+
+dependencies {
+    kover(project(":sshlib"))
 }

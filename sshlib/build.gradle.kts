@@ -23,8 +23,8 @@ plugins {
     alias(libs.plugins.publish)
     alias(libs.plugins.dokka)
     alias(libs.plugins.metalava)
+    alias(libs.plugins.kover)
     `java-library`
-    jacoco
 }
 
 dependencies {
@@ -57,13 +57,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-tasks.jacocoTestReport {
-    reports {
-        xml.required.set(true)
-        csv.required.set(true)
-    }
 }
 
 java {
