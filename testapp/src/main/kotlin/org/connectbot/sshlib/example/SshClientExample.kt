@@ -18,6 +18,14 @@ package org.connectbot.sshlib.example
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.types.int
 import kotlinx.coroutines.*
 import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.ConnectResult
@@ -27,27 +35,34 @@ import org.connectbot.sshlib.KnownHostsVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
+import org.connectbot.sshlib.SshSession
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
 import java.util.Base64
 
-fun main(args: Array<String>) =
-    runBlocking {
-        val parsed = parseArgs(args)
-        if (parsed == null) {
-            System.err.println("Usage: ssh [-d] [-i keyfile] [-K passphrase] <user>@<host> [-p port]")
-            return@runBlocking
-        }
+fun main(args: Array<String>) = SshCommand().main(args)
 
-        if (parsed.debug) {
+private class SshCommand : CliktCommand(name = "ssh") {
+    val debug by option("-d").flag()
+    val keyFile by option("-i", help = "Identity file").file(mustExist = true, canBeDir = false)
+    val keyPassphrase by option("-K", help = "Passphrase for identity file")
+    val port by option("-p", help = "Port").int().default(22)
+    val target by argument(help = "user@host")
+
+    override fun run() = runBlocking {
+        if (debug) {
             val root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
             root.level = Level.DEBUG
         }
 
-        val (user, host, port) = parsed
-
-        val console = System.console()
+        val atIndex = target.indexOf('@')
+        if (atIndex < 0) {
+            System.err.println("Target must be in user@host format")
+            return@runBlocking
+        }
+        val user = target.substring(0, atIndex)
+        val host = target.substring(atIndex + 1)
 
         val config = SshClientConfig {
             this.host = host
@@ -62,152 +77,12 @@ fun main(args: Array<String>) =
                 return@runBlocking
             }
 
-            var authenticated = false
-
-            // Try public key authentication if -i was specified
-            if (parsed.keyFile != null) {
-                val keyData = parsed.keyFile.readText()
-                var passphrase = parsed.keyPassphrase
-
-                if (passphrase == null && client.isPrivateKeyEncrypted(keyData)) {
-                    passphrase = if (console != null) {
-                        String(console.readPassword("Enter passphrase for ${parsed.keyFile}: "))
-                    } else {
-                        System.err.print("Enter passphrase for ${parsed.keyFile}: ")
-                        System.err.flush()
-                        readlnOrNull() ?: ""
-                    }
-                }
-
-                if (client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) {
-                    authenticated = true
-                } else if (passphrase == null && !authenticated) {
-                    // Try one more time with a prompt if it failed and we didn't have a passphrase
-                    // (maybe it was encrypted but isPrivateKeyEncrypted didn't catch it)
-                    passphrase = if (console != null) {
-                        String(console.readPassword("Enter passphrase for ${parsed.keyFile} (optional): "))
-                    } else {
-                        System.err.print("Enter passphrase for ${parsed.keyFile} (optional): ")
-                        System.err.flush()
-                        readlnOrNull() ?: ""
-                    }
-                    if (passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) {
-                        authenticated = true
-                    }
-                }
-            }
-
-            if (!authenticated) {
-                val kbdCallback = object : KeyboardInteractiveCallback {
-                    override suspend fun onInfoRequest(
-                        name: String,
-                        instruction: String,
-                        prompts: List<KeyboardInteractiveCallback.Prompt>,
-                        respond: suspend (responses: List<String>) -> Unit
-                    ) {
-                        if (name.isNotEmpty()) System.err.println(name)
-                        if (instruction.isNotEmpty()) System.err.println(instruction)
-
-                        val responses = prompts.map { prompt ->
-                            if (prompt.echo) {
-                                System.err.print(prompt.text)
-                                System.err.flush()
-                                readlnOrNull() ?: ""
-                            } else if (console != null) {
-                                String(console.readPassword(prompt.text))
-                            } else {
-                                System.err.print(prompt.text)
-                                System.err.flush()
-                                readlnOrNull() ?: ""
-                            }
-                        }
-                        respond(responses)
-                    }
-                }
-
-                if (client.authenticateKeyboardInteractive(user, kbdCallback) !is AuthResult.Success) {
-                    // Fall back to password auth
-                    val password = if (console != null) {
-                        String(console.readPassword("Password: "))
-                    } else {
-                        System.err.println("Warning: no console available, reading password from stdin")
-                        print("Password: ")
-                        readlnOrNull() ?: run {
-                            System.err.println("No password provided")
-                            return@runBlocking
-                        }
-                    }
-
-                    if (client.authenticatePassword(user, password) !is AuthResult.Success) {
-                        System.err.println("Authentication failed")
-                        return@runBlocking
-                    }
-                }
-            }
-
-            val session = client.openSession()
-            if (session == null) {
-                System.err.println("Failed to open session")
+            if (!authenticate(client, user)) {
+                System.err.println("Authentication failed")
                 return@runBlocking
             }
 
-            session.requestPty()
-            session.requestShell()
-
-            setRawMode()
-            Runtime.getRuntime().addShutdownHook(Thread { restoreTerminal() })
-
-            val stdinJob =
-                launch(Dispatchers.IO) {
-                    try {
-                        val buf = ByteArray(1024)
-                        while (isActive) {
-                            if (System.`in`.available() > 0) {
-                                val n = System.`in`.read(buf)
-                                if (n < 0) {
-                                    session.sendEof()
-                                    break
-                                }
-                                session.write(buf.copyOf(n))
-                            } else {
-                                // We could make an FFI call to poll/select here,
-                                // but this is good enough for an example
-                                delay(10)
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-
-            val stdoutJob =
-                launch(Dispatchers.IO) {
-                    try {
-                        while (isActive) {
-                            val data = session.read() ?: break
-                            System.out.write(data)
-                            System.out.flush()
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-
-            val stderrJob =
-                launch(Dispatchers.IO) {
-                    try {
-                        while (isActive) {
-                            val (_, data) = session.readExtended() ?: break
-                            System.err.write(data)
-                            System.err.flush()
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-
-            stdoutJob.join()
-            stdinJob.cancel()
-            stderrJob.cancel()
-
-            session.close()
+            coroutineScope { runSession(client) }
         } catch (e: Exception) {
             System.err.println("Error: ${e.message}")
         } finally {
@@ -215,6 +90,143 @@ fun main(args: Array<String>) =
             client.disconnect()
         }
     }
+
+    private suspend fun authenticate(client: SshClient, user: String): Boolean {
+        if (keyFile != null && authenticateWithKey(client, user)) return true
+        return authenticateInteractive(client, user)
+    }
+
+    private suspend fun authenticateWithKey(client: SshClient, user: String): Boolean {
+        val keyData = keyFile!!.readText()
+        val console = System.console()
+        var passphrase = keyPassphrase
+
+        if (passphrase == null && client.isPrivateKeyEncrypted(keyData)) {
+            passphrase = readPassphrase(console, "Enter passphrase for $keyFile: ")
+        }
+
+        if (client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success) return true
+
+        if (passphrase != null) return false
+
+        passphrase = readPassphrase(console, "Enter passphrase for $keyFile (optional): ")
+        return passphrase.isNotEmpty() && client.authenticatePublicKey(user, keyData, passphrase) is AuthResult.Success
+    }
+}
+
+private fun readPassphrase(console: java.io.Console?, prompt: String): String =
+    if (console != null) {
+        String(console.readPassword(prompt))
+    } else {
+        System.err.print(prompt)
+        System.err.flush()
+        readlnOrNull() ?: ""
+    }
+
+private suspend fun authenticateInteractive(client: SshClient, user: String): Boolean {
+    val console = System.console()
+    val kbdCallback = object : KeyboardInteractiveCallback {
+        override suspend fun onInfoRequest(
+            name: String,
+            instruction: String,
+            prompts: List<KeyboardInteractiveCallback.Prompt>,
+            respond: suspend (responses: List<String>) -> Unit
+        ) {
+            if (name.isNotEmpty()) System.err.println(name)
+            if (instruction.isNotEmpty()) System.err.println(instruction)
+
+            val responses = prompts.map { prompt ->
+                if (prompt.echo) {
+                    System.err.print(prompt.text)
+                    System.err.flush()
+                    readlnOrNull() ?: ""
+                } else {
+                    readPassphrase(console, prompt.text)
+                }
+            }
+            respond(responses)
+        }
+    }
+
+    if (client.authenticateKeyboardInteractive(user, kbdCallback) is AuthResult.Success) return true
+
+    return authenticatePassword(client, user, console)
+}
+
+private suspend fun authenticatePassword(client: SshClient, user: String, console: java.io.Console?): Boolean {
+    val password = if (console != null) {
+        String(console.readPassword("Password: "))
+    } else {
+        System.err.println("Warning: no console available, reading password from stdin")
+        print("Password: ")
+        readlnOrNull() ?: return false
+    }
+    return client.authenticatePassword(user, password) is AuthResult.Success
+}
+
+private suspend fun CoroutineScope.runSession(client: SshClient) {
+    val session = client.openSession() ?: run {
+        System.err.println("Failed to open session")
+        return
+    }
+
+    session.requestPty()
+    session.requestShell()
+
+    setRawMode()
+    Runtime.getRuntime().addShutdownHook(Thread { restoreTerminal() })
+
+    val stdinJob = launch(Dispatchers.IO) { runStdin(session) }
+    val stdoutJob = launch(Dispatchers.IO) { runStdout(session) }
+    val stderrJob = launch(Dispatchers.IO) { runStderr(session) }
+
+    stdoutJob.join()
+    stdinJob.cancel()
+    stderrJob.cancel()
+
+    session.close()
+}
+
+private suspend fun CoroutineScope.runStdin(session: SshSession) {
+    try {
+        val buf = ByteArray(1024)
+        while (isActive) {
+            if (System.`in`.available() > 0) {
+                val n = System.`in`.read(buf)
+                if (n < 0) {
+                    session.sendEof()
+                    break
+                }
+                session.write(buf.copyOf(n))
+            } else {
+                delay(10)
+            }
+        }
+    } catch (_: Exception) {
+    }
+}
+
+private suspend fun CoroutineScope.runStdout(session: SshSession) {
+    try {
+        while (isActive) {
+            val data = session.read() ?: break
+            System.out.write(data)
+            System.out.flush()
+        }
+    } catch (_: Exception) {
+    }
+}
+
+private suspend fun CoroutineScope.runStderr(session: SshSession) {
+    try {
+        while (isActive) {
+            val (_, data) = session.readExtended() ?: break
+            System.err.write(data)
+            System.err.flush()
+        }
+    } catch (_: Exception) {
+    }
+}
 
 private class InteractiveHostKeyVerifier(
     private val hostname: String,
@@ -282,65 +294,4 @@ private fun restoreTerminal() {
             .waitFor()
     } catch (_: Exception) {
     }
-}
-
-private data class ParsedArgs(
-    val user: String,
-    val host: String,
-    val port: Int,
-    val debug: Boolean,
-    val keyFile: File? = null,
-    val keyPassphrase: String? = null,
-)
-
-private fun parseArgs(args: Array<String>): ParsedArgs? {
-    if (args.isEmpty()) return null
-
-    var port = 22
-    var debug = false
-    var target: String? = null
-    var keyFile: File? = null
-    var keyPassphrase: String? = null
-
-    var i = 0
-    while (i < args.size) {
-        when (args[i]) {
-            "-p" -> {
-                if (i + 1 >= args.size) return null
-                port = args[++i].toIntOrNull() ?: return null
-            }
-
-            "-i" -> {
-                if (i + 1 >= args.size) return null
-                keyFile = File(args[++i])
-            }
-
-            "-K" -> {
-                if (i + 1 >= args.size) return null
-                keyPassphrase = args[++i]
-            }
-
-            "-d" -> {
-                debug = true
-            }
-
-            else -> {
-                target = args[i]
-            }
-        }
-        i++
-    }
-
-    if (target == null) return null
-    val atIndex = target.indexOf('@')
-    if (atIndex < 0) return null
-
-    return ParsedArgs(
-        user = target.substring(0, atIndex),
-        host = target.substring(atIndex + 1),
-        port = port,
-        debug = debug,
-        keyFile = keyFile,
-        keyPassphrase = keyPassphrase,
-    )
 }
