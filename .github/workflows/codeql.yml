@@ -28,6 +28,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Work around CodeQL issue 20661
       # Downgrade Kotlin fron 2.3.x to 2.2.x \todo Remove when https://github.com/github/codeql/issues/20661 is fixed.
