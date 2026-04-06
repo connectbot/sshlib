@@ -576,11 +576,17 @@ class SshClientIntegrationTest {
     }
 
     @Test
-    fun `auth handler should report available methods`() {
+    fun `auth handler should report available methods`() = runBlocking {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
-        val client = BlockingSshClient(host, port, acceptAllVerifier)
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            this.preferPasswordAuth = true
+        }
+        val client = BlockingSshClient(config)
 
         try {
             client.connect()
