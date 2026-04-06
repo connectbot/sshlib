@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import org.connectbot.sshlib.SftpResult
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -48,12 +49,12 @@ internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
      * @param timeoutMs Maximum time to wait for a response
      * @return The raw response packet
      */
-    suspend fun request(type: Int, payload: ByteArray, timeoutMs: Long = 30_000L): SftpRawPacket {
+    suspend fun request(type: Int, payload: ByteArray, timeoutMs: Long = 30_000L): SftpResult<SftpRawPacket> {
         val requestId = nextRequestId.getAndIncrement()
         val deferred = CompletableDeferred<SftpRawPacket>()
         pending[requestId] = deferred
 
-        try {
+        return try {
             // Prepend request ID to payload
             val fullPayload = ByteBuffer.allocate(4 + payload.size)
             fullPayload.putInt(requestId)
@@ -63,28 +64,47 @@ internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
                 packetIO.writePacket(type, fullPayload.array())
             }
 
-            return withTimeout(timeoutMs) {
+            val packet = withTimeout(timeoutMs) {
                 deferred.await()
             }
+            SftpResult.Success(packet)
+        } catch (e: SftpProtocolException) {
+            pending.remove(requestId)
+            SftpResult.ProtocolError(e.message ?: "Protocol error")
         } catch (e: Exception) {
             pending.remove(requestId)
-            throw e
+            SftpResult.IoError(e)
         }
     }
 
     /**
      * Send an SFTP packet without a request ID (used for INIT).
      */
-    suspend fun writeRaw(type: Int, payload: ByteArray) {
-        writeMutex.withLock {
-            packetIO.writePacket(type, payload)
+    suspend fun writeRaw(type: Int, payload: ByteArray): SftpResult<Unit> {
+        return try {
+            writeMutex.withLock {
+                packetIO.writePacket(type, payload)
+            }
+            SftpResult.Success(Unit)
+        } catch (e: SftpProtocolException) {
+            SftpResult.ProtocolError(e.message ?: "Protocol error")
+        } catch (e: Exception) {
+            SftpResult.IoError(e)
         }
     }
 
     /**
      * Read a single raw packet (used for VERSION response during init).
      */
-    suspend fun readRaw(): SftpRawPacket = packetIO.readPacket()
+    suspend fun readRaw(): SftpResult<SftpRawPacket> {
+        return try {
+            SftpResult.Success(packetIO.readPacket())
+        } catch (e: SftpProtocolException) {
+            SftpResult.ProtocolError(e.message ?: "Protocol error")
+        } catch (e: Exception) {
+            SftpResult.IoError(e)
+        }
+    }
 
     /**
      * Start the background read loop that routes responses to waiting callers.

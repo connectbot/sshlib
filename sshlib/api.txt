@@ -265,27 +265,27 @@ package org.connectbot.sshlib {
 
   public interface SftpClient {
     method public void close();
-    method public suspend java.lang.Object? close(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? fsetstat(org.connectbot.sshlib.SftpFileHandle handle, org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? fstat(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpAttributes>);
+    method public suspend java.lang.Object? close(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? fsetstat(org.connectbot.sshlib.SftpFileHandle handle, org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? fstat(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpAttributes>>);
     method @InaccessibleFromKotlin public int getProtocolVersion();
     method @InaccessibleFromKotlin public boolean isOpen();
-    method public default suspend java.lang.Object? listdir(java.lang.String path, kotlin.coroutines.Continuation<? super java.util.List<org.connectbot.sshlib.SftpDirectoryEntry>>);
-    method public suspend java.lang.Object? lstat(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpAttributes>);
-    method public suspend java.lang.Object? mkdir(java.lang.String path, optional org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? open(java.lang.String path, java.util.Set<? extends org.connectbot.sshlib.SftpOpenFlag> flags, optional org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpFileHandle>);
-    method public suspend java.lang.Object? opendir(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpFileHandle>);
-    method public suspend java.lang.Object? read(org.connectbot.sshlib.SftpFileHandle handle, long offset, int length, kotlin.coroutines.Continuation<? super byte[]?>);
-    method public suspend java.lang.Object? readdir(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super java.util.List<org.connectbot.sshlib.SftpDirectoryEntry>?>);
-    method public suspend java.lang.Object? readlink(java.lang.String path, kotlin.coroutines.Continuation<? super java.lang.String>);
-    method public suspend java.lang.Object? realpath(java.lang.String path, kotlin.coroutines.Continuation<? super java.lang.String>);
-    method public suspend java.lang.Object? remove(java.lang.String path, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? rename(java.lang.String oldPath, java.lang.String newPath, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? rmdir(java.lang.String path, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? setstat(java.lang.String path, org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? stat(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpAttributes>);
-    method public suspend java.lang.Object? symlink(java.lang.String targetPath, java.lang.String linkPath, kotlin.coroutines.Continuation<? super kotlin.Unit>);
-    method public suspend java.lang.Object? write(org.connectbot.sshlib.SftpFileHandle handle, long offset, byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public default suspend java.lang.Object? listdir(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<? extends java.util.List<org.connectbot.sshlib.SftpDirectoryEntry>>>);
+    method public suspend java.lang.Object? lstat(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpAttributes>>);
+    method public suspend java.lang.Object? mkdir(java.lang.String path, optional org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? open(java.lang.String path, java.util.Set<? extends org.connectbot.sshlib.SftpOpenFlag> flags, optional org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpFileHandle>>);
+    method public suspend java.lang.Object? opendir(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpFileHandle>>);
+    method public suspend java.lang.Object? read(org.connectbot.sshlib.SftpFileHandle handle, long offset, int length, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<byte[]?>>);
+    method public suspend java.lang.Object? readdir(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<? extends java.util.List<org.connectbot.sshlib.SftpDirectoryEntry>?>>);
+    method public suspend java.lang.Object? readlink(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<java.lang.String>>);
+    method public suspend java.lang.Object? realpath(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<java.lang.String>>);
+    method public suspend java.lang.Object? remove(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? rename(java.lang.String oldPath, java.lang.String newPath, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? rmdir(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? setstat(java.lang.String path, org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? stat(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpAttributes>>);
+    method public suspend java.lang.Object? symlink(java.lang.String targetPath, java.lang.String linkPath, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? write(org.connectbot.sshlib.SftpFileHandle handle, long offset, byte[] data, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
     property public abstract boolean isOpen;
     property public abstract int protocolVersion;
   }
@@ -328,6 +328,61 @@ package org.connectbot.sshlib {
     enum_constant public static final org.connectbot.sshlib.SftpOpenFlag READ;
     enum_constant public static final org.connectbot.sshlib.SftpOpenFlag TRUNCATE;
     enum_constant public static final org.connectbot.sshlib.SftpOpenFlag WRITE;
+  }
+
+  public sealed exhaustive interface SftpResult<T> {
+  }
+
+  public static final class SftpResult.IoError implements org.connectbot.sshlib.SftpResult {
+    ctor public SftpResult.IoError(java.lang.Throwable cause);
+    method public java.lang.Throwable component1();
+    method public org.connectbot.sshlib.SftpResult.IoError copy(optional java.lang.Throwable cause);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.Throwable getCause();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public Throwable cause;
+  }
+
+  public static final class SftpResult.ProtocolError implements org.connectbot.sshlib.SftpResult {
+    ctor public SftpResult.ProtocolError(java.lang.String message);
+    method public java.lang.String component1();
+    method public org.connectbot.sshlib.SftpResult.ProtocolError copy(optional java.lang.String message);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.String getMessage();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public String message;
+  }
+
+  public static final class SftpResult.ServerError implements org.connectbot.sshlib.SftpResult {
+    ctor public SftpResult.ServerError(org.connectbot.sshlib.SftpStatusCode statusCode, java.lang.String message);
+    method public org.connectbot.sshlib.SftpStatusCode component1();
+    method public java.lang.String component2();
+    method public org.connectbot.sshlib.SftpResult.ServerError copy(optional org.connectbot.sshlib.SftpStatusCode statusCode, optional java.lang.String message);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.String getMessage();
+    method @InaccessibleFromKotlin public org.connectbot.sshlib.SftpStatusCode getStatusCode();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public String message;
+    property public org.connectbot.sshlib.SftpStatusCode statusCode;
+  }
+
+  public static final class SftpResult.Success<T> implements org.connectbot.sshlib.SftpResult<T> {
+    ctor public SftpResult.Success(T value);
+    method public T component1();
+    method public org.connectbot.sshlib.SftpResult.Success<T> copy(optional T value);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public T getValue();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public T value;
+  }
+
+  public final class SftpResultKt {
+    method public static <T> T? getOrNull(org.connectbot.sshlib.SftpResult<? extends T>);
+    method public static <T> T getOrThrow(org.connectbot.sshlib.SftpResult<? extends T>);
   }
 
   public enum SftpStatusCode {
@@ -373,7 +428,7 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? localPortForward(int bindPort, java.lang.String remoteHost, int remotePort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort);
     method public suspend java.lang.Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
-    method public suspend java.lang.Object? openSftp(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpClient?>);
+    method public suspend java.lang.Object? openSftp(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<? extends org.connectbot.sshlib.SftpClient>>);
     method public suspend java.lang.Object? remotePortForward(java.lang.String remoteBindAddress, int remoteBindPort, java.lang.String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     property public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public boolean isAuthenticated;
@@ -539,7 +594,7 @@ package org.connectbot.sshlib.blocking {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr);
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort);
     method public org.connectbot.sshlib.SshSession? openSession();
-    method public org.connectbot.sshlib.SftpClient? openSftp();
+    method @kotlin.jvm.Throws(exceptionClasses=SftpException::class) public org.connectbot.sshlib.SftpClient openSftp() throws org.connectbot.sshlib.SftpException;
     method public org.connectbot.sshlib.PortForwarder? remotePortForward(java.lang.String remoteBindAddress, int remoteBindPort, java.lang.String localHost, int localPort);
     property public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public boolean isAuthenticated;
