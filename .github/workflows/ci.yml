@@ -39,7 +39,7 @@ jobs:
           validate-wrappers: true
 
       - name: Build with Gradle
-        run: ./gradlew build jacocoTestReport --info -PjdkVersion=${{ matrix.java }}
+        run: ./gradlew build koverXmlReport --info -PjdkVersion=${{ matrix.java }}
 
       - name: Upload to Sonatype
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
@@ -58,4 +58,4 @@ jobs:
           token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
           format: jacoco
           add-prefix: sshlib/src/main/kotlin/
-          files: ${{ github.workspace }}/sshlib/build/reports/jacoco/test/jacocoTestReport.xml
+          files: ${{ github.workspace }}/build/reports/kover/report.xml
