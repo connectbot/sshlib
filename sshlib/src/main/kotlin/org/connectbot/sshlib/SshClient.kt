@@ -418,27 +418,27 @@ class SshClient private constructor(
      * Opens a new session channel, starts the "sftp" subsystem, and performs
      * SFTP version negotiation.
      *
-     * @return SftpClient instance, or null if not authenticated or connection fails
+     * @return [SftpResult.Success] with the client, or an error variant
      */
-    suspend fun openSftp(): SftpClient? {
+    suspend fun openSftp(): SftpResult<SftpClient> {
         val conn = connection
         if (conn == null || !authenticated) {
             logger.error("Not authenticated - call connect() and authenticate first")
-            return null
+            return SftpResult.IoError(IllegalStateException("Not authenticated"))
         }
 
         return try {
             logger.info("Opening SFTP session")
             val session = conn.openSessionChannel()
-                ?: throw SshException("Failed to open session channel for SFTP")
+                ?: return SftpResult.ProtocolError("Failed to open session channel for SFTP")
             if (!session.requestSubsystem("sftp")) {
                 session.close()
-                throw SshException("Server rejected SFTP subsystem request")
+                return SftpResult.ProtocolError("Server rejected SFTP subsystem request")
             }
             SftpClientImpl.create(session)
         } catch (e: Exception) {
             logger.error("Failed to open SFTP session", e)
-            null
+            SftpResult.IoError(e)
         }
     }
 

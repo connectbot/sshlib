@@ -311,20 +311,19 @@ internal class SftpClientImpl private constructor(
     // --- Internal helpers ---
 
     /**
-     * Send a request and map the response, catching transport-level errors
-     * as [SftpResult.IoError].
+     * Send a request and map the response.
      */
     private suspend fun <T> dispatchRequest(
         type: Int,
         payload: ByteArray,
         map: (SftpRawPacket) -> SftpResult<T>,
-    ): SftpResult<T> = try {
-        val response = dispatcher.request(type, payload)
-        map(response)
-    } catch (e: SftpProtocolException) {
-        SftpResult.ProtocolError(e.message ?: "Protocol error")
-    } catch (e: Exception) {
-        SftpResult.IoError(e)
+    ): SftpResult<T> {
+        return when (val result = dispatcher.request(type, payload)) {
+            is SftpResult.Success -> map(result.value)
+            is SftpResult.ServerError -> result
+            is SftpResult.ProtocolError -> result
+            is SftpResult.IoError -> result
+        }
     }
 
     /**
@@ -387,24 +386,34 @@ internal class SftpClientImpl private constructor(
         /**
          * Create an SFTP client by performing the INIT/VERSION handshake.
          */
-        suspend fun create(session: SshSession): SftpClient {
+        suspend fun create(session: SshSession): SftpResult<SftpClient> {
             val packetIO = SftpPacketIO(session)
             val dispatcher = SftpDispatcher(packetIO)
 
             // Send SSH_FXP_INIT
             val initPayload = ByteBuffer.allocate(4)
             initPayload.putInt(SFTP_VERSION)
-            dispatcher.writeRaw(SSH_FXP_INIT, initPayload.array())
+            when (val w = dispatcher.writeRaw(SSH_FXP_INIT, initPayload.array())) {
+                is SftpResult.Success -> {}
+                is SftpResult.ServerError -> return w
+                is SftpResult.ProtocolError -> return w
+                is SftpResult.IoError -> return w
+            }
 
             // Read SSH_FXP_VERSION
-            val versionPacket = dispatcher.readRaw()
+            val versionPacket = when (val r = dispatcher.readRaw()) {
+                is SftpResult.Success -> r.value
+                is SftpResult.ServerError -> return r
+                is SftpResult.ProtocolError -> return r
+                is SftpResult.IoError -> return r
+            }
             if (versionPacket.type != SSH_FXP_VERSION) {
-                throw SftpProtocolException(
+                return SftpResult.ProtocolError(
                     "Expected SSH_FXP_VERSION (2), got ${versionPacket.type}"
                 )
             }
             if (versionPacket.payload.size < 4) {
-                throw SftpProtocolException("SSH_FXP_VERSION payload too short")
+                return SftpResult.ProtocolError("SSH_FXP_VERSION payload too short")
             }
             val serverVersion = ByteBuffer.wrap(versionPacket.payload, 0, 4).int
             val negotiatedVersion = minOf(SFTP_VERSION, serverVersion)
@@ -414,7 +423,7 @@ internal class SftpClientImpl private constructor(
             val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
             val readJob = dispatcher.startReadLoop(scope)
 
-            return SftpClientImpl(session, dispatcher, readJob, negotiatedVersion)
+            return SftpResult.Success(SftpClientImpl(session, dispatcher, readJob, negotiatedVersion))
         }
 
         // --- Wire format helpers ---

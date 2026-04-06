@@ -86,9 +86,10 @@ class SftpClientIntegrationTest {
         assertTrue(client.connect(), "Should connect to SSH server")
         assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
 
-        val sftp = client.openSftp()
-        assertNotNull(sftp, "Should open SFTP session")
-        return Pair(client, sftp!!)
+        val sftpResult = client.openSftp()
+        assertTrue(sftpResult is SftpResult.Success, "Should open SFTP session, got: $sftpResult")
+        val sftp = (sftpResult as SftpResult.Success).value
+        return Pair(client, sftp)
     }
 
     @Test
