@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.connectbot.sshlib.client.DynamicPortForwarder
 import org.connectbot.sshlib.client.LocalPortForwarder
+import org.connectbot.sshlib.client.sftp.SftpClientImpl
 import org.connectbot.sshlib.client.RemotePortForwarder
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.crypto.PrivateKeyReader
@@ -434,7 +435,7 @@ class SshClient private constructor(
                 session.close()
                 throw SshException("Server rejected SFTP subsystem request")
             }
-            org.connectbot.sshlib.client.sftp.SftpClientImpl.create(session)
+            SftpClientImpl.create(session)
         } catch (e: Exception) {
             logger.error("Failed to open SFTP session", e)
             null

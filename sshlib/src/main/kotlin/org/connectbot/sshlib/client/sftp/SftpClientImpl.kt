@@ -23,9 +23,9 @@ import kotlinx.coroutines.SupervisorJob
 import org.connectbot.sshlib.SftpAttributes
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpDirectoryEntry
-import org.connectbot.sshlib.SftpException
 import org.connectbot.sshlib.SftpFileHandle
 import org.connectbot.sshlib.SftpOpenFlag
+import org.connectbot.sshlib.SftpResult
 import org.connectbot.sshlib.SftpStatusCode
 import org.connectbot.sshlib.SshSession
 import org.slf4j.LoggerFactory
@@ -51,7 +51,7 @@ internal class SftpClientImpl private constructor(
 
     // --- File I/O ---
 
-    override suspend fun open(path: String, flags: Set<SftpOpenFlag>, attrs: SftpAttributes): SftpFileHandle {
+    override suspend fun open(path: String, flags: Set<SftpOpenFlag>, attrs: SftpAttributes): SftpResult<SftpFileHandle> {
         val pflags = flags.fold(0) { acc, flag -> acc or flag.value }
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val attrsBytes = SftpFileAttributes.encode(attrs)
@@ -61,234 +61,210 @@ internal class SftpClientImpl private constructor(
         payload.putInt(pflags)
         payload.put(attrsBytes)
 
-        val response = dispatcher.request(SSH_FXP_OPEN, payload.array())
-        return when (response.type) {
-            SSH_FXP_HANDLE -> SftpFileHandle(extractString(ByteBuffer.wrap(response.payload)))
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for OPEN")
+        return dispatchRequest(SSH_FXP_OPEN, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_HANDLE -> SftpResult.Success(SftpFileHandle(extractString(ByteBuffer.wrap(response.payload))))
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for OPEN")
+            }
         }
     }
 
-    override suspend fun close(handle: SftpFileHandle) {
+    override suspend fun close(handle: SftpFileHandle): SftpResult<Unit> {
         val payload = ByteBuffer.allocate(4 + handle.handle.size)
         putString(payload, handle.handle)
 
-        val response = dispatcher.request(SSH_FXP_CLOSE, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
+        return dispatchRequest(SSH_FXP_CLOSE, payload.array()) { response ->
+            if (response.type == SSH_FXP_STATUS) {
+                val status = decodeStatus(response.payload)
+                if (status == SftpStatusCode.OK) SftpResult.Success(Unit)
+                else decodeStatusError(response.payload)
+            } else {
+                SftpResult.Success(Unit)
+            }
         }
     }
 
-    override suspend fun read(handle: SftpFileHandle, offset: Long, length: Int): ByteArray? {
+    override suspend fun read(handle: SftpFileHandle, offset: Long, length: Int): SftpResult<ByteArray?> {
         val payload = ByteBuffer.allocate(4 + handle.handle.size + 8 + 4)
         putString(payload, handle.handle)
         payload.putLong(offset)
         payload.putInt(length)
 
-        val response = dispatcher.request(SSH_FXP_READ, payload.array())
-        return when (response.type) {
-            SSH_FXP_DATA -> extractString(ByteBuffer.wrap(response.payload))
-
-            SSH_FXP_STATUS -> {
-                val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.EOF) {
-                    null
-                } else {
-                    throw decodeStatusException(response.payload)
+        return dispatchRequest(SSH_FXP_READ, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_DATA -> SftpResult.Success(extractString(ByteBuffer.wrap(response.payload)))
+                SSH_FXP_STATUS -> {
+                    val status = decodeStatus(response.payload)
+                    if (status == SftpStatusCode.EOF) SftpResult.Success(null)
+                    else decodeStatusError(response.payload)
                 }
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READ")
             }
-
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for READ")
         }
     }
 
-    override suspend fun write(handle: SftpFileHandle, offset: Long, data: ByteArray) {
+    override suspend fun write(handle: SftpFileHandle, offset: Long, data: ByteArray): SftpResult<Unit> {
         val payload = ByteBuffer.allocate(4 + handle.handle.size + 8 + 4 + data.size)
         putString(payload, handle.handle)
         payload.putLong(offset)
         putString(payload, data)
 
-        val response = dispatcher.request(SSH_FXP_WRITE, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_WRITE, payload.array())
     }
 
     // --- Stat operations ---
 
-    override suspend fun stat(path: String): SftpAttributes = statRequest(SSH_FXP_STAT, path)
+    override suspend fun stat(path: String): SftpResult<SftpAttributes> = statRequest(SSH_FXP_STAT, path)
 
-    override suspend fun lstat(path: String): SftpAttributes = statRequest(SSH_FXP_LSTAT, path)
+    override suspend fun lstat(path: String): SftpResult<SftpAttributes> = statRequest(SSH_FXP_LSTAT, path)
 
-    private suspend fun statRequest(type: Int, path: String): SftpAttributes {
+    private suspend fun statRequest(type: Int, path: String): SftpResult<SftpAttributes> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        val response = dispatcher.request(type, payload.array())
-        return when (response.type) {
-            SSH_FXP_ATTRS -> SftpFileAttributes.decode(ByteBuffer.wrap(response.payload))
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for STAT")
+        return dispatchRequest(type, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_ATTRS -> SftpResult.Success(SftpFileAttributes.decode(ByteBuffer.wrap(response.payload)))
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for STAT")
+            }
         }
     }
 
-    override suspend fun fstat(handle: SftpFileHandle): SftpAttributes {
+    override suspend fun fstat(handle: SftpFileHandle): SftpResult<SftpAttributes> {
         val payload = ByteBuffer.allocate(4 + handle.handle.size)
         putString(payload, handle.handle)
 
-        val response = dispatcher.request(SSH_FXP_FSTAT, payload.array())
-        return when (response.type) {
-            SSH_FXP_ATTRS -> SftpFileAttributes.decode(ByteBuffer.wrap(response.payload))
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for FSTAT")
+        return dispatchRequest(SSH_FXP_FSTAT, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_ATTRS -> SftpResult.Success(SftpFileAttributes.decode(ByteBuffer.wrap(response.payload)))
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for FSTAT")
+            }
         }
     }
 
-    override suspend fun setstat(path: String, attrs: SftpAttributes) {
+    override suspend fun setstat(path: String, attrs: SftpAttributes): SftpResult<Unit> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val attrsBytes = SftpFileAttributes.encode(attrs)
         val payload = ByteBuffer.allocate(4 + pathBytes.size + attrsBytes.size)
         putString(payload, pathBytes)
         payload.put(attrsBytes)
 
-        val response = dispatcher.request(SSH_FXP_SETSTAT, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_SETSTAT, payload.array())
     }
 
-    override suspend fun fsetstat(handle: SftpFileHandle, attrs: SftpAttributes) {
+    override suspend fun fsetstat(handle: SftpFileHandle, attrs: SftpAttributes): SftpResult<Unit> {
         val attrsBytes = SftpFileAttributes.encode(attrs)
         val payload = ByteBuffer.allocate(4 + handle.handle.size + attrsBytes.size)
         putString(payload, handle.handle)
         payload.put(attrsBytes)
 
-        val response = dispatcher.request(SSH_FXP_FSETSTAT, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_FSETSTAT, payload.array())
     }
 
     // --- Directory operations ---
 
-    override suspend fun opendir(path: String): SftpFileHandle {
+    override suspend fun opendir(path: String): SftpResult<SftpFileHandle> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        val response = dispatcher.request(SSH_FXP_OPENDIR, payload.array())
-        return when (response.type) {
-            SSH_FXP_HANDLE -> SftpFileHandle(extractString(ByteBuffer.wrap(response.payload)))
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for OPENDIR")
+        return dispatchRequest(SSH_FXP_OPENDIR, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_HANDLE -> SftpResult.Success(SftpFileHandle(extractString(ByteBuffer.wrap(response.payload))))
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for OPENDIR")
+            }
         }
     }
 
-    override suspend fun readdir(handle: SftpFileHandle): List<SftpDirectoryEntry>? {
+    override suspend fun readdir(handle: SftpFileHandle): SftpResult<List<SftpDirectoryEntry>?> {
         val payload = ByteBuffer.allocate(4 + handle.handle.size)
         putString(payload, handle.handle)
 
-        val response = dispatcher.request(SSH_FXP_READDIR, payload.array())
-        return when (response.type) {
-            SSH_FXP_NAME -> decodeName(response.payload)
-
-            SSH_FXP_STATUS -> {
-                val status = decodeStatus(response.payload)
-                if (status == SftpStatusCode.EOF) {
-                    null
-                } else {
-                    throw decodeStatusException(response.payload)
+        return dispatchRequest(SSH_FXP_READDIR, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_NAME -> SftpResult.Success(decodeName(response.payload))
+                SSH_FXP_STATUS -> {
+                    val status = decodeStatus(response.payload)
+                    if (status == SftpStatusCode.EOF) SftpResult.Success(null)
+                    else decodeStatusError(response.payload)
                 }
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READDIR")
             }
-
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for READDIR")
         }
     }
 
-    override suspend fun mkdir(path: String, attrs: SftpAttributes) {
+    override suspend fun mkdir(path: String, attrs: SftpAttributes): SftpResult<Unit> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val attrsBytes = SftpFileAttributes.encode(attrs)
         val payload = ByteBuffer.allocate(4 + pathBytes.size + attrsBytes.size)
         putString(payload, pathBytes)
         payload.put(attrsBytes)
 
-        val response = dispatcher.request(SSH_FXP_MKDIR, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_MKDIR, payload.array())
     }
 
-    override suspend fun rmdir(path: String) {
-        simplePathRequest(SSH_FXP_RMDIR, path)
-    }
+    override suspend fun rmdir(path: String): SftpResult<Unit> = simplePathRequest(SSH_FXP_RMDIR, path)
 
     // --- File management ---
 
-    override suspend fun remove(path: String) {
-        simplePathRequest(SSH_FXP_REMOVE, path)
-    }
+    override suspend fun remove(path: String): SftpResult<Unit> = simplePathRequest(SSH_FXP_REMOVE, path)
 
-    override suspend fun rename(oldPath: String, newPath: String) {
+    override suspend fun rename(oldPath: String, newPath: String): SftpResult<Unit> {
         val oldBytes = oldPath.toByteArray(StandardCharsets.UTF_8)
         val newBytes = newPath.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + oldBytes.size + 4 + newBytes.size)
         putString(payload, oldBytes)
         putString(payload, newBytes)
 
-        val response = dispatcher.request(SSH_FXP_RENAME, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_RENAME, payload.array())
     }
 
     // --- Path operations ---
 
-    override suspend fun realpath(path: String): String {
+    override suspend fun realpath(path: String): SftpResult<String> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        val response = dispatcher.request(SSH_FXP_REALPATH, payload.array())
-        return when (response.type) {
-            SSH_FXP_NAME -> {
-                val entries = decodeName(response.payload)
-                entries.firstOrNull()?.filename
-                    ?: throw SftpProtocolException("REALPATH returned empty NAME")
+        return dispatchRequest(SSH_FXP_REALPATH, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_NAME -> {
+                    val entries = decodeName(response.payload)
+                    val filename = entries.firstOrNull()?.filename
+                    if (filename != null) SftpResult.Success(filename)
+                    else SftpResult.ProtocolError("REALPATH returned empty NAME")
+                }
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for REALPATH")
             }
-
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for REALPATH")
         }
     }
 
-    override suspend fun readlink(path: String): String {
+    override suspend fun readlink(path: String): SftpResult<String> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        val response = dispatcher.request(SSH_FXP_READLINK, payload.array())
-        return when (response.type) {
-            SSH_FXP_NAME -> {
-                val entries = decodeName(response.payload)
-                entries.firstOrNull()?.filename
-                    ?: throw SftpProtocolException("READLINK returned empty NAME")
+        return dispatchRequest(SSH_FXP_READLINK, payload.array()) { response ->
+            when (response.type) {
+                SSH_FXP_NAME -> {
+                    val entries = decodeName(response.payload)
+                    val filename = entries.firstOrNull()?.filename
+                    if (filename != null) SftpResult.Success(filename)
+                    else SftpResult.ProtocolError("READLINK returned empty NAME")
+                }
+                SSH_FXP_STATUS -> decodeStatusError(response.payload)
+                else -> SftpResult.ProtocolError("Unexpected response type ${response.type} for READLINK")
             }
-
-            SSH_FXP_STATUS -> throw decodeStatusException(response.payload)
-
-            else -> throw SftpProtocolException("Unexpected response type ${response.type} for READLINK")
         }
     }
 
-    override suspend fun symlink(targetPath: String, linkPath: String) {
+    override suspend fun symlink(targetPath: String, linkPath: String): SftpResult<Unit> {
         // Note: OpenSSH has a known bug where symlink arguments are reversed
         // from the spec. The spec says (targetpath, linkpath) but OpenSSH
         // expects (linkpath, targetpath). We follow the OpenSSH convention
@@ -299,11 +275,7 @@ internal class SftpClientImpl private constructor(
         putString(payload, linkBytes)
         putString(payload, targetBytes)
 
-        val response = dispatcher.request(SSH_FXP_SYMLINK, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(SSH_FXP_SYMLINK, payload.array())
     }
 
     override fun close() {
@@ -313,18 +285,48 @@ internal class SftpClientImpl private constructor(
         session.close()
     }
 
-    // --- Helpers ---
+    // --- Internal helpers ---
 
-    private suspend fun simplePathRequest(type: Int, path: String) {
+    /**
+     * Send a request and map the response, catching transport-level errors
+     * as [SftpResult.IoError].
+     */
+    private suspend fun <T> dispatchRequest(
+        type: Int,
+        payload: ByteArray,
+        map: (SftpRawPacket) -> SftpResult<T>,
+    ): SftpResult<T> {
+        return try {
+            val response = dispatcher.request(type, payload)
+            map(response)
+        } catch (e: SftpProtocolException) {
+            SftpResult.ProtocolError(e.message ?: "Protocol error")
+        } catch (e: Exception) {
+            SftpResult.IoError(e)
+        }
+    }
+
+    /**
+     * Send a request that expects SSH_FXP_STATUS with OK.
+     */
+    private suspend fun dispatchStatusRequest(type: Int, payload: ByteArray): SftpResult<Unit> {
+        return dispatchRequest(type, payload) { response ->
+            if (response.type == SSH_FXP_STATUS) {
+                val status = decodeStatus(response.payload)
+                if (status == SftpStatusCode.OK) SftpResult.Success(Unit)
+                else decodeStatusError(response.payload)
+            } else {
+                SftpResult.Success(Unit)
+            }
+        }
+    }
+
+    private suspend fun simplePathRequest(type: Int, path: String): SftpResult<Unit> {
         val pathBytes = path.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        val response = dispatcher.request(type, payload.array())
-        if (response.type == SSH_FXP_STATUS) {
-            val status = decodeStatus(response.payload)
-            if (status != SftpStatusCode.OK) throw decodeStatusException(response.payload)
-        }
+        return dispatchStatusRequest(type, payload.array())
     }
 
     companion object {
@@ -416,8 +418,8 @@ internal class SftpClientImpl private constructor(
             return SftpStatusCode.fromCode(code)
         }
 
-        /** Decode a STATUS response into an SftpException. */
-        private fun decodeStatusException(payload: ByteArray): SftpException {
+        /** Decode a STATUS response into an [SftpResult.ServerError]. */
+        private fun decodeStatusError(payload: ByteArray): SftpResult.ServerError {
             val buf = ByteBuffer.wrap(payload)
             val code = if (buf.remaining() >= 4) buf.int else 4
             val statusCode = SftpStatusCode.fromCode(code)
@@ -427,7 +429,7 @@ internal class SftpClientImpl private constructor(
             } else {
                 statusCode.name
             }
-            return SftpException(statusCode, message)
+            return SftpResult.ServerError(statusCode, message)
         }
 
         /** Decode a NAME response (used by readdir, realpath, readlink). */
