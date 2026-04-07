@@ -277,6 +277,26 @@ class AlgorithmsTest {
         assertTrue(KexEntry.defaultString.contains("kex-strict-c-v00@openssh.com"))
     }
 
+    @Test
+    fun `KexEntry MLKEM768X25519 is post-quantum`() {
+        assertTrue(KexEntry.MLKEM768X25519_SHA256.isPostQuantum)
+    }
+
+    @Test
+    fun `KexEntry non-PQ algorithms are not post-quantum`() {
+        assertFalse(KexEntry.CURVE25519_SHA256.isPostQuantum)
+        assertFalse(KexEntry.ECDH_SHA2_NISTP256.isPostQuantum)
+        assertFalse(KexEntry.ECDH_SHA2_NISTP384.isPostQuantum)
+        assertFalse(KexEntry.ECDH_SHA2_NISTP521.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP18_SHA512.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP16_SHA512.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP_EXCHANGE_SHA256.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP14_SHA256.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP14_SHA1.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP_EXCHANGE_SHA1.isPostQuantum)
+        assertFalse(KexEntry.DH_GROUP1_SHA1.isPostQuantum)
+    }
+
     // SignatureEntry lookup
 
     @Test
