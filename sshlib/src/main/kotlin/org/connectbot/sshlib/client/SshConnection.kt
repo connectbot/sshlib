@@ -26,9 +26,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -38,6 +40,7 @@ import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
@@ -122,6 +125,7 @@ import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.CoroutineContext
 import org.connectbot.sshlib.AuthResult as PublicAuthResult
 
 /**
@@ -144,6 +148,9 @@ class SshConnection(
     private val macAlgorithms: String = MacEntry.defaultString,
     private val compressionAlgorithms: String = CompressionEntry.defaultString,
     private val preferPasswordAuth: Boolean = false,
+    private val rekeyIntervalMs: Long = 3_600_000L,
+    private val rekeyBytesLimit: Long = 1_073_741_824L,
+    coroutineContext: CoroutineContext = Dispatchers.IO,
 ) {
 
     companion object {
@@ -166,6 +173,10 @@ class SshConnection(
         override suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) = this@SshConnection.receiveKexDhReply(msg)
         override suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
         override suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
+        override fun isRekeying(): Boolean = this@SshConnection.isRekeying
+        override fun rekeyStarted() = this@SshConnection.rekeyStarted()
+        override fun rekeyComplete() = this@SshConnection.rekeyComplete()
+        override suspend fun sendKexDhGexInit() = this@SshConnection.sendKexDhGexInit()
         override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
         override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
         override suspend fun activateEncryption() = this@SshConnection.activateEncryption()
@@ -191,7 +202,7 @@ class SshConnection(
     }
 
     private val stateMachine = SshClientStateMachine(callbacks)
-    private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val connectionScope = CoroutineScope(SupervisorJob() + coroutineContext)
     private val writeMutex = Mutex()
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
@@ -307,6 +318,14 @@ class SshConnection(
 
     private var packetLoopJob: Job? = null
 
+    @Volatile private var isRekeying = false
+
+    @Volatile private var rekeyPending = false
+    private var rekeyTimerJob: Job? = null
+
+    @Volatile private var pendingConnect: CompletableDeferred<ConnectResult>? = null
+    private var dhGexGroup: SshMsgKexDhGexGroup? = null
+
     private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
         logger.debug("Dispatching event: $event")
         try {
@@ -334,120 +353,41 @@ class SshConnection(
      * Returns [ConnectResult.Success] when the transport is ready for authentication calls.
      */
     suspend fun connect(): ConnectResult {
-        try {
+        val deferred = CompletableDeferred<ConnectResult>()
+        pendingConnect = deferred
+
+        return try {
             dispatchEvent(SshClientStateMachine.SshEvent.Connect)
 
-            // Version exchange
+            // Version exchange — text protocol, handled inline
             packetIO.writeBanner(clientVersion)
             val banner = packetIO.readBanner()
             dispatchEvent(SshClientStateMachine.SshEvent.ReceiveVersion(banner))
 
-            // Key exchange initialization - read server's KEXINIT
-            val kexInitPacket = packetIO.readPacket()
-            val kexInit = kexInitPacket.body() as SshMsgKexinit
-
-            // Save raw KEXINIT payload for exchange hash (message type + body)
-            val kexInitMsgType = kexInitPacket.messageType().id().toByte()
-            serverKexInit = byteArrayOf(kexInitMsgType) + kexInitPacket._raw_body()
-
-            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
-            // Note: ReceiveKexInit transition triggers sendKexInit() via state machine
-
-            // Key exchange - read server's reply
-            // KEX-specific messages (30-49) need special parsing based on negotiated algorithm
-            val kexReplyPacket = packetIO.readPacket()
-            val messageTypeByte = kexReplyPacket.messageType().id().toByte()
-            val rawBody = byteArrayOf(messageTypeByte) + kexReplyPacket._raw_body()
-
-            val negotiated = negotiatedKex
-                ?: throw SshException("No KEX algorithm negotiated")
-            val kexEntry = KexEntry.fromSshName(negotiated)
-                ?: throw SshException("Unknown KEX algorithm: $negotiated")
-            when (kexEntry.type) {
-                KexType.ECDH -> {
-                    val ecdhStream = ByteBufferKaitaiStream(rawBody)
-                    val ecdhPayload = KexEcdhPayload(ecdhStream)
-                    ecdhPayload._read()
-                    val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
-                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
-                }
-
-                KexType.DH -> {
-                    val kexdhStream = ByteBufferKaitaiStream(rawBody)
-                    val kexdhPayload = KexdhPayload(kexdhStream)
-                    kexdhPayload._read()
-                    val dhReply = kexdhPayload.body() as SshMsgKexdhReply
-                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
-                }
-
-                KexType.DH_GEX -> {
-                    // First packet is SSH_MSG_KEX_DH_GEX_GROUP
-                    val groupStream = ByteBufferKaitaiStream(rawBody)
-                    val groupPayload = KexDhGexPayload(groupStream)
-                    groupPayload._read()
-                    val group = groupPayload.body() as SshMsgKexDhGexGroup
-
-                    val dhGex = kex as DiffieHellmanGroupExchange
-                    dhGex.setGroup(
-                        BigInteger(1, group.p().body()),
-                        BigInteger(1, group.g().body()),
-                    )
-                    clientPublicKey = dhGex.generateClientKeys()
-
-                    val initMsg = SshMsgKexDhGexInit().apply {
-                        setE(createMpint(clientPublicKey!!))
-                        _check()
-                    }
-                    writePacket(
-                        SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
-                        initMsg.toByteArray(),
-                    )
-
-                    // Second packet is SSH_MSG_KEX_DH_GEX_REPLY
-                    val replyPacket = packetIO.readPacket()
-                    val replyMsgType = replyPacket.messageType().id().toByte()
-                    val replyRawBody = byteArrayOf(replyMsgType) + replyPacket._raw_body()
-                    val replyStream = ByteBufferKaitaiStream(replyRawBody)
-                    val replyPayload = KexDhGexPayload(replyStream)
-                    replyPayload._read()
-                    val reply = replyPayload.body() as SshMsgKexDhGexReply
-                    dispatchEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexReply(reply))
-                }
-            }
-
-            // New keys - read server's NEWKEYS
-            val newKeysPacket = packetIO.readPacket()
-            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveNewKeys)
-
-            // Service request (ssh-userauth)
-            // Loop until we get SERVICE_ACCEPT (skip IGNORE/DEBUG messages)
-            val serviceAccept = readExpectedMessage<SshMsgServiceAccept>(
-                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT,
-            )
-            dispatchEvent(
-                SshClientStateMachine.SshEvent.ReceiveServiceAccept(serviceAccept.serviceName().value()),
-            )
-
-            logger.info("SSH connection established successfully")
+            // Start packet loop — handles all binary SSH packets from here
             startPacketLoop()
-            return ConnectResult.Success
+
+            withTimeout(30_000L) {
+                deferred.await()
+            }
+        } catch (e: TimeoutCancellationException) {
+            ConnectResult.TransportError(Exception("Connection timed out"))
         } catch (e: HostKeyRejectedException) {
-            logger.error("Host key rejected")
-            return ConnectResult.HostKeyRejected(e.key)
+            ConnectResult.HostKeyRejected(e.key)
         } catch (e: SshException) {
-            logger.error("SSH connection failed", e)
-            return when {
+            when {
                 e.message?.startsWith("No matching") == true ||
                     e.message?.startsWith("No KEX") == true ||
-                    e.message?.startsWith("Unknown KEX") == true -> ConnectResult.AlgorithmMismatch(e.message ?: "Algorithm mismatch")
+                    e.message?.startsWith("Unknown KEX") == true ->
+                    ConnectResult.AlgorithmMismatch(e.message ?: "Algorithm mismatch")
 
-                e.message?.contains("host key", ignoreCase = true) == true -> ConnectResult.ProtocolError(e.message ?: "Host key error", e)
+                e.message?.contains("host key", ignoreCase = true) == true ->
+                    ConnectResult.ProtocolError(e.message ?: "Host key error", e)
 
                 else -> ConnectResult.ProtocolError(e.message ?: "Protocol error", e)
             }
         } catch (e: Exception) {
-            logger.error("SSH connection failed", e)
-            return ConnectResult.TransportError(e)
+            ConnectResult.TransportError(e)
         }
     }
 
@@ -1112,6 +1052,48 @@ class SshConnection(
         writePacket(SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REQUEST.id().toInt(), msg.toByteArray())
     }
 
+    private fun rekeyStarted() {
+        logger.info("Re-key started")
+        isRekeying = true
+        rekeyTimerJob?.cancel()
+    }
+
+    private fun rekeyComplete() {
+        logger.info("Re-key complete")
+        isRekeying = false
+        rekeyPending = false
+        packetIO.resetByteCounters()
+        startRekeyTimer()
+    }
+
+    private fun startRekeyTimer() {
+        rekeyTimerJob?.cancel()
+        rekeyTimerJob = connectionScope.launch {
+            delay(rekeyIntervalMs)
+            rekeyPending = true
+        }
+    }
+
+    private suspend fun sendKexDhGexInit() {
+        val group = dhGexGroup ?: throw SshException("DH-GEX group not received")
+        val dhGex = kex as? DiffieHellmanGroupExchange
+            ?: throw SshException("KEX algorithm is not DH-GEX")
+        dhGex.setGroup(
+            BigInteger(1, group.p().body()),
+            BigInteger(1, group.g().body()),
+        )
+        clientPublicKey = dhGex.generateClientKeys()
+
+        val initMsg = SshMsgKexDhGexInit().apply {
+            setE(createMpint(clientPublicKey!!))
+            _check()
+        }
+        writePacket(
+            SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_INIT.id().toInt(),
+            initMsg.toByteArray(),
+        )
+    }
+
     private suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) {
         logger.info("Received DH_REPLY from server")
         completeKex(
@@ -1172,8 +1154,6 @@ class SshConnection(
 
         val publicKey = PublicKey(keyType, serverHostKey)
 
-        serverHostKeyBlob = serverHostKey
-
         val trusted = hostKeyVerifier.verify(publicKey)
 
         if (!trusted) {
@@ -1181,6 +1161,13 @@ class SshConnection(
             throw HostKeyRejectedException(publicKey)
         }
         logger.info("Host key verified")
+
+        val existingKey = serverHostKeyBlob
+        if (existingKey != null && !serverHostKey.contentEquals(existingKey)) {
+            logger.error("Host key changed during re-key — possible MITM attack")
+            throw SshException("Host key changed during re-key")
+        }
+        serverHostKeyBlob = serverHostKey
 
         if (!SignatureVerifier.verify(serverHostKey, signature, hash)) {
             logger.error("Server signature verification failed")
@@ -1364,6 +1351,9 @@ class SshConnection(
 
     private fun receiveServiceAccept(service: String) {
         logger.info("Service accepted: $service")
+        startRekeyTimer()
+        pendingConnect?.complete(ConnectResult.Success)
+        pendingConnect = null
     }
 
     private fun startAuthentication() {
@@ -1811,6 +1801,27 @@ class SshConnection(
 
         withContext(stateMachineDispatcher) {
             when (msgType) {
+                SshEnums.MessageType.SSH_MSG_KEXINIT -> {
+                    val kexInitMsgType = msgType.id().toByte()
+                    serverKexInit = byteArrayOf(kexInitMsgType) + packet._raw_body()
+                    val kexInit = packet.body() as SshMsgKexinit
+                    if (stateMachine.isInState("PostAuthenticated")) {
+                        stateMachine.processEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+                    }
+                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
+                }
+
+                SshEnums.MessageType.SSH_MSG_NEWKEYS -> {
+                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveNewKeys)
+                }
+
+                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT -> {
+                    val msg = parseBody<SshMsgServiceAccept>(packet)
+                    stateMachine.processEvent(
+                        SshClientStateMachine.SshEvent.ReceiveServiceAccept(msg.serviceName().value()),
+                    )
+                }
+
                 SshEnums.MessageType.SSH_MSG_IGNORE -> {
                     stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
                 }
@@ -2031,73 +2042,60 @@ class SshConnection(
                 }
 
                 else -> {
-                    logger.warn("Unhandled message type: ${packet.messageType()}")
+                    // KEX-specific messages 30-49 are not in MessageType enum.
+                    // Disambiguate by negotiated KEX type since ECDH reply, DH reply,
+                    // and DH-GEX group all share message ID 31.
+                    val msgId = msgType.id().toInt()
+                    val rawBody = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
+                    val kexEntry = negotiatedKex?.let { KexEntry.fromSshName(it) }
+                    when {
+                        kexEntry?.type == KexType.ECDH &&
+                            msgId == SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_REPLY.id().toInt() -> {
+                            val stream = ByteBufferKaitaiStream(rawBody)
+                            val ecdhPayload = KexEcdhPayload(stream)
+                            ecdhPayload._read()
+                            val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
+                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
+                        }
+
+                        kexEntry?.type == KexType.DH &&
+                            msgId == SshEnums.KexDh.SSH_MSG_KEXDH_REPLY.id().toInt() -> {
+                            val stream = ByteBufferKaitaiStream(rawBody)
+                            val kexdhPayload = KexdhPayload(stream)
+                            kexdhPayload._read()
+                            val dhReply = kexdhPayload.body() as SshMsgKexdhReply
+                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
+                        }
+
+                        kexEntry?.type == KexType.DH_GEX &&
+                            msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_GROUP.id().toInt() -> {
+                            val stream = ByteBufferKaitaiStream(rawBody)
+                            val payload = KexDhGexPayload(stream)
+                            payload._read()
+                            val group = payload.body() as SshMsgKexDhGexGroup
+                            dhGexGroup = group
+                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexGroup(group))
+                        }
+
+                        kexEntry?.type == KexType.DH_GEX &&
+                            msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REPLY.id().toInt() -> {
+                            val stream = ByteBufferKaitaiStream(rawBody)
+                            val replyPayload = KexDhGexPayload(stream)
+                            replyPayload._read()
+                            val reply = replyPayload.body() as SshMsgKexDhGexReply
+                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexReply(reply))
+                        }
+
+                        else -> {
+                            logger.warn("Unhandled message type: ${packet.messageType()}")
+                        }
+                    }
                 }
             }
         }
     }
 
     // Helper methods for SSH protocol encoding
-
-    /**
-     * Read packets until we get the expected message type, skipping IGNORE/DEBUG messages.
-     */
-    private suspend inline fun <reified T> readExpectedMessage(expectedType: SshEnums.MessageType): T {
-        while (true) {
-            val packet = packetIO.readPacket()
-            val messageType = packet.messageType()
-
-            when (messageType) {
-                SshEnums.MessageType.SSH_MSG_IGNORE -> {
-                    logger.debug("Received SSH_MSG_IGNORE, skipping")
-                    continue
-                }
-
-                SshEnums.MessageType.SSH_MSG_DEBUG -> {
-                    logger.debug("Received SSH_MSG_DEBUG, skipping")
-                    continue
-                }
-
-                expectedType -> {
-                    return packet.body() as T
-                }
-
-                else -> {
-                    throw SshException("Expected $expectedType but got $messageType")
-                }
-            }
-        }
-    }
-
-    /**
-     * Read packets until we get one of the expected message types, skipping IGNORE/DEBUG messages.
-     */
-    private suspend inline fun <reified T> readExpectedMessage(vararg expectedTypes: SshEnums.MessageType): T {
-        while (true) {
-            val packet = packetIO.readPacket()
-            val messageType = packet.messageType()
-
-            when (messageType) {
-                SshEnums.MessageType.SSH_MSG_IGNORE -> {
-                    logger.debug("Received SSH_MSG_IGNORE, skipping")
-                    continue
-                }
-
-                SshEnums.MessageType.SSH_MSG_DEBUG -> {
-                    logger.debug("Received SSH_MSG_DEBUG, skipping")
-                    continue
-                }
-
-                in expectedTypes -> {
-                    return packet as T
-                }
-
-                else -> {
-                    throw SshException("Expected one of ${expectedTypes.joinToString()} but got $messageType")
-                }
-            }
-        }
-    }
 
     private inline fun <reified T : KaitaiStruct.ReadWrite> parseBody(packet: UnencryptedPacket.UnencryptedPayload): T {
         val rawBody = packet._raw_body()
@@ -2184,10 +2182,20 @@ class SshConnection(
                 while (isActive) {
                     logger.debug("Packet loop: waiting for next packet")
                     processNextPacket()
+                    if (!isRekeying && stateMachine.isInState("PostAuthenticated") && (
+                            rekeyPending ||
+                                packetIO.bytesSentOnWire >= rekeyBytesLimit ||
+                                packetIO.bytesReceivedOnWire >= rekeyBytesLimit
+                            )
+                    ) {
+                        dispatchEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+                    }
                 }
             } catch (_: CancellationException) {
                 logger.debug("Packet loop cancelled")
             } catch (e: Exception) {
+                pendingConnect?.completeExceptionally(e)
+                pendingConnect = null
                 val allClosed = channels.values.all { !it.isOpen }
                 if (allClosed) {
                     logger.debug("Packet loop ended (all channels closed)")

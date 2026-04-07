@@ -75,6 +75,10 @@ internal class PacketIO(private val transport: Transport) {
     private var sendCompressionActive: Boolean = false
     private var receiveCompressionActive: Boolean = false
 
+    // Wire-byte counters for re-key threshold tracking
+    internal var bytesSentOnWire: Long = 0L
+    internal var bytesReceivedOnWire: Long = 0L
+
     /**
      * Enable encryption and MAC for subsequent packets.
      *
@@ -161,6 +165,11 @@ internal class PacketIO(private val transport: Transport) {
         if (receiveCompressor != null) receiveCompressionActive = true
     }
 
+    fun resetByteCounters() {
+        bytesSentOnWire = 0L
+        bytesReceivedOnWire = 0L
+    }
+
     /**
      * Read and parse the next SSH packet, decompressing if compression is active.
      *
@@ -235,6 +244,7 @@ internal class PacketIO(private val transport: Transport) {
     private suspend fun readUnencryptedPacketBytes(): ByteArray {
         // Read packet_length (4 bytes)
         val lengthBytes = transport.read(4)
+        bytesReceivedOnWire += 4
         val packetLength = ByteBuffer.wrap(lengthBytes).int
 
         if (packetLength < MIN_PACKET_LENGTH || packetLength > MAX_PACKET_LENGTH) {
@@ -243,6 +253,7 @@ internal class PacketIO(private val transport: Transport) {
 
         // Read rest of packet
         val packetData = transport.read(packetLength)
+        bytesReceivedOnWire += packetLength
 
         receiveSequenceNumber++
         val fullPacket = lengthBytes + packetData
@@ -255,6 +266,7 @@ internal class PacketIO(private val transport: Transport) {
 
         // Read first block (contains packet_length)
         val firstBlock = transport.read(blockSize)
+        bytesReceivedOnWire += blockSize
         val decryptedFirst = cipher.decrypt(firstBlock)
 
         // Extract packet_length
@@ -267,13 +279,14 @@ internal class PacketIO(private val transport: Transport) {
         // Read remaining encrypted data
         val remainingLength = packetLength - blockSize + 4
         val remainingData = if (remainingLength.compareTo(0) > 0) {
-            transport.read(remainingLength)
+            transport.read(remainingLength).also { bytesReceivedOnWire += remainingLength }
         } else {
             byteArrayOf()
         }
 
         // Read MAC
         val receivedMac = transport.read(macLength)
+        bytesReceivedOnWire += macLength
 
         // Decrypt remaining data
         val decryptedRemaining = if (remainingData.isNotEmpty()) {
@@ -310,6 +323,7 @@ internal class PacketIO(private val transport: Transport) {
 
         // In ETM mode, length is NOT encrypted
         val lengthBytes = transport.read(4)
+        bytesReceivedOnWire += 4
         val encryptedLength = ByteBuffer.wrap(lengthBytes).int
 
         if (encryptedLength < MIN_PACKET_LENGTH || encryptedLength > MAX_PACKET_LENGTH) {
@@ -318,9 +332,11 @@ internal class PacketIO(private val transport: Transport) {
 
         // Read encrypted payload
         val encryptedPayload = transport.read(encryptedLength)
+        bytesReceivedOnWire += encryptedLength
 
         // Read MAC
         val receivedMac = transport.read(macLength)
+        bytesReceivedOnWire += macLength
 
         // Verify MAC (over sequence_number || length || encrypted_payload)
         val expectedMac = mac.computeEtm(receiveSequenceNumber, encryptedLength, encryptedPayload)
@@ -351,6 +367,7 @@ internal class PacketIO(private val transport: Transport) {
      */
     private suspend fun readAeadPacketBytes(aead: PacketAead): ByteArray {
         val wireLength = transport.read(4)
+        bytesReceivedOnWire += 4
 
         val lengthBytes: ByteArray
         val aadBytes: ByteArray
@@ -369,7 +386,9 @@ internal class PacketIO(private val transport: Transport) {
         }
 
         val ciphertext = transport.read(packetLength)
+        bytesReceivedOnWire += packetLength
         val tag = transport.read(aead.tagLength)
+        bytesReceivedOnWire += aead.tagLength
 
         val plaintext = aead.decrypt(aadBytes, ciphertext, tag)
 
@@ -442,7 +461,9 @@ internal class PacketIO(private val transport: Transport) {
         val padding = Random.nextBytes(paddingLength)
         buffer.write(padding)
 
-        transport.write(buffer.toByteArray())
+        val data = buffer.toByteArray()
+        transport.write(data)
+        bytesSentOnWire += data.size
         sendSequenceNumber++
     }
 
@@ -487,7 +508,9 @@ internal class PacketIO(private val transport: Transport) {
         val encryptedPacket = cipher.encrypt(unencryptedPacket)
 
         // Send encrypted packet + MAC
-        transport.write(encryptedPacket + macBytes)
+        val data = encryptedPacket + macBytes
+        transport.write(data)
+        bytesSentOnWire += data.size
         sendSequenceNumber++
     }
 
@@ -528,7 +551,9 @@ internal class PacketIO(private val transport: Transport) {
 
         // Build final packet: length (unencrypted) + encrypted_payload + MAC
         val lengthBytes = ByteBuffer.allocate(4).putInt(packetLength).array()
-        transport.write(lengthBytes + encryptedPayload + macBytes)
+        val data = lengthBytes + encryptedPayload + macBytes
+        transport.write(data)
+        bytesSentOnWire += data.size
         sendSequenceNumber++
     }
 
@@ -575,7 +600,9 @@ internal class PacketIO(private val transport: Transport) {
 
         val result = aead.encrypt(aadBytes, plaintext)
 
-        transport.write(wireLength + result.ciphertext + result.tag)
+        val data = wireLength + result.ciphertext + result.tag
+        transport.write(data)
+        bytesSentOnWire += data.size
         sendSequenceNumber++
     }
 

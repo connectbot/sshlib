@@ -699,6 +699,48 @@ class SshClientIntegrationTest {
     }
 
     @Test
+    fun `rekey occurs when byte limit is exceeded`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            this.hostKeyVerifier = acceptAllVerifier
+            // Keep this above handshake/auth traffic so re-key is triggered by session data.
+            this.rekeyBytesLimit = 8_192L
+            this.rekeyIntervalMs = Long.MAX_VALUE
+        }
+        val client = SshClient(config)
+
+        try {
+            val result = withTimeout(30_000) { client.connect() }
+            assertTrue(result is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            val execResult = session!!.requestExec("dd if=/dev/urandom bs=1024 count=64 2>/dev/null | base64")
+            assertTrue(execResult, "Should successfully request exec")
+
+            val output = withTimeout(10_000) {
+                val buf = StringBuilder()
+                while (true) {
+                    val data = session.read() ?: break
+                    buf.append(String(data))
+                }
+                buf.toString()
+            }
+
+            assertTrue(output.length > 1_024, "Should receive enough output to cross rekey threshold")
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun `should open sftp subsystem and exchange version`() = runBlocking {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
