@@ -168,6 +168,34 @@ package org.connectbot.sshlib {
     property public Throwable cause;
   }
 
+  public final class ConnectionInfo {
+    ctor public ConnectionInfo(java.lang.String kexAlgorithm, java.lang.String serverHostKeyAlgorithm, java.lang.String encryptionAlgorithmC2S, java.lang.String encryptionAlgorithmS2C, java.lang.String? macAlgorithmC2S, java.lang.String? macAlgorithmS2C);
+    method public java.lang.String component1();
+    method public java.lang.String component2();
+    method public java.lang.String component3();
+    method public java.lang.String component4();
+    method public java.lang.String? component5();
+    method public java.lang.String? component6();
+    method public org.connectbot.sshlib.ConnectionInfo copy(optional java.lang.String kexAlgorithm, optional java.lang.String serverHostKeyAlgorithm, optional java.lang.String encryptionAlgorithmC2S, optional java.lang.String encryptionAlgorithmS2C, optional java.lang.String? macAlgorithmC2S, optional java.lang.String? macAlgorithmS2C);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.String getEncryptionAlgorithmC2S();
+    method @InaccessibleFromKotlin public java.lang.String getEncryptionAlgorithmS2C();
+    method @InaccessibleFromKotlin public java.lang.String getKexAlgorithm();
+    method @InaccessibleFromKotlin public java.lang.String? getMacAlgorithmC2S();
+    method @InaccessibleFromKotlin public java.lang.String? getMacAlgorithmS2C();
+    method @InaccessibleFromKotlin public java.lang.String getServerHostKeyAlgorithm();
+    method public int hashCode();
+    method @InaccessibleFromKotlin public boolean isPostQuantumSecure();
+    method public java.lang.String toString();
+    property public String encryptionAlgorithmC2S;
+    property public String encryptionAlgorithmS2C;
+    property public boolean isPostQuantumSecure;
+    property public String kexAlgorithm;
+    property public String? macAlgorithmC2S;
+    property public String? macAlgorithmS2C;
+    property public String serverHostKeyAlgorithm;
+  }
+
   public interface HostKeyVerifier {
     method public default suspend java.lang.Object? addKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public default suspend java.lang.Object? removeKeys(java.util.List<org.connectbot.sshlib.PublicKey> keys, kotlin.coroutines.Continuation<? super kotlin.Unit>);
@@ -246,6 +274,7 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? dynamicPortForward(int bindPort, optional org.connectbot.sshlib.Socks5Authenticator? authenticator, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     method public void enableAgentForwarding(org.connectbot.sshlib.AgentProvider provider);
     method public suspend java.lang.Object? forwardStream(io.ktor.utils.io.ByteReadChannel readChannel, io.ktor.utils.io.ByteWriteChannel writeChannel, java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.StreamForwarder?>);
+    method @InaccessibleFromKotlin public org.connectbot.sshlib.ConnectionInfo? getConnectionInfo();
     method @InaccessibleFromKotlin public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> getDisconnectedFlow();
     method @InaccessibleFromKotlin public boolean isAuthenticated();
     method public boolean isPrivateKeyEncrypted(byte[] privateKeyData);
@@ -255,6 +284,7 @@ package org.connectbot.sshlib {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort);
     method public suspend java.lang.Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
     method public suspend java.lang.Object? remotePortForward(java.lang.String remoteBindAddress, int remoteBindPort, java.lang.String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
+    property public org.connectbot.sshlib.ConnectionInfo? connectionInfo;
     property public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public boolean isAuthenticated;
     field public static final org.connectbot.sshlib.SshClient.Companion Companion;
