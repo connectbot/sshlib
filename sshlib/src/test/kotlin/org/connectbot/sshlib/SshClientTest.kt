@@ -110,4 +110,10 @@ class SshClientTest {
         // This should not throw but return false or log error
         client.isPrivateKeyEncrypted("invalid key data")
     }
+
+    @Test
+    fun `connectionInfo is null before connect`() {
+        val client = clientWithHost("host")
+        assertNull(client.connectionInfo)
+    }
 }

@@ -42,6 +42,7 @@ import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.ConnectResult
+import org.connectbot.sshlib.ConnectionInfo
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
@@ -207,6 +208,7 @@ class SshConnection(
     private var sessionId: ByteArray? = null
 
     private var negotiatedKex: String? = null
+    private var negotiatedHostKeyAlgorithm: String? = null
     private var negotiatedEncryptionC2S: String? = null
     private var negotiatedEncryptionS2C: String? = null
     private var negotiatedMacC2S: String? = null
@@ -1007,6 +1009,7 @@ class SshConnection(
         val matchingHostKey = clientHostKeyList.firstOrNull { it in serverHostKeyAlgs }
             ?: throw SshException("No matching host key algorithm. Client: $hostKeyAlgorithms, Server: $serverHostKeyAlgs")
         logger.info("  Negotiated host key: $matchingHostKey")
+        negotiatedHostKeyAlgorithm = matchingHostKey
 
         val clientEncList = encryptionAlgorithms.split(",")
         negotiatedEncryptionC2S = clientEncList.firstOrNull { it in serverEncC2S }
@@ -2340,6 +2343,22 @@ class SshConnection(
             msg.toByteArray(),
         )
     }
+
+    internal val connectionInfo: ConnectionInfo?
+        get() {
+            val kex = negotiatedKex ?: return null
+            val hostKey = negotiatedHostKeyAlgorithm ?: return null
+            val encC2S = negotiatedEncryptionC2S ?: return null
+            val encS2C = negotiatedEncryptionS2C ?: return null
+            return ConnectionInfo(
+                kexAlgorithm = kex,
+                serverHostKeyAlgorithm = hostKey,
+                encryptionAlgorithmC2S = encC2S,
+                encryptionAlgorithmS2C = encS2C,
+                macAlgorithmC2S = negotiatedMacC2S,
+                macAlgorithmS2C = negotiatedMacS2C,
+            )
+        }
 }
 
 /**

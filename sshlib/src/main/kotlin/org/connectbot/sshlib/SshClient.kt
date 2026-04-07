@@ -381,6 +381,14 @@ class SshClient private constructor(
         get() = authenticated && connection != null && transport?.isConnected == true
 
     /**
+     * Negotiated algorithm details for the current connection.
+     *
+     * Null before [connect] succeeds or after [disconnect].
+     */
+    val connectionInfo: ConnectionInfo?
+        get() = connection?.connectionInfo
+
+    /**
      * Open a session channel (RFC 4254 section 6.1).
      *
      * @return SshSession instance if successful, null otherwise
