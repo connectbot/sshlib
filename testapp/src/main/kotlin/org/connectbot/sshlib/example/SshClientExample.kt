@@ -81,6 +81,11 @@ private class SshCommand : CliktCommand(name = "ssh") {
             System.err.println("Failed to connect to $host:$port: $connectResult")
             return
         }
+        if (client.connectionInfo?.isPostQuantumSecure != true) {
+            System.err.println("** WARNING: connection is not using a post-quantum key exchange algorithm.")
+            System.err.println("** This session may be vulnerable to \"store now, decrypt later\" attacks.")
+            System.err.println("** The server may need to be upgraded. See https://openssh.com/pq.html")
+        }
         if (!authenticate(client, user)) {
             System.err.println("Authentication failed")
             return
