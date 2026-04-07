@@ -18,6 +18,7 @@ package org.connectbot.sshlib
 
 import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.transport.TransportFactory
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -115,5 +116,31 @@ class SshClientTest {
     fun `connectionInfo is null before connect`() {
         val client = clientWithHost("host")
         assertNull(client.connectionInfo)
+    }
+
+    @Test
+    fun `SshClientConfig has default rekey thresholds`() {
+        val config = SshClientConfig {
+            host = "example.com"
+            hostKeyVerifier = object : HostKeyVerifier {
+                override suspend fun verify(key: PublicKey): Boolean = true
+            }
+        }
+        assertEquals(3_600_000L, config.rekeyIntervalMs)
+        assertEquals(1_073_741_824L, config.rekeyBytesLimit)
+    }
+
+    @Test
+    fun `SshClientConfig custom rekey thresholds are applied`() {
+        val config = SshClientConfig {
+            host = "example.com"
+            hostKeyVerifier = object : HostKeyVerifier {
+                override suspend fun verify(key: PublicKey): Boolean = true
+            }
+            rekeyIntervalMs = 60_000L
+            rekeyBytesLimit = 1024L
+        }
+        assertEquals(60_000L, config.rekeyIntervalMs)
+        assertEquals(1024L, config.rekeyBytesLimit)
     }
 }

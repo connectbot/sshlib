@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.protocol.SshEnums
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
 
@@ -115,5 +116,55 @@ class PacketIOTest {
 
         io.resetSendSequenceNumber()
         io.resetReceiveSequenceNumber()
+    }
+
+    @Test
+    fun `bytesSentOnWire tracks unencrypted write`() = runBlocking {
+        val transport = ByteArrayTransport()
+        val io = PacketIO(transport)
+
+        val data = byteArrayOf(1, 2, 3, 4, 5)
+        val payload = ByteBuffer.allocate(4 + data.size)
+            .putInt(data.size)
+            .put(data)
+            .array()
+        io.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), payload)
+        assertTrue(io.bytesSentOnWire > 0)
+        assertEquals(io.bytesSentOnWire, transport.getWrittenData().size.toLong())
+    }
+
+    @Test
+    fun `bytesReceivedOnWire tracks unencrypted read`() = runBlocking {
+        val transport = ByteArrayTransport()
+        val writer = PacketIO(transport)
+        val data = byteArrayOf(1, 2, 3, 4, 5)
+        val payload = ByteBuffer.allocate(4 + data.size)
+            .putInt(data.size)
+            .put(data)
+            .array()
+        writer.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), payload)
+
+        val readTransport = ByteArrayTransport(transport.getWrittenData())
+        val reader = PacketIO(readTransport)
+        reader.readPacket()
+
+        assertEquals(transport.getWrittenData().size.toLong(), reader.bytesReceivedOnWire)
+    }
+
+    @Test
+    fun `resetByteCounters zeroes both counters`() = runBlocking {
+        val transport = ByteArrayTransport()
+        val io = PacketIO(transport)
+        val data = byteArrayOf(1, 2, 3, 4, 5)
+        val payload = ByteBuffer.allocate(4 + data.size)
+            .putInt(data.size)
+            .put(data)
+            .array()
+        io.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), payload)
+        assertTrue(io.bytesSentOnWire > 0)
+
+        io.resetByteCounters()
+        assertEquals(0L, io.bytesSentOnWire)
+        assertEquals(0L, io.bytesReceivedOnWire)
     }
 }

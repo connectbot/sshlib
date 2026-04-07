@@ -54,6 +54,8 @@ class SshClientConfig private constructor(
     val macAlgorithms: String,
     internal val compressionAlgorithms: String,
     val preferPasswordAuth: Boolean,
+    val rekeyIntervalMs: Long,
+    val rekeyBytesLimit: Long,
 ) {
     class Builder {
         /**
@@ -107,6 +109,16 @@ class SshClientConfig private constructor(
          */
         var preferPasswordAuth: Boolean = false
 
+        /**
+         * Re-key after this many milliseconds. Default: 1 hour.
+         */
+        var rekeyIntervalMs: Long = 3_600_000L
+
+        /**
+         * Re-key after this many wire bytes (sent or received). Default: 1 GB.
+         */
+        var rekeyBytesLimit: Long = 1_073_741_824L
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -132,6 +144,8 @@ class SshClientConfig private constructor(
                 macAlgorithms,
                 compressionAlgorithms,
                 preferPasswordAuth,
+                rekeyIntervalMs,
+                rekeyBytesLimit,
             )
         }
     }

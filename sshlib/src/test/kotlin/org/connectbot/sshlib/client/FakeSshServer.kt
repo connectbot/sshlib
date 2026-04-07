@@ -1,0 +1,390 @@
+/*
+ * Copyright 2025 Kenny Root
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.connectbot.sshlib.client
+
+import io.kaitai.struct.ByteBufferKaitaiStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.connectbot.sshlib.crypto.CipherEntry
+import org.connectbot.sshlib.crypto.EncryptionInstance
+import org.connectbot.sshlib.crypto.KeyDerivation
+import org.connectbot.sshlib.crypto.MacEntry
+import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
+import org.connectbot.sshlib.crypto.X25519ProviderFactory
+import org.connectbot.sshlib.crypto.encodeMpint
+import org.connectbot.sshlib.protocol.SshEnums
+import org.connectbot.sshlib.protocol.SshMsgKexEcdhInit
+import org.connectbot.sshlib.protocol.SshMsgKexEcdhReply
+import org.connectbot.sshlib.protocol.SshMsgKexinit
+import org.connectbot.sshlib.protocol.SshMsgServiceAccept
+import org.connectbot.sshlib.protocol.createAsciiString
+import org.connectbot.sshlib.protocol.createByteString
+import org.connectbot.sshlib.protocol.createNameList
+import org.connectbot.sshlib.protocol.toByteArray
+import org.connectbot.sshlib.transport.PacketIO
+import org.connectbot.sshlib.transport.PipedTransport
+import java.math.BigInteger
+import java.nio.ByteBuffer
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.MessageDigest
+import java.security.SecureRandom
+
+class FakeSshServer(
+    private val serverTransport: PipedTransport,
+    private val scope: CoroutineScope,
+) {
+    @Volatile
+    var rekeyCount = 0
+        private set
+
+    private val hostKeyPair: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+    private val hostKeyBlob: ByteArray = SshPublicKeyEncoder.encode(hostKeyPair.public, "ssh-ed25519")
+
+    private lateinit var serverIo: PacketIO
+    private lateinit var clientVersionStr: String
+    private val serverVersionStr = "SSH-2.0-FakeServer_1.0"
+    private val writeMutex = Mutex()
+
+    private var sessionId: ByteArray? = null
+    private var latestSharedSecret: ByteArray? = null
+    private var latestExchangeHash: ByteArray? = null
+
+    private val rekeyRequestChannel = Channel<Unit>(Channel.UNLIMITED)
+
+    fun start() {
+        scope.launch { serve() }
+    }
+
+    /**
+     * Request that the server initiate a re-key. The re-key will happen when
+     * the server receives the next packet from the client (or when sendIgnore is called).
+     */
+    fun initiateRekey() {
+        rekeyRequestChannel.trySend(Unit)
+    }
+
+    fun sendIgnore() {
+        scope.launch {
+            val msg = org.connectbot.sshlib.protocol.SshMsgIgnore().apply {
+                setData(createByteString(byteArrayOf()))
+                _check()
+            }
+            writeMutex.withLock {
+                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), msg.toByteArray())
+            }
+        }
+    }
+
+    private suspend fun serve() {
+        serverIo = PacketIO(serverTransport)
+
+        serverIo.writeBanner(serverVersionStr)
+        val clientBanner = serverIo.readBanner()
+        clientVersionStr = "SSH-" + clientBanner.protoVersion().trimEnd('\r', '\n')
+
+        // Initial KEX: reads directly from serverIo (no reader coroutine yet)
+        doFullKex(serverIo)
+
+        // Service request
+        readPacketRaw(serverIo)
+        sendServiceAccept(serverIo)
+
+        // After authentication, all packets are routed through this channel by the reader
+        // coroutine. This ensures there is only one concurrent reader of serverIo at all
+        // times, even during re-key.
+        val incomingPackets = Channel<Pair<SshEnums.MessageType, ByteArray>>(Channel.UNLIMITED)
+        val readerJob = scope.launch {
+            try {
+                while (true) {
+                    incomingPackets.send(readPacketWithType(serverIo))
+                }
+            } catch (_: Exception) {
+                incomingPackets.close()
+            }
+        }
+
+        // Main loop
+        while (true) {
+            val done = select {
+                rekeyRequestChannel.onReceive {
+                    // Server-initiated rekey: send KEXINIT to client now; read from incomingPackets
+                    doServerInitiatedKex(serverIo, incomingPackets)
+                    false
+                }
+                incomingPackets.onReceiveCatching { result ->
+                    val (msgType, rawBytes) = result.getOrNull() ?: return@onReceiveCatching true
+                    when (msgType) {
+                        SshEnums.MessageType.SSH_MSG_KEXINIT ->
+                            doClientInitiatedKex(serverIo, rawBytes, incomingPackets)
+
+                        SshEnums.MessageType.SSH_MSG_DISCONNECT -> return@onReceiveCatching true
+
+                        else -> { /* ignore */ }
+                    }
+                    false
+                }
+            }
+            if (done) break
+        }
+        readerJob.cancel()
+    }
+
+    private suspend fun doFullKex(io: PacketIO) {
+        val serverKexInitBytes = sendKexInit(io)
+        val clientKexInitRaw = readPacketRaw(io)
+        val ecdhInitRaw = readPacketRaw(io)
+        val clientPublic = parseEcdhInit(ecdhInitRaw)
+        sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
+        writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
+        readPacketRaw(io) // client NEWKEYS
+        activateEncryption(io)
+    }
+
+    private suspend fun doServerInitiatedKex(
+        io: PacketIO,
+        packets: Channel<Pair<SshEnums.MessageType, ByteArray>>,
+    ) {
+        val serverKexInitBytes = sendKexInit(io)
+        // After sending KEXINIT, wait for the client to send its KEXINIT
+        val (firstType, firstRaw) = packets.receive()
+        val clientKexInitRaw = if (firstType == SshEnums.MessageType.SSH_MSG_KEXINIT) {
+            firstRaw
+        } else {
+            // Discard non-kexinit messages until we get KEXINIT
+            var raw = firstRaw
+            var type = firstType
+            while (type != SshEnums.MessageType.SSH_MSG_KEXINIT) {
+                val (t, r) = packets.receive()
+                type = t
+                raw = r
+            }
+            raw
+        }
+        val (_, ecdhInitRaw) = packets.receive() // ECDH_INIT
+        val clientPublic = parseEcdhInit(ecdhInitRaw)
+        sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
+        writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
+        packets.receive() // client NEWKEYS
+        activateEncryption(io)
+        rekeyCount++
+    }
+
+    private suspend fun doClientInitiatedKex(
+        io: PacketIO,
+        clientKexInitRaw: ByteArray,
+        packets: Channel<Pair<SshEnums.MessageType, ByteArray>>,
+    ) {
+        val serverKexInitBytes = sendKexInit(io)
+        val (_, ecdhInitRaw) = packets.receive() // ECDH_INIT
+        val clientPublic = parseEcdhInit(ecdhInitRaw)
+        sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
+        writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
+        packets.receive() // client NEWKEYS
+        activateEncryption(io)
+        rekeyCount++
+    }
+
+    private suspend fun sendKexInit(io: PacketIO): ByteArray {
+        val cookie = ByteArray(16).also { SecureRandom().nextBytes(it) }
+
+        val kexInit = SshMsgKexinit().apply {
+            setCookie(cookie)
+            setKexAlgorithms(createNameList("curve25519-sha256"))
+            setServerHostKeyAlgorithms(createNameList("ssh-ed25519"))
+            setEncryptionAlgorithmsClientToServer(createNameList("aes128-ctr"))
+            setEncryptionAlgorithmsServerToClient(createNameList("aes128-ctr"))
+            setMacAlgorithmsClientToServer(createNameList("hmac-sha2-256"))
+            setMacAlgorithmsServerToClient(createNameList("hmac-sha2-256"))
+            setCompressionAlgorithmsClientToServer(createNameList("none"))
+            setCompressionAlgorithmsServerToClient(createNameList("none"))
+            setLanguagesClientToServer(createNameList(""))
+            setLanguagesServerToClient(createNameList(""))
+            setFirstKexPacketFollows(0)
+            setReserved(0)
+            _check()
+        }
+
+        val payload = kexInit.toByteArray()
+        val rawBytes = byteArrayOf(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toByte()) + payload
+        writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), payload) }
+        return rawBytes
+    }
+
+    private suspend fun sendEcdhReply(
+        io: PacketIO,
+        clientKexInitRaw: ByteArray,
+        serverKexInitBytes: ByteArray,
+        clientPublic: ByteArray,
+    ) {
+        val x25519 = X25519ProviderFactory.provider
+        val serverPrivate = x25519.generatePrivateKey()
+        val serverPublic = x25519.publicFromPrivate(serverPrivate)
+
+        val sharedSecretRaw = x25519.computeSharedSecret(serverPrivate, clientPublic)
+        val sharedSecret = encodeMpint(BigInteger(1, sharedSecretRaw).toByteArray())
+
+        val exchangeHash = computeExchangeHash(
+            clientVersion = clientVersionStr.toByteArray(Charsets.US_ASCII),
+            serverVersion = serverVersionStr.toByteArray(Charsets.US_ASCII),
+            clientKexInit = clientKexInitRaw,
+            serverKexInit = serverKexInitBytes,
+            serverHostKey = hostKeyBlob,
+            clientPublicKey = clientPublic,
+            serverPublicKey = serverPublic,
+            sharedSecret = sharedSecret,
+        )
+
+        latestSharedSecret = sharedSecret
+        latestExchangeHash = exchangeHash
+        if (sessionId == null) {
+            sessionId = exchangeHash
+        }
+
+        val signature = signExchangeHash(exchangeHash)
+        val signatureBlob = buildSignatureBlob(signature)
+
+        val reply = SshMsgKexEcdhReply().apply {
+            setKS(createByteString(hostKeyBlob))
+            setQS(createByteString(serverPublic))
+            setSignatureH(createByteString(signatureBlob))
+            _check()
+        }
+
+        writeMutex.withLock { io.writePacket(SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_REPLY.id().toInt(), reply.toByteArray()) }
+    }
+
+    private fun activateEncryption(io: PacketIO) {
+        val sharedSecret = latestSharedSecret ?: return
+        val exchangeHash = latestExchangeHash ?: return
+        val sid = sessionId ?: return
+
+        val keyDerivation = KeyDerivation(sharedSecret, exchangeHash, sid, "SHA-256")
+        val cipherEntry = CipherEntry.fromSshName("aes128-ctr") ?: return
+        val macEntry = MacEntry.fromSshName("hmac-sha2-256") ?: return
+
+        val keys = keyDerivation.deriveKeys(
+            ivLength = cipherEntry.ivLength,
+            keyLength = cipherEntry.keyLength,
+            macKeyLength = macEntry.keyLength,
+        )
+
+        val c2sKey = keys.encryptionKeyClientToServer.copyOf(cipherEntry.keyLength)
+        val s2cKey = keys.encryptionKeyServerToClient.copyOf(cipherEntry.keyLength)
+        val c2sIv = keys.initialIvClientToServer.copyOf(cipherEntry.ivLength)
+        val s2cIv = keys.initialIvServerToClient.copyOf(cipherEntry.ivLength)
+
+        // Server RECEIVES with C2S key (client encrypts, server decrypts with decrypt=false)
+        val receiveCipher = (cipherEntry.create(c2sKey, c2sIv, false) as EncryptionInstance.Cipher).cipher
+        // Server SENDS with S2C key (server encrypts, client decrypts)
+        val sendCipher = (cipherEntry.create(s2cKey, s2cIv, true) as EncryptionInstance.Cipher).cipher
+
+        val receiveMac = macEntry.create(keys.integrityKeyClientToServer)
+        val sendMac = macEntry.create(keys.integrityKeyServerToClient)
+
+        // PacketIO.enableEncryption parameters (from client perspective):
+        //   clientToServerCipher -> PacketIO.sendCipher
+        //   serverToClientCipher -> PacketIO.receiveCipher
+        // For server: pass sendCipher as clientToServer, receiveCipher as serverToClient
+        io.enableEncryption(
+            clientToServerCipher = sendCipher,
+            clientToServerMac = sendMac,
+            serverToClientCipher = receiveCipher,
+            serverToClientMac = receiveMac,
+        )
+    }
+
+    private fun computeExchangeHash(
+        clientVersion: ByteArray,
+        serverVersion: ByteArray,
+        clientKexInit: ByteArray,
+        serverKexInit: ByteArray,
+        serverHostKey: ByteArray,
+        clientPublicKey: ByteArray,
+        serverPublicKey: ByteArray,
+        sharedSecret: ByteArray,
+    ): ByteArray {
+        val md = MessageDigest.getInstance("SHA-256")
+        val buf = java.io.ByteArrayOutputStream()
+
+        fun writeString(data: ByteArray) {
+            val len = data.size
+            buf.write(ByteBuffer.allocate(4).putInt(len).array())
+            buf.write(data)
+        }
+
+        writeString(clientVersion)
+        writeString(serverVersion)
+        writeString(clientKexInit)
+        writeString(serverKexInit)
+        writeString(serverHostKey)
+        writeString(clientPublicKey)
+        writeString(serverPublicKey)
+        buf.write(sharedSecret)
+
+        return md.digest(buf.toByteArray())
+    }
+
+    private fun signExchangeHash(hash: ByteArray): ByteArray {
+        val signer = java.security.Signature.getInstance("Ed25519")
+        signer.initSign(hostKeyPair.private)
+        signer.update(hash)
+        return signer.sign()
+    }
+
+    private fun buildSignatureBlob(signature: ByteArray): ByteArray {
+        val algBytes = "ssh-ed25519".toByteArray(Charsets.US_ASCII)
+        val out = java.io.ByteArrayOutputStream()
+        out.write(ByteBuffer.allocate(4).putInt(algBytes.size).array())
+        out.write(algBytes)
+        out.write(ByteBuffer.allocate(4).putInt(signature.size).array())
+        out.write(signature)
+        return out.toByteArray()
+    }
+
+    private suspend fun sendServiceAccept(io: PacketIO) {
+        val msg = SshMsgServiceAccept().apply {
+            setServiceName(createAsciiString("ssh-userauth"))
+            _check()
+        }
+        io.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT.id().toInt(), msg.toByteArray())
+    }
+
+    private suspend fun readPacketRaw(io: PacketIO): ByteArray {
+        val packet = io.readPacket()
+        return byteArrayOf(packet.messageType().id().toByte()) + packet._raw_body()
+    }
+
+    private suspend fun readPacketWithType(io: PacketIO): Pair<SshEnums.MessageType, ByteArray> {
+        val packet = io.readPacket()
+        val msgType = packet.messageType()
+        val rawBytes = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
+        return msgType to rawBytes
+    }
+
+    private fun parseEcdhInit(rawBytes: ByteArray): ByteArray {
+        val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+        val stream = ByteBufferKaitaiStream(bodyBytes)
+        val msg = SshMsgKexEcdhInit(stream)
+        msg._read()
+        return msg.qC().data()
+    }
+}

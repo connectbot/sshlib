@@ -158,6 +158,8 @@ class SshClient private constructor(
             macAlgorithms = config.macAlgorithms,
             compressionAlgorithms = config.compressionAlgorithms,
             preferPasswordAuth = config.preferPasswordAuth,
+            rekeyIntervalMs = config.rekeyIntervalMs,
+            rekeyBytesLimit = config.rekeyBytesLimit,
         )
         val result = sshConnection.connect()
 
