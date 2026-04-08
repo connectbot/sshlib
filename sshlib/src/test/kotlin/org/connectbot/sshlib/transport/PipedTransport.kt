@@ -17,7 +17,7 @@
 package org.connectbot.sshlib.transport
 
 import kotlinx.coroutines.channels.Channel
-import java.io.IOException
+import org.connectbot.sshlib.transport.TransportException
 
 class PipedTransport private constructor(
     private val inbound: Channel<ByteArray>,
@@ -42,7 +42,7 @@ class PipedTransport private constructor(
             val chunk = try {
                 inbound.receive()
             } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) {
-                throw java.io.IOException("Transport closed")
+                throw TransportException("Transport closed")
             }
             readBuffer.addAll(chunk.toList())
         }
@@ -50,7 +50,7 @@ class PipedTransport private constructor(
     }
 
     override suspend fun write(data: ByteArray) {
-        if (closed) throw IOException("Transport closed")
+        if (closed) throw TransportException("Transport closed")
         outbound.send(data)
     }
 

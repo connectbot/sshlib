@@ -320,7 +320,6 @@ class SshConnection(
 
     @Volatile private var isRekeying = false
 
-    @Volatile private var rekeyPending = false
     private var rekeyTimerJob: Job? = null
 
     @Volatile private var pendingConnect: CompletableDeferred<ConnectResult>? = null
@@ -388,6 +387,8 @@ class SshConnection(
             }
         } catch (e: Exception) {
             ConnectResult.TransportError(e)
+        } finally {
+            pendingConnect = null
         }
     }
 
@@ -1061,7 +1062,6 @@ class SshConnection(
     private fun rekeyComplete() {
         logger.info("Re-key complete")
         isRekeying = false
-        rekeyPending = false
         packetIO.resetByteCounters()
         startRekeyTimer()
     }
@@ -1070,7 +1070,11 @@ class SshConnection(
         rekeyTimerJob?.cancel()
         rekeyTimerJob = connectionScope.launch {
             delay(rekeyIntervalMs)
-            rekeyPending = true
+            if (!isRekeying && stateMachine.isInState("PostAuthenticated")) {
+                connectionScope.launch {
+                    dispatchEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+                }
+            }
         }
     }
 
@@ -2183,8 +2187,7 @@ class SshConnection(
                     logger.debug("Packet loop: waiting for next packet")
                     processNextPacket()
                     if (!isRekeying && stateMachine.isInState("PostAuthenticated") && (
-                            rekeyPending ||
-                                packetIO.bytesSentOnWire >= rekeyBytesLimit ||
+                            packetIO.bytesSentOnWire >= rekeyBytesLimit ||
                                 packetIO.bytesReceivedOnWire >= rekeyBytesLimit
                             )
                     ) {
