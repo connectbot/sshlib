@@ -42,6 +42,14 @@ internal interface KexAlgorithm {
     fun computeSharedSecret(serverPublicKey: ByteArray): ByteArray
 
     /**
+     * Zeroize any private key material stored during key exchange.
+     *
+     * This method should be called after the key exchange is complete
+     * (after NEWKEYS) to ensure no secret material remains in memory.
+     */
+    fun zeroize()
+
+    /**
      * Compute exchange hash H over the key exchange transcript.
      *
      * H = hash(V_C || V_S || I_C || I_S || K_S || e/Q_C || f/Q_S || K)

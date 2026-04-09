@@ -27,6 +27,8 @@ import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
 import javax.crypto.KeyAgreement
+import javax.security.auth.DestroyFailedException
+import javax.security.auth.Destroyable
 
 /**
  * Elliptic Curve Diffie-Hellman key exchange as specified in RFC 5656 Section 4.
@@ -129,5 +131,14 @@ internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
         val x = BigInteger(1, encoded, 1, fieldSize)
         val y = BigInteger(1, encoded, 1 + fieldSize, fieldSize)
         return ECPoint(x, y)
+    }
+
+    override fun zeroize() {
+        val kp = clientKeyPair
+        clientKeyPair = null
+        try {
+            (kp?.private as? Destroyable)?.destroy()
+        } catch (_: DestroyFailedException) {
+        }
     }
 }

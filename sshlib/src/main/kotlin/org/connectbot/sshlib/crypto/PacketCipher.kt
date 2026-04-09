@@ -16,10 +16,15 @@
 
 package org.connectbot.sshlib.crypto
 
+import javax.security.auth.Destroyable
+
 /**
  * Interface for SSH packet encryption/decryption.
  */
-internal interface PacketCipher {
+internal interface PacketCipher : Destroyable {
+    override fun destroy() {}
+    override fun isDestroyed() = false
+
     /**
      * Block size in bytes for this cipher.
      */

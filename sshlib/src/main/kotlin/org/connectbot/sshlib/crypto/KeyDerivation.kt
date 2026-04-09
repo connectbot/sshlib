@@ -43,7 +43,16 @@ internal class KeyDerivation(
         val encryptionKeyServerToClient: ByteArray,
         val integrityKeyClientToServer: ByteArray,
         val integrityKeyServerToClient: ByteArray,
-    )
+    ) {
+        fun zeroize() {
+            initialIvClientToServer.fill(0)
+            initialIvServerToClient.fill(0)
+            encryptionKeyClientToServer.fill(0)
+            encryptionKeyServerToClient.fill(0)
+            integrityKeyClientToServer.fill(0)
+            integrityKeyServerToClient.fill(0)
+        }
+    }
 
     /**
      * Derive all keys needed for SSH connection.
@@ -88,22 +97,27 @@ internal class KeyDerivation(
         md.update(sessionId)
         var key = md.digest()
 
-        val toCopy = minOf(key.size, length - offset)
-        System.arraycopy(key, 0, result, offset, toCopy)
-        offset += toCopy
+        try {
+            val toCopy = minOf(key.size, length - offset)
+            System.arraycopy(key, 0, result, offset, toCopy)
+            offset += toCopy
 
-        // Kn = HASH(K || H || K1 || K2 || ... || Kn-1)
-        while (offset < length) {
-            md.reset()
-            md.update(sharedSecret)
-            md.update(exchangeHash)
-            md.update(result, 0, offset)
-            key = md.digest()
+            // Kn = HASH(K || H || K1 || K2 || ... || Kn-1)
+            while (offset < length) {
+                key.fill(0)
+                md.reset()
+                md.update(sharedSecret)
+                md.update(exchangeHash)
+                md.update(result, 0, offset)
+                key = md.digest()
 
-            val remaining = length - offset
-            val copySize = minOf(key.size, remaining)
-            System.arraycopy(key, 0, result, offset, copySize)
-            offset += copySize
+                val remaining = length - offset
+                val copySize = minOf(key.size, remaining)
+                System.arraycopy(key, 0, result, offset, copySize)
+                offset += copySize
+            }
+        } finally {
+            key.fill(0)
         }
 
         return result

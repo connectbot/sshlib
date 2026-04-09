@@ -124,4 +124,11 @@ internal class MlKemHybridKeyExchange(
             throw SshException("Invalid X25519 shared secret; all zeroes")
         }
     }
+
+    override fun zeroize() {
+        mlKemPrivateKey?.fill(0)
+        mlKemPrivateKey = null
+        x25519PrivateKey?.fill(0)
+        x25519PrivateKey = null
+    }
 }

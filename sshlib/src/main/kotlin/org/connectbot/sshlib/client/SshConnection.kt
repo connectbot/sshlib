@@ -1143,7 +1143,7 @@ class SshConnection(
             ?: throw SshException("Exchange hash computation failed")
 
         if (sessionId == null) {
-            sessionId = hash
+            sessionId = hash.copyOf()
         }
 
         val keyType = try {
@@ -1178,6 +1178,13 @@ class SshConnection(
             throw SshException("Server signature verification failed")
         }
         logger.info("Server signature verified")
+
+        clientKexInit?.fill(0)
+        clientKexInit = null
+        serverKexInit?.fill(0)
+        serverKexInit = null
+        clientPublicKey?.fill(0)
+        clientPublicKey = null
     }
 
     private suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
@@ -1224,6 +1231,13 @@ class SshConnection(
         }
 
         logger.info("Encryption active")
+
+        kex?.zeroize()
+        kex = null
+        sharedSecret?.fill(0)
+        sharedSecret = null
+        exchangeHash?.fill(0)
+        exchangeHash = null
 
         val compC2SName = negotiatedCompressionC2S
         val compS2CName = negotiatedCompressionS2C
@@ -1272,11 +1286,19 @@ class SshConnection(
         val c2sIv = if (entryC2S.ivLength > 0) keys.initialIvClientToServer.copyOf(entryC2S.ivLength) else ByteArray(0)
         val s2cIv = if (entryS2C.ivLength > 0) keys.initialIvServerToClient.copyOf(entryS2C.ivLength) else ByteArray(0)
 
-        val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
-        val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
+        try {
+            val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
+            val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
 
-        writeMutex.withLock {
-            packetIO.enableAead(c2sAead, s2cAead)
+            writeMutex.withLock {
+                packetIO.enableAead(c2sAead, s2cAead)
+            }
+        } finally {
+            keys.zeroize()
+            c2sKey.fill(0)
+            s2cKey.fill(0)
+            c2sIv.fill(0)
+            s2cIv.fill(0)
         }
     }
 
@@ -1320,25 +1342,32 @@ class SshConnection(
 
         val c2sCipherKey = keys.encryptionKeyClientToServer.copyOf(cipherEntryC2S.keyLength)
         val s2cCipherKey = keys.encryptionKeyServerToClient.copyOf(cipherEntryS2C.keyLength)
-
         val c2sIv = keys.initialIvClientToServer.copyOf(cipherEntryC2S.ivLength)
         val s2cIv = keys.initialIvServerToClient.copyOf(cipherEntryS2C.ivLength)
 
-        val clientToServerCipher = (cipherEntryC2S.create(c2sCipherKey, c2sIv, true) as EncryptionInstance.Cipher).cipher
-        val serverToClientCipher = (cipherEntryS2C.create(s2cCipherKey, s2cIv, false) as EncryptionInstance.Cipher).cipher
+        try {
+            val clientToServerCipher = (cipherEntryC2S.create(c2sCipherKey, c2sIv, true) as EncryptionInstance.Cipher).cipher
+            val serverToClientCipher = (cipherEntryS2C.create(s2cCipherKey, s2cIv, false) as EncryptionInstance.Cipher).cipher
 
-        val clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
-        val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
+            val clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
+            val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
 
-        writeMutex.withLock {
-            packetIO.enableEncryption(
-                clientToServerCipher,
-                clientToServerMac,
-                serverToClientCipher,
-                serverToClientMac,
-                clientToServerEtm = macEntryC2S.isEtm,
-                serverToClientEtm = macEntryS2C.isEtm,
-            )
+            writeMutex.withLock {
+                packetIO.enableEncryption(
+                    clientToServerCipher,
+                    clientToServerMac,
+                    serverToClientCipher,
+                    serverToClientMac,
+                    clientToServerEtm = macEntryC2S.isEtm,
+                    serverToClientEtm = macEntryS2C.isEtm,
+                )
+            }
+        } finally {
+            keys.zeroize()
+            c2sCipherKey.fill(0)
+            s2cCipherKey.fill(0)
+            c2sIv.fill(0)
+            s2cIv.fill(0)
         }
     }
 
@@ -1568,6 +1597,8 @@ class SshConnection(
         packetLoopJob?.join()
         packetLoopJob = null
         stateMachineDispatcher.close()
+        sessionId?.fill(0)
+        sessionId = null
     }
 
     private fun onStateEnter(stateName: String) {
