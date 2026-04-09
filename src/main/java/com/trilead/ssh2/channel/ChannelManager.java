@@ -1676,23 +1676,11 @@ public class ChannelManager implements MessageHandler
 
 	public void msgGlobalRequest(byte[] msg, int msglen) throws IOException
 	{
-		/* Currently we do not support any kind of global request */
-
 		TypesReader tr = new TypesReader(msg, 0, msglen);
 
 		tr.readByte(); // skip packet type
 		String requestName = tr.readString();
 		boolean wantReply = tr.readBoolean();
-
-		if (wantReply)
-		{
-			byte[] reply_failure = new byte[1];
-			reply_failure[0] = Packets.SSH_MSG_REQUEST_FAILURE;
-
-			tm.sendAsynchronousMessage(reply_failure);
-		}
-
-		/* We do not clean up the requestName String - that is OK for debug */
 
 		if (log.isEnabled())
 			log.log(80, "Got SSH_MSG_GLOBAL_REQUEST (" + requestName + ")");
@@ -1702,20 +1690,33 @@ public class ChannelManager implements MessageHandler
 			try {
 				PacketGlobalHostkeys hostkeys = new PacketGlobalHostkeys(msg, 0, msglen);
 				processHostkeysAdvertisement(hostkeys, requestName);
-			} catch (IOException e) {
+			} catch (Exception e) {
 				if (log.isEnabled())
-					log.log(20, "Failed to parse hostkeys advertisement: " + e.getMessage());
+					log.log(20, "Failed to process hostkeys advertisement: " + e.getMessage());
 			}
+			// hostkeys-00@openssh.com typically has wantReply=false, but if the
+			// server does request a reply, acknowledge it since we processed it.
+			if (wantReply)
+			{
+				byte[] reply_success = new byte[1];
+				reply_success[0] = Packets.SSH_MSG_REQUEST_SUCCESS;
+				tm.sendAsynchronousMessage(reply_success);
+			}
+			return;
+		}
+
+		if (wantReply)
+		{
+			byte[] reply_failure = new byte[1];
+			reply_failure[0] = Packets.SSH_MSG_REQUEST_FAILURE;
+
+			tm.sendAsynchronousMessage(reply_failure);
 		}
 	}
 
 	public void msgGlobalSuccess(byte[] msg, int msglen) throws IOException {
-		synchronized (channels)
-		{
-			globalSuccessCounter++;
-			channels.notifyAll();
-		}
-
+		// Check for pending hostkeys-prove BEFORE incrementing the global counter,
+		// so the hostkeys-prove response doesn't interfere with other global request tracking.
 		synchronized (hostkeysProveLock) {
 			if (pendingHostkeysProve != null && !pendingHostkeysProve.completed) {
 				try {
@@ -1737,6 +1738,12 @@ public class ChannelManager implements MessageHandler
 				}
 				return;
 			}
+		}
+
+		synchronized (channels)
+		{
+			globalSuccessCounter++;
+			channels.notifyAll();
 		}
 
 		if (log.isEnabled())
@@ -1882,19 +1889,28 @@ public class ChannelManager implements MessageHandler
 		}
 
 		List<String> knownAlgos = extVerifier.getKnownKeyAlgorithmsForHost(hostname, port);
-		Set<String> knownAlgoSet = (knownAlgos != null) ? new HashSet<>(knownAlgos) : new HashSet<>();
+
+		// Normalize algorithm names so RSA signature variants (rsa-sha2-256,
+		// rsa-sha2-512) are treated as the same key type as ssh-rsa.
+		Set<String> normalizedKnownAlgoSet = new HashSet<>();
+		if (knownAlgos != null) {
+			for (String algo : knownAlgos) {
+				normalizedKnownAlgoSet.add(normalizeKeyAlgorithm(algo));
+			}
+		}
 
 		List<byte[]> newKeys = new ArrayList<>();
-		Set<String> advertisedAlgoSet = new HashSet<>();
+		Set<String> normalizedAdvertisedAlgoSet = new HashSet<>();
 
 		for (byte[] keyBlob : advertisedKeys) {
 			String keyAlgo = extractKeyAlgorithm(keyBlob);
 			if (keyAlgo == null)
 				continue;
 
-			advertisedAlgoSet.add(keyAlgo);
+			String normalizedAlgo = normalizeKeyAlgorithm(keyAlgo);
+			normalizedAdvertisedAlgoSet.add(normalizedAlgo);
 
-			if (!knownAlgoSet.contains(keyAlgo)) {
+			if (!normalizedKnownAlgoSet.contains(normalizedAlgo)) {
 				newKeys.add(keyBlob);
 			}
 		}
@@ -1903,7 +1919,7 @@ public class ChannelManager implements MessageHandler
 			for (String knownAlgo : knownAlgos) {
 				if (knownAlgo == null)
 					continue;
-				if (!advertisedAlgoSet.contains(knownAlgo)) {
+				if (!normalizedAdvertisedAlgoSet.contains(normalizeKeyAlgorithm(knownAlgo))) {
 					extVerifier.removeServerHostKey(hostname, port, knownAlgo, null);
 					if (log.isEnabled())
 						log.log(50, "Removed hostkey algorithm no longer advertised: " + knownAlgo);
@@ -2048,6 +2064,21 @@ public class ChannelManager implements MessageHandler
 	{
 		TypesReader tr = new TypesReader(keyBlob);
 		return tr.readString();
+	}
+
+	/**
+	 * Normalizes RSA algorithm variants to a canonical form for comparison.
+	 * In SSH, rsa-sha2-256 and rsa-sha2-512 use the same RSA key as ssh-rsa
+	 * (the difference is only the signature hash algorithm). Key blobs always
+	 * identify as ssh-rsa regardless of which signature algorithm was negotiated.
+	 */
+	static String normalizeKeyAlgorithm(String algorithm)
+	{
+		if (RSASHA256Verify.ID_RSA_SHA_2_256.equals(algorithm) ||
+			RSASHA512Verify.ID_RSA_SHA_2_512.equals(algorithm)) {
+			return RSASHA1Verify.ID_SSH_RSA;
+		}
+		return algorithm;
 	}
 
 	private SSHSignature getSignatureVerifier(String algorithm)

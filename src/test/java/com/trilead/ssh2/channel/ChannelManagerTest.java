@@ -1,12 +1,12 @@
 package com.trilead.ssh2.channel;
 
 import com.trilead.ssh2.ChannelCondition;
-import com.trilead.ssh2.ConnectionInfo;
 import com.trilead.ssh2.ExtendedServerHostKeyVerifier;
 import com.trilead.ssh2.packets.PacketGlobalHostkeys;
 import com.trilead.ssh2.packets.Packets;
 import com.trilead.ssh2.packets.TypesWriter;
 import com.trilead.ssh2.signature.RSASHA1Verify;
+import com.trilead.ssh2.signature.RSASHA256Verify;
 import com.trilead.ssh2.signature.RSASHA512Verify;
 import com.trilead.ssh2.transport.ITransportConnection;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -820,66 +819,50 @@ public class ChannelManagerTest {
 	}
 
 	/**
-	 * Simulates the scenario from GitHub issue connectbot/connectbot#2023:
+	 * Regression test for GitHub issue connectbot/connectbot#2023:
 	 *
-	 * 1. ConnectBot stores the host key algorithm as "rsa-sha2-512" (negotiated algo).
-	 * 2. Server sends hostkeys-00@openssh.com advertising its RSA key blob
-	 *    which contains "ssh-rsa" as the key format identifier.
-	 * 3. processHostkeysAdvertisement sees "rsa-sha2-512" NOT in the advertised set
-	 *    {"ssh-rsa"} and calls removeServerHostKey(hostname, port, "rsa-sha2-512", null).
-	 * 4. A Kotlin implementation (like ConnectBot's) declares hostKey as non-nullable
-	 *    ByteArray, so passing null throws NullPointerException, crashing the app.
+	 * Before the fix, when the stored algorithm was "rsa-sha2-512" and the
+	 * key blob contained "ssh-rsa", processHostkeysAdvertisement would call
+	 * removeServerHostKey with null hostKey (crashing Kotlin callers).
 	 *
-	 * This test verifies the bug: removeServerHostKey is called with null hostKey.
+	 * After the fix, RSA algorithm variants are normalized so "rsa-sha2-512"
+	 * and "ssh-rsa" are recognized as the same key type. removeServerHostKey
+	 * should NOT be called, since the key is still present.
 	 */
 	@Test
-	public void testHostkeysAdvertisement_rsaAlgoMismatch_callsRemoveWithNull() throws Exception {
-		// Set up an ExtendedServerHostKeyVerifier that reports "rsa-sha2-512" as known
+	public void testHostkeysAdvertisement_rsaAlgoMismatch_noRemovalAfterFix() throws Exception {
 		ExtendedServerHostKeyVerifier mockVerifier = mock(ExtendedServerHostKeyVerifier.class);
 		when(mockVerifier.getKnownKeyAlgorithmsForHost(anyString(), anyInt()))
 			.thenReturn(Collections.singletonList(RSASHA512Verify.ID_RSA_SHA_2_512));
-
-		// Mock getConnectionInfo so requestHostkeysProve doesn't NPE on ConnectionInfo
-		ConnectionInfo connInfo = new ConnectionInfo();
-		connInfo.serverHostKeyAlgorithm = RSASHA512Verify.ID_RSA_SHA_2_512;
-		when(mockTransportConnection.getConnectionInfo(anyInt())).thenReturn(connInfo);
 
 		when(mockTransportConnection.getServerHostKeyVerifier()).thenReturn(mockVerifier);
 		when(mockTransportConnection.getHostname()).thenReturn("esxi.example.com");
 		when(mockTransportConnection.getPort()).thenReturn(22);
 
-		// Server advertises an RSA key blob (algorithm in blob = "ssh-rsa")
 		byte[] rsaKeyBlob = buildKeyBlob(RSASHA1Verify.ID_SSH_RSA);
 		byte[] msg = buildHostkeysGlobalRequest(
 			"hostkeys-00@openssh.com", false, rsaKeyBlob);
 
 		channelManager.handleMessage(msg, msg.length);
 
-		// BUG: removeServerHostKey is called with null hostKey because
-		// "rsa-sha2-512" (known) is not in {"ssh-rsa"} (advertised)
-		ArgumentCaptor<byte[]> hostKeyCaptor = ArgumentCaptor.forClass(byte[].class);
-		verify(mockVerifier).removeServerHostKey(
-			anyString(), anyInt(), anyString(), hostKeyCaptor.capture());
-
-		// This proves the bug: the hostKey argument is null
-		assertNull(hostKeyCaptor.getValue(),
-			"removeServerHostKey should NOT be called with null hostKey, " +
-			"but currently it is due to RSA algorithm name mismatch");
+		// After fix: rsa-sha2-512 is normalized to ssh-rsa, so the algorithm
+		// is recognized as still advertised. removeServerHostKey must NOT be called.
+		verify(mockVerifier, never()).removeServerHostKey(
+			anyString(), anyInt(), anyString(), any());
 	}
 
 	/**
-	 * Simulates the crash: if removeServerHostKey throws when called with null
-	 * (as Kotlin's non-nullable ByteArray check does), the exception propagates
-	 * uncaught through handleMessage, killing the SSH receiver thread and
-	 * crashing the app.
+	 * Regression test: even if removeServerHostKey throws (e.g., Kotlin's
+	 * non-nullable parameter check), it must not propagate out of handleMessage
+	 * and kill the SSH receiver thread.
 	 */
 	@Test
-	public void testHostkeysAdvertisement_rsaAlgoMismatch_crashesReceiverThread() throws Exception {
-		// Set up an ExtendedServerHostKeyVerifier that throws NPE on null hostKey
-		// (simulating Kotlin's non-nullable parameter check)
+	public void testHostkeysAdvertisement_removeThrows_doesNotCrashReceiverThread() throws Exception {
+		// Use a non-RSA algorithm so normalization doesn't prevent the removal call.
+		// Pretend the client knows "ssh-dss" but server no longer advertises it.
 		ExtendedServerHostKeyVerifier mockVerifier = mock(ExtendedServerHostKeyVerifier.class);
 		when(mockVerifier.getKnownKeyAlgorithmsForHost(anyString(), anyInt()))
-			.thenReturn(Collections.singletonList(RSASHA512Verify.ID_RSA_SHA_2_512));
+			.thenReturn(Collections.singletonList("ssh-dss"));
 		doThrow(new NullPointerException("Parameter specified as non-null is null: parameter hostKey"))
 			.when(mockVerifier).removeServerHostKey(anyString(), anyInt(), anyString(), nullable(byte[].class));
 
@@ -887,14 +870,17 @@ public class ChannelManagerTest {
 		when(mockTransportConnection.getHostname()).thenReturn("esxi.example.com");
 		when(mockTransportConnection.getPort()).thenReturn(22);
 
-		byte[] rsaKeyBlob = buildKeyBlob(RSASHA1Verify.ID_SSH_RSA);
+		// Server advertises only an ed25519 key (no DSS)
+		byte[] ed25519KeyBlob = buildKeyBlob("ssh-ed25519");
 		byte[] msg = buildHostkeysGlobalRequest(
-			"hostkeys-00@openssh.com", false, rsaKeyBlob);
+			"hostkeys-00@openssh.com", false, ed25519KeyBlob);
 
-		// The NPE propagates out of handleMessage — this kills the receiver thread
-		// and crashes the Android app
-		assertThrows(NullPointerException.class, () ->
-			channelManager.handleMessage(msg, msg.length));
+		// Even if removeServerHostKey throws, handleMessage must NOT propagate it
+		channelManager.handleMessage(msg, msg.length);
+
+		// The call did happen (and threw), but the exception was caught
+		verify(mockVerifier).removeServerHostKey(
+			anyString(), anyInt(), anyString(), nullable(byte[].class));
 	}
 
 	/**
@@ -921,5 +907,58 @@ public class ChannelManagerTest {
 		// No algorithm mismatch, so removeServerHostKey should not be called
 		verify(mockVerifier, never()).removeServerHostKey(
 			anyString(), anyInt(), anyString(), any());
+	}
+
+	// ---- normalizeKeyAlgorithm tests ----
+
+	@Test
+	public void testNormalizeKeyAlgorithm_rsaSha2_512() {
+		assertEquals(RSASHA1Verify.ID_SSH_RSA,
+			ChannelManager.normalizeKeyAlgorithm(RSASHA512Verify.ID_RSA_SHA_2_512));
+	}
+
+	@Test
+	public void testNormalizeKeyAlgorithm_rsaSha2_256() {
+		assertEquals(RSASHA1Verify.ID_SSH_RSA,
+			ChannelManager.normalizeKeyAlgorithm(RSASHA256Verify.ID_RSA_SHA_2_256));
+	}
+
+	@Test
+	public void testNormalizeKeyAlgorithm_sshRsa_unchanged() {
+		assertEquals(RSASHA1Verify.ID_SSH_RSA,
+			ChannelManager.normalizeKeyAlgorithm(RSASHA1Verify.ID_SSH_RSA));
+	}
+
+	@Test
+	public void testNormalizeKeyAlgorithm_nonRsa_unchanged() {
+		assertEquals("ssh-ed25519",
+			ChannelManager.normalizeKeyAlgorithm("ssh-ed25519"));
+		assertEquals("ssh-dss",
+			ChannelManager.normalizeKeyAlgorithm("ssh-dss"));
+		assertEquals("ecdsa-sha2-nistp256",
+			ChannelManager.normalizeKeyAlgorithm("ecdsa-sha2-nistp256"));
+	}
+
+	// ---- msgGlobalRequest hostkeys reply tests ----
+
+	@Test
+	public void testMsgGlobalRequest_hostkeys_withReply_sendsSuccess() throws Exception {
+		ExtendedServerHostKeyVerifier mockVerifier = mock(ExtendedServerHostKeyVerifier.class);
+		when(mockVerifier.getKnownKeyAlgorithmsForHost(anyString(), anyInt())).thenReturn(null);
+		when(mockTransportConnection.getServerHostKeyVerifier()).thenReturn(mockVerifier);
+		when(mockTransportConnection.getHostname()).thenReturn("example.com");
+		when(mockTransportConnection.getPort()).thenReturn(22);
+
+		byte[] rsaKeyBlob = buildKeyBlob(RSASHA1Verify.ID_SSH_RSA);
+		byte[] msg = buildHostkeysGlobalRequest(
+			"hostkeys-00@openssh.com", true, rsaKeyBlob);
+
+		channelManager.handleMessage(msg, msg.length);
+
+		// Should send REQUEST_SUCCESS (not FAILURE) for handled hostkeys request
+		ArgumentCaptor<byte[]> replyCaptor = ArgumentCaptor.forClass(byte[].class);
+		verify(mockTransportConnection).sendAsynchronousMessage(replyCaptor.capture());
+		assertEquals(Packets.SSH_MSG_REQUEST_SUCCESS, replyCaptor.getValue()[0],
+			"Hostkeys global request should get SUCCESS reply, not FAILURE");
 	}
 }
