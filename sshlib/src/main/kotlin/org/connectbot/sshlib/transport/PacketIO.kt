@@ -97,6 +97,14 @@ internal class PacketIO(private val transport: Transport) {
         clientToServerEtm: Boolean = false,
         serverToClientEtm: Boolean = false,
     ) {
+        sendAead?.destroy()
+        sendAead = null
+        receiveAead?.destroy()
+        receiveAead = null
+        sendCipher?.destroy()
+        sendMac?.destroy()
+        receiveCipher?.destroy()
+        receiveMac?.destroy()
         this.sendCipher = clientToServerCipher
         this.sendMac = clientToServerMac
         this.receiveCipher = serverToClientCipher
@@ -115,6 +123,18 @@ internal class PacketIO(private val transport: Transport) {
         clientToServerAead: PacketAead,
         serverToClientAead: PacketAead,
     ) {
+        sendCipher?.destroy()
+        sendCipher = null
+        sendMac?.destroy()
+        sendMac = null
+        receiveCipher?.destroy()
+        receiveCipher = null
+        receiveMac?.destroy()
+        receiveMac = null
+        sendEtm = false
+        receiveEtm = false
+        sendAead?.destroy()
+        receiveAead?.destroy()
         this.sendAead = clientToServerAead
         this.receiveAead = serverToClientAead
     }

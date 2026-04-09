@@ -67,4 +67,8 @@ internal class HmacSha1(private val key: ByteArray) : PacketMac {
         mac.update(etmMac.toByteArray())
         return mac.doFinal()
     }
+
+    override fun destroy() {
+        key.fill(0)
+    }
 }

@@ -35,7 +35,7 @@ import javax.crypto.spec.SecretKeySpec
  * @param iv Initial 12-byte IV from key derivation
  */
 internal class AesGcmCipher(
-    key: ByteArray,
+    private val key: ByteArray,
     private val iv: ByteArray,
 ) : PacketAead {
     override val tagLength: Int = 16
@@ -92,5 +92,11 @@ internal class AesGcmCipher(
         } catch (e: AEADBadTagException) {
             throw TransportException("AEAD authentication failed", e)
         }
+    }
+
+    override fun destroy() {
+        key.fill(0)
+        iv.fill(0)
+        fixedField.fill(0)
     }
 }

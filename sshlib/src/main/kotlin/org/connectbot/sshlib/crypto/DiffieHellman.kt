@@ -52,6 +52,14 @@ internal class DiffieHellman(
             throw SshException("Invalid server public key")
         }
 
-        return encodeMpint(f.modPow(x, p).toByteArray())
+        val sharedSecret = encodeMpint(f.modPow(x, p).toByteArray())
+
+        privateKey = null
+
+        return sharedSecret
+    }
+
+    override fun zeroize() {
+        privateKey = null
     }
 }

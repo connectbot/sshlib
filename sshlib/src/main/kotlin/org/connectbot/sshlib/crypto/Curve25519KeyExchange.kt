@@ -29,9 +29,12 @@ internal class Curve25519KeyExchange(
     private var clientPrivate: ByteArray? = null
 
     override fun generateClientKeys(): ByteArray {
-        clientPrivate = presetPrivateKey?.clone() ?: x25519Provider.generatePrivateKey()
+        val clientPrivate = presetPrivateKey?.clone() ?: x25519Provider.generatePrivateKey()
+
+        this.clientPrivate = clientPrivate
+
         return try {
-            x25519Provider.publicFromPrivate(clientPrivate!!)
+            x25519Provider.publicFromPrivate(clientPrivate)
         } catch (e: Exception) {
             throw SshException("Failed to generate X25519 public key", e)
         }
@@ -67,5 +70,10 @@ internal class Curve25519KeyExchange(
         } catch (e: Exception) {
             throw SshException("X25519 key agreement failed", e)
         }
+    }
+
+    override fun zeroize() {
+        clientPrivate?.fill(0)
+        clientPrivate = null
     }
 }

@@ -66,7 +66,11 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
             throw SshException("Invalid server public key")
         }
 
-        return encodeMpint(f.modPow(x, p).toByteArray())
+        val sharedSecret = encodeMpint(f.modPow(x, p).toByteArray())
+
+        privateKey = null
+
+        return sharedSecret
     }
 
     /**
@@ -129,5 +133,11 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
 
         val md = MessageDigest.getInstance(hashAlgorithm)
         return md.digest(transcript.toByteArray())
+    }
+
+    override fun zeroize() {
+        privateKey = null
+        p = null
+        g = null
     }
 }

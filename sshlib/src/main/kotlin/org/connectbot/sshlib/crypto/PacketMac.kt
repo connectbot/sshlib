@@ -16,10 +16,15 @@
 
 package org.connectbot.sshlib.crypto
 
+import javax.security.auth.Destroyable
+
 /**
  * Interface for SSH packet message authentication codes (MAC).
  */
-internal interface PacketMac {
+internal interface PacketMac : Destroyable {
+    override fun destroy() {}
+    override fun isDestroyed() = false
+
     /**
      * MAC length in bytes.
      */

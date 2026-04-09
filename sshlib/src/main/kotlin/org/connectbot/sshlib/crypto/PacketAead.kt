@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.crypto
 
+import javax.security.auth.Destroyable
+
 internal data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
 
 /**
@@ -25,7 +27,9 @@ internal data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
  * unlike the separate cipher + MAC approach. The packet_length field serves
  * as AAD (authenticated but not encrypted).
  */
-internal interface PacketAead {
+internal interface PacketAead : Destroyable {
+    override fun destroy() {}
+    override fun isDestroyed() = false
     val tagLength: Int
 
     val encryptsLength: Boolean get() = false
