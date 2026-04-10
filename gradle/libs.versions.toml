@@ -19,6 +19,7 @@ dokka = "2.2.0"
 publish = "0.36.0"
 release = "3.1.0"
 kover = "0.9.8"
+cyclonedx = "3.2.4"
 
 [libraries]
 kaitai-runtime = { module = "io.kaitai:kaitai-struct-runtime", version.ref = "kaitai" }
@@ -48,3 +49,4 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 release = { id = "net.researchgate.release", version.ref = "release" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }

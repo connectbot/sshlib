@@ -24,6 +24,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.metalava)
     alias(libs.plugins.kover)
+    alias(libs.plugins.cyclonedx)
     `java-library`
 }
 
@@ -119,6 +120,23 @@ dokka {
 
     pluginsConfiguration {
         html.footerMessage.set("Copyright Kenny Root")
+    }
+}
+
+tasks.cyclonedxDirectBom {
+    includeConfigs.set(listOf("runtimeClasspath"))
+    includeLicenseText.set(true)
+    jsonOutput.set(layout.buildDirectory.file("reports/cyclonedx-direct/${project.name}-bom.json"))
+}
+
+publishing {
+    publications {
+        withType<MavenPublication>().configureEach {
+            artifact(tasks.cyclonedxDirectBom.flatMap { it.jsonOutput }) {
+                classifier = "cyclonedx"
+                extension = "json"
+            }
+        }
     }
 }
 
