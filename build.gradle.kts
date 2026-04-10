@@ -21,6 +21,7 @@ plugins {
     alias(libs.plugins.release)
     alias(libs.plugins.publish) apply false
     alias(libs.plugins.kover)
+    alias(libs.plugins.cyclonedx)
 }
 
 allprojects {
