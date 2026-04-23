@@ -729,6 +729,16 @@ public class KexManager
 
 			ConnectionInfo sci = new ConnectionInfo();
 
+			try
+			{
+				sci.localSocketAddress = tm.getLocalSocketAddress();
+				sci.remoteSocketAddress = tm.getRemoteSocketAddress();
+			}
+			catch (IOException e)
+			{
+				/* Ignore, if the connection is closed then it doesn't matter much anyway */
+			}
+
 			kexCount++;
 
 			sci.keyExchangeAlgorithm = kxs.np.kex_algo;

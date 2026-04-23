@@ -1076,6 +1076,34 @@ public class Connection implements AutoCloseable
 	}
 
 	/**
+	 * Returns the local address to which the socket is bound.
+	 *
+	 * @return the local address to which the socket is bound.
+	 * @throws IOException
+	 *             in case of any problem.
+	 */
+	public synchronized InetSocketAddress getLocalSocketAddress() throws IOException
+	{
+		if (tm == null)
+			throw new IllegalStateException("You need to establish a connection first.");
+		return tm.getLocalSocketAddress();
+	}
+
+	/**
+	 * Returns the address of the endpoint this socket is connected to.
+	 *
+	 * @return the address of the endpoint this socket is connected to.
+	 * @throws IOException
+	 *             in case of any problem.
+	 */
+	public synchronized InetSocketAddress getRemoteSocketAddress() throws IOException
+	{
+		if (tm == null)
+			throw new IllegalStateException("You need to establish a connection first.");
+		return tm.getRemoteSocketAddress();
+	}
+
+	/**
 	 * After a successful connect, one has to authenticate oneself. This method
 	 * can be used to tell which authentication methods are supported by the
 	 * server at a certain stage of the authentication process (for the given
