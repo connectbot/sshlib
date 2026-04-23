@@ -1,6 +1,8 @@
 
 package com.trilead.ssh2;
 
+import java.net.InetSocketAddress;
+
 /**
  * In most cases you probably do not need the information contained in here.
  *
@@ -9,6 +11,16 @@ package com.trilead.ssh2;
  */
 public class ConnectionInfo
 {
+	/**
+	 * The address of the local socket.
+	 */
+	public InetSocketAddress localSocketAddress;
+
+	/**
+	 * The address of the remote socket.
+	 */
+	public InetSocketAddress remoteSocketAddress;
+
 	/**
 	 * The used key exchange (KEX) algorithm in the latest key exchange.
 	 */

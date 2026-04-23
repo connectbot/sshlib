@@ -149,13 +149,36 @@ public void testSetSecureRandomWithNull() {
 @Test
 public void testGetConnectionInfoThrowsWhenNotConnected() {
 	try {
-	connection.getConnectionInfo();
-	fail("Should throw IllegalStateException when not connected");
+		connection.getConnectionInfo();
+		fail("Should throw IllegalStateException when not connected");
 	} catch (IllegalStateException e) {
-	assertTrue(e.getMessage().contains("establish a connection first"), "Exception message should indicate connection required");
+		assertTrue(e.getMessage().contains("establish a connection first"), "Exception message should indicate connection required");
 	} catch (Exception e) {
-	fail("Should throw IllegalStateException, got: " +
-		e.getClass().getSimpleName());
+		fail("Should throw IllegalStateException, got: " + e.getClass().getSimpleName());
+	}
+}
+
+@Test
+public void testGetLocalSocketAddressThrowsWhenNotConnected() {
+	try {
+		connection.getLocalSocketAddress();
+		fail("Should throw IllegalStateException when not connected");
+	} catch (IllegalStateException e) {
+		assertTrue(e.getMessage().contains("establish a connection first"), "Exception message should indicate connection required");
+	} catch (Exception e) {
+		fail("Should throw IllegalStateException, got: " + e.getClass().getSimpleName());
+	}
+}
+
+@Test
+public void testGetRemoteSocketAddressThrowsWhenNotConnected() {
+	try {
+		connection.getRemoteSocketAddress();
+		fail("Should throw IllegalStateException when not connected");
+	} catch (IllegalStateException e) {
+		assertTrue(e.getMessage().contains("establish a connection first"), "Exception message should indicate connection required");
+	} catch (Exception e) {
+		fail("Should throw IllegalStateException, got: " + e.getClass().getSimpleName());
 	}
 }
 

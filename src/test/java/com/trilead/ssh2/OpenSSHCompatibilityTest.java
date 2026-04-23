@@ -15,10 +15,12 @@ import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import com.trilead.ssh2.crypto.Base64;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
@@ -97,6 +99,28 @@ public class OpenSSHCompatibilityTest {
 				try (Session session = connection.openSession()) {
 					session.ping();
 				}
+			}
+		}
+	}
+
+	@Test
+	public void testSocketAddress() throws IOException {
+		try (GenericContainer<?> server = getBaseContainer()) {
+			server.start();
+			try (Connection c = withServer(server)) {
+				c.connect(verifier);
+
+				InetSocketAddress local = c.getLocalSocketAddress();
+				InetSocketAddress remote = c.getRemoteSocketAddress();
+
+				assertThat(local, notNullValue());
+				assertThat(remote, notNullValue());
+				assertThat(remote.getHostString(), is(server.getHost()));
+				assertThat(remote.getPort(), is(server.getMappedPort(22)));
+
+				ConnectionInfo info = c.getConnectionInfo();
+				assertThat(info.localSocketAddress.toString(), is(local.toString()));
+				assertThat(info.remoteSocketAddress.toString(), is(remote.toString()));
 			}
 		}
 	}

@@ -4,6 +4,7 @@ package com.trilead.ssh2.transport;
 import com.trilead.ssh2.ExtensionInfo;
 import com.trilead.ssh2.packets.PacketExtInfo;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.util.Vector;
@@ -182,6 +183,26 @@ public class TransportManager implements ITransportConnection
 	public int getPort()
 	{
 		return port;
+	}
+
+	public InetSocketAddress getLocalSocketAddress() throws IOException
+	{
+		synchronized (connectionSemaphore)
+		{
+			if (sock == null)
+				throw new IOException("The connection is closed.");
+			return (InetSocketAddress) sock.getLocalSocketAddress();
+		}
+	}
+
+	public InetSocketAddress getRemoteSocketAddress() throws IOException
+	{
+		synchronized (connectionSemaphore)
+		{
+			if (sock == null)
+				throw new IOException("The connection is closed.");
+			return (InetSocketAddress) sock.getRemoteSocketAddress();
+		}
 	}
 
 	public ServerHostKeyVerifier getServerHostKeyVerifier()
