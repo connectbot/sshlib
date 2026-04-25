@@ -59,12 +59,12 @@ class SftpClientIntegrationTest {
             ImageFromDockerfile("openssh-sftp-test", false)
                 .withFileFromClasspath(".", "openssh-server")
                 .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
-                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS)
+                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS),
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)
             .waitingFor(
-                Wait.forLogMessage(".*Server listening.*", 1)
+                Wait.forLogMessage(".*Server listening.*", 1),
             )
     }
 
@@ -140,7 +140,7 @@ class SftpClientIntegrationTest {
             // Create and write
             val handle = sftp.open(
                 testPath,
-                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE)
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
             ).getOrThrow()
             sftp.write(handle, 0, testData).getOrThrow()
             sftp.close(handle).getOrThrow()
@@ -261,7 +261,7 @@ class SftpClientIntegrationTest {
 
             val writeHandle = sftp.open(
                 testPath,
-                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE)
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
             ).getOrThrow()
             sftp.write(writeHandle, 0, testData).getOrThrow()
             sftp.close(writeHandle).getOrThrow()
@@ -280,7 +280,7 @@ class SftpClientIntegrationTest {
             assertEquals(testData.size, readBuffer.size, "Should read back all bytes")
             assertTrue(
                 testData.contentEquals(readBuffer.toByteArray()),
-                "Read data should match written data"
+                "Read data should match written data",
             )
 
             sftp.remove(testPath).getOrThrow()
@@ -306,7 +306,7 @@ class SftpClientIntegrationTest {
             assertEquals(
                 0b110_100_100,
                 (attrs.permissions ?: 0) and 0x1FF,
-                "Permissions should be 0644"
+                "Permissions should be 0644",
             )
 
             sftp.remove(testPath).getOrThrow()

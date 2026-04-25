@@ -94,10 +94,8 @@ internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
      * Send an SFTP packet without a request ID (used for INIT). Just
      * forwards the framing-layer result.
      */
-    suspend fun writeRaw(type: Int, payload: ByteArray): SftpResult<Unit> {
-        return writeMutex.withLock {
-            packetIO.writePacket(type, payload)
-        }
+    suspend fun writeRaw(type: Int, payload: ByteArray): SftpResult<Unit> = writeMutex.withLock {
+        packetIO.writePacket(type, payload)
     }
 
     /**
@@ -115,12 +113,14 @@ internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
                 loop@ while (true) {
                     val packet = when (val result = packetIO.readPacket()) {
                         is SftpResult.Success -> result.value
+
                         is SftpResult.IoError -> {
                             logger.debug("SFTP read loop ended: {}", result.cause.message)
                             pending.values.forEach { it.completeExceptionally(result.cause) }
                             pending.clear()
                             break@loop
                         }
+
                         is SftpResult.ProtocolError -> {
                             logger.debug("SFTP channel closed: {}", result.message)
                             val err = SftpProtocolException(result.message)
@@ -128,6 +128,7 @@ internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
                             pending.clear()
                             break@loop
                         }
+
                         is SftpResult.ServerError -> {
                             // Framing layer never produces ServerError, but the
                             // sealed exhaustiveness check requires this branch.
