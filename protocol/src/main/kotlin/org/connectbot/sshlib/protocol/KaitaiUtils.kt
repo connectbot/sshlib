@@ -21,12 +21,31 @@ import io.kaitai.struct.KaitaiStruct
 
 /**
  * Serialize a Kaitai struct to a byte array.
+ *
+ * Kaitai's [ByteBufferKaitaiStream] is fixed-capacity, so the underlying
+ * `ByteBuffer.put` throws [java.nio.BufferOverflowException] if the
+ * pre-allocated buffer is too small. We don't have a cheap way to know
+ * the encoded size up front, so start at 16 KiB and double on overflow
+ * until the message fits or we cross [MAX_BUFFER]. Most SSH messages
+ * encode in well under 16 KiB; this only matters for [SshMsgChannelData]
+ * carrying near-`maxPacketSize` (32 KiB) of data — e.g. SFTP transfers.
  */
 fun KaitaiStruct.ReadWrite.toByteArray(): ByteArray {
     _check()
-    val io = ByteBufferKaitaiStream(1024 * 16)
-    _write(io)
-    val size = io.pos()
-    io.seek(0)
-    return io.readBytes(size.toLong())
+    var capacity = INITIAL_BUFFER
+    while (true) {
+        try {
+            val io = ByteBufferKaitaiStream(capacity)
+            _write(io)
+            val size = io.pos()
+            io.seek(0)
+            return io.readBytes(size.toLong())
+        } catch (_: java.nio.BufferOverflowException) {
+            if (capacity >= MAX_BUFFER) throw IllegalStateException("Kaitai message exceeds $MAX_BUFFER byte serialization limit")
+            capacity = minOf(capacity * 2, MAX_BUFFER)
+        }
+    }
 }
+
+private const val INITIAL_BUFFER = 1024L * 16
+private const val MAX_BUFFER = 1024L * 1024
