@@ -50,7 +50,11 @@ class SftpClientIntegrationTest {
 
         private const val USERNAME = "testuser"
         private const val PASSWORD = "testpass"
-        private const val OPENSSH_VERSION = "V_9_9_P2"
+
+        // Tarball-name format expected by wget in the test Dockerfile
+        // (`openssh-${OPENSSH_VERSION}.tar.gz`). The renovate annotation
+        // there extracts this from the github tag `V_9_9_P2`.
+        private const val OPENSSH_VERSION = "9.9p2"
         private const val DEBUG_CFLAGS = ""
 
         @Container
