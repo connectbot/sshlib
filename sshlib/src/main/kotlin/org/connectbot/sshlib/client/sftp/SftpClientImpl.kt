@@ -317,13 +317,11 @@ internal class SftpClientImpl private constructor(
         type: Int,
         payload: ByteArray,
         map: (SftpRawPacket) -> SftpResult<T>,
-    ): SftpResult<T> {
-        return when (val result = dispatcher.request(type, payload)) {
-            is SftpResult.Success -> map(result.value)
-            is SftpResult.ServerError -> result
-            is SftpResult.ProtocolError -> result
-            is SftpResult.IoError -> result
-        }
+    ): SftpResult<T> = when (val result = dispatcher.request(type, payload)) {
+        is SftpResult.Success -> map(result.value)
+        is SftpResult.ServerError -> result
+        is SftpResult.ProtocolError -> result
+        is SftpResult.IoError -> result
     }
 
     /**
@@ -409,7 +407,7 @@ internal class SftpClientImpl private constructor(
             }
             if (versionPacket.type != SSH_FXP_VERSION) {
                 return SftpResult.ProtocolError(
-                    "Expected SSH_FXP_VERSION (2), got ${versionPacket.type}"
+                    "Expected SSH_FXP_VERSION (2), got ${versionPacket.type}",
                 )
             }
             if (versionPacket.payload.size < 4) {

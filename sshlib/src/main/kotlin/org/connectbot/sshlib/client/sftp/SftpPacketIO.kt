@@ -72,18 +72,16 @@ internal class SftpPacketIO(private val session: SshSession) {
      * Returns [SftpResult.Success] on send or [SftpResult.IoError] if the
      * underlying SSH session write fails.
      */
-    suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit> {
-        return try {
-            val length = 1 + payload.size // type byte + payload
-            val packet = ByteBuffer.allocate(4 + length)
-            packet.putInt(length)
-            packet.put(type.toByte())
-            packet.put(payload)
-            session.write(packet.array())
-            SftpResult.Success(Unit)
-        } catch (e: Exception) {
-            SftpResult.IoError(e)
-        }
+    suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit> = try {
+        val length = 1 + payload.size // type byte + payload
+        val packet = ByteBuffer.allocate(4 + length)
+        packet.putInt(length)
+        packet.put(type.toByte())
+        packet.put(payload)
+        session.write(packet.array())
+        SftpResult.Success(Unit)
+    } catch (e: Exception) {
+        SftpResult.IoError(e)
     }
 
     /**

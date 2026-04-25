@@ -29,13 +29,13 @@ import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PortForwarder
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpException
-import org.connectbot.sshlib.getOrThrow
 import org.connectbot.sshlib.Socks5Authenticator
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.StreamForwarder
+import org.connectbot.sshlib.getOrThrow
 import org.connectbot.sshlib.transport.TransportFactory
 import java.net.InetSocketAddress
 
