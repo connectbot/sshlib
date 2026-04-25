@@ -83,8 +83,10 @@ class SftpClientIntegrationTest {
         }
         val client = SshClient(config)
 
-        assertTrue(client.connect(), "Should connect to SSH server")
-        assertTrue(client.authenticatePassword(USERNAME, PASSWORD), "Should authenticate")
+        val connectResult = client.connect()
+        assertTrue(connectResult is org.connectbot.sshlib.ConnectResult.Success, "Should connect to SSH server, got: $connectResult")
+        val authResult = client.authenticatePassword(USERNAME, PASSWORD)
+        assertTrue(authResult is org.connectbot.sshlib.AuthResult.Success, "Should authenticate, got: $authResult")
 
         val sftpResult = client.openSftp()
         assertTrue(sftpResult is SftpResult.Success, "Should open SFTP session, got: $sftpResult")
