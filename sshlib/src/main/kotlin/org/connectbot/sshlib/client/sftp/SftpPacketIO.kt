@@ -16,6 +16,7 @@
 
 package org.connectbot.sshlib.client.sftp
 
+import org.connectbot.sshlib.SftpResult
 import org.connectbot.sshlib.SshSession
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -39,39 +40,58 @@ internal class SftpPacketIO(private val session: SshSession) {
     /**
      * Read a complete SFTP packet. Blocks (suspends) until enough data arrives.
      *
-     * @return Parsed SFTP packet (type + payload, without the length prefix)
-     * @throws SftpProtocolException if the channel closes before a complete packet
+     * Returns a sealed [SftpResult] rather than throwing — network errors and
+     * malformed packets are normal failure modes that callers should handle
+     * explicitly. (Reviewed by @kruton on PR #112: Kotlin library APIs
+     * shouldn't throw for things they can manage themselves.)
      */
-    suspend fun readPacket(): SftpRawPacket {
-        // Read the 4-byte length prefix
-        val lengthBytes = readExact(4)
-        val length = ByteBuffer.wrap(lengthBytes).int
-        if (length < 1 || length > MAX_PACKET_SIZE) {
-            throw SftpProtocolException("Invalid SFTP packet length: $length")
-        }
+    suspend fun readPacket(): SftpResult<SftpRawPacket> {
+        return try {
+            // Read the 4-byte length prefix
+            val lengthBytes = readExact(4)
+            val length = ByteBuffer.wrap(lengthBytes).int
+            if (length < 1 || length > MAX_PACKET_SIZE) {
+                return SftpResult.ProtocolError("Invalid SFTP packet length: $length")
+            }
 
-        // Read the packet body (type + payload)
-        val body = readExact(length)
-        val type = body[0].toInt() and 0xFF
-        val payload = body.copyOfRange(1, body.size)
-        return SftpRawPacket(type, payload)
+            // Read the packet body (type + payload)
+            val body = readExact(length)
+            val type = body[0].toInt() and 0xFF
+            val payload = body.copyOfRange(1, body.size)
+            SftpResult.Success(SftpRawPacket(type, payload))
+        } catch (e: ChannelClosedException) {
+            SftpResult.IoError(e)
+        } catch (e: Exception) {
+            SftpResult.IoError(e)
+        }
     }
 
     /**
      * Write an SFTP packet with the given type and payload.
+     *
+     * Returns [SftpResult.Success] on send or [SftpResult.IoError] if the
+     * underlying SSH session write fails.
      */
-    suspend fun writePacket(type: Int, payload: ByteArray) {
-        val length = 1 + payload.size // type byte + payload
-        val packet = ByteBuffer.allocate(4 + length)
-        packet.putInt(length)
-        packet.put(type.toByte())
-        packet.put(payload)
-        session.write(packet.array())
+    suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit> {
+        return try {
+            val length = 1 + payload.size // type byte + payload
+            val packet = ByteBuffer.allocate(4 + length)
+            packet.putInt(length)
+            packet.put(type.toByte())
+            packet.put(payload)
+            session.write(packet.array())
+            SftpResult.Success(Unit)
+        } catch (e: Exception) {
+            SftpResult.IoError(e)
+        }
     }
 
     /**
      * Read exactly [count] bytes from the session, accumulating across
-     * multiple channel data chunks as needed.
+     * multiple channel data chunks as needed. Throws [ChannelClosedException]
+     * if the channel closes mid-packet — callers (only [readPacket]) catch
+     * and translate to [SftpResult.IoError]. Kept private so the throw
+     * doesn't leak past the API surface.
      */
     private suspend fun readExact(count: Int): ByteArray {
         val result = ByteArray(count)
@@ -89,7 +109,7 @@ internal class SftpPacketIO(private val session: SshSession) {
         // Read from the session until we have enough
         while (filled < count) {
             val data = session.read()
-                ?: throw SftpProtocolException("SSH channel closed before complete SFTP packet")
+                ?: throw ChannelClosedException("SSH channel closed before complete SFTP packet")
 
             val toCopy = minOf(count - filled, data.size)
             System.arraycopy(data, 0, result, filled, toCopy)
@@ -111,6 +131,13 @@ internal class SftpPacketIO(private val session: SshSession) {
         private const val MAX_PACKET_SIZE = 256 * 1024
     }
 }
+
+/**
+ * Internal exception used by [SftpPacketIO.readExact] to signal a closed
+ * channel mid-packet. Caught by [SftpPacketIO.readPacket] and translated
+ * into [SftpResult.IoError]; never escapes this file.
+ */
+internal class ChannelClosedException(message: String) : Exception(message)
 
 /**
  * Raw SFTP packet with type byte and payload (without the length prefix).
