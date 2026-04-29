@@ -19,6 +19,10 @@ package org.connectbot.sshlib.client
 import io.kaitai.struct.ByteBufferKaitaiStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
@@ -47,14 +51,16 @@ import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 class FakeSshServer(
     private val serverTransport: PipedTransport,
     private val scope: CoroutineScope,
+    private val coroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) {
-    @Volatile
-    var rekeyCount = 0
-        private set
+    private val _rekeyCount = MutableStateFlow(0)
+    val rekeyCount: StateFlow<Int> = _rekeyCount.asStateFlow()
 
     private val hostKeyPair: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
     private val hostKeyBlob: ByteArray = SshPublicKeyEncoder.encode(hostKeyPair.public, "ssh-ed25519")
@@ -71,7 +77,7 @@ class FakeSshServer(
     private val rekeyRequestChannel = Channel<Unit>(Channel.UNLIMITED)
 
     fun start() {
-        scope.launch { serve() }
+        scope.launch(coroutineContext) { serve() }
     }
 
     /**
@@ -83,7 +89,7 @@ class FakeSshServer(
     }
 
     fun sendIgnore() {
-        scope.launch {
+        scope.launch(coroutineContext) {
             val msg = org.connectbot.sshlib.protocol.SshMsgIgnore().apply {
                 setData(createByteString(byteArrayOf()))
                 _check()
@@ -185,7 +191,7 @@ class FakeSshServer(
         writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
         packets.receive() // client NEWKEYS
         activateEncryption(io)
-        rekeyCount++
+        _rekeyCount.update { it + 1 }
     }
 
     private suspend fun doClientInitiatedKex(
@@ -200,7 +206,7 @@ class FakeSshServer(
         writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
         packets.receive() // client NEWKEYS
         activateEncryption(io)
-        rekeyCount++
+        _rekeyCount.update { it + 1 }
     }
 
     private suspend fun sendKexInit(io: PacketIO): ByteArray {
