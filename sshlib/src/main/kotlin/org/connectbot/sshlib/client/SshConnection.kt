@@ -88,6 +88,7 @@ import org.connectbot.sshlib.protocol.SshMsgChannelRequest
 import org.connectbot.sshlib.protocol.SshMsgChannelWindowAdjust
 import org.connectbot.sshlib.protocol.SshMsgDebug
 import org.connectbot.sshlib.protocol.SshMsgDisconnect
+import org.connectbot.sshlib.protocol.SshMsgExtInfo
 import org.connectbot.sshlib.protocol.SshMsgGlobalRequest
 import org.connectbot.sshlib.protocol.SshMsgKexDhGexGroup
 import org.connectbot.sshlib.protocol.SshMsgKexDhGexInit
@@ -107,11 +108,13 @@ import org.connectbot.sshlib.protocol.SshMsgUserauthInfoResponse
 import org.connectbot.sshlib.protocol.SshMsgUserauthPkOk
 import org.connectbot.sshlib.protocol.SshMsgUserauthRequest
 import org.connectbot.sshlib.protocol.UnencryptedPacket
+import org.connectbot.sshlib.protocol.UserauthPublickeyHostboundSignatureData
 import org.connectbot.sshlib.protocol.UserauthPublickeySignatureData
 import org.connectbot.sshlib.protocol.UserauthRequestKeyboardInteractive
 import org.connectbot.sshlib.protocol.UserauthRequestNone
 import org.connectbot.sshlib.protocol.UserauthRequestPassword
 import org.connectbot.sshlib.protocol.UserauthRequestPublickey
+import org.connectbot.sshlib.protocol.UserauthRequestPublickeyHostbound
 import org.connectbot.sshlib.protocol.createAsciiString
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.createMpint
@@ -239,6 +242,7 @@ class SshConnection(
 
     private var agentProvider: AgentProvider? = null
     private var serverHostKeyBlob: ByteArray? = null
+    private var serverAdvertisesHostBound: Boolean = false
 
     /**
      * Helper to manage a pending asynchronous operation that waits for a server response.
@@ -546,37 +550,47 @@ class SshConnection(
             val sigEntry = SignatureEntry.fromSshName(sigAlgorithmName)
                 ?: throw SshException("Unknown signature algorithm: $sigAlgorithmName")
 
-            // Build the data to sign per RFC 4252 §7
-            val signatureData = buildSignatureData(
-                sid,
-                username,
-                "ssh-connection",
-                sigAlgorithmName,
-                publicKeyBlob,
-            )
+            val hostKeyBlob = serverHostKeyBlob
+            val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
 
-            // Sign the data
+            val signatureData = if (useHostBound && hostKeyBlob != null) {
+                buildHostBoundSignatureData(sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob, hostKeyBlob)
+            } else {
+                buildSignatureData(sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob)
+            }
+
             val signature = sigEntry.algorithm.sign(
                 sigAlgorithmName,
                 privateKey.jcaKeyPair.private,
                 signatureData,
             )
 
-            // Build the SSH_MSG_USERAUTH_REQUEST
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
                 setServiceName(createAsciiString("ssh-connection"))
-                setMethodName(createAsciiString("publickey"))
 
-                val pubkeyAuth = UserauthRequestPublickey().apply {
-                    setHasSignature(1)
-                    setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
-                    setPublicKeyBlob(createByteString(publicKeyBlob))
-                    setSignature(createByteString(signature))
-                    _check()
+                if (useHostBound && hostKeyBlob != null) {
+                    setMethodName(createAsciiString("publickey-hostbound-v00@openssh.com"))
+                    val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
+                        setHasSignature(1)
+                        setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
+                        setPublicKeyBlob(createByteString(publicKeyBlob))
+                        setServerHostKey(createByteString(hostKeyBlob))
+                        setSignature(createByteString(signature))
+                        _check()
+                    }
+                    setMethodSpecificFields(pubkeyAuth)
+                } else {
+                    setMethodName(createAsciiString("publickey"))
+                    val pubkeyAuth = UserauthRequestPublickey().apply {
+                        setHasSignature(1)
+                        setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
+                        setPublicKeyBlob(createByteString(publicKeyBlob))
+                        setSignature(createByteString(signature))
+                        _check()
+                    }
+                    setMethodSpecificFields(pubkeyAuth)
                 }
-
-                setMethodSpecificFields(pubkeyAuth)
                 _check()
             }
 
@@ -620,6 +634,29 @@ class SshConnection(
             setHasSignature(byteArrayOf(1))
             setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
             setPublicKeyBlob(createByteString(publicKeyBlob))
+            _check()
+        }
+        return data.toByteArray()
+    }
+
+    private fun buildHostBoundSignatureData(
+        sessionId: ByteArray,
+        username: String,
+        serviceName: String,
+        algorithmName: String,
+        publicKeyBlob: ByteArray,
+        serverHostKeyBlob: ByteArray,
+    ): ByteArray {
+        val data = UserauthPublickeyHostboundSignatureData().apply {
+            setSessionIdentifier(createByteString(sessionId))
+            setMessageType(byteArrayOf(50))
+            setUserName(createByteString(username.toByteArray(Charsets.UTF_8)))
+            setServiceName(createByteString(serviceName.toByteArray(Charsets.US_ASCII)))
+            setMethodName(createByteString("publickey-hostbound-v00@openssh.com".toByteArray(Charsets.US_ASCII)))
+            setHasSignature(byteArrayOf(1))
+            setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
+            setPublicKeyBlob(createByteString(publicKeyBlob))
+            setServerHostKey(createByteString(serverHostKeyBlob))
             _check()
         }
         return data.toByteArray()
@@ -738,25 +775,40 @@ class SshConnection(
         channel: Channel<InternalAuthResult>,
     ): Boolean {
         val sid = sessionId ?: throw SshException("Session ID not established")
-        val signatureData = buildSignatureData(
-            sid,
-            username,
-            "ssh-connection",
-            key.algorithmName,
-            key.publicKeyBlob,
-        )
+        val hostKeyBlob = serverHostKeyBlob
+        val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
+
+        val signatureData = if (useHostBound && hostKeyBlob != null) {
+            buildHostBoundSignatureData(sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob, hostKeyBlob)
+        } else {
+            buildSignatureData(sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob)
+        }
 
         val signature = handler.onSignatureRequest(key, signatureData) ?: return false
 
-        sendAuthRequest(username, "publickey") {
-            val pubkeyAuth = UserauthRequestPublickey().apply {
-                setHasSignature(1)
-                setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
-                setPublicKeyBlob(createByteString(key.publicKeyBlob))
-                setSignature(createByteString(signature))
-                _check()
+        if (useHostBound && hostKeyBlob != null) {
+            sendAuthRequest(username, "publickey-hostbound-v00@openssh.com") {
+                val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
+                    setHasSignature(1)
+                    setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                    setPublicKeyBlob(createByteString(key.publicKeyBlob))
+                    setServerHostKey(createByteString(hostKeyBlob))
+                    setSignature(createByteString(signature))
+                    _check()
+                }
+                setMethodSpecificFields(pubkeyAuth)
             }
-            setMethodSpecificFields(pubkeyAuth)
+        } else {
+            sendAuthRequest(username, "publickey") {
+                val pubkeyAuth = UserauthRequestPublickey().apply {
+                    setHasSignature(1)
+                    setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                    setPublicKeyBlob(createByteString(key.publicKeyBlob))
+                    setSignature(createByteString(signature))
+                    _check()
+                }
+                setMethodSpecificFields(pubkeyAuth)
+            }
         }
 
         return when (channel.receive()) {
@@ -2074,6 +2126,16 @@ class SshConnection(
                     val msg = parseBody<SshMsgDisconnect>(packet)
                     logger.info("Received SSH_MSG_DISCONNECT from server: reason=${msg.reasonCode()}, description=${msg.description().value()}")
                     stateMachine.processEvent(SshClientStateMachine.SshEvent.Disconnect)
+                }
+
+                SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
+                    val extInfo = parseBody<SshMsgExtInfo>(packet)
+                    for (ext in extInfo.extensions()) {
+                        if (ext.extensionName().value() == "publickey-hostbound@openssh.com") {
+                            serverAdvertisesHostBound = true
+                            logger.info("Server advertises publickey-hostbound@openssh.com")
+                        }
+                    }
                 }
 
                 else -> {

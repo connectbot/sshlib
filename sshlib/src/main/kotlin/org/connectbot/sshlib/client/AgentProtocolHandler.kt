@@ -18,21 +18,33 @@ package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
+import org.connectbot.sshlib.AgentIdentity
+import org.connectbot.sshlib.AgentKeySpec
 import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AgentSigningContext
+import org.connectbot.sshlib.DestinationConstraint
+import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
 import org.connectbot.sshlib.protocol.SshAgentMessage
 import org.connectbot.sshlib.protocol.SshAgentSignResponse
 import org.connectbot.sshlib.protocol.SshAgentcExtension
 import org.connectbot.sshlib.protocol.SshAgentcSessionBind
 import org.connectbot.sshlib.protocol.SshAgentcSignRequest
+import org.connectbot.sshlib.protocol.UserauthPublickeySignatureDataAny
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.toByteArray
 import org.slf4j.LoggerFactory
 
+internal fun interface SessionBindVerifier {
+    fun verify(hostKeyBlob: ByteArray, signature: ByteArray, data: ByteArray): Boolean
+}
+
 internal class AgentProtocolHandler(
     private val provider: AgentProvider,
     private val sessionInfo: AgentSessionInfo,
+    private val bindVerifier: SessionBindVerifier = SessionBindVerifier { hk, sig, data ->
+        SignatureVerifier.verify(hk, sig, data)
+    },
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(AgentProtocolHandler::class.java)
@@ -44,10 +56,29 @@ internal class AgentProtocolHandler(
         const val SSH_AGENT_FAILURE: Int = 5
         const val SSH_AGENTC_EXTENSION: Int = 27
         const val SSH_AGENT_SUCCESS: Int = 6
+
+        private const val METHOD_PUBLICKEY = "publickey"
+        private const val METHOD_PUBLICKEY_HOSTBOUND = "publickey-hostbound-v00@openssh.com"
     }
 
-    private var sessionBound = false
-    private var boundSessionId: ByteArray? = null
+    private data class BindingEntry(val hostKeyBlob: ByteArray, val sessionId: ByteArray) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as BindingEntry
+            if (!hostKeyBlob.contentEquals(other.hostKeyBlob)) return false
+            if (!sessionId.contentEquals(other.sessionId)) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = hostKeyBlob.contentHashCode()
+            result = 31 * result + sessionId.contentHashCode()
+            return result
+        }
+    }
+
+    private val bindingList: MutableList<BindingEntry> = mutableListOf()
 
     suspend fun handleRequest(requestBytes: ByteArray): ByteArray {
         logger.debug("Handling agent request (${requestBytes.size} bytes)")
@@ -76,14 +107,15 @@ internal class AgentProtocolHandler(
     private suspend fun handleRequestIdentities(): ByteArray {
         logger.debug("Handling REQUEST_IDENTITIES")
 
-        val identities = provider.getIdentities()
-        logger.debug("Provider returned ${identities.size} identities")
+        val allIdentities = provider.getIdentities()
+        val visibleIdentities = filterVisibleIdentities(allIdentities)
+        logger.debug("Provider returned ${allIdentities.size} identities, ${visibleIdentities.size} visible for current path")
 
         val response = SshAgentIdentitiesAnswer()
-        response.setNkeys(identities.size.toLong())
+        response.setNkeys(visibleIdentities.size.toLong())
 
         val identityList = ArrayList<SshAgentIdentitiesAnswer.Identity>()
-        for (identity in identities) {
+        for (identity in visibleIdentities) {
             val id = SshAgentIdentitiesAnswer.Identity()
             id.set_root(response)
             id.set_parent(response)
@@ -98,21 +130,67 @@ internal class AgentProtocolHandler(
         return buildAgentMessage(SSH_AGENT_IDENTITIES_ANSWER, response.toByteArray())
     }
 
+    private fun filterVisibleIdentities(identities: List<AgentIdentity>): List<AgentIdentity> {
+        if (bindingList.isEmpty()) return identities
+        val lastHopKey = bindingList.last().hostKeyBlob
+        return identities.filter { identity ->
+            val constraints = identity.destinationConstraints
+            if (constraints == null) return@filter true
+            constraints.any { c ->
+                c.fromKeyspecs.isNotEmpty() && c.fromKeyspecs.any { spec ->
+                    spec.keyBlob.contentEquals(lastHopKey)
+                }
+            }
+        }
+    }
+
     private suspend fun handleSignRequest(message: SshAgentMessage): ByteArray {
         logger.debug("Handling SIGN_REQUEST")
 
         val payload = parsePayload<SshAgentcSignRequest>(message)
+        val keyBlob = payload.keyBlob().data()
+        val dataToSign = payload.data().data()
+
+        val identity = provider.getIdentities().find { it.publicKeyBlob.contentEquals(keyBlob) }
+        val constraints = identity?.destinationConstraints
+
+        if (constraints != null) {
+            var components = parseSignedDataComponents(dataToSign)
+            if (components == null) {
+                logger.warn("Failed to parse signed data for constraint check")
+                return createFailureResponse()
+            }
+
+            if (bindingList.isNotEmpty() && components.methodName != METHOD_PUBLICKEY_HOSTBOUND) {
+                logger.warn("Forwarded connection requires publickey-hostbound method, got: ${components.methodName}")
+                return createFailureResponse()
+            }
+
+            // For direct connections with standard publickey auth (no embedded server host key),
+            // use the session's server host key as the implicit destination.
+            if (bindingList.isEmpty() && components.serverHostKeyBlob == null) {
+                components = components.copy(serverHostKeyBlob = sessionInfo.serverHostKey)
+            }
+
+            if (!isConstraintSatisfied(constraints, components)) {
+                logger.warn("Destination constraint not satisfied for key")
+                return createFailureResponse()
+            }
+        }
+
+        val isBound = bindingList.isNotEmpty()
+        val effectiveSessionId = bindingList.lastOrNull()?.sessionId ?: sessionInfo.sessionId
 
         val context = AgentSigningContext(
-            publicKeyBlob = payload.keyBlob().data(),
-            dataToSign = payload.data().data(),
+            publicKeyBlob = keyBlob,
+            dataToSign = dataToSign,
             flags = payload.flags().toInt(),
-            sessionId = boundSessionId ?: sessionInfo.sessionId,
+            sessionId = effectiveSessionId,
             serverHostKey = sessionInfo.serverHostKey,
-            isBound = sessionBound,
+            isBound = isBound,
         )
 
-        logger.debug("Requesting signature from provider (bound=$sessionBound, flags=${context.flags})")
+        logger.debug("Requesting signature from provider (bound=$isBound, flags=${context.flags})")
 
         val signature = provider.signData(context)
 
@@ -125,6 +203,86 @@ internal class AgentProtocolHandler(
         } else {
             logger.info("Provider denied signing request")
             createFailureResponse()
+        }
+    }
+
+    private data class SignedDataComponents(
+        val methodName: String,
+        val destUsername: String,
+        val serverHostKeyBlob: ByteArray?,
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as SignedDataComponents
+            if (methodName != other.methodName) return false
+            if (destUsername != other.destUsername) return false
+            if (!serverHostKeyBlob.contentEquals(other.serverHostKeyBlob)) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = methodName.hashCode()
+            result = 31 * result + destUsername.hashCode()
+            result = 31 * result + serverHostKeyBlob.contentHashCode()
+            return result
+        }
+    }
+
+    private fun ByteArray?.contentEquals(other: ByteArray?): Boolean {
+        if (this == null && other == null) return true
+        if (this == null || other == null) return false
+        return java.util.Arrays.equals(this, other)
+    }
+
+    private fun ByteArray?.contentHashCode(): Int = this?.contentHashCode() ?: 0
+
+    private fun parseSignedDataComponents(data: ByteArray): SignedDataComponents? = try {
+        val stream = ByteBufferKaitaiStream(data)
+        val sigData = UserauthPublickeySignatureDataAny(stream)
+        sigData._read()
+
+        SignedDataComponents(
+            methodName = sigData.methodName().value(),
+            destUsername = sigData.userName().value(),
+            serverHostKeyBlob = sigData.serverHostKey()?.data(),
+        )
+    } catch (e: Exception) {
+        logger.debug("Failed to parse signed data components: ${e.message}")
+        null
+    }
+
+    private fun isConstraintSatisfied(
+        constraints: List<DestinationConstraint>,
+        components: SignedDataComponents,
+    ): Boolean {
+        val isForwarding = bindingList.isNotEmpty()
+        // The forwarding hop key is the second-to-last binding (the host that relayed to us).
+        // The last binding is the destination's connection key, also represented in components.serverHostKeyBlob.
+        val forwardingHopKey = if (bindingList.size >= 2) {
+            bindingList[bindingList.size - 2].hostKeyBlob
+        } else if (bindingList.size == 1) {
+            bindingList[0].hostKeyBlob
+        } else {
+            null
+        }
+
+        return constraints.any { c ->
+            val fromMatches = if (!isForwarding) {
+                c.fromHostname.isEmpty() && c.fromKeyspecs.isEmpty()
+            } else {
+                forwardingHopKey != null && c.fromKeyspecs.any { spec ->
+                    spec.keyBlob.contentEquals(forwardingHopKey)
+                }
+            }
+            if (!fromMatches) return@any false
+
+            val usernameMatches = c.toUsername.isEmpty() || c.toUsername == components.destUsername
+            if (!usernameMatches) return@any false
+
+            val hostKeyMatches = components.serverHostKeyBlob != null &&
+                c.toHostspecs.any { spec -> spec.keyBlob.contentEquals(components.serverHostKeyBlob) }
+            hostKeyMatches
         }
     }
 
@@ -151,20 +309,30 @@ internal class AgentProtocolHandler(
         val bind = SshAgentcSessionBind(stream)
         bind._read()
 
-        if (sessionBound) {
-            logger.warn("Session already bound, rejecting duplicate binding")
+        val hostKeyBlob = bind.hostkey().data()
+        val sessionId = bind.sessionIdentifier().data()
+        val isForwarding = bind.isForwarding().toInt() != 0
+
+        // Replay protection: reject duplicate session IDs
+        if (bindingList.any { it.sessionId.contentEquals(sessionId) }) {
+            logger.warn("Session bind replay: session ID already recorded")
             return createFailureResponse()
         }
 
-        if (!bind.hostkey().data().contentEquals(sessionInfo.serverHostKey)) {
-            logger.error("Session bind hostkey mismatch")
+        // For non-forwarding (origin) binds, verify the hostkey matches the connection's server key
+        if (!isForwarding && !hostKeyBlob.contentEquals(sessionInfo.serverHostKey)) {
+            logger.error("Session bind hostkey mismatch for non-forwarding bind")
             return createFailureResponse()
         }
 
-        sessionBound = true
-        boundSessionId = bind.sessionIdentifier().data()
+        // Cryptographically verify the session bind signature
+        if (!bindVerifier.verify(hostKeyBlob, bind.signature().data(), sessionId)) {
+            logger.error("Session bind signature verification failed")
+            return createFailureResponse()
+        }
 
-        logger.info("Session binding successful")
+        bindingList.add(BindingEntry(hostKeyBlob, sessionId))
+        logger.info("Session binding successful (isForwarding=$isForwarding, total bindings=${bindingList.size})")
         return createSuccessResponse()
     }
 

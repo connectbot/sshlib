@@ -2,17 +2,34 @@
 package org.connectbot.sshlib {
 
   public final class AgentIdentity {
-    ctor public AgentIdentity(byte[] publicKeyBlob, java.lang.String comment);
+    ctor public AgentIdentity(byte[] publicKeyBlob, java.lang.String comment, optional java.util.List<org.connectbot.sshlib.DestinationConstraint>? destinationConstraints);
     method public byte[] component1();
     method public java.lang.String component2();
-    method public org.connectbot.sshlib.AgentIdentity copy(optional byte[] publicKeyBlob, optional java.lang.String comment);
+    method public java.util.List<org.connectbot.sshlib.DestinationConstraint>? component3();
+    method public org.connectbot.sshlib.AgentIdentity copy(optional byte[] publicKeyBlob, optional java.lang.String comment, optional java.util.List<org.connectbot.sshlib.DestinationConstraint>? destinationConstraints);
     method public boolean equals(java.lang.Object? other);
     method @InaccessibleFromKotlin public java.lang.String getComment();
+    method @InaccessibleFromKotlin public java.util.List<org.connectbot.sshlib.DestinationConstraint>? getDestinationConstraints();
     method @InaccessibleFromKotlin public byte[] getPublicKeyBlob();
     method public int hashCode();
     method public java.lang.String toString();
     property public String comment;
+    property public java.util.List<org.connectbot.sshlib.DestinationConstraint>? destinationConstraints;
     property public byte[] publicKeyBlob;
+  }
+
+  public final class AgentKeySpec {
+    ctor public AgentKeySpec(byte[] keyBlob, boolean isCa);
+    method public byte[] component1();
+    method public boolean component2();
+    method public org.connectbot.sshlib.AgentKeySpec copy(optional byte[] keyBlob, optional boolean isCa);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public byte[] getKeyBlob();
+    method public int hashCode();
+    method @InaccessibleFromKotlin public boolean isCa();
+    method public java.lang.String toString();
+    property public boolean isCa;
+    property public byte[] keyBlob;
   }
 
   public interface AgentProvider {
@@ -194,6 +211,29 @@ package org.connectbot.sshlib {
     property public String? macAlgorithmC2S;
     property public String? macAlgorithmS2C;
     property public String serverHostKeyAlgorithm;
+  }
+
+  public final class DestinationConstraint {
+    ctor public DestinationConstraint(java.lang.String fromHostname, java.util.List<org.connectbot.sshlib.AgentKeySpec> fromKeyspecs, java.lang.String toUsername, java.lang.String toHostname, java.util.List<org.connectbot.sshlib.AgentKeySpec> toHostspecs);
+    method public java.lang.String component1();
+    method public java.util.List<org.connectbot.sshlib.AgentKeySpec> component2();
+    method public java.lang.String component3();
+    method public java.lang.String component4();
+    method public java.util.List<org.connectbot.sshlib.AgentKeySpec> component5();
+    method public org.connectbot.sshlib.DestinationConstraint copy(optional java.lang.String fromHostname, optional java.util.List<org.connectbot.sshlib.AgentKeySpec> fromKeyspecs, optional java.lang.String toUsername, optional java.lang.String toHostname, optional java.util.List<org.connectbot.sshlib.AgentKeySpec> toHostspecs);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.String getFromHostname();
+    method @InaccessibleFromKotlin public java.util.List<org.connectbot.sshlib.AgentKeySpec> getFromKeyspecs();
+    method @InaccessibleFromKotlin public java.lang.String getToHostname();
+    method @InaccessibleFromKotlin public java.util.List<org.connectbot.sshlib.AgentKeySpec> getToHostspecs();
+    method @InaccessibleFromKotlin public java.lang.String getToUsername();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public String fromHostname;
+    property public java.util.List<org.connectbot.sshlib.AgentKeySpec> fromKeyspecs;
+    property public String toHostname;
+    property public java.util.List<org.connectbot.sshlib.AgentKeySpec> toHostspecs;
+    property public String toUsername;
   }
 
   public interface HostKeyVerifier {
