@@ -63,7 +63,8 @@ class PortForwardingIntegrationTest {
         @JvmStatic
         val opensshContainer: GenericContainer<*> = GenericContainer(
             ImageFromDockerfile("openssh-server-fwd-test", false)
-                .withFileFromClasspath(".", "openssh-server"),
+                .withFileFromClasspath(".", "openssh-server")
+                .withFileFromClasspath("test_rsa.pub", "keys/rsa_unencrypted.pub"),
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)
