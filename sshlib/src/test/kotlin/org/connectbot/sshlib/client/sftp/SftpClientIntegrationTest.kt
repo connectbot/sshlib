@@ -62,6 +62,7 @@ class SftpClientIntegrationTest {
         val opensshContainer: GenericContainer<*> = GenericContainer(
             ImageFromDockerfile("openssh-sftp-test", false)
                 .withFileFromClasspath(".", "openssh-server")
+                .withFileFromClasspath("test_rsa.pub", "keys/rsa_unencrypted.pub")
                 .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
                 .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS),
         )

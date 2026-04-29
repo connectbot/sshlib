@@ -243,6 +243,7 @@ class SshConnection(
     private var agentProvider: AgentProvider? = null
     private var serverHostKeyBlob: ByteArray? = null
     private var serverAdvertisesHostBound: Boolean = false
+    private var serverSigAlgs: Set<String>? = null
 
     /**
      * Helper to manage a pending asynchronous operation that waits for a server response.
@@ -546,7 +547,11 @@ class SshConnection(
 
             val publicKeyBlob = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
 
-            val sigAlgorithmName = privateKey.signatureAlgorithm
+            val sigAlgorithmName = if (privateKey.keyType == "ssh-rsa") {
+                negotiateRsaAlgorithm()
+            } else {
+                privateKey.signatureAlgorithm
+            }
             val sigEntry = SignatureEntry.fromSshName(sigAlgorithmName)
                 ?: throw SshException("Unknown signature algorithm: $sigAlgorithmName")
 
@@ -662,6 +667,18 @@ class SshConnection(
         return data.toByteArray()
     }
 
+    private fun keyBlobAlgorithmName(publicKeyBlob: ByteArray): String? {
+        if (publicKeyBlob.size < 4) return null
+        val len = ((publicKeyBlob[0].toInt() and 0xFF) shl 24) or
+            ((publicKeyBlob[1].toInt() and 0xFF) shl 16) or
+            ((publicKeyBlob[2].toInt() and 0xFF) shl 8) or
+            (publicKeyBlob[3].toInt() and 0xFF)
+        if (len <= 0 || len > publicKeyBlob.size - 4) return null
+        return String(publicKeyBlob, 4, len, Charsets.US_ASCII)
+    }
+
+    private fun negotiateRsaAlgorithm(): String = SignatureEntry.negotiateRsaAlgorithm(serverSigAlgs)
+
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
      *
@@ -756,10 +773,15 @@ class SshConnection(
         key: AuthPublicKey,
         channel: Channel<InternalAuthResult>,
     ): InternalAuthResult {
+        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == "ssh-rsa") {
+            negotiateRsaAlgorithm()
+        } else {
+            key.algorithmName
+        }
         sendAuthRequest(username, "publickey") {
             val pubkeyAuth = UserauthRequestPublickey().apply {
                 setHasSignature(0)
-                setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                setPublicKeyAlgorithmName(createAsciiString(effectiveAlgorithmName))
                 setPublicKeyBlob(createByteString(key.publicKeyBlob))
                 _check()
             }
@@ -778,19 +800,26 @@ class SshConnection(
         val hostKeyBlob = serverHostKeyBlob
         val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
 
-        val signatureData = if (useHostBound && hostKeyBlob != null) {
-            buildHostBoundSignatureData(sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob, hostKeyBlob)
+        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == "ssh-rsa") {
+            negotiateRsaAlgorithm()
         } else {
-            buildSignatureData(sid, username, "ssh-connection", key.algorithmName, key.publicKeyBlob)
+            key.algorithmName
         }
 
-        val signature = handler.onSignatureRequest(key, signatureData) ?: return false
+        val signatureData = if (useHostBound && hostKeyBlob != null) {
+            buildHostBoundSignatureData(sid, username, "ssh-connection", effectiveAlgorithmName, key.publicKeyBlob, hostKeyBlob)
+        } else {
+            buildSignatureData(sid, username, "ssh-connection", effectiveAlgorithmName, key.publicKeyBlob)
+        }
+
+        val signingKey = if (effectiveAlgorithmName != key.algorithmName) key.copy(algorithmName = effectiveAlgorithmName) else key
+        val signature = handler.onSignatureRequest(signingKey, signatureData) ?: return false
 
         if (useHostBound && hostKeyBlob != null) {
             sendAuthRequest(username, "publickey-hostbound-v00@openssh.com") {
                 val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
                     setHasSignature(1)
-                    setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                    setPublicKeyAlgorithmName(createAsciiString(effectiveAlgorithmName))
                     setPublicKeyBlob(createByteString(key.publicKeyBlob))
                     setServerHostKey(createByteString(hostKeyBlob))
                     setSignature(createByteString(signature))
@@ -802,7 +831,7 @@ class SshConnection(
             sendAuthRequest(username, "publickey") {
                 val pubkeyAuth = UserauthRequestPublickey().apply {
                     setHasSignature(1)
-                    setPublicKeyAlgorithmName(createAsciiString(key.algorithmName))
+                    setPublicKeyAlgorithmName(createAsciiString(effectiveAlgorithmName))
                     setPublicKeyBlob(createByteString(key.publicKeyBlob))
                     setSignature(createByteString(signature))
                     _check()
@@ -2131,9 +2160,17 @@ class SshConnection(
                 SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
                     val extInfo = parseBody<SshMsgExtInfo>(packet)
                     for (ext in extInfo.extensions()) {
-                        if (ext.extensionName().value() == "publickey-hostbound@openssh.com") {
-                            serverAdvertisesHostBound = true
-                            logger.info("Server advertises publickey-hostbound@openssh.com")
+                        when (ext.extensionName().value()) {
+                            "publickey-hostbound@openssh.com" -> {
+                                serverAdvertisesHostBound = true
+                                logger.info("Server advertises publickey-hostbound@openssh.com")
+                            }
+
+                            "server-sig-algs" -> {
+                                val algs = String(ext.extensionValue().data(), Charsets.UTF_8)
+                                serverSigAlgs = algs.split(",").filter { it.isNotEmpty() }.toSet()
+                                logger.info("Server advertises server-sig-algs: $algs")
+                            }
                         }
                     }
                 }

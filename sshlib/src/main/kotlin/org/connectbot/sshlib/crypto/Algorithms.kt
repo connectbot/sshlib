@@ -295,6 +295,18 @@ internal enum class SignatureEntry(
         val defaultString: String = defaults.joinToString(",") { it.sshName }
 
         fun fromSshName(name: String): SignatureEntry? = entries.firstOrNull { it.sshName == name }
+
+        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256", "ssh-rsa")
+
+        /**
+         * Picks the best RSA signing algorithm given the server's advertised list.
+         * Returns "ssh-rsa" if [serverSigAlgs] is null (server didn't send the extension)
+         * or if no supported RSA algorithms were advertised.
+         */
+        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String {
+            if (serverSigAlgs == null) return "ssh-rsa"
+            return rsaPreferenceOrder.firstOrNull { it in serverSigAlgs } ?: "ssh-rsa"
+        }
     }
 }
 

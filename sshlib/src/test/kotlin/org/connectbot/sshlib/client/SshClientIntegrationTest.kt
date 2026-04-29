@@ -33,6 +33,7 @@ import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSigning
 import org.connectbot.sshlib.blocking.BlockingSshClient
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -82,11 +83,28 @@ class SshClientIntegrationTest {
         val opensshContainer: GenericContainer<*> = GenericContainer(
             ImageFromDockerfile(opensshImageName(), false)
                 .withFileFromClasspath(".", "openssh-server")
+                .withFileFromClasspath("test_rsa.pub", "keys/rsa_unencrypted.pub")
                 .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
                 .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS),
         )
             .withExposedPorts(22)
             .withLogConsumer(logConsumer)
+            .waitingFor(
+                Wait.forLogMessage(".*Server listening.*", 1),
+            )
+
+        @Container
+        @JvmStatic
+        val opensshRsaOnlyContainer: GenericContainer<*> = GenericContainer(
+            ImageFromDockerfile(opensshImageName() + "-rsa", false)
+                .withFileFromClasspath(".", "openssh-server")
+                .withFileFromClasspath("test_rsa.pub", "keys/rsa_unencrypted.pub")
+                .withBuildArg("OPENSSH_VERSION", OPENSSH_VERSION)
+                .withBuildArg("DEBUG_CFLAGS", DEBUG_CFLAGS),
+        )
+            .withExposedPorts(22)
+            .withLogConsumer(logConsumer)
+            .withCommand("/usr/sbin/sshd", "-D", "-e", "-o", "HostKeyAlgorithms=ssh-rsa", "-o", "PubkeyAcceptedAlgorithms=ssh-rsa")
             .waitingFor(
                 Wait.forLogMessage(".*Server listening.*", 1),
             )
@@ -410,6 +428,94 @@ class SshClientIntegrationTest {
 
     private fun readTestKey(): String = javaClass.getResourceAsStream("/openssh-server/test_ed25519")!!
         .bufferedReader().readText()
+
+    private fun readRsaTestKey(): String = javaClass.getResourceAsStream("/keys/rsa_unencrypted")!!
+        .bufferedReader().readText()
+
+    @Test
+    fun `should connect to server only supporting ssh-rsa`() = runBlocking {
+        val host = opensshRsaOnlyContainer.host
+        val port = opensshRsaOnlyContainer.getMappedPort(22)
+
+        val client = SshClient(
+            SshClientConfig {
+                this.host = host
+                this.port = port
+                this.hostKeyVerifier = acceptAllVerifier
+                // Force ssh-rsa only by excluding rsa-sha2 variants
+                this.hostKeyAlgorithms = "ssh-rsa"
+                // Use a KEX algorithm that doesn't include ext-info-c by default
+                this.kexAlgorithms = "diffie-hellman-group14-sha256"
+            },
+        )
+
+        try {
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+
+            val keyData = readRsaTestKey()
+            val pubKey = SshSigning.getPublicKey("ssh-rsa", keyData, null)
+
+            val handler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = listOf(pubKey)
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray = SshSigning.sign(key.algorithmName, keyData, null, dataToSign)
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                ): List<String>? = null
+                override suspend fun onPasswordNeeded(): String? = null
+            }
+
+            val result = withTimeout(10_000) { client.authenticate(USERNAME, handler) }
+            assertTrue(result is AuthResult.Success, "Should authenticate with ssh-rsa")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should connect with rsa-sha2-512 by default when server supports it`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = SshClient(
+            SshClientConfig {
+                this.host = host
+                this.port = port
+                this.hostKeyVerifier = acceptAllVerifier
+            },
+        )
+
+        try {
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+
+            val keyData = readRsaTestKey()
+            // Even if we provide the key as ssh-rsa, it should negotiate rsa-sha2-512
+            val pubKey = SshSigning.getPublicKey("ssh-rsa", keyData, null)
+
+            val handler = object : AuthHandler {
+                override suspend fun onPublicKeysNeeded(): List<AuthPublicKey> = listOf(pubKey)
+                override suspend fun onSignatureRequest(key: AuthPublicKey, dataToSign: ByteArray): ByteArray {
+                    // Verify that the negotiated algorithm is rsa-sha2-512
+                    assertEquals("rsa-sha2-512", key.algorithmName)
+                    return SshSigning.sign(key.algorithmName, keyData, null, dataToSign)
+                }
+                override suspend fun onKeyboardInteractivePrompt(
+                    name: String,
+                    instruction: String,
+                    prompts: List<KeyboardInteractiveCallback.Prompt>,
+                ): List<String>? = null
+                override suspend fun onPasswordNeeded(): String? = null
+            }
+
+            val result = withTimeout(10_000) { client.authenticate(USERNAME, handler) }
+            assertTrue(result is AuthResult.Success, "Should authenticate with rsa-sha2-512")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
+        } finally {
+            client.disconnect()
+        }
+    }
 
     @Test
     fun `auth handler should authenticate with password when preferPasswordAuth is set`() {

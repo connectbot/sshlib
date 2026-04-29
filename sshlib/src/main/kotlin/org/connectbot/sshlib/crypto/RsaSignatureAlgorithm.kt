@@ -33,10 +33,7 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
         val spec = RSAPublicKeySpec(n, e)
         val jcaKey = KeyFactory.getInstance("RSA").generatePublic(spec)
 
-        val jcaAlgorithm = when (sig.algorithmName()) {
-            "rsa-sha2-512" -> "SHA512withRSA"
-            else -> "SHA256withRSA"
-        }
+        val jcaAlgorithm = toJcaAlgorithm(sig.algorithmName())
 
         val sigBlob = sig.signatureBlob() as SshRsaSignatureBlob
         val verifier = Signature.getInstance(jcaAlgorithm)
@@ -46,10 +43,7 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
     }
 
     override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
-        val jcaAlgorithm = when (algorithmName) {
-            "rsa-sha2-512" -> "SHA512withRSA"
-            else -> "SHA256withRSA"
-        }
+        val jcaAlgorithm = toJcaAlgorithm(algorithmName)
 
         val signer = Signature.getInstance(jcaAlgorithm)
         signer.initSign(privateKey)
@@ -58,5 +52,11 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
 
         return encodeSshString(algorithmName.toByteArray(Charsets.US_ASCII)) +
             encodeSshString(sigBytes)
+    }
+
+    private fun toJcaAlgorithm(sshAlgorithmName: String): String = when (sshAlgorithmName) {
+        "rsa-sha2-512" -> "SHA512withRSA"
+        "rsa-sha2-256" -> "SHA256withRSA"
+        else -> "SHA1withRSA"
     }
 }

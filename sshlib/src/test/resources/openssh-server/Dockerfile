@@ -50,6 +50,7 @@ RUN mkdir -p /run/openssh && \
     sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
     echo "KexAlgorithms +diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,diffie-hellman-group18-sha512,diffie-hellman-group16-sha512,diffie-hellman-group-exchange-sha256,diffie-hellman-group-exchange-sha1,diffie-hellman-group1-sha1" >> /etc/ssh/sshd_config && \
     echo "HostKeyAlgorithms +ssh-rsa" >> /etc/ssh/sshd_config && \
+    echo "PubkeyAcceptedAlgorithms +ssh-rsa" >> /etc/ssh/sshd_config && \
     echo "Ciphers +aes128-ctr,aes256-ctr,aes128-cbc,aes256-cbc,3des-cbc" >> /etc/ssh/sshd_config && \
     echo "MACs +hmac-sha2-256,hmac-sha2-512,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com" >> /etc/ssh/sshd_config && \
     echo "KbdInteractiveAuthentication yes" >> /etc/ssh/sshd_config && \
@@ -60,12 +61,14 @@ RUN mkdir -p /run/openssh && \
 
 # Set up public key authentication for test user
 COPY test_ed25519.pub /tmp/test_ed25519.pub
+COPY test_rsa.pub /tmp/test_rsa.pub
 RUN mkdir -p /home/$USERNAME/.ssh && \
     cat /tmp/test_ed25519.pub >> /home/$USERNAME/.ssh/authorized_keys && \
+    cat /tmp/test_rsa.pub >> /home/$USERNAME/.ssh/authorized_keys && \
     chown -R $USERNAME:$USERNAME /home/$USERNAME/.ssh && \
     chmod 700 /home/$USERNAME/.ssh && \
     chmod 600 /home/$USERNAME/.ssh/authorized_keys && \
-    rm /tmp/test_ed25519.pub
+    rm /tmp/test_ed25519.pub /tmp/test_rsa.pub
 
 # Configure PAM for sshd
 RUN mkdir -p /etc/pam.d && \

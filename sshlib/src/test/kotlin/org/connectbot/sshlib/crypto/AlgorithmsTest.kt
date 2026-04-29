@@ -331,4 +331,38 @@ class AlgorithmsTest {
             )
         }
     }
+
+    @Test
+    fun `negotiateRsaAlgorithm returns ssh-rsa when serverSigAlgs is null`() {
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(null))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm prefers rsa-sha2-512 when server supports it`() {
+        val serverAlgs = setOf("rsa-sha2-256", "rsa-sha2-512", "ssh-ed25519")
+        assertEquals("rsa-sha2-512", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm falls back to rsa-sha2-256 when 512 not supported`() {
+        val serverAlgs = setOf("rsa-sha2-256", "ssh-ed25519")
+        assertEquals("rsa-sha2-256", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm falls back to ssh-rsa as last resort`() {
+        val serverAlgs = setOf("ssh-rsa", "ssh-ed25519")
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm returns ssh-rsa when no RSA algorithm in server list`() {
+        val serverAlgs = setOf("ssh-ed25519", "ecdsa-sha2-nistp256")
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm returns ssh-rsa when serverSigAlgs is empty`() {
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(emptySet()))
+    }
 }

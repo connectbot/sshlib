@@ -23,6 +23,7 @@ import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.toByteArray
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -98,5 +99,50 @@ class ExtInfoProcessingTest {
         parsed._read()
         assertEquals(2, parsed.numExtensions().toInt())
         assertEquals(2, parsed.extensions().size)
+    }
+
+    private fun parseServerSigAlgs(bytes: ByteArray): Set<String>? {
+        val parsed = SshMsgExtInfo(ByteBufferKaitaiStream(bytes))
+        parsed._read()
+        val ext = parsed.extensions().firstOrNull { it.extensionName().value() == "server-sig-algs" }
+            ?: return null
+        val value = String(ext.extensionValue().data(), Charsets.UTF_8)
+        return value.split(",").filter { it.isNotEmpty() }.toSet()
+    }
+
+    @Test
+    fun `parses server-sig-algs with multiple algorithms`() {
+        val bytes = buildExtInfo(
+            mapOf("server-sig-algs" to "rsa-sha2-256,rsa-sha2-512,ssh-ed25519".toByteArray()),
+        )
+        val algs = parseServerSigAlgs(bytes)
+        assertEquals(setOf("rsa-sha2-256", "rsa-sha2-512", "ssh-ed25519"), algs)
+    }
+
+    @Test
+    fun `server-sig-algs absent returns null`() {
+        val bytes = buildExtInfo(mapOf("no-flow-control" to byteArrayOf()))
+        assertNull(parseServerSigAlgs(bytes))
+    }
+
+    @Test
+    fun `server-sig-algs with single algorithm`() {
+        val bytes = buildExtInfo(
+            mapOf("server-sig-algs" to "rsa-sha2-256".toByteArray()),
+        )
+        val algs = parseServerSigAlgs(bytes)
+        assertEquals(setOf("rsa-sha2-256"), algs)
+    }
+
+    @Test
+    fun `server-sig-algs with empty value yields empty set`() {
+        val bytes = buildExtInfo(mapOf("server-sig-algs" to byteArrayOf()))
+        assertEquals(emptySet<String>(), parseServerSigAlgs(bytes))
+    }
+
+    @Test
+    fun `server-sig-algs with leading and trailing commas is handled`() {
+        val bytes = buildExtInfo(mapOf("server-sig-algs" to ",rsa-sha2-256,".toByteArray()))
+        assertEquals(setOf("rsa-sha2-256"), parseServerSigAlgs(bytes))
     }
 }
