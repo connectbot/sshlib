@@ -269,7 +269,7 @@ internal enum class KexEntry(
         val defaults: List<KexEntry> = entries.filter { it != DH_GROUP1_SHA1 }
 
         val defaultString: String =
-            defaults.joinToString(",") { it.sshName } + ",kex-strict-c-v00@openssh.com"
+            defaults.joinToString(",") { it.sshName } + ",kex-strict-c-v00@openssh.com,ext-info-c"
 
         fun fromSshName(name: String): KexEntry? = entries.firstOrNull { it.sshName == name }
     }

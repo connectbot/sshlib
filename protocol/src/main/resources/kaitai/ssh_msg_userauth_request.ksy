@@ -13,6 +13,7 @@ meta:
   - userauth_request_none
   - userauth_request_password
   - userauth_request_publickey
+  - userauth_request_publickey_hostbound
 doc-ref: RFC 4252 section 5
 seq:
 - id: user_name
@@ -26,6 +27,7 @@ seq:
     switch-on: method_name.value
     cases:
       '"publickey"': userauth_request_publickey
+      '"publickey-hostbound-v00@openssh.com"': userauth_request_publickey_hostbound
       '"password"': userauth_request_password
       '"hostbased"': userauth_request_hostbased
       '"none"': userauth_request_none
