@@ -107,3 +107,6 @@ fabric.properties
 
 # Android projects
 local.properties
+
+# Git worktrees
+.worktrees/
