@@ -19,7 +19,9 @@ package org.connectbot.sshlib.client
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CloseableCoroutineDispatcher
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +38,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -140,7 +141,7 @@ import org.connectbot.sshlib.AuthResult as PublicAuthResult
  * @param transport Underlying transport (e.g., TCP socket)
  * @param clientVersion Client version string (default: SSH-2.0-CBSSH_1.0)
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 class SshConnection(
     private val transport: Transport,
     private val clientVersion: String = "SSH-2.0-CBSSH_1.0",
@@ -153,19 +154,18 @@ class SshConnection(
     private val preferPasswordAuth: Boolean = false,
     private val rekeyIntervalMs: Long = 3_600_000L,
     private val rekeyBytesLimit: Long = 1_073_741_824L,
-    coroutineContext: CoroutineContext = Dispatchers.IO,
+    coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
     }
 
+    private val stateMachineDispatcher = coroutineDispatcher.limitedParallelism(1, "StateMachine")
+
     private class HostKeyRejectedException(val key: PublicKey) : Exception("Host key rejected")
 
     private val packetIO = PacketIO(transport)
-
-    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
-    private val stateMachineDispatcher = newSingleThreadContext("ssh-state-machine")
 
     private val callbacks = object : SshClientCallbacks {
         override fun sendVersion() = this@SshConnection.sendVersion()
@@ -205,7 +205,7 @@ class SshConnection(
     }
 
     private val stateMachine = SshClientStateMachine(callbacks)
-    private val connectionScope = CoroutineScope(SupervisorJob() + coroutineContext)
+    private val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
     private val writeMutex = Mutex()
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
@@ -371,9 +371,7 @@ class SshConnection(
             // Start packet loop — handles all binary SSH packets from here
             startPacketLoop()
 
-            withTimeout(30_000L) {
-                deferred.await()
-            }
+            withTimeout(30_000L) { deferred.await() }
         } catch (e: TimeoutCancellationException) {
             ConnectResult.TransportError(Exception("Connection timed out"))
         } catch (e: HostKeyRejectedException) {
@@ -1677,7 +1675,6 @@ class SshConnection(
         transport.close()
         packetLoopJob?.join()
         packetLoopJob = null
-        stateMachineDispatcher.close()
         sessionId?.fill(0)
         sessionId = null
     }
