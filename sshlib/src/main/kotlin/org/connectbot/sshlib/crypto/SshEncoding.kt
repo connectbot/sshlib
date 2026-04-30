@@ -24,8 +24,13 @@ package org.connectbot.sshlib.crypto
  */
 internal fun encodeMpint(value: ByteArray): ByteArray {
     var start = 0
-    while (start < value.size - 1 && value[start] == 0.toByte()) {
+    while (start < value.size && value[start] == 0.toByte()) {
         start++
+    }
+
+    // All-zero input (including empty) encodes as mpint 0: length=0, no body bytes.
+    if (start == value.size) {
+        return byteArrayOf(0, 0, 0, 0)
     }
 
     val needsPadding = value[start].toInt() and 0x80 != 0

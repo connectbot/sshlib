@@ -170,6 +170,19 @@ internal object OpenSshKeyReader {
             else -> throw SshException("Unknown key type: $keyType")
         }
 
+        // Also read the comment string that trails the key material
+        priv.readString()
+
+        // Validate padding: remaining bytes must be 1, 2, 3, ... (mod 256)
+        var padByte = 1
+        while (priv.hasRemaining()) {
+            val b = priv.get().toInt() and 0xff
+            if (b != padByte and 0xff) {
+                throw SshException("Invalid OpenSSH key padding at byte $padByte")
+            }
+            padByte++
+        }
+
         return SshPrivateKey(keyType, keyPair, sigAlgorithm)
     }
 

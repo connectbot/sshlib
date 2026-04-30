@@ -94,6 +94,58 @@ class KeyFingerprintTest {
         assertEquals(KeyFingerprint.bubblebabble(blob), KeyFingerprint.bubblebabble(blob))
     }
 
+    @Test
+    fun `bubblebabble RSA golden value`() {
+        val blob = loadPublicKeyBlob("rsa_unencrypted.pub")
+        assertEquals("xudis-caduh-dupyf-podiv-lozah-vokeb-kihot-zupad-cynun-honyh-vyxux", KeyFingerprint.bubblebabble(blob))
+    }
+
+    @Test
+    fun `bubblebabble Ed25519 golden value`() {
+        val blob = loadPublicKeyBlob("ed25519_unencrypted.pub")
+        assertEquals("xigis-zarak-podid-zavuv-zidyl-mukev-bapin-tuvap-docih-vosub-gexex", KeyFingerprint.bubblebabble(blob))
+    }
+
+    @Test
+    fun `bubblebabble ECDSA256 golden value`() {
+        val blob = loadPublicKeyBlob("ecdsa256_unencrypted.pub")
+        assertEquals("xupam-hetid-forel-sycas-genic-ditiz-gebug-zyrad-rabog-geceb-naxax", KeyFingerprint.bubblebabble(blob))
+    }
+
+    @Test
+    fun `bubblebabble format has correct dash count`() {
+        val blob = loadPublicKeyBlob("rsa_unencrypted.pub")
+        val result = KeyFingerprint.bubblebabble(blob)
+        // SHA-1 produces 20 bytes → 10 full rounds each appending a dash → 10 dashes total
+        val inner = result.drop(1).dropLast(1)
+        assertEquals(10, inner.count { it == '-' }, "10 full rounds produce 10 dashes")
+        val groups = inner.split("-")
+        assertEquals(11, groups.size)
+        assertEquals(4, groups.first().length, "First group is vcvc (4 chars)")
+        assertEquals(4, groups.last().length, "Last group is cvcv (4 chars) from partial round")
+        for (group in groups.drop(1).dropLast(1)) {
+            assertEquals(5, group.length, "Middle groups are cvcvc (5 chars): $group")
+        }
+    }
+
+    @Test
+    fun `bubblebabble different keys produce different fingerprints`() {
+        val rsa = loadPublicKeyBlob("rsa_unencrypted.pub")
+        val ed = loadPublicKeyBlob("ed25519_unencrypted.pub")
+        val bbRsa = KeyFingerprint.bubblebabble(rsa)
+        val bbEd = KeyFingerprint.bubblebabble(ed)
+        assertTrue(bbRsa != bbEd, "Different keys must produce different fingerprints")
+    }
+
+    @Test
+    fun `randomArt all rows have same width`() {
+        val blob = loadPublicKeyBlob("rsa_unencrypted.pub")
+        val art = KeyFingerprint.randomArt(blob, "RSA", 2048)
+        val lines = art.lines()
+        val widths = lines.map { it.length }.toSet()
+        assertEquals(1, widths.size, "All lines should have the same width")
+    }
+
     // Random art tests (golden values from ssh-keygen -lvf -E sha256)
 
     @Test

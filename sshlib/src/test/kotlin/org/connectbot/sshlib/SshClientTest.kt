@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.transport.TransportFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -142,5 +143,55 @@ class SshClientTest {
         }
         assertEquals(60_000L, config.rekeyIntervalMs)
         assertEquals(1024L, config.rekeyBytesLimit)
+    }
+
+    @Test
+    fun `SshClientConfig rejects port 0`() {
+        assertFailsWith<IllegalArgumentException> {
+            SshClientConfig {
+                host = "example.com"
+                port = 0
+                hostKeyVerifier = acceptAllVerifier
+            }
+        }
+    }
+
+    @Test
+    fun `SshClientConfig rejects port 65536`() {
+        assertFailsWith<IllegalArgumentException> {
+            SshClientConfig {
+                host = "example.com"
+                port = 65536
+                hostKeyVerifier = acceptAllVerifier
+            }
+        }
+    }
+
+    @Test
+    fun `SshClientConfig accepts port 1`() {
+        SshClientConfig {
+            host = "example.com"
+            port = 1
+            hostKeyVerifier = acceptAllVerifier
+        }
+    }
+
+    @Test
+    fun `SshClientConfig accepts port 65535`() {
+        SshClientConfig {
+            host = "example.com"
+            port = 65535
+            hostKeyVerifier = acceptAllVerifier
+        }
+    }
+
+    @Test
+    fun `SshClientConfig rejects blank host`() {
+        assertFailsWith<IllegalArgumentException> {
+            SshClientConfig {
+                host = "  "
+                hostKeyVerifier = acceptAllVerifier
+            }
+        }
     }
 }

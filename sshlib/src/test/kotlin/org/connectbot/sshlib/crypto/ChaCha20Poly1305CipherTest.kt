@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class ChaCha20Poly1305CipherTest {
 
@@ -197,6 +198,86 @@ class ChaCha20Poly1305CipherTest {
             val decrypted = decCipher.decrypt(encLen, result.ciphertext, result.tag)
 
             assertContentEquals(plaintext, decrypted, "Failed at seq=$seq")
+        }
+    }
+
+    @Test
+    fun `different sequence numbers produce different ciphertext`() {
+        val key = ByteArray(64).apply { for (i in indices) this[i] = i.toByte() }
+        val cipher1 = ChaCha20Poly1305Cipher(key)
+        val cipher2 = ChaCha20Poly1305Cipher(key)
+        val plaintext = ByteArray(16) { 0x42 }
+        val plainLength = byteArrayOf(0, 0, 0, 16)
+
+        val enc1 = cipher1.encryptLength(0L, plainLength)
+        val result1 = cipher1.encrypt(enc1, plaintext)
+
+        val enc2 = cipher2.encryptLength(1L, plainLength)
+        val result2 = cipher2.encrypt(enc2, plaintext)
+
+        assertFalse(result1.ciphertext.contentEquals(result2.ciphertext), "Different seq nums must produce different ciphertext")
+    }
+
+    @Test
+    fun `all four sequence number bytes influence the nonce`() {
+        // updateNonce writes bytes 8-11 of the 12-byte nonce from seqNum bits 31-0.
+        // If any of the four shift expressions (ushr 24, ushr 16, ushr 8, plain) were
+        // replaced with a shift-left (a pitest mutation), two otherwise-identical
+        // encryptions that differ only in the affected byte position would produce
+        // the same ciphertext, failing this test.
+        val key = ByteArray(64).apply { for (i in indices) this[i] = i.toByte() }
+        val plainLength = byteArrayOf(0, 0, 0, 8)
+        val plaintext = ByteArray(8) { it.toByte() }
+
+        // Pairs where only one byte position of the nonce differs.
+        // seqNum 0x00000001 vs 0x00000100 differ in byte 3 vs byte 2 of the nonce.
+        // seqNum 0x00000001 vs 0x00010000 differ in byte 3 vs byte 1.
+        // seqNum 0x00000001 vs 0x01000000 differ in byte 3 vs byte 0.
+        val seqNums = listOf(0x00000001L, 0x00000100L, 0x00010000L, 0x01000000L)
+
+        val ciphertexts = seqNums.map { seqNum ->
+            val cipher = ChaCha20Poly1305Cipher(key)
+            val encLen = cipher.encryptLength(seqNum, plainLength)
+            cipher.encrypt(encLen, plaintext).ciphertext
+        }
+
+        // Every pair must produce distinct ciphertext — if any nonce byte assignment
+        // is wrong (e.g. ushr replaced with shl) two entries will collide.
+        for (i in ciphertexts.indices) {
+            for (j in i + 1 until ciphertexts.size) {
+                assertFalse(
+                    ciphertexts[i].contentEquals(ciphertexts[j]),
+                    "seqNums 0x${seqNums[i].toString(16)} and 0x${seqNums[j].toString(16)} produced identical ciphertext",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `destroy zeroes key material`() {
+        val key = ByteArray(64).apply { for (i in indices) this[i] = (i + 1).toByte() }
+        val cipher = ChaCha20Poly1305Cipher(key)
+        cipher.destroy()
+        assertContentEquals(ByteArray(64), key)
+    }
+
+    @Test
+    fun `constantTimeEquals is size-sensitive - different length returns false`() {
+        val key = ByteArray(64)
+        val enc = ChaCha20Poly1305Cipher(key)
+        val dec = ChaCha20Poly1305Cipher(key)
+        val plainLength = byteArrayOf(0, 0, 0, 1)
+        val plaintext = byteArrayOf(0x42)
+
+        val encLen = enc.encryptLength(0L, plainLength)
+        val result = enc.encrypt(encLen, plaintext)
+
+        // A tag with correct bytes but wrong length would be caught by constantTimeEquals size check;
+        // verify the cipher correctly rejects a tag of different length by providing wrong data
+        dec.decryptLength(0L, encLen)
+        assertFailsWith<TransportException> {
+            // Pass a 15-byte tag instead of 16
+            dec.decrypt(encLen, result.ciphertext, result.tag.copyOf(15))
         }
     }
 

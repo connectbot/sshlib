@@ -102,4 +102,79 @@ class DerTest {
             }
         }
     }
+
+    @Test
+    fun `readBitString rejects non-zero unused bits`() {
+        // BIT STRING with 1 unused bit — not supported
+        val data = byteArrayOf(0x03, 0x02, 0x01, 0xFE.toByte())
+        val reader = DerReader(data)
+        assertFailsWith<SshException> {
+            reader.readBitString()
+        }
+    }
+
+    @Test
+    fun `readBitString with zero unused bits succeeds`() {
+        // BIT STRING: tag=0x03, length=3, unused=0x00, data=[0xAB, 0xCD]
+        val data = byteArrayOf(0x03, 0x03, 0x00, 0xAB.toByte(), 0xCD.toByte())
+        val reader = DerReader(data)
+        val result = reader.readBitString()
+        assertArrayEquals(byteArrayOf(0xAB.toByte(), 0xCD.toByte()), result)
+    }
+
+    @Test
+    fun `peekTag returns -1 on empty buffer`() {
+        val reader = DerReader(byteArrayOf())
+        assertEquals(-1, reader.peekTag())
+    }
+
+    @Test
+    fun `peekTag returns correct tag without consuming`() {
+        val data = byteArrayOf(0x30, 0x03, 0x02, 0x01, 0x01)
+        val reader = DerReader(data)
+        assertEquals(0x30, reader.peekTag())
+        assertEquals(0x30, reader.peekTag()) // still the same after peeking
+    }
+
+    @Test
+    fun `readContextTag succeeds with matching tag`() {
+        // Context tag [0]: 0xA0, length=3, INTEGER(1)
+        val data = byteArrayOf(0xA0.toByte(), 0x03, 0x02, 0x01, 0x01)
+        val reader = DerReader(data)
+        val result = reader.readContextTag(0) { inner ->
+            inner.readInteger()
+        }
+        assertEquals(BigInteger.ONE, result)
+    }
+
+    @Test
+    fun `readContextTag rejects wrong tag`() {
+        // Context tag [1] but we ask for [0]
+        val data = byteArrayOf(0xA1.toByte(), 0x03, 0x02, 0x01, 0x01)
+        val reader = DerReader(data)
+        assertFailsWith<SshException> {
+            reader.readContextTag(0) { inner -> inner.readInteger() }
+        }
+    }
+
+    @Test
+    fun `readContextTag rejects unconsumed content`() {
+        // Context tag [0] with two integers but we only read one
+        val data = byteArrayOf(0xA0.toByte(), 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02)
+        val reader = DerReader(data)
+        assertFailsWith<SshException> {
+            reader.readContextTag(0) { inner -> inner.readInteger() }
+        }
+    }
+
+    @Test
+    fun `readSequence length subtraction - reads exact bytes`() {
+        // Sequence containing exactly 1 integer to verify length arithmetic
+        val data = byteArrayOf(0x30, 0x03, 0x02, 0x01, 0x7F)
+        val reader = DerReader(data)
+        reader.readSequence { seq ->
+            assertEquals(BigInteger.valueOf(127), seq.readInteger())
+        }
+        reader.ensureFullyConsumed()
+    }
 }
