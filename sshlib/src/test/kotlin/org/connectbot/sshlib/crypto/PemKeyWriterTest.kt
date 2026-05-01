@@ -112,4 +112,54 @@ class PemKeyWriterTest {
         assertTrue(pem.contains("-----BEGIN PRIVATE KEY-----"))
         assertTrue(pem.contains("-----END PRIVATE KEY-----"))
     }
+
+    @Test
+    fun `EC key private bytes are exactly fieldSize long in output`() {
+        // Tests the padOrTrim logic in writeEc: the scalar s value from BigInteger.toByteArray()
+        // may have a leading zero sign byte (size > fieldSize) or may be short (size < fieldSize).
+        // Parse the produced DER and assert the private key OCTET STRING is exactly fieldSize bytes.
+        val cases = listOf(
+            "ecdsa256_unencrypted" to 32,
+            "ecdsa384_unencrypted" to 48,
+            "ecdsa521_unencrypted" to 66,
+        )
+        for ((key, expectedFieldSize) in cases) {
+            val original = PrivateKeyReader.read(readKey(key)).jcaKeyPair
+            val pem = PemKeyWriter.write(original)
+
+            // Extract DER from PEM (SEC1 "EC PRIVATE KEY" format)
+            val der = pem.lines()
+                .filter { !it.startsWith("-----") && it.isNotBlank() }
+                .joinToString("")
+                .let { java.util.Base64.getDecoder().decode(it) }
+
+            // SEC1 ECPrivateKey ::= SEQUENCE { version INTEGER, privateKey OCTET STRING,
+            //   [0] OID OPTIONAL, [1] BIT STRING OPTIONAL }
+            val privateKeyBytes = DerReader(der).readSequence { seq ->
+                seq.readInteger() // version = 1
+                val octets = seq.readOctetString() // the private scalar bytes
+                // Skip optional context tags [0] and [1]
+                while (seq.hasRemaining()) seq.skipTag()
+                octets
+            }
+            assertEquals(
+                expectedFieldSize,
+                privateKeyBytes.size,
+                "EC private scalar for $key must be exactly $expectedFieldSize bytes, got ${privateKeyBytes.size}",
+            )
+        }
+    }
+
+    @Test
+    fun `wrapPem includes base64 content between markers`() {
+        val keyPair = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+        val pem = PemKeyWriter.write(keyPair)
+        val lines = pem.lines().filter { it.isNotBlank() }
+        assertTrue(lines.size > 2, "PEM should have content between markers")
+        val contentLines = lines.drop(1).dropLast(1)
+        assertTrue(contentLines.isNotEmpty())
+        contentLines.forEach { line ->
+            assertTrue(line.matches(Regex("[A-Za-z0-9+/=]+")), "PEM content line is valid base64: $line")
+        }
+    }
 }
