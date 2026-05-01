@@ -137,6 +137,51 @@ class OpenSshKeyWriterTest {
         assertTrue(enc1 != enc2, "Encrypted output must differ due to random salt/checkInt")
     }
 
+    @Test
+    fun `unencrypted private section is padded to 8-byte boundary`() {
+        val original = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+        val encoded = OpenSshKeyWriter.write(original)
+        val privateSectionLen = extractPrivateSectionLength(encoded)
+        assertEquals(0, privateSectionLen % 8, "Unencrypted private section must be a multiple of 8 bytes, got $privateSectionLen")
+    }
+
+    @Test
+    fun `encrypted private section is padded to 16-byte boundary`() {
+        val original = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+        val encoded = OpenSshKeyWriter.write(original, "pass")
+        val privateSectionLen = extractPrivateSectionLength(encoded)
+        assertEquals(0, privateSectionLen % 16, "Encrypted private section must be a multiple of 16 bytes (AES block size), got $privateSectionLen")
+    }
+
+    private fun extractPrivateSectionLength(pem: String): Int {
+        val binary = extractBinary(pem)
+        val buf = java.nio.ByteBuffer.wrap(binary)
+
+        fun skipBytes(n: Int) {
+            buf.position(buf.position() + n)
+        }
+        fun skipString() {
+            skipBytes(buf.int)
+        }
+
+        // Skip magic: "openssh-key-v1\0" (15 bytes: 14 ASCII chars + NUL)
+        skipBytes(15)
+
+        // Skip cipherName, kdfName, kdfOptions (each a uint32-prefixed string)
+        skipString()
+        skipString()
+        skipString()
+
+        // Skip numKeys uint32
+        buf.int
+
+        // Skip public key blob (uint32-prefixed string)
+        skipString()
+
+        // The next uint32 is the length of the private section (encrypted or plaintext)
+        return buf.int
+    }
+
     private fun extractBinary(pem: String): ByteArray {
         val b64 = pem.lines()
             .filter { !it.startsWith("-----") && it.isNotBlank() }

@@ -25,24 +25,58 @@ import org.junit.jupiter.api.Test
 
 class AgentProviderTest {
 
+    private val baseBlob = byteArrayOf(1, 2, 3)
+    private val otherBlob = byteArrayOf(4, 5, 6)
+
     @Test
     fun `AgentIdentity equality works correctly`() {
-        val key1 = AgentIdentity(
-            publicKeyBlob = byteArrayOf(1, 2, 3),
-            comment = "test-key",
-        )
-        val key2 = AgentIdentity(
-            publicKeyBlob = byteArrayOf(1, 2, 3),
-            comment = "test-key",
-        )
-        val key3 = AgentIdentity(
-            publicKeyBlob = byteArrayOf(1, 2, 4),
-            comment = "test-key",
-        )
+        val key1 = AgentIdentity(publicKeyBlob = baseBlob, comment = "test-key")
+        val key2 = AgentIdentity(publicKeyBlob = baseBlob.clone(), comment = "test-key")
+        val key3 = AgentIdentity(publicKeyBlob = byteArrayOf(1, 2, 4), comment = "test-key")
 
         assertEquals(key1, key2)
         assertNotEquals(key1, key3)
         assertEquals(key1.hashCode(), key2.hashCode())
+    }
+
+    @Test
+    fun `AgentIdentity differs when publicKeyBlob differs`() {
+        val a = AgentIdentity(publicKeyBlob = baseBlob, comment = "key")
+        val b = AgentIdentity(publicKeyBlob = otherBlob, comment = "key")
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun `AgentIdentity differs when comment differs`() {
+        val a = AgentIdentity(publicKeyBlob = baseBlob, comment = "key-a")
+        val b = AgentIdentity(publicKeyBlob = baseBlob.clone(), comment = "key-b")
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun `AgentIdentity differs when destinationConstraints differs`() {
+        val a = AgentIdentity(publicKeyBlob = baseBlob, comment = "key", destinationConstraints = null)
+        val b = AgentIdentity(publicKeyBlob = baseBlob.clone(), comment = "key", destinationConstraints = emptyList())
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun `AgentIdentity self-equality`() {
+        val a = AgentIdentity(publicKeyBlob = baseBlob, comment = "key")
+        assertEquals(a, a)
+    }
+
+    @Test
+    fun `AgentIdentity not equal to different type`() {
+        val a = AgentIdentity(publicKeyBlob = baseBlob, comment = "key")
+        assertNotEquals(a, "not an identity")
+    }
+
+    @Test
+    fun `AgentIdentity hashCode differs for different blobs`() {
+        val a = AgentIdentity(publicKeyBlob = byteArrayOf(1), comment = "key")
+        val b = AgentIdentity(publicKeyBlob = byteArrayOf(2), comment = "key")
+        assertNotEquals(a.hashCode(), b.hashCode())
     }
 
     @Test
@@ -75,6 +109,100 @@ class AgentProviderTest {
         assertEquals(context1, context2)
         assertNotEquals(context1, context3)
         assertEquals(context1.hashCode(), context2.hashCode())
+    }
+
+    private fun baseContext(
+        publicKeyBlob: ByteArray = byteArrayOf(1, 2, 3),
+        dataToSign: ByteArray = byteArrayOf(4, 5, 6),
+        flags: Int = 0,
+        sessionId: ByteArray = byteArrayOf(7, 8, 9),
+        serverHostKey: ByteArray = byteArrayOf(10, 11, 12),
+        isBound: Boolean = true,
+    ) = AgentSigningContext(publicKeyBlob, dataToSign, flags, sessionId, serverHostKey, isBound)
+
+    @Test
+    fun `AgentSigningContext differs when publicKeyBlob differs`() {
+        assertNotEquals(baseContext(publicKeyBlob = byteArrayOf(1, 2, 3)), baseContext(publicKeyBlob = byteArrayOf(9, 9, 9)))
+    }
+
+    @Test
+    fun `AgentSigningContext differs when dataToSign differs`() {
+        assertNotEquals(baseContext(dataToSign = byteArrayOf(1)), baseContext(dataToSign = byteArrayOf(2)))
+    }
+
+    @Test
+    fun `AgentSigningContext differs when flags differs`() {
+        assertNotEquals(baseContext(flags = 0), baseContext(flags = 2))
+    }
+
+    @Test
+    fun `AgentSigningContext differs when sessionId differs`() {
+        assertNotEquals(baseContext(sessionId = byteArrayOf(1)), baseContext(sessionId = byteArrayOf(2)))
+    }
+
+    @Test
+    fun `AgentSigningContext differs when serverHostKey differs`() {
+        assertNotEquals(baseContext(serverHostKey = byteArrayOf(1)), baseContext(serverHostKey = byteArrayOf(2)))
+    }
+
+    @Test
+    fun `AgentSigningContext differs when isBound differs`() {
+        assertNotEquals(baseContext(isBound = true), baseContext(isBound = false))
+    }
+
+    @Test
+    fun `AgentSigningContext self-equality`() {
+        val ctx = baseContext()
+        assertEquals(ctx, ctx)
+    }
+
+    @Test
+    fun `AgentSigningContext not equal to different type`() {
+        assertNotEquals(baseContext(), "not a context")
+    }
+
+    @Test
+    fun `AgentSigningContext hashCode differs when fields differ`() {
+        assertNotEquals(baseContext(flags = 1).hashCode(), baseContext(flags = 2).hashCode())
+        assertNotEquals(baseContext(isBound = true).hashCode(), baseContext(isBound = false).hashCode())
+    }
+
+    @Test
+    fun `AgentKeySpec equals and hashCode`() {
+        val spec1 = AgentKeySpec(keyBlob = byteArrayOf(1, 2, 3), isCa = true)
+        val spec2 = AgentKeySpec(keyBlob = byteArrayOf(1, 2, 3), isCa = true)
+        val specDiffBlob = AgentKeySpec(keyBlob = byteArrayOf(9, 9, 9), isCa = true)
+        val specDiffCa = AgentKeySpec(keyBlob = byteArrayOf(1, 2, 3), isCa = false)
+
+        assertEquals(spec1, spec2)
+        assertEquals(spec1.hashCode(), spec2.hashCode())
+        assertNotEquals(spec1, specDiffBlob)
+        assertNotEquals(spec1, specDiffCa)
+    }
+
+    @Test
+    fun `AgentKeySpec differs when keyBlob differs`() {
+        val a = AgentKeySpec(keyBlob = byteArrayOf(1), isCa = false)
+        val b = AgentKeySpec(keyBlob = byteArrayOf(2), isCa = false)
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun `AgentKeySpec differs when isCa differs`() {
+        val a = AgentKeySpec(keyBlob = byteArrayOf(1, 2, 3), isCa = true)
+        val b = AgentKeySpec(keyBlob = byteArrayOf(1, 2, 3), isCa = false)
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun `AgentKeySpec self-equality`() {
+        val spec = AgentKeySpec(keyBlob = byteArrayOf(1, 2), isCa = false)
+        assertEquals(spec, spec)
+    }
+
+    @Test
+    fun `AgentKeySpec not equal to different type`() {
+        assertNotEquals(AgentKeySpec(byteArrayOf(1), false), "string")
     }
 
     @Test

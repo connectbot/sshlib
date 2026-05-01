@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.crypto
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
@@ -83,5 +84,39 @@ class ZlibCompressorTest {
         assert(compressed.size < repeatedData.size) {
             "Compressed size (${compressed.size}) should be smaller than original (${repeatedData.size})"
         }
+    }
+
+    @Test
+    fun compressedOutputIsExactSize() {
+        val compressor = ZlibCompressor()
+        val decompressor = ZlibCompressor()
+        val data = "exact size test data that should roundtrip cleanly".toByteArray()
+        val compressed = compressor.compress(data)
+        val decompressed = decompressor.uncompress(compressed)
+        assertArrayEquals(data, decompressed)
+        // Output must be exactly data.size — not zero, not larger
+        assertEquals(data.size, decompressed.size)
+    }
+
+    @Test
+    fun uncompressOutputIsExactSize() {
+        val compressor = ZlibCompressor()
+        val decompressor = ZlibCompressor()
+        // Use data that expands significantly when compressed (already-compressed data grows)
+        val data = "abcdefghij".repeat(200).toByteArray()
+        val compressed = compressor.compress(data)
+        val decompressed = decompressor.uncompress(compressed)
+        assertArrayEquals(data, decompressed)
+        assertEquals(data.size, decompressed.size)
+    }
+
+    @Test
+    fun smallInputFitsInInitialBuffer() {
+        val compressor = ZlibCompressor()
+        val decompressor = ZlibCompressor()
+        val data = byteArrayOf(0x42)
+        val compressed = compressor.compress(data)
+        val decompressed = decompressor.uncompress(compressed)
+        assertArrayEquals(data, decompressed)
     }
 }
