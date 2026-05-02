@@ -18,6 +18,7 @@ package org.connectbot.sshlib
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import kotlinx.coroutines.test.runTest
+import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.client.AgentProtocolHandler
 import org.connectbot.sshlib.client.AgentSessionInfo
 import org.connectbot.sshlib.client.SessionBindVerifier
@@ -394,5 +395,34 @@ class AgentProtocolTest {
 
         val (messageType, _) = parseAgentMessage(response)
         assertEquals(5, messageType)
+    }
+
+    @Test
+    fun `AgentSessionInfo equals and hashCode`() {
+        EqualsVerifier.forClass(AgentSessionInfo::class.java)
+            .withPrefabValues(ByteArray::class.java, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+            .verify()
+    }
+
+    @Test
+    fun `buildAgentMessage encodes length field correctly for large payload`() = runTest {
+        // Use a payload of 256 bytes so the length field requires byte[1] (not just byte[3]) to be non-zero.
+        // If shr 16 is mutated to shr 8 (or removed), byte[1] would encode incorrectly and parsing would fail.
+        val largePayload = ByteArray(256) { it.toByte() }
+        val message = buildAgentMessage(12, largePayload)
+        val (msgType, parsedPayload) = parseAgentMessage(message)
+        assertEquals(12, msgType)
+        assertArrayEquals(largePayload, parsedPayload)
+    }
+
+    @Test
+    fun `buildAgentMessage encodes length field correctly for 65536-byte payload`() = runTest {
+        // Payload of 65536 bytes forces byte[0] of the length field to be non-zero.
+        // Kills MathMutator survivors on the shr 24 / shr 16 shift expressions.
+        val hugePayload = ByteArray(65536) { it.toByte() }
+        val message = buildAgentMessage(14, hugePayload)
+        val (msgType, parsedPayload) = parseAgentMessage(message)
+        assertEquals(14, msgType)
+        assertArrayEquals(hugePayload, parsedPayload)
     }
 }

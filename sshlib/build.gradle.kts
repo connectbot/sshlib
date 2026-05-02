@@ -45,6 +45,7 @@ dependencies {
     // Unit tests
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.equalsverifier)
     testImplementation(libs.mockk)
 
     // Integration test dependencies

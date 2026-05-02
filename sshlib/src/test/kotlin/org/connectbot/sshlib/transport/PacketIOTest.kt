@@ -167,4 +167,64 @@ class PacketIOTest {
         assertEquals(0L, io.bytesSentOnWire)
         assertEquals(0L, io.bytesReceivedOnWire)
     }
+
+    // calculatePaddingLength: totalLength = 4 + 1 + (1 + payload.size) = 6 + payload.size.
+    // With blockSize=8: raw = if (totalLength%8==0) 8 else 8-(totalLength%8). Bump by 8 if raw<4.
+    // Verifying the exact padding_length byte at wire[4] kills MathMutator and ConditionalsBoundaryMutator survivors.
+
+    private fun writtenPaddingLength(payloadSize: Int): Int = runBlocking {
+        val transport = ByteArrayTransport()
+        val io = PacketIO(transport)
+        io.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), ByteArray(payloadSize))
+        transport.getWrittenData()[4].toInt() and 0xFF
+    }
+
+    @Test
+    fun `calculatePaddingLength produces minimum 4 bytes of padding`() {
+        for (payloadSize in 0..64) {
+            val padding = writtenPaddingLength(payloadSize)
+            assertTrue(padding >= 4, "payload=$payloadSize: padding $padding < 4")
+        }
+    }
+
+    @Test
+    fun `calculatePaddingLength result aligns total wire packet to multiple of 8`() {
+        // totalLength in RFC 4253 = 4(length field) + 1(padding_length) + 1(msg_type) + payloadSize + padding
+        // = 6 + payloadSize + padding must be multiple of 8
+        for (payloadSize in 0..64) {
+            val padding = writtenPaddingLength(payloadSize)
+            val wireTotal = 6 + payloadSize + padding
+            assertEquals(0, wireTotal % 8, "payload=$payloadSize: wireTotal $wireTotal not multiple of 8")
+        }
+    }
+
+    @Test
+    fun `calculatePaddingLength payload 2 aligns without bump`() {
+        // totalLength=8 (2+6), 8%8=0, raw=8, ≥4 → no bump → padding=8
+        assertEquals(8, writtenPaddingLength(2))
+    }
+
+    @Test
+    fun `calculatePaddingLength payload 3 gives 7`() {
+        // totalLength=9, 9%8=1, raw=7, ≥4 → padding=7
+        assertEquals(7, writtenPaddingLength(3))
+    }
+
+    @Test
+    fun `calculatePaddingLength payload 6 gives exactly 4 without bump`() {
+        // totalLength=12, 12%8=4, raw=4, not <4 → padding=4 (boundary: mutant with <=4 would bump to 12)
+        assertEquals(4, writtenPaddingLength(6))
+    }
+
+    @Test
+    fun `calculatePaddingLength payload 7 gets bumped because raw is 3`() {
+        // totalLength=13, 13%8=5, raw=3, <4 → bump: 3+8=11
+        assertEquals(11, writtenPaddingLength(7))
+    }
+
+    @Test
+    fun `calculatePaddingLength payload 0 gets bumped because raw is 2`() {
+        // totalLength=6, 6%8=6, raw=2, <4 → bump: 2+8=10
+        assertEquals(10, writtenPaddingLength(0))
+    }
 }
