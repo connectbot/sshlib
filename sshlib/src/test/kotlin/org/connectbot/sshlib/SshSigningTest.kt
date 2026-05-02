@@ -17,6 +17,7 @@
 package org.connectbot.sshlib
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SignatureVerifier
@@ -28,7 +29,6 @@ import java.security.spec.ECGenParameterSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class SshSigningTest {
@@ -273,44 +273,9 @@ class SshSigningTest {
 class AuthPublicKeyTest {
 
     @Test
-    fun `equal keys are equal`() {
-        val blob = byteArrayOf(1, 2, 3)
-        val a = AuthPublicKey("ssh-ed25519", blob.copyOf())
-        val b = AuthPublicKey("ssh-ed25519", blob.copyOf())
-        assertEquals(a, b)
-        assertEquals(a.hashCode(), b.hashCode())
-    }
-
-    @Test
-    fun `different algorithm names are not equal`() {
-        val blob = byteArrayOf(1, 2, 3)
-        val a = AuthPublicKey("ssh-ed25519", blob.copyOf())
-        val b = AuthPublicKey("rsa-sha2-256", blob.copyOf())
-        assertNotEquals(a, b)
-    }
-
-    @Test
-    fun `different blobs are not equal`() {
-        val a = AuthPublicKey("ssh-ed25519", byteArrayOf(1, 2, 3))
-        val b = AuthPublicKey("ssh-ed25519", byteArrayOf(4, 5, 6))
-        assertNotEquals(a, b)
-    }
-
-    @Test
-    fun `same instance is equal`() {
-        val key = AuthPublicKey("ssh-ed25519", byteArrayOf(1, 2, 3))
-        assertEquals(key, key)
-    }
-
-    @Test
-    fun `not equal to null`() {
-        val key = AuthPublicKey("ssh-ed25519", byteArrayOf(1, 2, 3))
-        assertFalse(key.equals(null))
-    }
-
-    @Test
-    fun `not equal to different type`() {
-        val key = AuthPublicKey("ssh-ed25519", byteArrayOf(1, 2, 3))
-        assertFalse(key.equals("string"))
+    fun `equals and hashCode`() {
+        EqualsVerifier.forClass(AuthPublicKey::class.java)
+            .withPrefabValues(ByteArray::class.java, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+            .verify()
     }
 }
