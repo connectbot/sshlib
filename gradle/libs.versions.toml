@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.3.20"
+kotlin = "2.3.21"
 clikt = "5.1.0"
 spotless = "8.4.0"
 kaitai = "0.11"
