@@ -56,6 +56,7 @@ class SshClientConfig private constructor(
     val preferPasswordAuth: Boolean,
     val rekeyIntervalMs: Long,
     val rekeyBytesLimit: Long,
+    val obscureKeystrokeTimingIntervalMs: Long,
 ) {
     class Builder {
         /**
@@ -119,11 +120,21 @@ class SshClientConfig private constructor(
          */
         var rekeyBytesLimit: Long = 1_073_741_824L
 
+        /**
+         * Quantize outbound keystroke packet timing to this interval (milliseconds) to mask
+         * inter-keystroke timing patterns. Requires a PTY session and server support for
+         * `ping@openssh.com`. Set to 0 to disable.
+         */
+        var obscureKeystrokeTimingIntervalMs: Long = 20L
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
                 require(port in 1..65535) { "Port must be between 1 and 65535" }
                 KtorTcpTransportFactory(host, port, ipVersion)
+            }
+            require(obscureKeystrokeTimingIntervalMs >= 0) {
+                "obscureKeystrokeTimingIntervalMs must be non-negative"
             }
 
             val verifier = hostKeyVerifier
@@ -146,6 +157,7 @@ class SshClientConfig private constructor(
                 preferPasswordAuth,
                 rekeyIntervalMs,
                 rekeyBytesLimit,
+                obscureKeystrokeTimingIntervalMs,
             )
         }
     }

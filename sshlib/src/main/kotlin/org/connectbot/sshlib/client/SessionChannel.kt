@@ -17,9 +17,13 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestExec
@@ -28,6 +32,8 @@ import org.connectbot.sshlib.protocol.ChannelRequestShell
 import org.connectbot.sshlib.protocol.ChannelRequestSubsystem
 import org.connectbot.sshlib.protocol.ChannelRequestWindowChange
 import org.slf4j.LoggerFactory
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
 
 class SessionChannel internal constructor(
     private val connection: SshConnection,
@@ -37,6 +43,10 @@ class SessionChannel internal constructor(
     private val maxPacketSize: Int,
     remoteWindowSizeInitial: Long = 0,
     private val initialWindowSize: Int = 64 * 1024,
+    private val canSendChaff: Boolean = false,
+    private val obscureKeystrokeTimingIntervalMs: Long = 20L,
+    private val obfuscatorClockMs: () -> Long = { System.nanoTime() / 1_000_000L },
+    private val obfuscatorRandom: Random = Random.Default,
 ) : SshSession {
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
@@ -58,6 +68,21 @@ class SessionChannel internal constructor(
     override val remoteChannelNumber: Int get() = _remoteChannelNumber
     override val stdout: ReceiveChannel<ByteArray> get() = _stdout
     override val stderr: ReceiveChannel<ByteArray> get() = _stderr
+
+    private var ptyGranted = false
+    private var obfuscator: KeystrokeObfuscator? = null
+    private val obfuscatorMutex = Mutex()
+    private var chaffJob: Job? = null
+    private val pendingObfuscatedWrites = AtomicInteger(0)
+    private val obfuscatedWritesIdle = Channel<Unit>(Channel.CONFLATED)
+
+    /** Called by tests that need to simulate PTY being granted without a real channel request. */
+    internal fun markPtyGranted() {
+        ptyGranted = true
+    }
+
+    private val obfuscationActive: Boolean
+        get() = ptyGranted && canSendChaff && obscureKeystrokeTimingIntervalMs > 0
 
     internal suspend fun onData(data: ByteArray) {
         _stdout.trySend(data)
@@ -99,6 +124,10 @@ class SessionChannel internal constructor(
 
     internal suspend fun onClose() {
         logger.debug("Received CLOSE on channel $localChannelNumber")
+        obfuscatorMutex.withLock {
+            obfuscator?.stop()
+        }
+        chaffJob?.cancel()
         if (!closeSent) {
             closeSent = true
             try {
@@ -115,9 +144,16 @@ class SessionChannel internal constructor(
     }
 
     override suspend fun write(data: ByteArray) {
+        if (obfuscationActive) {
+            writeObfuscated(data)
+        } else {
+            writeDirect(data)
+        }
+    }
+
+    private suspend fun writeDirect(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
-            // Wait for remote window to have space
             while (remoteWindowSize <= 0) {
                 windowAvailable.receive()
             }
@@ -130,6 +166,70 @@ class SessionChannel internal constructor(
             connection.sendChannelData(_remoteChannelNumber, chunk)
             remoteWindowSize -= chunkSize
             offset += chunkSize
+        }
+    }
+
+    private suspend fun writeObfuscated(data: ByteArray) {
+        pendingObfuscatedWrites.incrementAndGet()
+        try {
+            val (obs, justStarted) = obfuscatorMutex.withLock {
+                val current = obfuscator ?: KeystrokeObfuscator(
+                    obscureKeystrokeTimingIntervalMs,
+                    clockMs = obfuscatorClockMs,
+                    random = obfuscatorRandom,
+                ).also {
+                    obfuscator = it
+                }
+                current to current.recordKeystroke()
+            }
+            startChaffLoopIfNeeded(obs)
+
+            if (!justStarted) {
+                val delayMs = obfuscatorMutex.withLock {
+                    obs.delayUntilNextSendMs()
+                }
+                if (delayMs > 0) {
+                    delay(delayMs)
+                }
+                obfuscatorMutex.withLock {
+                    obs.advanceInterval()
+                }
+            }
+
+            writeDirect(data)
+        } finally {
+            if (pendingObfuscatedWrites.decrementAndGet() == 0) {
+                obfuscatedWritesIdle.trySend(Unit)
+            }
+        }
+    }
+
+    private fun startChaffLoopIfNeeded(obs: KeystrokeObfuscator) {
+        if (chaffJob?.isActive == true) return
+        chaffJob = connectionScope.launch {
+            while (obfuscatorMutex.withLock { obs.isActive() }) {
+                val delayMs = obfuscatorMutex.withLock {
+                    obs.delayUntilNextSendMs()
+                }
+                if (delayMs > 0) {
+                    delay(delayMs)
+                }
+                val shouldSendChaff = obfuscatorMutex.withLock {
+                    if (!obs.isActive()) {
+                        false
+                    } else if (pendingObfuscatedWrites.get() > 0) {
+                        null
+                    } else {
+                        obs.advanceInterval()
+                        true
+                    }
+                }
+                when (shouldSendChaff) {
+                    true -> connection.sendChaff()
+                    false -> break
+                    null -> obfuscatedWritesIdle.receiveCatching()
+                }
+            }
         }
     }
 
@@ -172,7 +272,7 @@ class SessionChannel internal constructor(
         terminalModes: ByteArray,
     ): Boolean {
         logger.debug("Requesting PTY: $terminalType ${widthChars}x$heightRows")
-        return connection.sendChannelRequest(
+        val granted = connection.sendChannelRequest(
             _remoteChannelNumber,
             "pty-req",
             wantReply = true,
@@ -199,6 +299,8 @@ class SessionChannel internal constructor(
             ptyReq._check()
             msg.setRequestSpecificFields(ptyReq)
         }
+        if (granted) ptyGranted = true
+        return granted
     }
 
     override suspend fun requestShell(): Boolean {
@@ -254,6 +356,8 @@ class SessionChannel internal constructor(
         if (!_isOpen) return
 
         logger.debug("Closing channel $localChannelNumber")
+        obfuscator?.stop()
+        chaffJob?.cancel()
         closeSent = true
         _isOpen = false
         _stdout.close()

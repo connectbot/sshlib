@@ -132,6 +132,15 @@ class SshClientTest {
     }
 
     @Test
+    fun `SshClientConfig defaults keystroke obfuscation interval to twenty milliseconds`() {
+        val config = SshClientConfig {
+            host = "example.com"
+            hostKeyVerifier = acceptAllVerifier
+        }
+        assertEquals(20L, config.obscureKeystrokeTimingIntervalMs)
+    }
+
+    @Test
     fun `SshClientConfig custom rekey thresholds are applied`() {
         val config = SshClientConfig {
             host = "example.com"
@@ -191,6 +200,17 @@ class SshClientTest {
             SshClientConfig {
                 host = "  "
                 hostKeyVerifier = acceptAllVerifier
+            }
+        }
+    }
+
+    @Test
+    fun `SshClientConfig rejects negative keystroke obfuscation interval`() {
+        assertFailsWith<IllegalArgumentException> {
+            SshClientConfig {
+                host = "example.com"
+                hostKeyVerifier = acceptAllVerifier
+                obscureKeystrokeTimingIntervalMs = -1L
             }
         }
     }

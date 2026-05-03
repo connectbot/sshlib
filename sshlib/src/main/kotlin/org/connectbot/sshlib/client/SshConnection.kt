@@ -160,6 +160,7 @@ class SshConnection(
     private val preferPasswordAuth: Boolean = false,
     private val rekeyIntervalMs: Long = 3_600_000L,
     private val rekeyBytesLimit: Long = 1_073_741_824L,
+    private val obscureKeystrokeTimingIntervalMs: Long = 20L,
     coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
@@ -2426,6 +2427,21 @@ class SshConnection(
         )
     }
 
+    /**
+     * Sends a chaff SSH_MSG_PING packet sized to match a minimal SSH_MSG_CHANNEL_DATA frame
+     * (4-byte channel ID + 4-byte length + 1-byte data = 9 bytes payload). Used for keystroke
+     * timing obfuscation in interactive sessions.
+     */
+    internal suspend fun sendChaff() {
+        if (!serverSupportsPing || isRekeying) return
+        // SSH string encoding adds a 4-byte length, so 5 data bytes produce a 9-byte ping body.
+        val payload = "PING!".encodeToByteArray()
+        val ping = SshMsgPing()
+        ping.setData(createByteString(payload))
+        ping._check()
+        writePacket(SshEnums.MessageType.SSH_MSG_PING.id().toInt(), ping.toByteArray())
+    }
+
     internal suspend fun sendWindowAdjust(recipientChannel: Int, bytesToAdd: Int) {
         val msg = SshMsgChannelWindowAdjust().apply {
             setRecipientChannel(recipientChannel.toLong())
@@ -2592,6 +2608,8 @@ class SshConnection(
             maxPacketSize,
             remoteWindowSizeInitial = remoteWindow,
             initialWindowSize = initialWindowSize,
+            canSendChaff = serverSupportsPing,
+            obscureKeystrokeTimingIntervalMs = obscureKeystrokeTimingIntervalMs,
         )
         channels[localChannelNumber] = channel
         channelsByRemote[localChannelNumber] = channel
