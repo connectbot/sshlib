@@ -162,6 +162,7 @@ class SshClient private constructor(
             preferPasswordAuth = config.preferPasswordAuth,
             rekeyIntervalMs = config.rekeyIntervalMs,
             rekeyBytesLimit = config.rekeyBytesLimit,
+            obscureKeystrokeTimingIntervalMs = config.obscureKeystrokeTimingIntervalMs,
         )
         val result = sshConnection.connect()
 

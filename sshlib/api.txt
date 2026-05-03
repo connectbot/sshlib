@@ -558,6 +558,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public org.connectbot.sshlib.HostKeyVerifier getHostKeyVerifier();
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
+    method @InaccessibleFromKotlin public long getObscureKeystrokeTimingIntervalMs();
     method @InaccessibleFromKotlin public boolean getPreferPasswordAuth();
     method @InaccessibleFromKotlin public long getRekeyBytesLimit();
     method @InaccessibleFromKotlin public long getRekeyIntervalMs();
@@ -568,6 +569,7 @@ package org.connectbot.sshlib {
     property public org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier;
     property public String kexAlgorithms;
     property public String macAlgorithms;
+    property public long obscureKeystrokeTimingIntervalMs;
     property public boolean preferPasswordAuth;
     property public long rekeyBytesLimit;
     property public long rekeyIntervalMs;
@@ -587,6 +589,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.IpVersion getIpVersion();
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
+    method @InaccessibleFromKotlin public long getObscureKeystrokeTimingIntervalMs();
     method @InaccessibleFromKotlin public int getPort();
     method @InaccessibleFromKotlin public boolean getPreferPasswordAuth();
     method @InaccessibleFromKotlin public long getRekeyBytesLimit();
@@ -601,6 +604,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public void setIpVersion(org.connectbot.sshlib.transport.IpVersion);
     method @InaccessibleFromKotlin public void setKexAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setMacAlgorithms(java.lang.String);
+    method @InaccessibleFromKotlin public void setObscureKeystrokeTimingIntervalMs(long);
     method @InaccessibleFromKotlin public void setPort(int);
     method @InaccessibleFromKotlin public void setPreferPasswordAuth(boolean);
     method @InaccessibleFromKotlin public void setRekeyBytesLimit(long);
@@ -615,6 +619,7 @@ package org.connectbot.sshlib {
     property public org.connectbot.sshlib.transport.IpVersion ipVersion;
     property public String kexAlgorithms;
     property public String macAlgorithms;
+    property public long obscureKeystrokeTimingIntervalMs;
     property public int port;
     property public boolean preferPasswordAuth;
     property public long rekeyBytesLimit;
@@ -753,7 +758,7 @@ package org.connectbot.sshlib.client {
   }
 
   public final class SshConnection {
-    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional java.lang.String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String kexAlgorithms, optional java.lang.String hostKeyAlgorithms, optional java.lang.String encryptionAlgorithms, optional java.lang.String macAlgorithms, optional java.lang.String compressionAlgorithms, optional boolean preferPasswordAuth, optional long rekeyIntervalMs, optional long rekeyBytesLimit, optional kotlinx.coroutines.CoroutineDispatcher coroutineDispatcher);
+    ctor public SshConnection(org.connectbot.sshlib.transport.Transport transport, optional java.lang.String clientVersion, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String kexAlgorithms, optional java.lang.String hostKeyAlgorithms, optional java.lang.String encryptionAlgorithms, optional java.lang.String macAlgorithms, optional java.lang.String compressionAlgorithms, optional boolean preferPasswordAuth, optional long rekeyIntervalMs, optional long rekeyBytesLimit, optional long obscureKeystrokeTimingIntervalMs, optional kotlinx.coroutines.CoroutineDispatcher coroutineDispatcher);
     method public suspend java.lang.Object? authenticateKeyboardInteractive(java.lang.String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.AuthResult>);
     method public suspend java.lang.Object? authenticatePassword(java.lang.String username, java.lang.String password, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.AuthResult>);
     method public suspend java.lang.Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
