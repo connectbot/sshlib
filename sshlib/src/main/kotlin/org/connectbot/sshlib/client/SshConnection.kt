@@ -706,16 +706,6 @@ class SshConnection(
         return data.toByteArray()
     }
 
-    private fun keyBlobAlgorithmName(publicKeyBlob: ByteArray): String? {
-        if (publicKeyBlob.size < 4) return null
-        val len = ((publicKeyBlob[0].toInt() and 0xFF) shl 24) or
-            ((publicKeyBlob[1].toInt() and 0xFF) shl 16) or
-            ((publicKeyBlob[2].toInt() and 0xFF) shl 8) or
-            (publicKeyBlob[3].toInt() and 0xFF)
-        if (len <= 0 || len > publicKeyBlob.size - 4) return null
-        return String(publicKeyBlob, 4, len, Charsets.US_ASCII)
-    }
-
     private fun negotiateRsaAlgorithm(): String = SignatureEntry.negotiateRsaAlgorithm(serverSigAlgs)
 
     /**
@@ -2772,4 +2762,12 @@ internal fun selectPasswordMethods(
         hasPassword -> listOf(AuthMethod.Password)
         else -> emptyList()
     }
+}
+
+internal fun keyBlobAlgorithmName(publicKeyBlob: ByteArray): String? {
+    if (publicKeyBlob.size < 4) return null
+    val stream = ByteBufferKaitaiStream(publicKeyBlob)
+    val len = stream.readU4be()
+    if (len <= 0 || len > publicKeyBlob.size - 4) return null
+    return String(stream.readBytes(len), Charsets.US_ASCII)
 }
