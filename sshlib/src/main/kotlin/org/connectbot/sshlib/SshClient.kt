@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.client.DynamicPortForwarder
 import org.connectbot.sshlib.client.LocalPortForwarder
 import org.connectbot.sshlib.client.RemotePortForwarder
@@ -650,6 +651,25 @@ class SshClient private constructor(
             ) ?: throw SshException("Failed to open direct-tcpip channel to $remoteHost:$remotePort")
             ForwardingChannelTransport(channel)
         }
+    }
+
+    /**
+     * Send an SSH ping to the server and return the round-trip time.
+     *
+     * Requires a prior successful [connect] and authentication. Returns
+     * [PingResult.NotAuthenticated] if there is no active connection or
+     * authentication has not completed, [PingResult.NotSupported] if the server
+     * did not advertise `ping@openssh.com` support via SSH2_MSG_EXT_INFO, or
+     * [PingResult.Failure] if the ping cannot be sent or the connection closes
+     * before the server replies.
+     *
+     * @return [PingResult.Success] with round-trip nanoseconds, [PingResult.NotSupported],
+     *   [PingResult.NotAuthenticated], or [PingResult.Failure]
+     */
+    suspend fun ping(): PingResult {
+        val conn = connection ?: return PingResult.NotAuthenticated
+        if (!authenticated) return PingResult.NotAuthenticated
+        return conn.ping()
     }
 
     /**

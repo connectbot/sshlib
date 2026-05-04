@@ -273,6 +273,45 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? verify(org.connectbot.sshlib.PublicKey key, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
   }
 
+  public abstract sealed exhaustive class PingResult {
+  }
+
+  public static final class PingResult.Failure extends org.connectbot.sshlib.PingResult {
+    ctor public PingResult.Failure(java.lang.Throwable cause);
+    method public java.lang.Throwable component1();
+    method public org.connectbot.sshlib.PingResult.Failure copy(optional java.lang.Throwable cause);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.Throwable getCause();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public Throwable cause;
+  }
+
+  public static final class PingResult.NotAuthenticated extends org.connectbot.sshlib.PingResult {
+    method public boolean equals(java.lang.Object? other);
+    method public int hashCode();
+    method public java.lang.String toString();
+    field public static final org.connectbot.sshlib.PingResult.NotAuthenticated INSTANCE;
+  }
+
+  public static final class PingResult.NotSupported extends org.connectbot.sshlib.PingResult {
+    method public boolean equals(java.lang.Object? other);
+    method public int hashCode();
+    method public java.lang.String toString();
+    field public static final org.connectbot.sshlib.PingResult.NotSupported INSTANCE;
+  }
+
+  public static final class PingResult.Success extends org.connectbot.sshlib.PingResult {
+    ctor public PingResult.Success(long elapsedNs);
+    method public long component1();
+    method public org.connectbot.sshlib.PingResult.Success copy(optional long elapsedNs);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public long getElapsedNs();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public long elapsedNs;
+  }
+
   public interface PortForwarder {
     method public default void close();
     method @InaccessibleFromKotlin public java.lang.String getBoundHost();
@@ -498,6 +537,7 @@ package org.connectbot.sshlib {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort);
     method public suspend java.lang.Object? openSession(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SshSession?>);
     method public suspend java.lang.Object? openSftp(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<? extends org.connectbot.sshlib.SftpClient>>);
+    method public suspend java.lang.Object? ping(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PingResult>);
     method public suspend java.lang.Object? remotePortForward(java.lang.String remoteBindAddress, int remoteBindPort, java.lang.String localHost, int localPort, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.PortForwarder?>);
     property public org.connectbot.sshlib.ConnectionInfo? connectionInfo;
     property public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
@@ -675,6 +715,7 @@ package org.connectbot.sshlib.blocking {
     method public org.connectbot.sshlib.transport.TransportFactory? openDirectTcpipTransport(java.lang.String remoteHost, int remotePort, optional java.lang.String originAddr, optional int originPort);
     method public org.connectbot.sshlib.SshSession? openSession();
     method @kotlin.jvm.Throws(exceptionClasses=SftpException::class) public org.connectbot.sshlib.SftpClient openSftp() throws org.connectbot.sshlib.SftpException;
+    method public org.connectbot.sshlib.PingResult ping();
     method public org.connectbot.sshlib.PortForwarder? remotePortForward(java.lang.String remoteBindAddress, int remoteBindPort, java.lang.String localHost, int localPort);
     property public kotlinx.coroutines.flow.SharedFlow<java.lang.Throwable?> disconnectedFlow;
     property public boolean isAuthenticated;

@@ -27,6 +27,7 @@ import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
+import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
@@ -50,6 +51,7 @@ import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import kotlin.test.assertIs
 
 /**
  * Integration tests for SSH client using testcontainers with real SSH servers.
@@ -164,6 +166,60 @@ class SshClientIntegrationTest {
             client.connect()
         } finally {
             client.disconnect()
+        }
+    }
+
+    @Test
+    fun `ping returns success against real OpenSSH server`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        runBlocking {
+            val client = SshClient(
+                SshClientConfig {
+                    this.host = host
+                    this.port = port
+                    this.hostKeyVerifier = acceptAllVerifier
+                },
+            )
+            try {
+                val connectResult = client.connect()
+                assertIs<ConnectResult.Success>(connectResult)
+
+                val authResult = client.authenticatePassword(USERNAME, PASSWORD)
+                assertIs<AuthResult.Success>(authResult)
+
+                val pingResult = client.ping()
+                assertIs<PingResult.Success>(pingResult)
+                assertTrue(pingResult.elapsedNs > 0, "Elapsed time should be positive")
+            } finally {
+                client.disconnect()
+            }
+        }
+    }
+
+    @Test
+    fun `ping returns NotAuthenticated before authentication against real OpenSSH server`() {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        runBlocking {
+            val client = SshClient(
+                SshClientConfig {
+                    this.host = host
+                    this.port = port
+                    this.hostKeyVerifier = acceptAllVerifier
+                },
+            )
+            try {
+                val connectResult = client.connect()
+                assertIs<ConnectResult.Success>(connectResult)
+
+                val pingResult = client.ping()
+                assertIs<PingResult.NotAuthenticated>(pingResult)
+            } finally {
+                client.disconnect()
+            }
         }
     }
 
@@ -444,7 +500,7 @@ class SshClientIntegrationTest {
                 this.hostKeyVerifier = acceptAllVerifier
                 // Force ssh-rsa only by excluding rsa-sha2 variants
                 this.hostKeyAlgorithms = "ssh-rsa"
-                // Use a KEX algorithm that doesn't include ext-info-c by default
+                // Use a single KEX algorithm; SshConnection appends ext-info-c automatically.
                 this.kexAlgorithms = "diffie-hellman-group14-sha256"
             },
         )

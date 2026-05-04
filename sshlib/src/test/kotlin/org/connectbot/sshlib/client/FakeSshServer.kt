@@ -35,10 +35,14 @@ import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.crypto.X25519ProviderFactory
 import org.connectbot.sshlib.crypto.encodeMpint
 import org.connectbot.sshlib.protocol.SshEnums
+import org.connectbot.sshlib.protocol.SshMsgExtInfo
 import org.connectbot.sshlib.protocol.SshMsgKexEcdhInit
 import org.connectbot.sshlib.protocol.SshMsgKexEcdhReply
 import org.connectbot.sshlib.protocol.SshMsgKexinit
+import org.connectbot.sshlib.protocol.SshMsgPing
+import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
+import org.connectbot.sshlib.protocol.SshMsgUserauthRequest
 import org.connectbot.sshlib.protocol.createAsciiString
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.createNameList
@@ -76,6 +80,13 @@ class FakeSshServer(
 
     private val rekeyRequestChannel = Channel<Unit>(Channel.UNLIMITED)
 
+    var advertisePing: Boolean = false
+    var advertiseExtInfo: Boolean = false
+    var kexAlgorithms: String? = null
+    private val receivedPongs = Channel<ByteArray>(Channel.UNLIMITED)
+    private val receivedExtInfo = Channel<SshMsgExtInfo>(Channel.UNLIMITED)
+    private val receivedUserauthRequests = Channel<SshMsgUserauthRequest>(Channel.UNLIMITED)
+
     fun start() {
         scope.launch(coroutineContext) { serve() }
     }
@@ -109,9 +120,32 @@ class FakeSshServer(
 
         // Initial KEX: reads directly from serverIo (no reader coroutine yet)
         doFullKex(serverIo)
+        sendExtInfo(serverIo)
 
-        // Service request
-        readPacketRaw(serverIo)
+        // After initial KEX, the client MAY send SSH_MSG_EXT_INFO,
+        // followed by a SERVICE_REQUEST (ssh-userauth).
+        var serviceRequest: ByteArray? = null
+        while (serviceRequest == null) {
+            val (msgType, rawBytes) = readPacketWithType(serverIo)
+            when (msgType) {
+                SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
+                    val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                    val extMsg = SshMsgExtInfo(ByteBufferKaitaiStream(bodyBytes))
+                    extMsg._read()
+                    receivedExtInfo.trySend(extMsg)
+                }
+
+                SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST -> {
+                    serviceRequest = rawBytes
+                }
+
+                SshEnums.MessageType.SSH_MSG_DEBUG,
+                SshEnums.MessageType.SSH_MSG_IGNORE,
+                -> { /* skip */ }
+
+                else -> throw IllegalStateException("Unexpected packet during handshake: $msgType")
+            }
+        }
         sendServiceAccept(serverIo)
 
         // After authentication, all packets are routed through this channel by the reader
@@ -121,7 +155,11 @@ class FakeSshServer(
         val readerJob = scope.launch {
             try {
                 while (true) {
-                    incomingPackets.send(readPacketWithType(serverIo))
+                    val packet = readPacketWithType(serverIo)
+                    if (packet.first == SshEnums.MessageType.SSH_MSG_NEWKEYS) {
+                        activateEncryption(serverIo)
+                    }
+                    incomingPackets.send(packet)
                 }
             } catch (_: Exception) {
                 incomingPackets.close()
@@ -144,6 +182,39 @@ class FakeSshServer(
 
                         SshEnums.MessageType.SSH_MSG_DISCONNECT -> return@onReceiveCatching true
 
+                        SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val extMsg = SshMsgExtInfo(ByteBufferKaitaiStream(bodyBytes))
+                            extMsg._read()
+                            receivedExtInfo.trySend(extMsg)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val request = SshMsgUserauthRequest(ByteBufferKaitaiStream(bodyBytes))
+                            request._read()
+                            receivedUserauthRequests.trySend(request)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_PING -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val pingMsg = SshMsgPing(ByteBufferKaitaiStream(bodyBytes))
+                            pingMsg._read()
+                            val pong = SshMsgPong()
+                            pong.setData(createByteString(pingMsg.data().data()))
+                            pong._check()
+                            writeMutex.withLock {
+                                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
+                            }
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_PONG -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val pongMsg = SshMsgPong(ByteBufferKaitaiStream(bodyBytes))
+                            pongMsg._read()
+                            receivedPongs.trySend(pongMsg.data().data())
+                        }
+
                         else -> { /* ignore */ }
                     }
                     false
@@ -161,7 +232,7 @@ class FakeSshServer(
         val clientPublic = parseEcdhInit(ecdhInitRaw)
         sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
         writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
-        readPacketRaw(io) // client NEWKEYS
+        readPacketFiltering(io) // client NEWKEYS
         activateEncryption(io)
     }
 
@@ -189,8 +260,7 @@ class FakeSshServer(
         val clientPublic = parseEcdhInit(ecdhInitRaw)
         sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
         writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
-        packets.receive() // client NEWKEYS
-        activateEncryption(io)
+        packets.receive() // client NEWKEYS (encryption already activated by reader)
         _rekeyCount.update { it + 1 }
     }
 
@@ -204,17 +274,22 @@ class FakeSshServer(
         val clientPublic = parseEcdhInit(ecdhInitRaw)
         sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
         writeMutex.withLock { io.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
-        packets.receive() // client NEWKEYS
-        activateEncryption(io)
+        packets.receive() // client NEWKEYS (encryption already activated by reader)
         _rekeyCount.update { it + 1 }
     }
 
     private suspend fun sendKexInit(io: PacketIO): ByteArray {
         val cookie = ByteArray(16).also { SecureRandom().nextBytes(it) }
 
+        val kexAlgs = kexAlgorithms ?: if (advertiseExtInfo) {
+            "curve25519-sha256,ext-info-s"
+        } else {
+            "curve25519-sha256"
+        }
+
         val kexInit = SshMsgKexinit().apply {
             setCookie(cookie)
-            setKexAlgorithms(createNameList("curve25519-sha256"))
+            setKexAlgorithms(createNameList(kexAlgs))
             setServerHostKeyAlgorithms(createNameList("ssh-ed25519"))
             setEncryptionAlgorithmsClientToServer(createNameList("aes128-ctr"))
             setEncryptionAlgorithmsServerToClient(createNameList("aes128-ctr"))
@@ -366,6 +441,42 @@ class FakeSshServer(
         return out.toByteArray()
     }
 
+    suspend fun sendCustomExtInfo(extensions: Map<String, ByteArray>) {
+        val msg = SshMsgExtInfo()
+        msg.setNumExtensions(extensions.size.toLong())
+        val extList = extensions.map { (name, value) ->
+            SshMsgExtInfo.Extension().apply {
+                set_root(msg)
+                set_parent(msg)
+                setExtensionName(createAsciiString(name))
+                setExtensionValue(createByteString(value))
+                _check()
+            }
+        }
+        msg.setExtensions(ArrayList(extList))
+        msg._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_EXT_INFO.id().toInt(), msg.toByteArray())
+        }
+    }
+
+    private suspend fun sendExtInfo(io: PacketIO) {
+        if (!advertiseExtInfo || !advertisePing) return
+        val msg = SshMsgExtInfo()
+        msg.setNumExtensions(1L)
+        val ext = SshMsgExtInfo.Extension()
+        ext.set_root(msg)
+        ext.set_parent(msg)
+        ext.setExtensionName(createAsciiString("ping@openssh.com"))
+        ext.setExtensionValue(createByteString("0".toByteArray(Charsets.US_ASCII)))
+        ext._check()
+        msg.setExtensions(arrayListOf(ext))
+        msg._check()
+        writeMutex.withLock {
+            io.writePacket(SshEnums.MessageType.SSH_MSG_EXT_INFO.id().toInt(), msg.toByteArray())
+        }
+    }
+
     private suspend fun sendServiceAccept(io: PacketIO) {
         val msg = SshMsgServiceAccept().apply {
             setServiceName(createAsciiString("ssh-userauth"))
@@ -377,6 +488,28 @@ class FakeSshServer(
     private suspend fun readPacketRaw(io: PacketIO): ByteArray {
         val packet = io.readPacket()
         return byteArrayOf(packet.messageType().id().toByte()) + packet._raw_body()
+    }
+
+    private suspend fun readPacketFiltering(io: PacketIO): Pair<SshEnums.MessageType, ByteArray> {
+        while (true) {
+            val packet = io.readPacket()
+            val msgType = packet.messageType()
+            val rawBytes = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
+            when (msgType) {
+                SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
+                    val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                    val extMsg = SshMsgExtInfo(ByteBufferKaitaiStream(bodyBytes))
+                    extMsg._read()
+                    receivedExtInfo.trySend(extMsg)
+                }
+
+                SshEnums.MessageType.SSH_MSG_DEBUG,
+                SshEnums.MessageType.SSH_MSG_IGNORE,
+                -> { /* skip */ }
+
+                else -> return msgType to rawBytes
+            }
+        }
     }
 
     private suspend fun readPacketWithType(io: PacketIO): Pair<SshEnums.MessageType, ByteArray> {
@@ -393,4 +526,21 @@ class FakeSshServer(
         msg._read()
         return msg.qC().data()
     }
+
+    fun sendServerPing(data: ByteArray) {
+        scope.launch(coroutineContext) {
+            val ping = SshMsgPing()
+            ping.setData(createByteString(data))
+            ping._check()
+            writeMutex.withLock {
+                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_PING.id().toInt(), ping.toByteArray())
+            }
+        }
+    }
+
+    suspend fun awaitPong(): ByteArray = receivedPongs.receive()
+
+    suspend fun awaitExtInfo(): SshMsgExtInfo = receivedExtInfo.receive()
+
+    suspend fun awaitUserauthRequest(): SshMsgUserauthRequest = receivedUserauthRequests.receive()
 }
