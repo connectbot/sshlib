@@ -20,6 +20,8 @@ that runs in reaction to state changes.
   4419, 5656, 8308, 8709, 8731, 9142)
 - **Channel I/O**: Interactive shells with PTY, stdout/stderr streams, flow
   control
+- **SFTP**: File transfer with full read/write/stat/directory operations
+  ([draft-ietf-secsh-filexfer](https://datatracker.ietf.org/doc/html/draft-ietf-secsh-filexfer))
 - **Port Forwarding**: Local, remote, and dynamic (SOCKS5) port forwarding
 - **Agent Forwarding**: Forward SSH agent requests with session binding support
 - **Transport**: Pluggable transport layer (TCP via Ktor, or custom)
@@ -122,6 +124,31 @@ session.close()
 client.disconnect()
 ```
 
+### SFTP File Transfer
+
+```kotlin
+val sftp = when (val result = client.openSftp()) {
+    is SftpResult.Success -> result.value
+    else -> error("Failed to open SFTP: $result")
+}
+
+try {
+    // List a directory
+    when (val result = sftp.listdir("/home/user")) {
+        is SftpResult.Success -> result.value.forEach { println(it.filename) }
+        is SftpResult.ServerError -> println("Server error: ${result.message}")
+        else -> println("Error: $result")
+    }
+
+    // Read a file
+    val handle = sftp.open("/home/user/file.txt", setOf(SftpOpenFlag.READ)).getOrThrow()
+    val data = sftp.read(handle, 0L, 4096).getOrThrow()
+    sftp.close(handle)
+} finally {
+    sftp.close()
+}
+```
+
 ### SSH Agent Forwarding
 
 Enable SSH agent forwarding to allow remote servers to use your keys:
@@ -175,7 +202,6 @@ Run integration tests with: `./gradlew :sshlib:test` (requires Docker).
 
 ## Current Limitations
 
-- No SFTP
 - Client-only (no server implementation)
 
 ## License
