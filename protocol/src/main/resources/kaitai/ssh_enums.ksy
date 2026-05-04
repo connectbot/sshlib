@@ -72,6 +72,8 @@ enums:
     98: ssh_msg_channel_request
     99: ssh_msg_channel_success
     100: ssh_msg_channel_failure
+    192: ssh_msg_ping
+    193: ssh_msg_pong
   global_request_type:
     0: empty_response
     1: tcpip_forward

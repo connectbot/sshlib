@@ -26,6 +26,7 @@ import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
+import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.PortForwarder
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpException
@@ -246,6 +247,11 @@ class BlockingSshClient internal constructor(
      */
     @Throws(SftpException::class)
     fun openSftp(): SftpClient = runBlocking { client.openSftp().getOrThrow() }
+
+    /**
+     * Send an SSH ping to the server and return the result.
+     */
+    fun ping(): PingResult = runBlocking { client.ping() }
 
     /**
      * Start local port forwarding.

@@ -27,6 +27,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
@@ -49,6 +50,7 @@ import org.connectbot.sshlib.ConnectResult
 import org.connectbot.sshlib.ConnectionInfo
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
+import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.crypto.CipherEntry
@@ -100,6 +102,8 @@ import org.connectbot.sshlib.protocol.SshMsgKexEcdhReply
 import org.connectbot.sshlib.protocol.SshMsgKexdhInit
 import org.connectbot.sshlib.protocol.SshMsgKexdhReply
 import org.connectbot.sshlib.protocol.SshMsgKexinit
+import org.connectbot.sshlib.protocol.SshMsgPing
+import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
 import org.connectbot.sshlib.protocol.SshMsgServiceRequest
 import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
@@ -126,9 +130,11 @@ import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
+import java.nio.ByteBuffer
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import org.connectbot.sshlib.AuthResult as PublicAuthResult
 
@@ -146,7 +152,7 @@ class SshConnection(
     private val transport: Transport,
     private val clientVersion: String = "SSH-2.0-CBSSH_1.0",
     private val hostKeyVerifier: HostKeyVerifier,
-    private val kexAlgorithms: String = KexEntry.defaultString,
+    kexAlgorithms: String = KexEntry.defaultString,
     private val hostKeyAlgorithms: String = SignatureEntry.defaultString,
     private val encryptionAlgorithms: String = CipherEntry.defaultString,
     private val macAlgorithms: String = MacEntry.defaultString,
@@ -159,7 +165,25 @@ class SshConnection(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
+
+        private fun stripExtInfoC(kexAlgorithms: String): String = kexAlgorithms.split(",")
+            .filter { it.isNotEmpty() && it != "ext-info-c" }
+            .joinToString(",")
+
+        private fun appendExtInfoC(kexAlgorithms: String): String {
+            val algorithms = kexAlgorithms.split(",").filter { it.isNotEmpty() }
+            return if ("ext-info-c" in algorithms) {
+                kexAlgorithms
+            } else {
+                (algorithms + "ext-info-c").joinToString(",")
+            }
+        }
+
+        private fun parseNameList(nameList: String): List<String> = nameList.split(",").filter { it.isNotEmpty() }
     }
+
+    private val kexAlgorithms: String = stripExtInfoC(kexAlgorithms)
+    private val initialKexAlgorithms: String = appendExtInfoC(this.kexAlgorithms)
 
     private val stateMachineDispatcher = coroutineDispatcher.limitedParallelism(1, "StateMachine")
 
@@ -183,6 +207,7 @@ class SshConnection(
         override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
         override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
         override suspend fun activateEncryption() = this@SshConnection.activateEncryption()
+        override suspend fun sendClientExtInfo() = this@SshConnection.sendClientExtInfo()
         override suspend fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
         override fun receiveServiceAccept(service: String) = this@SshConnection.receiveServiceAccept(service)
         override fun startAuthentication() = this@SshConnection.startAuthentication()
@@ -205,7 +230,7 @@ class SshConnection(
     }
 
     private val stateMachine = SshClientStateMachine(callbacks)
-    private val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
+    internal val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
     private val writeMutex = Mutex()
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
@@ -230,6 +255,9 @@ class SshConnection(
     private var negotiatedCompressionC2S: String? = null
     private var negotiatedCompressionS2C: String? = null
     private var strictKexEnabled: Boolean = false
+    private var serverAdvertisesExtInfo: Boolean = false
+    private var serverExtInfoReceivedCount: Int = 0
+    private var clientExtInfoSent: Boolean = false
 
     private var nextLocalChannelNumber = 0
     private val channelNumberLock = Mutex()
@@ -242,8 +270,20 @@ class SshConnection(
 
     private var agentProvider: AgentProvider? = null
     private var serverHostKeyBlob: ByteArray? = null
-    private var serverAdvertisesHostBound: Boolean = false
-    private var serverSigAlgs: Set<String>? = null
+
+    @Volatile private var serverAdvertisesHostBound: Boolean = false
+
+    @Volatile private var serverSigAlgs: Set<String>? = null
+
+    @Volatile internal var serverSupportsPing: Boolean = false
+    private val pingSequence = AtomicLong(0)
+    private data class PendingPing(
+        val deferred: CompletableDeferred<PingResult>,
+        val payload: ByteArray,
+        val sentTimeNs: Long? = null,
+    )
+    private val pendingPings = HashMap<Long, PendingPing>()
+    private val pendingPingQueue = ArrayDeque<suspend () -> Unit>()
 
     /**
      * Helper to manage a pending asynchronous operation that waits for a server response.
@@ -323,7 +363,7 @@ class SshConnection(
 
     private var packetLoopJob: Job? = null
 
-    @Volatile private var isRekeying = false
+    @Volatile internal var isRekeying = false
 
     private var rekeyTimerJob: Job? = null
 
@@ -962,6 +1002,7 @@ class SshConnection(
 
     private suspend fun sendKexInit() {
         logger.debug("Sending KEX_INIT")
+        val localKexAlgorithms = if (isRekeying) kexAlgorithms else initialKexAlgorithms
 
         val kexInit = SshMsgKexinit().apply {
             // Cookie (16 random bytes)
@@ -970,7 +1011,7 @@ class SshConnection(
             }
             setCookie(cookie)
 
-            setKexAlgorithms(createNameList(kexAlgorithms))
+            setKexAlgorithms(createNameList(localKexAlgorithms))
             setServerHostKeyAlgorithms(createNameList(hostKeyAlgorithms))
             setEncryptionAlgorithmsClientToServer(createNameList(encryptionAlgorithms))
             setEncryptionAlgorithmsServerToClient(createNameList(encryptionAlgorithms))
@@ -1013,16 +1054,25 @@ class SshConnection(
         logger.debug("  Server compression c->s: $serverCompC2S")
         logger.debug("  Server compression s->c: $serverCompS2C")
 
-        val clientKexStrict = kexAlgorithms.contains("kex-strict-c-v00@openssh.com")
-        val serverKexStrict = serverKexAlgs.contains("kex-strict-s-v00@openssh.com")
+        val localKexAlgorithms = if (isRekeying) kexAlgorithms else initialKexAlgorithms
+        val clientKexList = parseNameList(localKexAlgorithms)
+        val serverKexList = serverKexAlgs.filter { it.isNotEmpty() }
+        val clientKexStrict = "kex-strict-c-v00@openssh.com" in clientKexList
+        val serverKexStrict = "kex-strict-s-v00@openssh.com" in serverKexList
         strictKexEnabled = clientKexStrict && serverKexStrict
         if (strictKexEnabled) {
             logger.info("  Strict KEX enabled")
         }
 
-        val clientKexList = kexAlgorithms.split(",")
-        negotiatedKex = clientKexList.firstOrNull { it in serverKexAlgs }
-            ?: throw SshException("No matching KEX algorithm. Client: $kexAlgorithms, Server: $serverKexAlgs")
+        if (!isRekeying) {
+            serverAdvertisesExtInfo = "ext-info-s" in serverKexList
+            if (serverAdvertisesExtInfo) {
+                logger.info("  Server advertises EXT_INFO support")
+            }
+        }
+
+        negotiatedKex = clientKexList.firstOrNull { it in serverKexList }
+            ?: throw SshException("No matching KEX algorithm. Client: $localKexAlgorithms, Server: $serverKexAlgs")
         logger.info("  Negotiated KEX: $negotiatedKex")
 
         val clientHostKeyList = hostKeyAlgorithms.split(",")
@@ -1140,9 +1190,17 @@ class SshConnection(
 
     private fun rekeyComplete() {
         logger.info("Re-key complete")
-        isRekeying = false
         packetIO.resetByteCounters()
-        startRekeyTimer()
+        connectionScope.launch {
+            withContext(stateMachineDispatcher) {
+                while (pendingPingQueue.isNotEmpty()) {
+                    val action = pendingPingQueue.removeFirst()
+                    action()
+                }
+                isRekeying = false
+                startRekeyTimer()
+            }
+        }
     }
 
     private fun startRekeyTimer() {
@@ -1281,6 +1339,84 @@ class SshConnection(
             packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
             if (strictKexEnabled) {
                 packetIO.resetSendSequenceNumber()
+            }
+        }
+    }
+
+    private suspend fun sendClientExtInfo() {
+        if (clientExtInfoSent) {
+            logger.info("Skipping client SSH_MSG_EXT_INFO; already sent during initial key exchange")
+            return
+        }
+        if (isRekeying) {
+            logger.info("Skipping client SSH_MSG_EXT_INFO during re-key")
+            return
+        }
+        if (!serverAdvertisesExtInfo) {
+            logger.info("Skipping client SSH_MSG_EXT_INFO; server did not advertise ext-info-s")
+            return
+        }
+        logger.info("Sending client SSH_MSG_EXT_INFO")
+        val msg = SshMsgExtInfo()
+        val extensions = listOf(
+            "ext-info-in-auth@openssh.com",
+        )
+        msg.setNumExtensions(extensions.size.toLong())
+        msg.setExtensions(
+            extensions.mapTo(ArrayList()) { name ->
+                SshMsgExtInfo.Extension().apply {
+                    set_root(msg)
+                    set_parent(msg)
+                    setExtensionName(createAsciiString(name))
+                    setExtensionValue(createByteString("0".toByteArray(Charsets.US_ASCII)))
+                    _check()
+                }
+            },
+        )
+        msg._check()
+        writePacket(SshEnums.MessageType.SSH_MSG_EXT_INFO.id().toInt(), msg.toByteArray())
+        clientExtInfoSent = true
+    }
+
+    private fun processServerExtInfo(extInfo: SshMsgExtInfo) {
+        if (!serverAdvertisesExtInfo) {
+            logger.warn("Ignoring SSH_MSG_EXT_INFO because server did not advertise ext-info-s")
+            return
+        }
+        if (serverExtInfoReceivedCount >= 2) {
+            logger.warn("Ignoring unexpected extra SSH_MSG_EXT_INFO from server")
+            return
+        }
+        val initialExtInfo = serverExtInfoReceivedCount == 0
+        serverExtInfoReceivedCount++
+
+        if (initialExtInfo) {
+            serverAdvertisesHostBound = false
+            serverSigAlgs = null
+            serverSupportsPing = false
+        }
+
+        for (ext in extInfo.extensions()) {
+            when (ext.extensionName().value()) {
+                "publickey-hostbound@openssh.com" -> {
+                    if (initialExtInfo) {
+                        serverAdvertisesHostBound = true
+                        logger.info("Server advertises publickey-hostbound@openssh.com")
+                    }
+                }
+
+                "server-sig-algs" -> {
+                    val algs = String(ext.extensionValue().data(), Charsets.UTF_8)
+                    serverSigAlgs = algs.split(",").filter { it.isNotEmpty() }.toSet()
+                    logger.info("Server advertises server-sig-algs: $algs")
+                }
+
+                "ping@openssh.com" -> {
+                    if (initialExtInfo) {
+                        serverSupportsPing = true
+                        logger.info("Server advertises ping@openssh.com")
+                    }
+                }
             }
         }
     }
@@ -1671,10 +1807,20 @@ class SshConnection(
     }
 
     suspend fun close() {
-        connectionScope.cancel()
         transport.close()
+        connectionScope.cancel()
         packetLoopJob?.join()
         packetLoopJob = null
+
+        withContext(stateMachineDispatcher) {
+            val error = Exception("Connection closed")
+            for ((_, pending) in pendingPings) {
+                pending.deferred.complete(PingResult.Failure(error))
+            }
+            pendingPings.clear()
+            pendingPingQueue.clear()
+        }
+
         sessionId?.fill(0)
         sessionId = null
     }
@@ -2155,20 +2301,51 @@ class SshConnection(
                 }
 
                 SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
-                    val extInfo = parseBody<SshMsgExtInfo>(packet)
-                    for (ext in extInfo.extensions()) {
-                        when (ext.extensionName().value()) {
-                            "publickey-hostbound@openssh.com" -> {
-                                serverAdvertisesHostBound = true
-                                logger.info("Server advertises publickey-hostbound@openssh.com")
-                            }
+                    processServerExtInfo(parseBody(packet))
+                }
 
-                            "server-sig-algs" -> {
-                                val algs = String(ext.extensionValue().data(), Charsets.UTF_8)
-                                serverSigAlgs = algs.split(",").filter { it.isNotEmpty() }.toSet()
-                                logger.info("Server advertises server-sig-algs: $algs")
+                SshEnums.MessageType.SSH_MSG_PING -> {
+                    val msg = parseBody<SshMsgPing>(packet)
+                    val pongSend: suspend () -> Unit = {
+                        val pong = SshMsgPong()
+                        pong.setData(createByteString(msg.data().data()))
+                        pong._check()
+                        writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
+                    }
+                    val sendNow = withContext(stateMachineDispatcher) {
+                        if (isRekeying) {
+                            pendingPingQueue.addLast(pongSend)
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    if (sendNow) {
+                        pongSend()
+                    }
+                }
+
+                SshEnums.MessageType.SSH_MSG_PONG -> {
+                    val msg = parseBody<SshMsgPong>(packet)
+                    val seqBytes = msg.data().data()
+                    if (seqBytes.size == 8) {
+                        val seq = ByteBuffer.wrap(seqBytes).getLong()
+                        withContext(stateMachineDispatcher) {
+                            val pending = pendingPings.remove(seq)
+                            if (pending != null) {
+                                val sentTimeNs = pending.sentTimeNs
+                                if (sentTimeNs != null) {
+                                    pending.deferred.complete(PingResult.Success(System.nanoTime() - sentTimeNs))
+                                } else {
+                                    pendingPings[seq] = pending
+                                    logger.warn("Received SSH_MSG_PONG before ping send timestamp was recorded: $seq")
+                                }
+                            } else {
+                                logger.warn("Received SSH_MSG_PONG with unknown sequence: $seq")
                             }
                         }
+                    } else {
+                        logger.warn("Received SSH_MSG_PONG with unexpected data length: ${seqBytes.size}")
                     }
                 }
 
@@ -2350,6 +2527,12 @@ class SshConnection(
                         pending.deferred.completeExceptionally(loopError)
                     }
                     pendingChannelOpens.clear()
+
+                    for ((_, pending) in pendingPings) {
+                        pending.deferred.complete(PingResult.Failure(loopError))
+                    }
+                    pendingPings.clear()
+                    pendingPingQueue.clear()
                 }
                 if (loopException != null) {
                     _disconnectedFlow.tryEmit(loopException)
@@ -2480,6 +2663,56 @@ class SshConnection(
             SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(),
             msg.toByteArray(),
         )
+    }
+
+    internal suspend fun ping(): PingResult {
+        if (!serverSupportsPing) return PingResult.NotSupported
+
+        val seq = pingSequence.getAndIncrement()
+        val data = ByteBuffer.allocate(8).putLong(seq).array()
+        val deferred = CompletableDeferred<PingResult>()
+
+        val send: suspend () -> Unit = {
+            try {
+                writeMutex.withLock {
+                    val current = pendingPings[seq] ?: return@withLock
+                    val ping = SshMsgPing()
+                    ping.setData(createByteString(current.payload))
+                    ping._check()
+
+                    val sentTimeNs = System.nanoTime()
+                    pendingPings[seq] = current.copy(sentTimeNs = sentTimeNs)
+                    packetIO.writePacket(SshEnums.MessageType.SSH_MSG_PING.id().toInt(), ping.toByteArray())
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                withContext(stateMachineDispatcher) {
+                    if (pendingPings.remove(seq) != null) {
+                        deferred.complete(PingResult.Failure(e))
+                    }
+                }
+            }
+        }
+
+        withContext(stateMachineDispatcher) {
+            pendingPings[seq] = PendingPing(deferred, data)
+            if (isRekeying) {
+                pendingPingQueue.addLast(send)
+            } else {
+                send()
+            }
+        }
+
+        return try {
+            deferred.await()
+        } finally {
+            withContext(NonCancellable) {
+                withContext(stateMachineDispatcher) {
+                    pendingPings.remove(seq)
+                }
+            }
+        }
     }
 
     internal val connectionInfo: ConnectionInfo?

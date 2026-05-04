@@ -271,6 +271,7 @@ internal class SshClientStateMachine(
                 onTriggered {
                     callbacks.receiveNewKeys()
                     callbacks.activateEncryption()
+                    callbacks.sendClientExtInfo()
                     callbacks.sendServiceRequest("ssh-userauth")
                 }
             }
@@ -351,6 +352,7 @@ internal interface SshClientCallbacks {
     suspend fun sendNewKeys()
     fun receiveNewKeys()
     suspend fun activateEncryption()
+    suspend fun sendClientExtInfo()
     suspend fun sendServiceRequest(service: String)
     fun receiveServiceAccept(service: String)
     fun startAuthentication()
