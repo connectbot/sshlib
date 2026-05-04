@@ -17,6 +17,7 @@
 package org.connectbot.sshlib
 
 import kotlinx.coroutines.test.runTest
+import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.transport.TransportFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -57,6 +58,13 @@ class SshClientTest {
             prompts: List<KeyboardInteractiveCallback.Prompt>,
         ): List<String>? = emptyList()
         override suspend fun onPasswordNeeded(): String? = null
+    }
+
+    @Test
+    fun `AuthPublicKey equals and hashCode`() {
+        EqualsVerifier.forClass(AuthPublicKey::class.java)
+            .withPrefabValues(ByteArray::class.java, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+            .verify()
     }
 
     @Test
