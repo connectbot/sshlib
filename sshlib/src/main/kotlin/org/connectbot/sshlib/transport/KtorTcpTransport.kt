@@ -70,6 +70,12 @@ class KtorTcpTransport internal constructor(
         get() = socket?.isClosed == false
 
     /**
+     * Local TCP address assigned to the connected socket, or `null` before
+     * connection, after close, or when the injected socket does not expose it.
+     */
+    fun getLocalAddress(): java.net.InetSocketAddress? = (socket as? LocalAddressProvider)?.localAddress
+
+    /**
      * Connect to the remote host.
      * Must be called before any read/write operations.
      */

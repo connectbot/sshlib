@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.net.InetAddress
+import java.net.InetSocketAddress as JavaInetSocketAddress
 
 /**
  * Resolves hostnames to IP addresses.
@@ -43,6 +44,10 @@ interface TransportSocket : Closeable {
     val isClosed: Boolean
     fun openReadChannel(): ByteReadChannel
     fun openWriteChannel(autoFlush: Boolean = false): ByteWriteChannel
+}
+
+internal interface LocalAddressProvider {
+    val localAddress: JavaInetSocketAddress?
 }
 
 /**
@@ -68,9 +73,14 @@ internal class KtorTcpSocketFactory(
     }
 }
 
-private class KtorTransportSocket(private val socket: Socket) : TransportSocket {
+private class KtorTransportSocket(private val socket: Socket) :
+    TransportSocket,
+    LocalAddressProvider {
     override val isClosed: Boolean
         get() = socket.isClosed
+
+    override val localAddress: JavaInetSocketAddress?
+        get() = (socket.localAddress as? InetSocketAddress)?.toJavaInetSocketAddress()
 
     override fun openReadChannel(): ByteReadChannel = socket.openReadChannel()
 
@@ -79,4 +89,10 @@ private class KtorTransportSocket(private val socket: Socket) : TransportSocket 
     override fun close() {
         socket.close()
     }
+}
+
+private fun InetSocketAddress.toJavaInetSocketAddress(): JavaInetSocketAddress = runCatching {
+    JavaInetSocketAddress(InetAddress.getByAddress(hostname, resolveAddress()), port)
+}.getOrElse {
+    JavaInetSocketAddress.createUnresolved(hostname, port)
 }
