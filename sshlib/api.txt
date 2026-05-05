@@ -791,6 +791,7 @@ package org.connectbot.sshlib.transport {
     ctor public KtorTcpTransport(java.lang.String host, optional int port, optional org.connectbot.sshlib.transport.IpVersion ipVersion);
     method public suspend java.lang.Object? close(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? connect(kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public java.net.InetSocketAddress? getLocalAddress();
     method @InaccessibleFromKotlin public boolean isConnected();
     method public suspend java.lang.Object? read(int count, kotlin.coroutines.Continuation<? super byte[]>);
     method public suspend java.lang.Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);

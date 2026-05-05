@@ -24,8 +24,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -45,6 +47,27 @@ class KtorTcpTransportTest {
         assertTrue(transport.isConnected)
         assertEquals(1, factory.connectionAttempts.size)
         assertEquals(addr, factory.connectionAttempts[0])
+    }
+
+    @Test
+    fun `local address is exposed for connected socket`() = runTest {
+        val addr = InetAddress.getByName("127.0.0.1")
+        val localAddress = InetSocketAddress(InetAddress.getByName("192.0.2.10"), 54321)
+        val socket = MockSocket(localAddress)
+
+        val resolver = MockAddressResolver(mapOf("example.com" to listOf(addr)))
+        val factory = MockTcpSocketFactory(mapOf(addr to { socket }))
+
+        val transport = KtorTcpTransport("example.com", 22, resolver, factory)
+
+        assertNull(transport.getLocalAddress())
+        transport.connect()
+
+        assertEquals(localAddress, transport.getLocalAddress())
+
+        transport.close()
+
+        assertNull(transport.getLocalAddress())
     }
 
     @Test
@@ -266,7 +289,10 @@ class MockTcpSocketFactory(
     }
 }
 
-class MockSocket : TransportSocket {
+class MockSocket(
+    override val localAddress: InetSocketAddress? = null,
+) : TransportSocket,
+    LocalAddressProvider {
     private var closed = false
 
     override fun close() {
