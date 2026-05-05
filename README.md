@@ -1,7 +1,4 @@
-# ConnectBot SSH Client Library *(IN PROGRESS)*
-
-*This is currently a work-in-progress and not meant to be used for
-production.*
+# ConnectBot SSH Client Library
 
 This is ConnectBot SSH library built with Kotlin. Internally it uses coroutines,
 protocol definition files, and a state machine to run the SSH protocol. It
