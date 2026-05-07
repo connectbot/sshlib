@@ -39,6 +39,30 @@ internal class JavaMlKemProvider : MlKemProvider {
             0x03, 0x82.toByte(), 0x04, 0xa1.toByte(), // BIT STRING
             0x00, // no unused bits
         )
+
+        internal fun extractRawMlKemPublicKey(x509Encoded: ByteArray): ByteArray {
+            if (x509Encoded.size < X509_PREFIX.size) throw IOException("X.509 encoded ML-KEM public key too short")
+            if (x509Encoded[0] != 0x30.toByte()) throw IOException("Invalid X.509 encoding: expected SEQUENCE tag")
+            if (x509Encoded[17] != 0x03.toByte()) throw IOException("Invalid X.509 encoding: BIT STRING not found")
+            if (x509Encoded[21] != 0x00.toByte()) throw IOException("Invalid X.509 encoding: unexpected unused bits")
+            if (x509Encoded.size < X509_PREFIX.size + MLKEM768_PUBLIC_KEY_SIZE) {
+                throw IOException("X.509 encoded ML-KEM public key missing raw key bytes")
+            }
+
+            val rawKey = ByteArray(MLKEM768_PUBLIC_KEY_SIZE)
+            System.arraycopy(x509Encoded, X509_PREFIX.size, rawKey, 0, MLKEM768_PUBLIC_KEY_SIZE)
+            return rawKey
+        }
+
+        internal fun wrapRawMlKemPublicKey(rawKey: ByteArray): ByteArray {
+            if (rawKey.size != MLKEM768_PUBLIC_KEY_SIZE) {
+                throw IOException("Invalid raw ML-KEM public key size: ${rawKey.size}")
+            }
+            val x509 = ByteArray(X509_PREFIX.size + MLKEM768_PUBLIC_KEY_SIZE)
+            System.arraycopy(X509_PREFIX, 0, x509, 0, X509_PREFIX.size)
+            System.arraycopy(rawKey, 0, x509, X509_PREFIX.size, MLKEM768_PUBLIC_KEY_SIZE)
+            return x509
+        }
     }
 
     private val kemInstance: Any
@@ -113,26 +137,5 @@ internal class JavaMlKemProvider : MlKemProvider {
         } catch (e: Exception) {
             throw IOException("ML-KEM decapsulation failed", e)
         }
-    }
-
-    private fun extractRawMlKemPublicKey(x509Encoded: ByteArray): ByteArray {
-        if (x509Encoded.size < 22) throw IOException("X.509 encoded ML-KEM public key too short")
-        if (x509Encoded[0] != 0x30.toByte()) throw IOException("Invalid X.509 encoding: expected SEQUENCE tag")
-        if (x509Encoded[17] != 0x03.toByte()) throw IOException("Invalid X.509 encoding: BIT STRING not found")
-        if (x509Encoded[21] != 0x00.toByte()) throw IOException("Invalid X.509 encoding: unexpected unused bits")
-
-        val rawKey = ByteArray(MLKEM768_PUBLIC_KEY_SIZE)
-        System.arraycopy(x509Encoded, 22, rawKey, 0, MLKEM768_PUBLIC_KEY_SIZE)
-        return rawKey
-    }
-
-    private fun wrapRawMlKemPublicKey(rawKey: ByteArray): ByteArray {
-        if (rawKey.size != MLKEM768_PUBLIC_KEY_SIZE) {
-            throw IOException("Invalid raw ML-KEM public key size: ${rawKey.size}")
-        }
-        val x509 = ByteArray(X509_PREFIX.size + MLKEM768_PUBLIC_KEY_SIZE)
-        System.arraycopy(X509_PREFIX, 0, x509, 0, X509_PREFIX.size)
-        System.arraycopy(rawKey, 0, x509, X509_PREFIX.size, MLKEM768_PUBLIC_KEY_SIZE)
-        return x509
     }
 }
