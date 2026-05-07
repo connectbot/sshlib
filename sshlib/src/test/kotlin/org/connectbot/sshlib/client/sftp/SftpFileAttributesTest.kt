@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.text.Charsets.UTF_8
 
 class SftpFileAttributesTest {
 
@@ -173,6 +174,30 @@ class SftpFileAttributesTest {
     }
 
     @Test
+    fun `decode skips extended attributes and consumes only their bytes`() {
+        val buf = ByteBuffer.allocate(128)
+        buf.putInt(0x80000001.toInt())
+        buf.putLong(1234L)
+        buf.putInt(2)
+        buf.putSftpString("vendor@example.com")
+        buf.putSftpString("alpha")
+        buf.putSftpString("mtime64")
+        buf.putSftpString("beta")
+        buf.flip()
+        val expectedEnd = buf.limit()
+
+        val attrs = SftpFileAttributes.decode(buf)
+
+        assertEquals(1234L, attrs.size)
+        assertNull(attrs.uid)
+        assertNull(attrs.gid)
+        assertNull(attrs.permissions)
+        assertNull(attrs.atime)
+        assertNull(attrs.mtime)
+        assertEquals(expectedEnd, buf.position())
+    }
+
+    @Test
     fun `encoded size for all fields is correct`() {
         val attrs = SftpAttributes(
             size = 1L,
@@ -185,5 +210,11 @@ class SftpFileAttributesTest {
         val encoded = SftpFileAttributes.encode(attrs)
         // flags(4) + size(8) + uid+gid(8) + permissions(4) + atime+mtime(8) = 32
         assertEquals(32, encoded.size)
+    }
+
+    private fun ByteBuffer.putSftpString(value: String) {
+        val bytes = value.toByteArray(UTF_8)
+        putInt(bytes.size)
+        put(bytes)
     }
 }
