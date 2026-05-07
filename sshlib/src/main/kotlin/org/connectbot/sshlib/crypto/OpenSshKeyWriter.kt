@@ -22,6 +22,7 @@ import java.security.KeyPair
 import java.security.SecureRandom
 import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
+import java.security.interfaces.EdECPrivateKey
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
 
@@ -144,7 +145,7 @@ internal object OpenSshKeyWriter {
     private fun extractEd25519Seed(keyPair: KeyPair): ByteArray {
         val privKey = keyPair.private
         return when {
-            privKey is java.security.interfaces.EdECPrivateKey -> {
+            privKey is EdECPrivateKey -> {
                 privKey.bytes.orElseThrow { SshException("Cannot extract Ed25519 seed") }
             }
 

@@ -20,8 +20,10 @@ import java.io.IOException
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.PrivateKey
+import java.security.PublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
+import javax.crypto.SecretKey
 
 /**
  * ML-KEM provider using Java 23+ native javax.crypto.KEM API via reflection.
@@ -99,7 +101,7 @@ internal class JavaMlKemProvider : MlKemProvider {
             val pubKey = kf.generatePublic(X509EncodedKeySpec(x509Encoded))
 
             val kemClass = Class.forName("javax.crypto.KEM")
-            val newEncapsulator = kemClass.getMethod("newEncapsulator", java.security.PublicKey::class.java)
+            val newEncapsulator = kemClass.getMethod("newEncapsulator", PublicKey::class.java)
             val encapsulator = newEncapsulator.invoke(kemInstance, pubKey)
 
             val encapsulatorClass = Class.forName("javax.crypto.KEM\$Encapsulator")
@@ -111,7 +113,7 @@ internal class JavaMlKemProvider : MlKemProvider {
             val ciphertext = encapsulationMethod.invoke(encapsulated) as ByteArray
 
             val keyMethod = encapsulatedClass.getMethod("key")
-            val secretKey = keyMethod.invoke(encapsulated) as javax.crypto.SecretKey
+            val secretKey = keyMethod.invoke(encapsulated) as SecretKey
             val sharedSecret = secretKey.encoded
 
             return MlKemEncapsulationResult(ciphertext, sharedSecret)
@@ -131,7 +133,7 @@ internal class JavaMlKemProvider : MlKemProvider {
 
             val decapsulatorClass = Class.forName("javax.crypto.KEM\$Decapsulator")
             val decapsulateMethod = decapsulatorClass.getMethod("decapsulate", ByteArray::class.java)
-            val secretKey = decapsulateMethod.invoke(decapsulator, ciphertext) as javax.crypto.SecretKey
+            val secretKey = decapsulateMethod.invoke(decapsulator, ciphertext) as SecretKey
 
             return secretKey.encoded
         } catch (e: Exception) {

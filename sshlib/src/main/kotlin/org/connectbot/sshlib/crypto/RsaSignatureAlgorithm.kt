@@ -22,6 +22,7 @@ import org.connectbot.sshlib.protocol.SshRsaSignatureBlob
 import org.connectbot.sshlib.protocol.SshSignature
 import java.math.BigInteger
 import java.security.KeyFactory
+import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.RSAPublicKeySpec
 
@@ -42,7 +43,7 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
         return verifier.verify(sigBlob.signature().data())
     }
 
-    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+    override fun sign(algorithmName: String, privateKey: PrivateKey, data: ByteArray): ByteArray {
         val jcaAlgorithm = toJcaAlgorithm(algorithmName)
 
         val signer = Signature.getInstance(jcaAlgorithm)

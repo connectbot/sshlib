@@ -36,6 +36,7 @@ import org.connectbot.sshlib.crypto.X25519ProviderFactory
 import org.connectbot.sshlib.crypto.encodeMpint
 import org.connectbot.sshlib.protocol.SshEnums
 import org.connectbot.sshlib.protocol.SshMsgExtInfo
+import org.connectbot.sshlib.protocol.SshMsgIgnore
 import org.connectbot.sshlib.protocol.SshMsgKexEcdhInit
 import org.connectbot.sshlib.protocol.SshMsgKexEcdhReply
 import org.connectbot.sshlib.protocol.SshMsgKexinit
@@ -49,12 +50,14 @@ import org.connectbot.sshlib.protocol.createNameList
 import org.connectbot.sshlib.protocol.toByteArray
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.PipedTransport
+import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.security.Signature
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -101,7 +104,7 @@ class FakeSshServer(
 
     fun sendIgnore() {
         scope.launch(coroutineContext) {
-            val msg = org.connectbot.sshlib.protocol.SshMsgIgnore().apply {
+            val msg = SshMsgIgnore().apply {
                 setData(createByteString(byteArrayOf()))
                 _check()
             }
@@ -404,7 +407,7 @@ class FakeSshServer(
         sharedSecret: ByteArray,
     ): ByteArray {
         val md = MessageDigest.getInstance("SHA-256")
-        val buf = java.io.ByteArrayOutputStream()
+        val buf = ByteArrayOutputStream()
 
         fun writeString(data: ByteArray) {
             val len = data.size
@@ -425,7 +428,7 @@ class FakeSshServer(
     }
 
     private fun signExchangeHash(hash: ByteArray): ByteArray {
-        val signer = java.security.Signature.getInstance("Ed25519")
+        val signer = Signature.getInstance("Ed25519")
         signer.initSign(hostKeyPair.private)
         signer.update(hash)
         return signer.sign()
@@ -433,7 +436,7 @@ class FakeSshServer(
 
     private fun buildSignatureBlob(signature: ByteArray): ByteArray {
         val algBytes = "ssh-ed25519".toByteArray(Charsets.US_ASCII)
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteArrayOutputStream()
         out.write(ByteBuffer.allocate(4).putInt(algBytes.size).array())
         out.write(algBytes)
         out.write(ByteBuffer.allocate(4).putInt(signature.size).array())

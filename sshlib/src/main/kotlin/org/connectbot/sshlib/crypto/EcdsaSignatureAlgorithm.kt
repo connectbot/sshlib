@@ -24,6 +24,7 @@ import org.connectbot.sshlib.protocol.SshSignature
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
+import java.security.PrivateKey
 import java.security.Signature
 import java.security.interfaces.ECKey
 import java.security.spec.ECGenParameterSpec
@@ -89,7 +90,7 @@ internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
         }
     }
 
-    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+    override fun sign(algorithmName: String, privateKey: PrivateKey, data: ByteArray): ByteArray {
         val ecKey = privateKey as ECKey
         val fieldSize = (ecKey.params.order.bitLength() + 7) / 8
 

@@ -18,8 +18,9 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
+import java.security.PrivateKey
 
 internal interface SshSignatureAlgorithm {
     fun verify(pubKey: SshPublicKey, sig: SshSignature, data: ByteArray): Boolean
-    fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray
+    fun sign(algorithmName: String, privateKey: PrivateKey, data: ByteArray): ByteArray
 }

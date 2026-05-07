@@ -24,6 +24,7 @@ import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
 import org.junit.jupiter.api.Test
+import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
 import kotlin.test.assertEquals
@@ -107,7 +108,7 @@ class SshSigningTest {
         }
     }
 
-    private fun loadKeyPair(keyResource: String, passphrase: String? = null): java.security.KeyPair {
+    private fun loadKeyPair(keyResource: String, passphrase: String? = null): KeyPair {
         val keyData = readKey(keyResource)
         return PrivateKeyReader.read(keyData, passphrase).jcaKeyPair
     }

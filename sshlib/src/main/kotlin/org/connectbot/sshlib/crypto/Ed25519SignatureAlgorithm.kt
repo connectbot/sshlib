@@ -21,6 +21,7 @@ import org.connectbot.sshlib.protocol.SshEd25519SignatureBlob
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
 import java.security.KeyFactory
+import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 
@@ -49,7 +50,7 @@ internal object Ed25519SignatureAlgorithm : SshSignatureAlgorithm {
         return verifier.verify(sigBlob.signature().data())
     }
 
-    override fun sign(algorithmName: String, privateKey: java.security.PrivateKey, data: ByteArray): ByteArray {
+    override fun sign(algorithmName: String, privateKey: PrivateKey, data: ByteArray): ByteArray {
         val signer = Signature.getInstance("Ed25519")
         signer.initSign(privateKey)
         signer.update(data)

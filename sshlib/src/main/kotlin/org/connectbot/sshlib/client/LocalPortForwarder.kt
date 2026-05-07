@@ -54,7 +54,7 @@ internal class LocalPortForwarder(
         ): LocalPortForwarder {
             val selectorManager = SelectorManager(Dispatchers.IO)
             val serverSocket = aSocket(selectorManager).tcp().bind(bindAddress.hostString, bindAddress.port)
-            val actualAddress = serverSocket.localAddress.toJavaAddress() as java.net.InetSocketAddress
+            val actualAddress = serverSocket.localAddress.toJavaAddress() as InetSocketAddress
 
             val forwarder = LocalPortForwarder(
                 scope,
@@ -92,7 +92,7 @@ internal class LocalPortForwarder(
     }
 
     private suspend fun handleConnection(socket: Socket) {
-        val remoteAddr = socket.remoteAddress.toJavaAddress() as? java.net.InetSocketAddress
+        val remoteAddr = socket.remoteAddress.toJavaAddress() as? InetSocketAddress
         val originAddr = remoteAddr?.hostString ?: "127.0.0.1"
         val originPort = remoteAddr?.port ?: 0
 

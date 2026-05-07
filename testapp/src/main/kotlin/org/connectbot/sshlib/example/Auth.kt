@@ -19,8 +19,9 @@ package org.connectbot.sshlib.example
 import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.SshClient
+import java.io.Console
 
-internal fun readPassphrase(console: java.io.Console?, prompt: String): String =
+internal fun readPassphrase(console: Console?, prompt: String): String =
     if (console != null) {
         String(console.readPassword(prompt))
     } else {
@@ -30,7 +31,7 @@ internal fun readPassphrase(console: java.io.Console?, prompt: String): String =
     }
 
 internal class ConsoleKeyboardInteractiveCallback(
-    private val console: java.io.Console?,
+    private val console: Console?,
 ) : KeyboardInteractiveCallback {
     override suspend fun onInfoRequest(
         name: String,
@@ -59,7 +60,7 @@ internal suspend fun authenticateInteractive(client: SshClient, user: String): B
     return authenticatePassword(client, user, console)
 }
 
-private fun readPassword(console: java.io.Console?): String? =
+private fun readPassword(console: Console?): String? =
     if (console != null) {
         String(console.readPassword("Password: "))
     } else {
@@ -68,7 +69,7 @@ private fun readPassword(console: java.io.Console?): String? =
         readlnOrNull()
     }
 
-internal suspend fun authenticatePassword(client: SshClient, user: String, console: java.io.Console?): Boolean {
+internal suspend fun authenticatePassword(client: SshClient, user: String, console: Console?): Boolean {
     val password = readPassword(console) ?: return false
     return client.authenticatePassword(user, password) is AuthResult.Success
 }

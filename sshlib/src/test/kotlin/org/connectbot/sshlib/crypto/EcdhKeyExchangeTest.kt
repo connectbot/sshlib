@@ -19,9 +19,12 @@ package org.connectbot.sshlib.crypto
 import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECPublicKeySpec
+import javax.crypto.KeyAgreement
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -92,12 +95,12 @@ class EcdhKeyExchangeTest {
         val clientSecret = client.computeSharedSecret(qs)
 
         // Server computes shared secret from client's Q_C
-        val serverAgreement = javax.crypto.KeyAgreement.getInstance("ECDH")
+        val serverAgreement = KeyAgreement.getInstance("ECDH")
         serverAgreement.init(serverKp.private)
 
         val clientPoint = EcdsaSignatureAlgorithm.decodeEcPoint(qc, serverPub.params)
-        val clientPubKey = java.security.KeyFactory.getInstance("EC")
-            .generatePublic(java.security.spec.ECPublicKeySpec(clientPoint, serverPub.params))
+        val clientPubKey = KeyFactory.getInstance("EC")
+            .generatePublic(ECPublicKeySpec(clientPoint, serverPub.params))
         serverAgreement.doPhase(clientPubKey, true)
         val serverRawSecret = serverAgreement.generateSecret()
 

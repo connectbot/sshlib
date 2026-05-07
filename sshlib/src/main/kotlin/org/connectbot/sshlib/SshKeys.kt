@@ -22,6 +22,7 @@ import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.ed25519.Ed25519Provider
 import java.security.KeyFactory
 import java.security.KeyPair
+import java.security.NoSuchAlgorithmException
 
 /**
  * Key management utilities for SSH private keys.
@@ -83,7 +84,7 @@ object SshKeys {
     fun ensureEd25519Support() {
         try {
             KeyFactory.getInstance("Ed25519")
-        } catch (_: java.security.NoSuchAlgorithmException) {
+        } catch (_: NoSuchAlgorithmException) {
             Ed25519Provider.insertIfNeeded()
         }
     }
