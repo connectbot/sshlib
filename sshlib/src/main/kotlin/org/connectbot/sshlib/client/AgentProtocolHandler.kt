@@ -81,7 +81,7 @@ internal data class SignedDataComponents(
     override fun hashCode(): Int {
         var result = methodName.hashCode()
         result = 31 * result + destUsername.hashCode()
-        result = 31 * result + serverHostKeyBlob.contentHashCode()
+        result = 31 * result + (serverHostKeyBlob?.contentHashCode() ?: 0)
         return result
     }
 }
