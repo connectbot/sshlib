@@ -19,6 +19,7 @@ package org.connectbot.sshlib.crypto
 import org.junit.jupiter.api.Test
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -131,7 +132,7 @@ class PemKeyWriterTest {
             val der = pem.lines()
                 .filter { !it.startsWith("-----") && it.isNotBlank() }
                 .joinToString("")
-                .let { java.util.Base64.getDecoder().decode(it) }
+                .let { Base64.getDecoder().decode(it) }
 
             // SEC1 ECPrivateKey ::= SEQUENCE { version INTEGER, privateKey OCTET STRING,
             //   [0] OID OPTIONAL, [1] BIT STRING OPTIONAL }

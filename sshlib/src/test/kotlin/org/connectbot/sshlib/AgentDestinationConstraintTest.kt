@@ -16,10 +16,12 @@
 
 package org.connectbot.sshlib
 
+import io.kaitai.struct.ByteBufferKaitaiStream
 import kotlinx.coroutines.test.runTest
 import org.connectbot.sshlib.client.AgentProtocolHandler
 import org.connectbot.sshlib.client.AgentSessionInfo
 import org.connectbot.sshlib.client.SessionBindVerifier
+import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
 import org.connectbot.sshlib.protocol.SshAgentcSessionBind
 import org.connectbot.sshlib.protocol.SshAgentcSignRequest
 import org.connectbot.sshlib.protocol.createByteString
@@ -27,6 +29,7 @@ import org.connectbot.sshlib.protocol.toByteArray
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
+import java.nio.charset.Charset
 
 class AgentDestinationConstraintTest {
 
@@ -43,7 +46,7 @@ class AgentDestinationConstraintTest {
         return result
     }
 
-    private fun sshString(s: String, charset: java.nio.charset.Charset = Charsets.UTF_8): ByteArray = sshString(s.toByteArray(charset))
+    private fun sshString(s: String, charset: Charset = Charsets.UTF_8): ByteArray = sshString(s.toByteArray(charset))
 
     /**
      * Builds the signed data blob for a publickey or publickey-hostbound auth request.
@@ -312,8 +315,8 @@ class AgentDestinationConstraintTest {
         val (msgType, payload) = parseAgentMessage(response)
         assertEquals(12, msgType) // SSH_AGENT_IDENTITIES_ANSWER
 
-        val stream = io.kaitai.struct.ByteBufferKaitaiStream(payload)
-        val answer = org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer(stream)
+        val stream = ByteBufferKaitaiStream(payload)
+        val answer = SshAgentIdentitiesAnswer(stream)
         answer._read()
 
         // Only unconstrained key should be visible (constrained key needs fromKeyspecs=hostKeyA
@@ -352,8 +355,8 @@ class AgentDestinationConstraintTest {
         val (msgType, payload) = parseAgentMessage(response)
         assertEquals(12, msgType) // SSH_AGENT_IDENTITIES_ANSWER
 
-        val stream = io.kaitai.struct.ByteBufferKaitaiStream(payload)
-        val answer = org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer(stream)
+        val stream = ByteBufferKaitaiStream(payload)
+        val answer = SshAgentIdentitiesAnswer(stream)
         answer._read()
 
         // Only unconstrained key should be visible

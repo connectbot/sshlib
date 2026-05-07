@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import java.security.InvalidKeyException
 import java.security.Key
 import java.security.KeyFactory
+import java.security.KeyPair
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.spec.InvalidKeySpecException
@@ -37,7 +38,7 @@ class Ed25519KeyFactoryTest {
     private val factory = KeyFactory.getInstance(Ed25519Provider.KEY_ALGORITHM, provider)
     private val testSeed = ByteArray(32) { it.toByte() }
 
-    private fun generateKeyPair(): java.security.KeyPair = Ed25519KeyPairGenerator().generateKeyPair()
+    private fun generateKeyPair(): KeyPair = Ed25519KeyPairGenerator().generateKeyPair()
 
     @Test
     fun `generatePublic with X509EncodedKeySpec`() {

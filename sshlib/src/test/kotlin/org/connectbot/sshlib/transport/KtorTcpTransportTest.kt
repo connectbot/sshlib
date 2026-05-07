@@ -23,6 +23,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import kotlin.test.assertEquals
@@ -249,7 +250,7 @@ class KtorTcpTransportTest {
         val transport = KtorTcpTransport("example.com", 22, resolver, factory, IpVersion.IPV4_ONLY)
         transport.connect()
 
-        assertTrue(factory.connectionAttempts.all { it is java.net.Inet4Address })
+        assertTrue(factory.connectionAttempts.all { it is Inet4Address })
         assertTrue(transport.isConnected)
     }
 

@@ -53,7 +53,7 @@ internal class DynamicPortForwarder(
         ): DynamicPortForwarder {
             val selectorManager = SelectorManager(Dispatchers.IO)
             val serverSocket = aSocket(selectorManager).tcp().bind(bindAddress.hostString, bindAddress.port)
-            val actualAddress = serverSocket.localAddress.toJavaAddress() as java.net.InetSocketAddress
+            val actualAddress = serverSocket.localAddress.toJavaAddress() as InetSocketAddress
 
             val handler = Socks5Handler(authenticator)
             val forwarder = DynamicPortForwarder(
@@ -108,7 +108,7 @@ internal class DynamicPortForwarder(
             return
         }
 
-        val remoteAddr = socket.remoteAddress.toJavaAddress() as? java.net.InetSocketAddress
+        val remoteAddr = socket.remoteAddress.toJavaAddress() as? InetSocketAddress
         val originAddr = remoteAddr?.hostString ?: "127.0.0.1"
         val originPort = remoteAddr?.port ?: 0
 

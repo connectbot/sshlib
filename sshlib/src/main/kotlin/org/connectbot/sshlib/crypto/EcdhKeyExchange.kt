@@ -20,6 +20,7 @@ import org.connectbot.sshlib.SshException
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
+import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
@@ -42,7 +43,7 @@ internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
     private val fieldSize: Int
     override val hashAlgorithm: String
 
-    private var clientKeyPair: java.security.KeyPair? = null
+    private var clientKeyPair: KeyPair? = null
 
     init {
         val (jcaName, hash) = when (curveName) {

@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import io.kaitai.struct.KaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import org.connectbot.sshlib.AgentIdentity
 import org.connectbot.sshlib.AgentKeySpec
@@ -340,7 +341,7 @@ internal class AgentProtocolHandler(
 
     private inline fun <reified T : KaitaiStruct.ReadWrite> parsePayload(message: SshAgentMessage): T {
         val stream = ByteBufferKaitaiStream(message._raw_payload())
-        val payload = T::class.java.getConstructor(io.kaitai.struct.KaitaiStream::class.java).newInstance(stream)
+        val payload = T::class.java.getConstructor(KaitaiStream::class.java).newInstance(stream)
         payload._read()
         return payload
     }

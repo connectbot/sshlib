@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.crypto.ed25519
 
 import com.google.crypto.tink.subtle.Ed25519Sign
+import java.security.GeneralSecurityException
 import java.security.KeyPair
 import java.security.KeyPairGeneratorSpi
 import java.security.SecureRandom
@@ -30,7 +31,7 @@ internal class Ed25519KeyPairGenerator : KeyPairGeneratorSpi() {
         try {
             val kp = Ed25519Sign.KeyPair.newKeyPair()
             return KeyPair(Ed25519PublicKey(kp.publicKey), Ed25519PrivateKey(kp.privateKey))
-        } catch (e: java.security.GeneralSecurityException) {
+        } catch (e: GeneralSecurityException) {
             throw IllegalStateException(e)
         }
     }

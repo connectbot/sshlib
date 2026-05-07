@@ -18,12 +18,13 @@ package org.connectbot.sshlib.protocol
 
 import io.kaitai.struct.ByteBufferKaitaiStream
 import io.kaitai.struct.KaitaiStruct
+import java.nio.BufferOverflowException
 
 /**
  * Serialize a Kaitai struct to a byte array.
  *
  * Kaitai's [ByteBufferKaitaiStream] is fixed-capacity, so the underlying
- * `ByteBuffer.put` throws [java.nio.BufferOverflowException] if the
+ * `ByteBuffer.put` throws [BufferOverflowException] if the
  * pre-allocated buffer is too small. We don't have a cheap way to know
  * the encoded size up front, so start at 16 KiB and double on overflow
  * until the message fits or we cross [MAX_BUFFER]. Most SSH messages
@@ -40,7 +41,7 @@ fun KaitaiStruct.ReadWrite.toByteArray(): ByteArray {
             val size = io.pos()
             io.seek(0)
             return io.readBytes(size.toLong())
-        } catch (_: java.nio.BufferOverflowException) {
+        } catch (_: BufferOverflowException) {
             if (capacity >= MAX_BUFFER) throw IllegalStateException("Kaitai message exceeds $MAX_BUFFER byte serialization limit")
             capacity = minOf(capacity * 2, MAX_BUFFER)
         }

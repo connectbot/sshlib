@@ -51,6 +51,7 @@ import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.security.MessageDigest
 import kotlin.test.assertIs
 
 /**
@@ -74,7 +75,7 @@ class SshClientIntegrationTest {
         private const val DEBUG_CFLAGS = ""
 
         private fun opensshImageName(): String {
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val digest = MessageDigest.getInstance("SHA-256")
                 .digest("$OPENSSH_VERSION:$DEBUG_CFLAGS".toByteArray())
             val hash = digest.take(4).joinToString("") { "%02x".format(it) }
             return "openssh-server-test-$hash"

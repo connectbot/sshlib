@@ -16,12 +16,14 @@
 
 package org.connectbot.sshlib.crypto
 
+import java.util.Base64
+
 /**
  * Base64 compatibility adapter supporting both JVM and Android API 24+.
  *
- * On Android below API 26, `java.util.Base64` is unavailable. This object detects
+ * On Android below API 26, `Base64` is unavailable. This object detects
  * `android.util.Base64` at runtime via reflection and delegates to it; otherwise
- * falls back to `java.util.Base64`.
+ * falls back to `Base64`.
  */
 internal object Base64Compat {
 
@@ -45,9 +47,9 @@ internal object Base64Compat {
     }
 
     private class JvmDelegate : Delegate {
-        private val encoder = java.util.Base64.getEncoder()
-        private val encoderNoPad = java.util.Base64.getEncoder().withoutPadding()
-        private val decoder = java.util.Base64.getDecoder()
+        private val encoder = Base64.getEncoder()
+        private val encoderNoPad = Base64.getEncoder().withoutPadding()
+        private val decoder = Base64.getDecoder()
 
         override fun encode(data: ByteArray): String = encoderNoPad.encodeToString(data)
         override fun encodeWithPadding(data: ByteArray): String = encoder.encodeToString(data)

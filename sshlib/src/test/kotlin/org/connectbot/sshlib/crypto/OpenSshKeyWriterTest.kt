@@ -18,6 +18,7 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Test
+import java.nio.ByteBuffer
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.util.Base64
@@ -155,7 +156,7 @@ class OpenSshKeyWriterTest {
 
     private fun extractPrivateSectionLength(pem: String): Int {
         val binary = extractBinary(pem)
-        val buf = java.nio.ByteBuffer.wrap(binary)
+        val buf = ByteBuffer.wrap(binary)
 
         fun skipBytes(n: Int) {
             buf.position(buf.position() + n)

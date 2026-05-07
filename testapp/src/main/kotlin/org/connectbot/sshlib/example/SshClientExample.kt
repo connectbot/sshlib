@@ -33,6 +33,7 @@ import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshSession
 import org.slf4j.LoggerFactory
+import java.io.Console
 
 fun main(args: Array<String>) = SshCommand().main(args)
 
@@ -108,7 +109,7 @@ private class SshCommand : CliktCommand(name = "ssh") {
         return retry.isNotEmpty() && client.authenticatePublicKey(user, keyData, retry) is AuthResult.Success
     }
 
-    private suspend fun resolvePassphrase(client: SshClient, keyData: String, console: java.io.Console?): String? {
+    private suspend fun resolvePassphrase(client: SshClient, keyData: String, console: Console?): String? {
         if (keyPassphrase != null) return keyPassphrase
         if (client.isPrivateKeyEncrypted(keyData)) return readPassphrase(console, "Enter passphrase for $keyFile: ")
         return null

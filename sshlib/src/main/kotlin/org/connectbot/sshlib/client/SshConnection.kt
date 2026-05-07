@@ -17,6 +17,7 @@
 package org.connectbot.sshlib.client
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import io.kaitai.struct.KaitaiStream
 import io.kaitai.struct.KaitaiStruct
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CloseableCoroutineDispatcher
@@ -2399,7 +2400,7 @@ class SshConnection(
     private inline fun <reified T : KaitaiStruct.ReadWrite> parseBody(packet: UnencryptedPacket.UnencryptedPayload): T {
         val rawBody = packet._raw_body()
         val stream = ByteBufferKaitaiStream(rawBody)
-        val msg = T::class.java.getConstructor(io.kaitai.struct.KaitaiStream::class.java).newInstance(stream)
+        val msg = T::class.java.getConstructor(KaitaiStream::class.java).newInstance(stream)
         msg._read()
         return msg
     }
