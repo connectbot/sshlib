@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.AuthResult
@@ -1082,7 +1083,7 @@ class SshClientIntegrationTest {
                 }
             }
 
-            kotlinx.coroutines.yield()
+            yield()
 
             val session = client.openSession()
             assertNotNull(session)
@@ -1156,13 +1157,19 @@ class SshClientIntegrationTest {
             assertNotNull(session)
             session!!.requestShell()
 
+            val disconnectDeferred = async {
+                withTimeout(10_000) {
+                    client.disconnectedFlow.first()
+                }
+            }
+
+            kotlinx.coroutines.yield()
+
             // Force kill the server-side connection
             session.write("kill -9 \$PPID\n".toByteArray())
 
             // Wait for disconnectedFlow to fire (so we know the packet loop ended)
-            withTimeout(10_000) {
-                client.disconnectedFlow.first()
-            }
+            disconnectDeferred.await()
 
             assertFalse(session.isOpen, "Session should be closed after server drops connection")
             assertNull(session.read(), "Read should return null on closed session")
