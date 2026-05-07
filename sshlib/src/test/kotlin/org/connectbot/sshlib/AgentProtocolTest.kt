@@ -21,7 +21,11 @@ import kotlinx.coroutines.test.runTest
 import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.client.AgentProtocolHandler
 import org.connectbot.sshlib.client.AgentSessionInfo
+import org.connectbot.sshlib.client.BindingEntry
 import org.connectbot.sshlib.client.SessionBindVerifier
+import org.connectbot.sshlib.client.SignedDataComponents
+import org.connectbot.sshlib.client.buildAgentMessage
+import org.connectbot.sshlib.client.isConstraintSatisfied
 import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
 import org.connectbot.sshlib.protocol.SshAgentMessage
 import org.connectbot.sshlib.protocol.SshAgentSignResponse
@@ -405,24 +409,206 @@ class AgentProtocolTest {
     }
 
     @Test
-    fun `buildAgentMessage encodes length field correctly for large payload`() = runTest {
-        // Use a payload of 256 bytes so the length field requires byte[1] (not just byte[3]) to be non-zero.
-        // If shr 16 is mutated to shr 8 (or removed), byte[1] would encode incorrectly and parsing would fail.
-        val largePayload = ByteArray(256) { it.toByte() }
-        val message = buildAgentMessage(12, largePayload)
-        val (msgType, parsedPayload) = parseAgentMessage(message)
-        assertEquals(12, msgType)
-        assertArrayEquals(largePayload, parsedPayload)
+    fun `buildAgentMessage encodes length field correctly for 255-byte signature`() = runTest {
+        // A 255-byte signature makes the SIGN_RESPONSE payload large enough that byte[2] of the
+        // length field is non-zero. Routes through the production buildAgentMessage (not the local helper).
+        val largeSignature = ByteArray(255) { it.toByte() }
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray = largeSignature
+        }
+        val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)))
+        val signRequest = SshAgentcSignRequest()
+        signRequest.setKeyBlob(createByteString(byteArrayOf(1)))
+        signRequest.setData(createByteString(byteArrayOf(2)))
+        signRequest.setFlags(0)
+        signRequest._check()
+        val response = handler.handleRequest(buildAgentMessage(13, signRequest.toByteArray()))
+        val (messageType, payload) = parseAgentMessage(response)
+        assertEquals(14, messageType)
+        val sig = SshAgentSignResponse(ByteBufferKaitaiStream(payload))
+        sig._read()
+        assertArrayEquals(largeSignature, sig.signature().data())
     }
 
     @Test
-    fun `buildAgentMessage encodes length field correctly for 65536-byte payload`() = runTest {
-        // Payload of 65536 bytes forces byte[0] of the length field to be non-zero.
-        // Kills MathMutator survivors on the shr 24 / shr 16 shift expressions.
-        val hugePayload = ByteArray(65536) { it.toByte() }
-        val message = buildAgentMessage(14, hugePayload)
-        val (msgType, parsedPayload) = parseAgentMessage(message)
+    fun `buildAgentMessage encodes length field correctly for 65535-byte signature`() = runTest {
+        // A 65535-byte signature forces byte[1] of the length field to be non-zero.
+        // Routes through the production buildAgentMessage.
+        val hugeSignature = ByteArray(65535) { it.toByte() }
+        val testProvider = object : AgentProvider {
+            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun signData(context: AgentSigningContext): ByteArray = hugeSignature
+        }
+        val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)))
+        val signRequest = SshAgentcSignRequest()
+        signRequest.setKeyBlob(createByteString(byteArrayOf(1)))
+        signRequest.setData(createByteString(byteArrayOf(2)))
+        signRequest.setFlags(0)
+        signRequest._check()
+        val response = handler.handleRequest(buildAgentMessage(13, signRequest.toByteArray()))
+        val (messageType, payload) = parseAgentMessage(response)
+        assertEquals(14, messageType)
+        val sig = SshAgentSignResponse(ByteBufferKaitaiStream(payload))
+        sig._read()
+        assertArrayEquals(hugeSignature, sig.signature().data())
+    }
+}
+
+class BuildAgentMessageTest {
+
+    private fun parseMessage(bytes: ByteArray): Pair<Int, ByteArray> {
+        val buf = ByteBuffer.wrap(bytes)
+        val length = buf.int
+        val msgType = buf.get().toInt() and 0xFF
+        val payload = ByteArray(length - 1)
+        buf.get(payload)
+        return msgType to payload
+    }
+
+    @Test
+    fun `empty payload encodes correctly`() {
+        val result = buildAgentMessage(5, ByteArray(0))
+        val (msgType, payload) = parseMessage(result)
+        assertEquals(5, msgType)
+        assertArrayEquals(ByteArray(0), payload)
+    }
+
+    @Test
+    fun `small payload roundtrips`() {
+        val data = byteArrayOf(1, 2, 3)
+        val result = buildAgentMessage(14, data)
+        val (msgType, payload) = parseMessage(result)
         assertEquals(14, msgType)
-        assertArrayEquals(hugePayload, parsedPayload)
+        assertArrayEquals(data, payload)
+    }
+
+    @Test
+    fun `255-byte payload makes byte 2 of length non-zero`() {
+        val data = ByteArray(255) { it.toByte() }
+        val result = buildAgentMessage(12, data)
+        val (msgType, payload) = parseMessage(result)
+        assertEquals(12, msgType)
+        assertArrayEquals(data, payload)
+        assertTrue(result[2] != 0.toByte()) { "byte[2] should be non-zero for payload size 255" }
+    }
+
+    @Test
+    fun `65535-byte payload makes byte 1 of length non-zero`() {
+        val data = ByteArray(65535) { it.toByte() }
+        val result = buildAgentMessage(6, data)
+        val (msgType, payload) = parseMessage(result)
+        assertEquals(6, msgType)
+        assertArrayEquals(data, payload)
+        assertTrue(result[1] != 0.toByte()) { "byte[1] should be non-zero for payload size 65535" }
+    }
+}
+
+class IsConstraintSatisfiedTest {
+
+    private fun constraint(
+        fromHostname: String = "",
+        fromKeyspecs: List<AgentKeySpec> = emptyList(),
+        toUsername: String = "",
+        toHostname: String = "",
+        toHostspecs: List<AgentKeySpec> = emptyList(),
+    ) = DestinationConstraint(fromHostname, fromKeyspecs, toUsername, toHostname, toHostspecs)
+
+    private fun keyspec(blob: ByteArray) = AgentKeySpec(blob, false)
+
+    private val hostKey = byteArrayOf(0x01, 0x02, 0x03)
+    private val sessionId = byteArrayOf(0x04, 0x05, 0x06)
+
+    @Test
+    fun `direct connection - no constraints - always rejected`() {
+        val components = SignedDataComponents("publickey", "user", hostKey)
+        assertFalse(isConstraintSatisfied(emptyList(), components, emptyList()))
+    }
+
+    @Test
+    fun `direct connection - empty from constraint with matching toHostspec - satisfied`() {
+        val c = constraint(toHostspecs = listOf(keyspec(hostKey)))
+        val components = SignedDataComponents("publickey", "user", hostKey)
+        assertTrue(isConstraintSatisfied(listOf(c), components, emptyList()))
+    }
+
+    @Test
+    fun `direct connection - empty from constraint with non-matching toHostspec - rejected`() {
+        val c = constraint(toHostspecs = listOf(keyspec(byteArrayOf(0x99.toByte()))))
+        val components = SignedDataComponents("publickey", "user", hostKey)
+        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    }
+
+    @Test
+    fun `direct connection - toUsername mismatch - rejected`() {
+        val c = constraint(toHostspecs = listOf(keyspec(hostKey)), toUsername = "alice")
+        val components = SignedDataComponents("publickey", "bob", hostKey)
+        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    }
+
+    @Test
+    fun `direct connection - toUsername matches - satisfied`() {
+        val c = constraint(toHostspecs = listOf(keyspec(hostKey)), toUsername = "alice")
+        val components = SignedDataComponents("publickey", "alice", hostKey)
+        assertTrue(isConstraintSatisfied(listOf(c), components, emptyList()))
+    }
+
+    @Test
+    fun `direct connection - null serverHostKeyBlob - rejected`() {
+        val c = constraint(toHostspecs = listOf(keyspec(hostKey)))
+        val components = SignedDataComponents("publickey", "user", null)
+        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    }
+
+    @Test
+    fun `forwarded connection - single binding - fromKeyspec matches hop - satisfied`() {
+        val hopKey = byteArrayOf(0xAA.toByte())
+        val destKey = byteArrayOf(0xBB.toByte())
+        val binding = BindingEntry(hopKey, sessionId)
+        val c = constraint(fromKeyspecs = listOf(keyspec(hopKey)), toHostspecs = listOf(keyspec(destKey)))
+        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
+        assertTrue(isConstraintSatisfied(listOf(c), components, listOf(binding)))
+    }
+
+    @Test
+    fun `forwarded connection - single binding - fromKeyspec does not match - rejected`() {
+        val hopKey = byteArrayOf(0xAA.toByte())
+        val wrongKey = byteArrayOf(0xCC.toByte())
+        val destKey = byteArrayOf(0xBB.toByte())
+        val binding = BindingEntry(hopKey, sessionId)
+        val c = constraint(fromKeyspecs = listOf(keyspec(wrongKey)), toHostspecs = listOf(keyspec(destKey)))
+        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
+        assertFalse(isConstraintSatisfied(listOf(c), components, listOf(binding)))
+    }
+
+    @Test
+    fun `forwarded connection - two bindings - uses second-to-last as hop key`() {
+        val hop1Key = byteArrayOf(0xAA.toByte())
+        val hop2Key = byteArrayOf(0xBB.toByte())
+        val destKey = byteArrayOf(0xCC.toByte())
+        val bindings = listOf(BindingEntry(hop1Key, byteArrayOf(1)), BindingEntry(hop2Key, byteArrayOf(2)))
+        val c = constraint(fromKeyspecs = listOf(keyspec(hop1Key)), toHostspecs = listOf(keyspec(destKey)))
+        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
+        assertTrue(isConstraintSatisfied(listOf(c), components, bindings))
+    }
+}
+
+class BindingEntryEqualsTest {
+
+    @Test
+    fun `equals and hashCode`() {
+        EqualsVerifier.forClass(BindingEntry::class.java)
+            .withPrefabValues(ByteArray::class.java, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+            .verify()
+    }
+}
+
+class SignedDataComponentsEqualsTest {
+
+    @Test
+    fun `equals and hashCode`() {
+        EqualsVerifier.forClass(SignedDataComponents::class.java)
+            .withPrefabValues(ByteArray::class.java, byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
+            .verify()
     }
 }

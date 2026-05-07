@@ -23,8 +23,7 @@ import org.junit.jupiter.api.Test
 
 class KeyBlobAlgorithmNameTest {
 
-    private fun readKey(resourcePath: String): String =
-        javaClass.getResourceAsStream("/keys/$resourcePath")!!.bufferedReader().readText()
+    private fun readKey(resourcePath: String): String = javaClass.getResourceAsStream("/keys/$resourcePath")!!.bufferedReader().readText()
 
     /** Builds a minimal blob: 4-byte big-endian length prefix + ASCII name bytes. */
     private fun blobWithName(name: String): ByteArray {
@@ -90,5 +89,4 @@ class KeyBlobAlgorithmNameTest {
         val blob = SshSigning.getPublicKey("ecdsa-sha2-nistp256", readKey("ecdsa256_unencrypted"), null).publicKeyBlob
         assertEquals("ecdsa-sha2-nistp256", keyBlobAlgorithmName(blob))
     }
-
 }
