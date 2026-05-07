@@ -57,8 +57,15 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+val testJdkVersion = providers.gradleProperty("jdkVersion").map(String::toInt).orElse(17)
+
 tasks.test {
     useJUnitPlatform()
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(testJdkVersion.get()))
+        },
+    )
 }
 
 java {
