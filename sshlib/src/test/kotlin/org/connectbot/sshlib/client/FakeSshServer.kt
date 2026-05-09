@@ -89,6 +89,7 @@ class FakeSshServer(
     private val receivedPongs = Channel<ByteArray>(Channel.UNLIMITED)
     private val receivedExtInfo = Channel<SshMsgExtInfo>(Channel.UNLIMITED)
     private val receivedUserauthRequests = Channel<SshMsgUserauthRequest>(Channel.UNLIMITED)
+    private val receivedClientKexInits = Channel<SshMsgKexinit>(Channel.UNLIMITED)
 
     fun start() {
         scope.launch(coroutineContext) { serve() }
@@ -231,6 +232,9 @@ class FakeSshServer(
     private suspend fun doFullKex(io: PacketIO) {
         val serverKexInitBytes = sendKexInit(io)
         val clientKexInitRaw = readPacketRaw(io)
+        val clientKexInit = SshMsgKexinit(ByteBufferKaitaiStream(clientKexInitRaw.copyOfRange(1, clientKexInitRaw.size)))
+        clientKexInit._read()
+        receivedClientKexInits.trySend(clientKexInit)
         val ecdhInitRaw = readPacketRaw(io)
         val clientPublic = parseEcdhInit(ecdhInitRaw)
         sendEcdhReply(io, clientKexInitRaw, serverKexInitBytes, clientPublic)
@@ -546,4 +550,6 @@ class FakeSshServer(
     suspend fun awaitExtInfo(): SshMsgExtInfo = receivedExtInfo.receive()
 
     suspend fun awaitUserauthRequest(): SshMsgUserauthRequest = receivedUserauthRequests.receive()
+
+    suspend fun awaitClientKexInit(): SshMsgKexinit = receivedClientKexInits.receive()
 }
