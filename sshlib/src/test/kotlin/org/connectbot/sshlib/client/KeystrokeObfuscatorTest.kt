@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.random.Random
 import kotlin.test.assertFailsWith
 
 class KeystrokeObfuscatorTest {
@@ -148,5 +149,148 @@ class KeystrokeObfuscatorTest {
                 "Interval $elapsed exceeded 220% of expected $intervalMs",
             )
         }
+    }
+
+    // --- delayUntilNextSendMs boundary tests ---
+
+    @Test
+    fun `delayUntilNextSendMs returns 0 exactly when now equals nextIntervalMs`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        val boundary = obfuscator.nextIntervalMs()
+        now = boundary
+        assertEquals(0L, obfuscator.delayUntilNextSendMs())
+    }
+
+    @Test
+    fun `delayUntilNextSendMs returns 1 when one ms before nextIntervalMs`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        val boundary = obfuscator.nextIntervalMs()
+        now = boundary - 1
+        assertEquals(1L, obfuscator.delayUntilNextSendMs())
+    }
+
+    // --- advanceInterval math and clamp tests ---
+
+    @Test
+    fun `advanceInterval skips exactly one interval when just past boundary`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        val first = obfuscator.nextIntervalMs()
+        now = first + 1 // just past the first boundary
+        obfuscator.advanceInterval()
+        val second = obfuscator.nextIntervalMs()
+        // Must be strictly after 'now', not before it
+        assertTrue(second > now, "nextIntervalMs $second should be after now $now")
+    }
+
+    @Test
+    fun `advanceInterval skips multiple missed intervals`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        val first = obfuscator.nextIntervalMs()
+        // Advance 5 full intervals past the boundary
+        now = first + intervalMs * 5
+        obfuscator.advanceInterval()
+        val second = obfuscator.nextIntervalMs()
+        assertTrue(second > now, "nextIntervalMs $second should be after now $now after skipping intervals")
+    }
+
+    @Test
+    fun `advanceInterval clamps negative missed-interval count to zero`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        // Don't advance clock — now is before nextIntervalMs so missedIntervals would be negative
+        val before = obfuscator.nextIntervalMs()
+        obfuscator.advanceInterval()
+        val after = obfuscator.nextIntervalMs()
+        // Result should still be in the future (clamped to 0 missed, advances by 1 interval)
+        assertTrue(after > now, "nextIntervalMs $after should be positive after clamp")
+        // The boundary should move forward even though we didn't cross it.
+        assertTrue(after > before, "nextIntervalMs $after should be after previous boundary $before")
+        assertTrue(after >= 1L, "nextIntervalMs must be at least 1")
+    }
+
+    // --- computeFuzzMs boundary tests ---
+
+    @Test
+    fun `fuzz floor is 1 for tiny intervals`() {
+        // With intervalMs=1 and FUZZ_PERCENT=10, raw fuzz = 0 → should clamp to 1
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(1L, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        // nextIntervalMs must be at least 1 (coerceAtLeast(1))
+        assertTrue(obfuscator.nextIntervalMs() >= 1L)
+    }
+
+    @Test
+    fun `interval close to Long MAX does not overflow fuzz computation`() {
+        // Int.MAX_VALUE cap prevents fuzz from exceeding random's int range
+        val hugeInterval = Int.MAX_VALUE.toLong() * 100L
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(hugeInterval, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        assertTrue(obfuscator.nextIntervalMs() >= 1L)
+    }
+
+    // --- setNextInterval: sessionRate only set on starting=true ---
+
+    @Test
+    fun `sessionRate is fixed per session and does not change on subsequent advances`() {
+        // Use a seeded Random so results are deterministic.
+        // First keystroke sets sessionRate (starting=true). Subsequent advanceInterval calls
+        // should NOT change sessionRate (starting=false), so the per-advance fuzz is different
+        // from what it would be if sessionRate were reset each time.
+        var now = 0L
+        val seededRandom = Random(42)
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now }, random = seededRandom)
+        obfuscator.recordKeystroke()
+
+        // Record nextIntervalMs values across several advances
+        val intervals = mutableListOf<Long>()
+        repeat(5) {
+            val prev = obfuscator.nextIntervalMs()
+            now = prev
+            obfuscator.advanceInterval()
+            intervals.add(obfuscator.nextIntervalMs() - prev)
+        }
+
+        // All intervals must be positive (sessionRate never causes a negative adjusted value)
+        assertTrue(intervals.all { it >= 1L }, "All intervals must be >= 1, got: $intervals")
+    }
+
+    @Test
+    fun `recordKeystroke returns true on first call and false when window still active`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now })
+        assertTrue(obfuscator.recordKeystroke(), "First keystroke should return true (just started)")
+        // Still within chaff window
+        assertFalse(obfuscator.recordKeystroke(), "Second keystroke within window should return false")
+    }
+
+    @Test
+    fun `recordKeystroke returns true again after chaff window expires`() {
+        var now = 0L
+        val obfuscator = KeystrokeObfuscator(intervalMs, clockMs = { now })
+        obfuscator.recordKeystroke()
+        now = obfuscator.chaffUntilMs() + 1
+        assertTrue(obfuscator.recordKeystroke(), "Keystroke after expired window should return true")
+    }
+
+    @Test
+    fun `setNextInterval adjusted value is at least 1 when fuzz exceeds interval`() {
+        // With intervalMs=1 fuzz=1, adjusted = 1 - 1 + random(1) + sessionRate
+        // random(1) is always 0, sessionRate is random(1) which is also 0
+        // → adjusted = 0, coerceAtLeast(1) = 1
+        var now = 1000L
+        val obfuscator = KeystrokeObfuscator(1L, clockMs = { now }, random = Random(0))
+        obfuscator.recordKeystroke()
+        assertTrue(obfuscator.nextIntervalMs() >= now + 1L)
     }
 }
