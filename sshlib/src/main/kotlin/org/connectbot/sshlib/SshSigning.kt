@@ -46,6 +46,7 @@ object SshSigning {
         passphrase: String?,
         dataToSign: ByteArray,
     ): ByteArray {
+        rejectSkAlgorithm(algorithmName)
         val privateKey = PrivateKeyReader.read(privateKeyData, passphrase)
         val sigEntry = SignatureEntry.fromSshName(algorithmName)
             ?: throw SshException("Unknown signature algorithm: $algorithmName")
@@ -131,9 +132,21 @@ object SshSigning {
         keyPair: KeyPair,
         dataToSign: ByteArray,
     ): ByteArray {
+        rejectSkAlgorithm(algorithmName)
         val sigEntry = SignatureEntry.fromSshName(algorithmName)
             ?: throw SshException("Unknown signature algorithm: $algorithmName")
         return sigEntry.algorithm.sign(algorithmName, keyPair.private, dataToSign)
+    }
+
+    private fun rejectSkAlgorithm(algorithmName: String) {
+        if (algorithmName.startsWith("sk-")) {
+            throw SshException(
+                "SK (FIDO2 / Security Key) algorithm \"$algorithmName\" cannot be signed locally — " +
+                    "the private key lives on the authenticator. Drive auth through " +
+                    "AuthHandler.onSignatureRequest(): call your CTAP2 stack for an assertion, " +
+                    "then return SkSignatureBlob.pack(...) from org.connectbot.sshlib.sk.",
+            )
+        }
     }
 
     /**

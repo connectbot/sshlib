@@ -775,6 +775,64 @@ package org.connectbot.sshlib.client {
 
 }
 
+package org.connectbot.sshlib.sk {
+
+  public enum SkAlgorithm {
+    method @InaccessibleFromKotlin public java.lang.String getSshName();
+    property public String sshName;
+    enum_constant public static final org.connectbot.sshlib.sk.SkAlgorithm ECDSA_P256;
+    enum_constant public static final org.connectbot.sshlib.sk.SkAlgorithm ED25519;
+    field public static final org.connectbot.sshlib.sk.SkAlgorithm.Companion Companion;
+  }
+
+  public static final class SkAlgorithm.Companion {
+    method public org.connectbot.sshlib.sk.SkAlgorithm? fromSshName(java.lang.String name);
+    method public boolean isSkAlgorithm(java.lang.String name);
+  }
+
+  public final class SkAuthHelpers {
+    method public org.connectbot.sshlib.AuthPublicKey buildAuthPublicKey(org.connectbot.sshlib.sk.SkAlgorithm algorithm, byte[] rawKey, java.lang.String application);
+    field public static final org.connectbot.sshlib.sk.SkAuthHelpers INSTANCE;
+  }
+
+  public final class SkPublicKey {
+    ctor public SkPublicKey(org.connectbot.sshlib.sk.SkAlgorithm algorithm, byte[] rawKey, java.lang.String application);
+    method public org.connectbot.sshlib.sk.SkAlgorithm component1();
+    method public byte[] component2();
+    method public java.lang.String component3();
+    method public org.connectbot.sshlib.sk.SkPublicKey copy(optional org.connectbot.sshlib.sk.SkAlgorithm algorithm, optional byte[] rawKey, optional java.lang.String application);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public org.connectbot.sshlib.sk.SkAlgorithm getAlgorithm();
+    method @InaccessibleFromKotlin public java.lang.String getApplication();
+    method @InaccessibleFromKotlin public byte[] getRawKey();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public org.connectbot.sshlib.sk.SkAlgorithm algorithm;
+    property public String application;
+    property public byte[] rawKey;
+  }
+
+  public final class SkPublicKeyDecoder {
+    method public org.connectbot.sshlib.sk.SkPublicKey decode(byte[] blob);
+    field public static final org.connectbot.sshlib.sk.SkPublicKeyDecoder INSTANCE;
+  }
+
+  public final class SkPublicKeyEncoder {
+    method public byte[] encode(org.connectbot.sshlib.sk.SkAlgorithm algorithm, byte[] rawKey, java.lang.String application);
+    field public static final org.connectbot.sshlib.sk.SkPublicKeyEncoder INSTANCE;
+  }
+
+  public final class SkSignatureBlob {
+    method @KotlinOnly public byte[] pack(org.connectbot.sshlib.sk.SkAlgorithm algorithm, byte[] rawSignature, byte flags, kotlin.UInt counter);
+    property public static byte FLAG_USER_PRESENCE;
+    property public static byte FLAG_USER_VERIFICATION;
+    field public static final byte FLAG_USER_PRESENCE = 1; // 0x1
+    field public static final byte FLAG_USER_VERIFICATION = 4; // 0x4
+    field public static final org.connectbot.sshlib.sk.SkSignatureBlob INSTANCE;
+  }
+
+}
+
 package org.connectbot.sshlib.transport {
 
   public interface AddressResolver {
