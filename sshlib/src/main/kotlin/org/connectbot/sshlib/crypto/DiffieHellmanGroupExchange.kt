@@ -44,6 +44,21 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
     private var privateKey: BigInteger? = null
 
     fun setGroup(p: BigInteger, g: BigInteger) {
+        val pBits = p.bitLength()
+        if (pBits < min) {
+            throw SshException("DH group prime too small: $pBits bits < $min bits minimum")
+        }
+        if (pBits > max) {
+            throw SshException("DH group prime too large: $pBits bits > $max bits maximum")
+        }
+        // p must be odd (a basic primality sanity check: all primes > 2 are odd)
+        if (!p.testBit(0)) {
+            throw SshException("DH group prime is even")
+        }
+        // g must satisfy 1 < g < p-1 to be a valid generator candidate
+        if (g <= BigInteger.ONE || g >= p - BigInteger.ONE) {
+            throw SshException("DH group generator g is out of range: must be 1 < g < p-1")
+        }
         this.p = p
         this.g = g
     }
