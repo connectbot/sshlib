@@ -25,7 +25,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestExec
@@ -52,15 +51,11 @@ class SessionChannel internal constructor(
 ) : SshSession {
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
-        private const val WINDOW_ADJUST_THRESHOLD = 16 * 1024
-        private const val MAX_WINDOW_SIZE = 0xFFFFFFFFL
     }
 
     private var _isOpen = true
     private var closeSent = false
-    private var localWindowSize: Long = initialWindowSize.toLong()
-
-    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val _stdout = Channel<ByteArray>(Channel.UNLIMITED)
@@ -88,38 +83,28 @@ class SessionChannel internal constructor(
         get() = ptyGranted && canSendChaff && obscureKeystrokeTimingIntervalMs > 0
 
     internal suspend fun onData(data: ByteArray) {
+        val adjust = window.consumeLocal(data.size)
         _stdout.trySend(data)
-        localWindowSize -= data.size
-        if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
-            val adjust = initialWindowSize - localWindowSize.toInt()
-            localWindowSize += adjust
+        if (adjust > 0) {
             connection.sendWindowAdjust(_remoteChannelNumber, adjust)
         }
     }
 
     internal suspend fun onExtendedData(dataType: Int, data: ByteArray) {
+        val adjust = window.consumeLocal(data.size)
         _extendedData.trySend(dataType to data)
         if (dataType == 1) {
             _stderr.trySend(data)
         }
-        localWindowSize -= data.size
-        if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
-            val adjust = initialWindowSize - localWindowSize.toInt()
-            localWindowSize += adjust
+        if (adjust > 0) {
             connection.sendWindowAdjust(_remoteChannelNumber, adjust)
         }
     }
 
     internal fun onWindowAdjust(bytesToAdd: Long) {
-        if (bytesToAdd <= 0) {
-            throw SshException("Invalid window adjust: bytesToAdd must be positive, got $bytesToAdd")
-        }
-        if (remoteWindowSize + bytesToAdd > MAX_WINDOW_SIZE) {
-            throw SshException("Channel window overflow: current=$remoteWindowSize, adding=$bytesToAdd exceeds max $MAX_WINDOW_SIZE")
-        }
-        remoteWindowSize += bytesToAdd
-        logger.debug("Window adjust +$bytesToAdd, remote window now $remoteWindowSize")
-        if (remoteWindowSize > 0) {
+        window.adjustRemote(bytesToAdd)
+        logger.debug("Window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
+        if (window.remoteRemaining > 0) {
             windowAvailable.trySend(Unit)
         }
     }
@@ -163,17 +148,17 @@ class SessionChannel internal constructor(
     private suspend fun writeDirect(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
-            while (remoteWindowSize <= 0) {
+            while (window.remoteRemaining <= 0) {
                 windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,
-                remoteWindowSize.toInt(),
+                window.remoteRemaining.toInt(),
                 maxPacketSize,
             )
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(_remoteChannelNumber, chunk)
-            remoteWindowSize -= chunkSize
+            window.consumeRemote(chunkSize)
             offset += chunkSize
         }
     }

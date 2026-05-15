@@ -18,7 +18,6 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.channels.Channel
-import org.connectbot.sshlib.SshException
 import org.slf4j.LoggerFactory
 
 internal class AgentChannel(
@@ -28,16 +27,16 @@ internal class AgentChannel(
     private var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
     remoteWindowSizeInitial: Long,
+    initialWindowSize: Int = 64 * 1024,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(AgentChannel::class.java)
-        private const val MAX_WINDOW_SIZE = 0xFFFFFFFFL
     }
 
     private var _isOpen = true
     private var closeSent = false
 
-    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     val isOpen: Boolean get() = _isOpen
@@ -47,8 +46,12 @@ internal class AgentChannel(
             logger.warn("Received data on closed agent channel")
             return
         }
+        val adjust = window.consumeLocal(data.size)
 
         logger.debug("Agent channel received ${data.size} bytes")
+        if (adjust > 0) {
+            connection.sendWindowAdjust(remoteChannelNumber, adjust)
+        }
 
         val response = handler.handleRequest(data)
 
@@ -57,15 +60,9 @@ internal class AgentChannel(
     }
 
     fun onWindowAdjust(bytesToAdd: Long) {
-        if (bytesToAdd <= 0) {
-            throw SshException("Invalid window adjust: bytesToAdd must be positive, got $bytesToAdd")
-        }
-        if (remoteWindowSize + bytesToAdd > MAX_WINDOW_SIZE) {
-            throw SshException("Channel window overflow: current=$remoteWindowSize, adding=$bytesToAdd exceeds max $MAX_WINDOW_SIZE")
-        }
-        remoteWindowSize += bytesToAdd
-        logger.debug("Agent channel window adjust +$bytesToAdd, remote window now $remoteWindowSize")
-        if (remoteWindowSize > 0) {
+        window.adjustRemote(bytesToAdd)
+        logger.debug("Agent channel window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
+        if (window.remoteRemaining > 0) {
             windowAvailable.trySend(Unit)
         }
     }
@@ -91,17 +88,17 @@ internal class AgentChannel(
     private suspend fun sendData(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
-            while (remoteWindowSize <= 0) {
+            while (window.remoteRemaining <= 0) {
                 windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,
-                remoteWindowSize.toInt(),
+                window.remoteRemaining.toInt(),
                 maxPacketSize,
             )
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(remoteChannelNumber, chunk)
-            remoteWindowSize -= chunkSize
+            window.consumeRemote(chunkSize)
             offset += chunkSize
         }
     }
