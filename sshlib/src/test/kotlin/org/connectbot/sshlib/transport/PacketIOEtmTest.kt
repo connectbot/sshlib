@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import org.connectbot.sshlib.crypto.HmacSha256
 import org.connectbot.sshlib.crypto.TripleDesCbcCipher
 import org.connectbot.sshlib.protocol.SshEnums
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class PacketIOEtmTest {
@@ -171,6 +172,41 @@ class PacketIOEtmTest {
 
         val parsed = readIO.readPacket()
         assertEquals(SshEnums.MessageType.SSH_MSG_NEWKEYS, parsed.messageType())
+    }
+
+    @Test
+    fun `ETM rejects tampered MAC`() {
+        val (cipherKey, iv, macKey) = createKeyMaterial()
+
+        val writeTransport = ByteArrayTransport()
+        val writeIO = PacketIO(writeTransport)
+        writeIO.enableEncryption(
+            clientToServerCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = true),
+            clientToServerMac = HmacSha256(macKey.copyOf()),
+            serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
+            serverToClientMac = HmacSha256(macKey.copyOf()),
+            clientToServerEtm = true,
+            serverToClientEtm = true,
+        )
+        runBlocking { writeIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
+
+        val wireData = writeTransport.getWrittenData().clone()
+        wireData[wireData.size - 1] = (wireData[wireData.size - 1].toInt() xor 0xFF).toByte()
+
+        val readTransport = ByteArrayTransport(wireData)
+        val readIO = PacketIO(readTransport)
+        readIO.enableEncryption(
+            clientToServerCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = true),
+            clientToServerMac = HmacSha256(macKey.copyOf()),
+            serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
+            serverToClientMac = HmacSha256(macKey.copyOf()),
+            clientToServerEtm = true,
+            serverToClientEtm = true,
+        )
+
+        assertThrows(TransportException::class.java) {
+            runBlocking { readIO.readPacket() }
+        }
     }
 
     @Test

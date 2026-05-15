@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 package org.connectbot.sshlib.transport
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.crypto.AesCbcCipher
+import org.connectbot.sshlib.crypto.HmacSha256
 import org.connectbot.sshlib.protocol.SshEnums
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -167,6 +169,39 @@ class PacketIOTest {
         io.resetByteCounters()
         assertEquals(0L, io.bytesSentOnWire)
         assertEquals(0L, io.bytesReceivedOnWire)
+    }
+
+    @Test
+    fun `encrypt-and-MAC rejects tampered MAC`() {
+        val cipherKey = ByteArray(16) { it.toByte() }
+        val iv = ByteArray(16) { (it + 0x10).toByte() }
+        val macKey = ByteArray(32) { (it + 0x20).toByte() }
+
+        val writeTransport = ByteArrayTransport()
+        val writeIO = PacketIO(writeTransport)
+        writeIO.enableEncryption(
+            clientToServerCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = true),
+            clientToServerMac = HmacSha256(macKey.copyOf()),
+            serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
+            serverToClientMac = HmacSha256(macKey.copyOf()),
+        )
+        runBlocking { writeIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt()) }
+
+        val wireData = writeTransport.getWrittenData().clone()
+        wireData[wireData.size - 1] = (wireData[wireData.size - 1].toInt() xor 0xFF).toByte()
+
+        val readTransport = ByteArrayTransport(wireData)
+        val readIO = PacketIO(readTransport)
+        readIO.enableEncryption(
+            clientToServerCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = true),
+            clientToServerMac = HmacSha256(macKey.copyOf()),
+            serverToClientCipher = AesCbcCipher(cipherKey, iv.copyOf(), forEncryption = false),
+            serverToClientMac = HmacSha256(macKey.copyOf()),
+        )
+
+        assertThrows(TransportException::class.java) {
+            runBlocking { readIO.readPacket() }
+        }
     }
 
     // calculatePaddingLength: totalLength = 4 + 1 + (1 + payload.size) = 6 + payload.size.
