@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,6 +122,15 @@ class EcdhKeyExchangeTest {
 
         assertFailsWith<SshException> {
             ecdh.computeSharedSecret(invalidPoint)
+        }
+    }
+
+    @Test
+    fun `rejects all-zero shared secret`() {
+        val ecdh = EcdhKeyExchange("nistp256")
+        ecdh.generateClientKeys()
+        assertFailsWith<SshException> {
+            ecdh.computeSharedSecretFromRaw(ByteArray(32))
         }
     }
 

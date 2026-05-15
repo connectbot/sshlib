@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,12 +96,19 @@ internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
             agreement.doPhase(serverPubKey, true)
             val rawSecret = agreement.generateSecret()
 
-            return encodeMpint(BigInteger(1, rawSecret).toByteArray())
+            return computeSharedSecretFromRaw(rawSecret)
         } catch (e: SshException) {
             throw e
         } catch (e: Exception) {
             throw SshException("Invalid server ECDH public key: ${e.message}", e)
         }
+    }
+
+    internal fun computeSharedSecretFromRaw(rawSecret: ByteArray): ByteArray {
+        if (rawSecret.all { it == 0.toByte() }) {
+            throw SshException("Invalid ECDH shared secret: all zeroes")
+        }
+        return encodeMpint(BigInteger(1, rawSecret).toByteArray())
     }
 
     private fun encodeEcPoint(point: ECPoint): ByteArray {
