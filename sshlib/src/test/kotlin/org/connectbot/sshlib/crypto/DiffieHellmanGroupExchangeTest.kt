@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,80 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DiffieHellmanGroupExchangeTest {
+
+    // A tiny 16-bit prime — far below the min=2048 requested by the client
+    private val tinyPrime = BigInteger("65537")
+
+    // A 2048-bit composite (GROUP14_P with the last bit flipped) — not a safe prime
+    private val compositeLikePrime = DhGroups.GROUP14_P.subtract(BigInteger.ONE)
+
+    @Test
+    fun `setGroup rejects p smaller than min bits`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(tinyPrime, DhGroups.GENERATOR)
+        }
+    }
+
+    @Test
+    fun `setGroup rejects p larger than max bits`() {
+        // Construct a number just over 8192 bits
+        val tooBig = BigInteger.ONE.shiftLeft(8193)
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(tooBig, DhGroups.GENERATOR)
+        }
+    }
+
+    @Test
+    fun `setGroup rejects g equal to 1`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(DhGroups.GROUP14_P, BigInteger.ONE)
+        }
+    }
+
+    @Test
+    fun `setGroup rejects g equal to 0`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(DhGroups.GROUP14_P, BigInteger.ZERO)
+        }
+    }
+
+    @Test
+    fun `setGroup rejects g greater than or equal to p minus 1`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(DhGroups.GROUP14_P, DhGroups.GROUP14_P - BigInteger.ONE)
+        }
+    }
+
+    @Test
+    fun `setGroup rejects even p`() {
+        val evenP = DhGroups.GROUP14_P.subtract(BigInteger.ONE) // make it even
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        assertFailsWith<SshException> {
+            gex.setGroup(evenP, DhGroups.GENERATOR)
+        }
+    }
+
+    @Test
+    fun `setGroup accepts valid group 14 parameters`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        gex.setGroup(DhGroups.GROUP14_P, DhGroups.GENERATOR)
+        // Should not throw; verify we can generate keys
+        val e = gex.generateClientKeys()
+        assertTrue(e.isNotEmpty())
+    }
+
+    @Test
+    fun `setGroup accepts valid group 16 parameters`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        gex.setGroup(DhGroups.GROUP16_P, DhGroups.GENERATOR)
+        val e = gex.generateClientKeys()
+        assertTrue(e.isNotEmpty())
+    }
 
     @Test
     fun `generateClientKeys throws if group not set`() {
