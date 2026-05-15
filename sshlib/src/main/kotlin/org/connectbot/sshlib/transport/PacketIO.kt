@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import org.connectbot.sshlib.protocol.UnencryptedPacket
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import kotlin.random.Random
 
 /**
@@ -321,7 +322,7 @@ internal class PacketIO(private val transport: Transport) {
 
         // Verify MAC (over plaintext for encrypt-and-MAC)
         val expectedMac = mac.compute(receiveSequenceNumber, decryptedPacket)
-        if (!receivedMac.contentEquals(expectedMac)) {
+        if (!MessageDigest.isEqual(receivedMac, expectedMac)) {
             logger.error("MAC verification failed for seq=$receiveSequenceNumber")
             logger.error("  Received MAC: ${receivedMac.joinToString("") { "%02x".format(it) }}")
             logger.error("  Expected MAC: ${expectedMac.joinToString("") { "%02x".format(it) }}")
@@ -361,7 +362,7 @@ internal class PacketIO(private val transport: Transport) {
 
         // Verify MAC (over sequence_number || length || encrypted_payload)
         val expectedMac = mac.computeEtm(receiveSequenceNumber, encryptedLength, encryptedPayload)
-        if (!receivedMac.contentEquals(expectedMac)) {
+        if (!MessageDigest.isEqual(receivedMac, expectedMac)) {
             logger.error("ETM MAC verification failed for seq=$receiveSequenceNumber")
             throw TransportException("ETM MAC verification failed")
         }
