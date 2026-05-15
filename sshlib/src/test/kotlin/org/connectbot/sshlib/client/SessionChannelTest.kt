@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionChannelTest {
@@ -156,5 +158,46 @@ class SessionChannelTest {
         channel.close()
 
         coVerify(exactly = 1) { conn.sendChannelClose(1) }
+    }
+
+    @Test
+    fun `onWindowAdjust throws when remote window would exceed max uint32`() = runTest {
+        // Start with a large initial window and try to push it over 2^32-1
+        val (channel, _) = createChannel(
+            connection = mockk(relaxed = true),
+            initialWindowSize = 64 * 1024,
+        )
+        // channel starts with remoteWindowSizeInitial = 64 * 1024; add enough to overflow uint32
+        val overflow = (0xFFFFFFFFL - 64 * 1024L) + 1L
+        assertFailsWith<SshException> {
+            channel.onWindowAdjust(overflow)
+        }
+    }
+
+    @Test
+    fun `onWindowAdjust accepts legitimate adjustment within uint32 range`() = runTest {
+        val (channel, _) = createChannel(
+            connection = mockk(relaxed = true),
+            initialWindowSize = 64 * 1024,
+        )
+        // Valid: bring window up to exactly 2^32-1
+        val maxAdd = 0xFFFFFFFFL - 64 * 1024L
+        channel.onWindowAdjust(maxAdd) // should not throw
+    }
+
+    @Test
+    fun `onWindowAdjust rejects zero adjustment`() = runTest {
+        val (channel, _) = createChannel(connection = mockk(relaxed = true))
+        assertFailsWith<SshException> {
+            channel.onWindowAdjust(0L)
+        }
+    }
+
+    @Test
+    fun `onWindowAdjust rejects negative adjustment`() = runTest {
+        val (channel, _) = createChannel(connection = mockk(relaxed = true))
+        assertFailsWith<SshException> {
+            channel.onWindowAdjust(-1L)
+        }
     }
 }

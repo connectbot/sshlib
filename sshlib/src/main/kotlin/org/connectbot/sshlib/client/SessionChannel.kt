@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestExec
@@ -52,6 +53,7 @@ class SessionChannel internal constructor(
     companion object {
         private val logger = LoggerFactory.getLogger(SessionChannel::class.java)
         private const val WINDOW_ADJUST_THRESHOLD = 16 * 1024
+        private const val MAX_WINDOW_SIZE = 0xFFFFFFFFL
     }
 
     private var _isOpen = true
@@ -109,6 +111,12 @@ class SessionChannel internal constructor(
     }
 
     internal fun onWindowAdjust(bytesToAdd: Long) {
+        if (bytesToAdd <= 0) {
+            throw SshException("Invalid window adjust: bytesToAdd must be positive, got $bytesToAdd")
+        }
+        if (remoteWindowSize + bytesToAdd > MAX_WINDOW_SIZE) {
+            throw SshException("Channel window overflow: current=$remoteWindowSize, adding=$bytesToAdd exceeds max $MAX_WINDOW_SIZE")
+        }
         remoteWindowSize += bytesToAdd
         logger.debug("Window adjust +$bytesToAdd, remote window now $remoteWindowSize")
         if (remoteWindowSize > 0) {
