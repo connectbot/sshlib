@@ -1329,7 +1329,9 @@ class SshConnection(
         }
         serverHostKeyBlob = serverHostKey
 
-        if (!SignatureVerifier.verify(serverHostKey, signature, hash)) {
+        val negotiatedAlg = negotiatedHostKeyAlgorithm
+            ?: throw SshException("No host key algorithm negotiated")
+        if (!SignatureVerifier.verify(serverHostKey, signature, hash, negotiatedAlg)) {
             logger.error("Server signature verification failed")
             throw SshException("Server signature verification failed")
         }

@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ internal class AgentProtocolHandler(
     private val provider: AgentProvider,
     private val sessionInfo: AgentSessionInfo,
     private val bindVerifier: SessionBindVerifier = SessionBindVerifier { hk, sig, data ->
-        SignatureVerifier.verify(hk, sig, data)
+        SignatureVerifier.verifyWithKeyType(hk, sig, data)
     },
 ) {
     companion object {
