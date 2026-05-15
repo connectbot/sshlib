@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,16 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
 import java.util.zip.Deflater
 import java.util.zip.Inflater
 
 internal class ZlibCompressor : PacketCompressor {
+    companion object {
+        // Max decompressed size per packet. Prevents decompression-bomb DoS from a malicious server.
+        internal const val MAX_UNCOMPRESSED_SIZE = 512 * 1024
+    }
+
     private val deflater = Deflater(5)
     private val inflater = Inflater()
 
@@ -54,8 +60,12 @@ internal class ZlibCompressor : PacketCompressor {
             val count = inflater.inflate(output, totalOut, output.size - totalOut)
             totalOut += count
             if (count == 0) break
+            if (totalOut > MAX_UNCOMPRESSED_SIZE) {
+                throw SshException("Decompressed packet exceeds maximum allowed size ($MAX_UNCOMPRESSED_SIZE bytes)")
+            }
             if (totalOut == output.size) {
-                output = output.copyOf(output.size * 2)
+                val newSize = minOf(output.size * 2, MAX_UNCOMPRESSED_SIZE + 1)
+                output = output.copyOf(newSize)
             }
         }
 

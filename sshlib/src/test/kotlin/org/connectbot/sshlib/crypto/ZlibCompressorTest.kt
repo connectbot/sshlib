@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
+import kotlin.test.assertFailsWith
 
 class ZlibCompressorTest {
 
@@ -109,6 +111,34 @@ class ZlibCompressorTest {
         val decompressed = decompressor.uncompress(compressed)
         assertArrayEquals(data, decompressed)
         assertEquals(data.size, decompressed.size)
+    }
+
+    @Test
+    fun `rejects decompression bomb exceeding limit`() {
+        val compressor = ZlibCompressor()
+        val decompressor = ZlibCompressor()
+
+        // Highly compressible data: 1 MB of zeros compresses to ~1 KB
+        val bomb = ByteArray(1_024 * 1_024)
+        val compressed = compressor.compress(bomb)
+
+        // The compressed form is small, but decompressing it must be rejected
+        // when the output would exceed MAX_UNCOMPRESSED_SIZE
+        assertFailsWith<SshException> {
+            decompressor.uncompress(compressed)
+        }
+    }
+
+    @Test
+    fun `accepts decompressed output within limit`() {
+        val compressor = ZlibCompressor()
+        val decompressor = ZlibCompressor()
+
+        // Half of the limit — should succeed
+        val data = ByteArray(ZlibCompressor.MAX_UNCOMPRESSED_SIZE / 2) { it.toByte() }
+        val compressed = compressor.compress(data)
+        val result = decompressor.uncompress(compressed)
+        assertArrayEquals(data, result)
     }
 
     @Test
