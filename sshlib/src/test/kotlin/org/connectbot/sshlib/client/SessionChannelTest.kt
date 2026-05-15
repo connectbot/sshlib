@@ -200,4 +200,26 @@ class SessionChannelTest {
             channel.onWindowAdjust(-1L)
         }
     }
+
+    @Test
+    fun `onData rejects data exceeding local window size`() = runTest {
+        val (channel, _) = createChannel(initialWindowSize = 1024)
+        assertFailsWith<SshException> {
+            channel.onData(ByteArray(1025))
+        }
+    }
+
+    @Test
+    fun `onData accepts data exactly filling local window`() = runTest {
+        val (channel, _) = createChannel(initialWindowSize = 1024)
+        channel.onData(ByteArray(1024))
+    }
+
+    @Test
+    fun `onExtendedData rejects data exceeding local window size`() = runTest {
+        val (channel, _) = createChannel(initialWindowSize = 512)
+        assertFailsWith<SshException> {
+            channel.onExtendedData(1, ByteArray(513))
+        }
+    }
 }

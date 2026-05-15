@@ -19,7 +19,6 @@ package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import org.connectbot.sshlib.SshException
 import org.slf4j.LoggerFactory
 
 internal class ForwardingChannel(
@@ -32,15 +31,11 @@ internal class ForwardingChannel(
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(ForwardingChannel::class.java)
-        private const val WINDOW_ADJUST_THRESHOLD = 64 * 1024
-        private const val MAX_WINDOW_SIZE = 0xFFFFFFFFL
     }
 
     private var _isOpen = true
     private var closeSent = false
-    private var localWindowSize: Long = initialWindowSize.toLong()
-
-    @Volatile private var remoteWindowSize: Long = remoteWindowSizeInitial
+    private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val _incomingData = Channel<ByteArray>(Channel.UNLIMITED)
@@ -49,25 +44,17 @@ internal class ForwardingChannel(
     val isOpen: Boolean get() = _isOpen
 
     internal suspend fun onData(data: ByteArray) {
+        val adjust = window.consumeLocal(data.size)
         _incomingData.trySend(data)
-        localWindowSize -= data.size
-        if (localWindowSize < WINDOW_ADJUST_THRESHOLD) {
-            val adjust = initialWindowSize - localWindowSize.toInt()
-            localWindowSize += adjust
+        if (adjust > 0) {
             connection.sendWindowAdjust(remoteChannelNumber, adjust)
         }
     }
 
     internal fun onWindowAdjust(bytesToAdd: Long) {
-        if (bytesToAdd <= 0) {
-            throw SshException("Invalid window adjust: bytesToAdd must be positive, got $bytesToAdd")
-        }
-        if (remoteWindowSize + bytesToAdd > MAX_WINDOW_SIZE) {
-            throw SshException("Channel window overflow: current=$remoteWindowSize, adding=$bytesToAdd exceeds max $MAX_WINDOW_SIZE")
-        }
-        remoteWindowSize += bytesToAdd
-        logger.debug("Forwarding channel window adjust +$bytesToAdd, remote window now $remoteWindowSize")
-        if (remoteWindowSize > 0) {
+        window.adjustRemote(bytesToAdd)
+        logger.debug("Forwarding channel window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
+        if (window.remoteRemaining > 0) {
             windowAvailable.trySend(Unit)
         }
     }
@@ -95,17 +82,17 @@ internal class ForwardingChannel(
     suspend fun sendData(data: ByteArray) {
         var offset = 0
         while (offset < data.size) {
-            while (remoteWindowSize <= 0) {
+            while (window.remoteRemaining <= 0) {
                 windowAvailable.receive()
             }
             val chunkSize = minOf(
                 data.size - offset,
-                remoteWindowSize.toInt(),
+                window.remoteRemaining.toInt(),
                 maxPacketSize,
             )
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(remoteChannelNumber, chunk)
-            remoteWindowSize -= chunkSize
+            window.consumeRemote(chunkSize)
             offset += chunkSize
         }
     }
