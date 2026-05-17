@@ -19,7 +19,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.spotless)
     alias(libs.plugins.publish)
     alias(libs.plugins.dokka)
     alias(libs.plugins.metalava)
@@ -78,37 +77,6 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
-
-spotless {
-    kotlinGradle {
-        target(
-            fileTree(".") {
-                include("**/*.gradle.kts")
-                exclude("**/build", "**/out")
-            },
-        )
-        ktlint()
-    }
-
-    kotlin {
-        ktlint("1.8.0")
-    }
-
-    format("xml") {
-        target(
-            fileTree(".") {
-                include("config/**/*.xml", "lib/**/*.xml", "test-app/**/*.xml")
-                exclude("**/build", "**/out")
-            },
-        )
-    }
-
-    format("misc") {
-        target("**/.gitignore")
-        trimTrailingWhitespace()
-        endWithNewline()
     }
 }
 

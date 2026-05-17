@@ -36,3 +36,43 @@ allprojects {
 dependencies {
     kover(project(":sshlib"))
 }
+
+spotless {
+    ratchetFrom = "origin/main"
+
+    kotlin {
+        target("**/src/**/*.kt")
+        ktlint("1.8.0")
+        licenseHeaderFile("spotless/license-header.txt")
+    }
+
+    kotlinGradle {
+        target("**/*.gradle.kts")
+        ktlint("1.8.0")
+    }
+
+    yaml {
+        target(".github/**/*.yml", ".github/**/*.yaml")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format("xml") {
+        target("**/*.xml")
+        targetExclude("**/.idea/**/*.xml", "**/bin/**/*.xml", "**/build/**/*.xml", "**/.worktrees/**/*.xml")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format("toml") {
+        target("**/*.toml")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    format("misc") {
+        target(listOf("**/*.md", "**/.gitignore", "**/.gitattributes", "**/.editorconfig"))
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
