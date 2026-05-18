@@ -1,5 +1,6 @@
 /*
- * Copyright 2025 Kenny Root
+ * ConnectBot SSH Library
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,10 +44,13 @@ import org.connectbot.sshlib.protocol.SshMsgKexinit
 import org.connectbot.sshlib.protocol.SshMsgPing
 import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
+import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
+import org.connectbot.sshlib.protocol.SshMsgUserauthFailure
 import org.connectbot.sshlib.protocol.SshMsgUserauthRequest
 import org.connectbot.sshlib.protocol.createAsciiString
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.createNameList
+import org.connectbot.sshlib.protocol.createUtf8String
 import org.connectbot.sshlib.protocol.toByteArray
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.PipedTransport
@@ -541,6 +545,31 @@ class FakeSshServer(
             ping._check()
             writeMutex.withLock {
                 serverIo.writePacket(SshEnums.MessageType.SSH_MSG_PING.id().toInt(), ping.toByteArray())
+            }
+        }
+    }
+
+    fun sendUserauthBanner(message: String) {
+        scope.launch(coroutineContext) {
+            val banner = SshMsgUserauthBanner()
+            val utf8 = createUtf8String(message)
+            banner.setMessage(utf8)
+            banner.setLanguageTag(createByteString(ByteArray(0)))
+            banner._check()
+            writeMutex.withLock {
+                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER.id().toInt(), banner.toByteArray())
+            }
+        }
+    }
+
+    fun sendUserauthFailure(allowedMethods: Set<String>, partialSuccess: Boolean) {
+        scope.launch(coroutineContext) {
+            val failure = SshMsgUserauthFailure()
+            failure.setValidAuthentications(createNameList(allowedMethods.joinToString(",")))
+            failure.setPartialSuccess(if (partialSuccess) 1 else 0)
+            failure._check()
+            writeMutex.withLock {
+                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE.id().toInt(), failure.toByteArray())
             }
         }
     }

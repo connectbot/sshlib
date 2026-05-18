@@ -1,5 +1,6 @@
 /*
- * Copyright 2025 Kenny Root
+ * ConnectBot SSH Library
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +71,12 @@ interface AuthHandler {
      * Return the password, or null to skip password auth.
      */
     suspend fun onPasswordNeeded(): String?
+
+    /**
+     * Called when the server sends an authentication banner (SSH_MSG_USERAUTH_BANNER).
+     * This is often used for out-of-band authentication instructions (e.g., a URL to visit).
+     */
+    suspend fun onBanner(message: String) {}
 }
 
 /**

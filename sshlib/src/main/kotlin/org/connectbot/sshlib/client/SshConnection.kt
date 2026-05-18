@@ -1,5 +1,6 @@
 /*
- * Copyright 2025 Kenny Root
+ * ConnectBot SSH Library
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -743,7 +744,11 @@ class SshConnection(
                 setMethodSpecificFields(noneAuth)
             }
 
-            val noneResult = channel.receive()
+            var noneResult = channel.receive()
+            while (noneResult is InternalAuthResult.Banner) {
+                handler.onBanner(noneResult.message)
+                noneResult = channel.receive()
+            }
             if (noneResult is InternalAuthResult.Success) return PublicAuthResult.Success
             if (noneResult !is InternalAuthResult.Failure) return PublicAuthResult.Error("Unexpected response to 'none' auth: $noneResult")
 
@@ -758,7 +763,7 @@ class SshConnection(
             val keys = handler.onPublicKeysNeeded()
             for (key in keys) {
                 if (key in triedPublicKeys) continue
-                val probeResult = probePublicKey(username, key, channel)
+                val probeResult = probePublicKey(username, key, handler, channel)
                 if (probeResult is InternalAuthResult.Success) return PublicAuthResult.Success
                 if (probeResult is InternalAuthResult.PkOk) {
                     triedPublicKeys.add(key)
@@ -783,7 +788,7 @@ class SshConnection(
 
                 is AuthMethod.Password -> {
                     val password = handler.onPasswordNeeded() ?: return PublicAuthResult.Failure(allowedAuthentications ?: emptySet())
-                    val passResult = doPasswordAuth(username, password, channel)
+                    val passResult = doPasswordAuth(username, password, handler, channel)
                     if (passResult) return PublicAuthResult.Success
                 }
 
@@ -801,6 +806,7 @@ class SshConnection(
     private suspend fun probePublicKey(
         username: String,
         key: AuthPublicKey,
+        handler: AuthHandler,
         channel: Channel<InternalAuthResult>,
     ): InternalAuthResult {
         val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == "ssh-rsa") {
@@ -817,7 +823,12 @@ class SshConnection(
             }
             setMethodSpecificFields(pubkeyAuth)
         }
-        return channel.receive()
+        var response = channel.receive()
+        while (response is InternalAuthResult.Banner) {
+            handler.onBanner(response.message)
+            response = channel.receive()
+        }
+        return response
     }
 
     private suspend fun signPublicKey(
@@ -870,7 +881,12 @@ class SshConnection(
             }
         }
 
-        return when (channel.receive()) {
+        var response = channel.receive()
+        while (response is InternalAuthResult.Banner) {
+            handler.onBanner(response.message)
+            response = channel.receive()
+        }
+        return when (response) {
             is InternalAuthResult.Success -> true
             else -> false
         }
@@ -892,6 +908,10 @@ class SshConnection(
 
         while (true) {
             when (val result = channel.receive()) {
+                is InternalAuthResult.Banner -> {
+                    handler.onBanner(result.message)
+                }
+
                 is InternalAuthResult.Success -> return true
 
                 is InternalAuthResult.Failure -> {
@@ -933,6 +953,7 @@ class SshConnection(
     private suspend fun doPasswordAuth(
         username: String,
         password: String,
+        handler: AuthHandler,
         channel: Channel<InternalAuthResult>,
     ): Boolean {
         sendAuthRequest(username, "password") {
@@ -944,7 +965,12 @@ class SshConnection(
             setMethodSpecificFields(passAuth)
         }
 
-        return when (val result = channel.receive()) {
+        var response = channel.receive()
+        while (response is InternalAuthResult.Banner) {
+            handler.onBanner(response.message)
+            response = channel.receive()
+        }
+        return when (val result = response) {
             is InternalAuthResult.Success -> true
 
             is InternalAuthResult.Failure -> {
@@ -1624,7 +1650,15 @@ class SshConnection(
     }
 
     private fun receiveUserauthBanner(msg: SshMsgUserauthBanner) {
-        logger.info("SSH banner: ${msg.message().value()}")
+        val ch = authResultChannel
+        if (ch != null) {
+            val message = msg.message().value()
+            if (ch.trySend(InternalAuthResult.Banner(message)).isFailure) {
+                logger.warn("Failed to deliver banner to auth channel")
+            }
+        } else {
+            logger.info("SSH banner: ${msg.message().value()}")
+        }
     }
 
     private fun debug(msg: SshMsgDebug) {
