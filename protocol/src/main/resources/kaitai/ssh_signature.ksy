@@ -8,6 +8,8 @@ meta:
   - ssh_ed25519_signature_blob
   - ssh_ed448_signature_blob
   - ssh_rsa_signature_blob
+  - sk_ed25519_signature_blob
+  - sk_ecdsa_p256_signature_blob
 doc-ref: RFC 4253 section 6.6
 doc: >
   Generic SSH signature structure. The signature blob format is defined
@@ -32,4 +34,6 @@ seq:
       '"ecdsa-sha2-nistp521"': ecdsa_signature_blob
       '"ssh-ed25519"': ssh_ed25519_signature_blob
       '"ssh-ed448"': ssh_ed448_signature_blob
+      '"sk-ssh-ed25519@openssh.com"': sk_ed25519_signature_blob
+      '"sk-ecdsa-sha2-nistp256@openssh.com"': sk_ecdsa_p256_signature_blob
       _: byte_string

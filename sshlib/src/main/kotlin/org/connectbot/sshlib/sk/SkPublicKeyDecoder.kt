@@ -16,7 +16,11 @@
 
 package org.connectbot.sshlib.sk
 
+import io.kaitai.struct.ByteBufferKaitaiStream
 import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.protocol.SkEcdsaP256PublicKeyBlob
+import org.connectbot.sshlib.protocol.SkEd25519PublicKeyBlob
+import org.connectbot.sshlib.protocol.SshPublicKey
 
 /**
  * Parses OpenSSH SK public-key wire blobs into an [SkPublicKey].
@@ -43,80 +47,47 @@ public object SkPublicKeyDecoder {
      *   uses an algorithm name that is not one of the known SK algorithms.
      */
     public fun decode(blob: ByteArray): SkPublicKey {
-        val reader = SshWireReader(blob)
-        val algoBytes = reader.readSshString()
-        val algoName = algoBytes.toString(Charsets.US_ASCII)
+        val stream = ByteBufferKaitaiStream(blob)
+        val kaitai = SshPublicKey(stream)
+        try {
+            kaitai._read()
+            if (!stream.isEof) {
+                throw SshException("Trailing bytes after SK public key blob")
+            }
+        } catch (e: Exception) {
+            if (e is SshException) throw e
+            throw SshException("Malformed SK public key blob: ${e.message}", e)
+        }
+
+        val algoName = kaitai.algorithmName()
         val algorithm = SkAlgorithm.fromSshName(algoName)
             ?: throw SshException("Not an SK public key blob: algorithm = \"$algoName\"")
 
-        val result = when (algorithm) {
-            SkAlgorithm.ED25519 -> decodeEd25519Body(reader)
-            SkAlgorithm.ECDSA_P256 -> decodeEcdsaP256Body(reader)
-        }
+        return when (val keyBlob = kaitai.keyBlob()) {
+            is SkEd25519PublicKeyBlob -> {
+                val rawKey = keyBlob.publicKey().data()
+                if (rawKey.size != ED25519_RAW_KEY_SIZE) {
+                    throw SshException(
+                        "sk-ssh-ed25519 raw key must be $ED25519_RAW_KEY_SIZE bytes, got ${rawKey.size}",
+                    )
+                }
+                val application = keyBlob.application().data().toString(Charsets.UTF_8)
+                SkPublicKey(SkAlgorithm.ED25519, rawKey, application)
+            }
 
-        reader.expectEnd("trailing bytes after sk public key blob")
-        return result
-    }
+            is SkEcdsaP256PublicKeyBlob -> {
+                val ecPoint = keyBlob.publicKey().data()
+                if (ecPoint.size != P256_POINT_SIZE || ecPoint[0] != 0x04.toByte()) {
+                    throw SshException(
+                        "sk-ecdsa-sha2-nistp256 EC point must be $P256_POINT_SIZE bytes starting with 0x04, " +
+                            "got ${ecPoint.size} bytes",
+                    )
+                }
+                val application = keyBlob.application().data().toString(Charsets.UTF_8)
+                SkPublicKey(SkAlgorithm.ECDSA_P256, ecPoint, application)
+            }
 
-    private fun decodeEd25519Body(reader: SshWireReader): SkPublicKey {
-        val rawKey = reader.readSshString()
-        if (rawKey.size != ED25519_RAW_KEY_SIZE) {
-            throw SshException(
-                "sk-ssh-ed25519 raw key must be $ED25519_RAW_KEY_SIZE bytes, got ${rawKey.size}",
-            )
-        }
-        val application = reader.readSshString().toString(Charsets.UTF_8)
-        return SkPublicKey(SkAlgorithm.ED25519, rawKey, application)
-    }
-
-    private fun decodeEcdsaP256Body(reader: SshWireReader): SkPublicKey {
-        val curveBytes = reader.readSshString()
-        val curveName = curveBytes.toString(Charsets.US_ASCII)
-        if (curveName != P256_CURVE_IDENTIFIER) {
-            throw SshException(
-                "sk-ecdsa-sha2-nistp256 expects curve \"$P256_CURVE_IDENTIFIER\", got \"$curveName\"",
-            )
-        }
-        val ecPoint = reader.readSshString()
-        if (ecPoint.size != P256_POINT_SIZE || ecPoint[0] != 0x04.toByte()) {
-            throw SshException(
-                "sk-ecdsa-sha2-nistp256 EC point must be $P256_POINT_SIZE bytes starting with 0x04, " +
-                    "got ${ecPoint.size} bytes",
-            )
-        }
-        val application = reader.readSshString().toString(Charsets.UTF_8)
-        return SkPublicKey(SkAlgorithm.ECDSA_P256, ecPoint, application)
-    }
-}
-
-/** Internal SSH-wire string reader (uint32-length prefixed). Not part of the public API. */
-internal class SshWireReader(private val buffer: ByteArray) {
-    private var offset: Int = 0
-
-    fun readSshString(): ByteArray {
-        if (offset + 4 > buffer.size) {
-            throw SshException("Truncated SSH string at offset $offset (need 4 length bytes)")
-        }
-        val len = ((buffer[offset].toInt() and 0xff) shl 24) or
-            ((buffer[offset + 1].toInt() and 0xff) shl 16) or
-            ((buffer[offset + 2].toInt() and 0xff) shl 8) or
-            (buffer[offset + 3].toInt() and 0xff)
-        if (len < 0) {
-            throw SshException("SSH string length overflow at offset $offset: $len")
-        }
-        if (offset + 4 + len > buffer.size) {
-            throw SshException(
-                "Truncated SSH string at offset $offset: declared $len bytes, have ${buffer.size - offset - 4}",
-            )
-        }
-        val out = buffer.copyOfRange(offset + 4, offset + 4 + len)
-        offset += 4 + len
-        return out
-    }
-
-    fun expectEnd(message: String) {
-        if (offset != buffer.size) {
-            throw SshException("$message (${buffer.size - offset} bytes remaining)")
+            else -> throw SshException("Unexpected key blob type for $algoName")
         }
     }
 }

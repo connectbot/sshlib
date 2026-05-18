@@ -16,6 +16,8 @@
 
 package org.connectbot.sshlib.sk
 
+import nl.jqno.equalsverifier.EqualsVerifier
+import nl.jqno.equalsverifier.Warning
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -44,5 +46,12 @@ class SkAlgorithmTest {
         assertFalse(SkAlgorithm.isSkAlgorithm("ssh-ed25519"))
         // Other SK variants (e.g. webauthn) intentionally not handled by this helper
         assertFalse(SkAlgorithm.isSkAlgorithm("webauthn-sk-ecdsa-sha2-nistp256@openssh.com"))
+    }
+
+    @Test
+    fun `SkPublicKey respects equals and hashCode contract`() {
+        EqualsVerifier.forClass(SkPublicKey::class.java)
+            .suppress(Warning.SURROGATE_KEY)
+            .verify()
     }
 }
