@@ -1,5 +1,6 @@
 /*
- * Copyright 2025 Kenny Root
+ * ConnectBot SSH Library
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,4 +28,5 @@ internal sealed class InternalAuthResult {
         val instruction: String,
         val prompts: List<KeyboardInteractiveCallback.Prompt>,
     ) : InternalAuthResult()
+    data class Banner(val message: String) : InternalAuthResult()
 }
