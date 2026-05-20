@@ -81,7 +81,7 @@ kotlin {
     }
 }
 
-val gitHubUrl = "https://github.com/kruton/ssh-proto"
+val gitHubUrl = "https://github.com/connectbot/cbssh"
 
 dokka {
     moduleName.set("ConnectBot SSH Library")
@@ -123,8 +123,8 @@ mavenPublishing {
 
     pom {
         name.set("sshlib")
-        description.set("ConnectBot's SSH library written with Kotlin suspend functions.")
-        inceptionYear.set("2025")
+        description.set("ConnectBot SSH Client Library")
+        inceptionYear.set("2019")
         url.set(gitHubUrl)
         licenses {
             license {

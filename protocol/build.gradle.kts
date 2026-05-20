@@ -44,9 +44,12 @@ abstract class KaitaiTask : JavaExec() {
         File(outputDirPath.get()).mkdirs()
         args = listOf(
             "--read-write",
-            "--target", "java",
-            "--outdir", outputDirPath.get(),
-            "--java-package", javaPackage.get()
+            "--target",
+            "java",
+            "--outdir",
+            outputDirPath.get(),
+            "--java-package",
+            javaPackage.get(),
         ) + ksyFiles.files.map { it.absolutePath }
         super.exec()
     }
@@ -83,7 +86,7 @@ java {
     }
 }
 
-val gitHubUrl = "https://github.com/kruton/ssh-proto"
+val gitHubUrl = "https://github.com/connectbot/cbssh"
 
 dokka {
     moduleName.set("ConnectBot SSH Protocol Messages")
@@ -125,8 +128,8 @@ mavenPublishing {
 
     pom {
         name.set("protocol")
-        description.set("ConnectBot's SSH protocol messages in Kaitai Struct.")
-        inceptionYear.set("2025")
+        description.set("Protocol messages for ConnectBot SSH client library")
+        inceptionYear.set("2019")
         url.set(gitHubUrl)
         licenses {
             license {
