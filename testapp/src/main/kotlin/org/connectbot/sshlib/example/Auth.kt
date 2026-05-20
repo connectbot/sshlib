@@ -1,4 +1,5 @@
 /*
+ * ConnectBot SSH Library
  * Copyright 2025 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,14 +22,13 @@ import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.SshClient
 import java.io.Console
 
-internal fun readPassphrase(console: Console?, prompt: String): String =
-    if (console != null) {
-        String(console.readPassword(prompt))
-    } else {
-        System.err.print(prompt)
-        System.err.flush()
-        readlnOrNull() ?: ""
-    }
+internal fun readPassphrase(console: Console?, prompt: String): String = if (console != null) {
+    String(console.readPassword(prompt))
+} else {
+    System.err.print(prompt)
+    System.err.flush()
+    readlnOrNull() ?: ""
+}
 
 internal class ConsoleKeyboardInteractiveCallback(
     private val console: Console?,
@@ -44,8 +44,7 @@ internal class ConsoleKeyboardInteractiveCallback(
         respond(prompts.map { readPromptResponse(it) })
     }
 
-    private fun readPromptResponse(prompt: KeyboardInteractiveCallback.Prompt): String =
-        if (prompt.echo) readEchoPrompt(prompt.text) else readPassphrase(console, prompt.text)
+    private fun readPromptResponse(prompt: KeyboardInteractiveCallback.Prompt): String = if (prompt.echo) readEchoPrompt(prompt.text) else readPassphrase(console, prompt.text)
 
     private fun readEchoPrompt(text: String): String {
         System.err.print(text)
@@ -60,14 +59,13 @@ internal suspend fun authenticateInteractive(client: SshClient, user: String): B
     return authenticatePassword(client, user, console)
 }
 
-private fun readPassword(console: Console?): String? =
-    if (console != null) {
-        String(console.readPassword("Password: "))
-    } else {
-        System.err.println("Warning: no console available, reading password from stdin")
-        print("Password: ")
-        readlnOrNull()
-    }
+private fun readPassword(console: Console?): String? = if (console != null) {
+    String(console.readPassword("Password: "))
+} else {
+    System.err.println("Warning: no console available, reading password from stdin")
+    print("Password: ")
+    readlnOrNull()
+}
 
 internal suspend fun authenticatePassword(client: SshClient, user: String, console: Console?): Boolean {
     val password = readPassword(console) ?: return false
