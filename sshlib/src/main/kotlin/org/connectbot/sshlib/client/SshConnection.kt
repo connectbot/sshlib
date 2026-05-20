@@ -744,11 +744,7 @@ class SshConnection(
                 setMethodSpecificFields(noneAuth)
             }
 
-            var noneResult = channel.receive()
-            while (noneResult is InternalAuthResult.Banner) {
-                handler.onBanner(noneResult.message)
-                noneResult = channel.receive()
-            }
+            val noneResult = receiveAuthResult(channel, handler)
             if (noneResult is InternalAuthResult.Success) return PublicAuthResult.Success
             if (noneResult !is InternalAuthResult.Failure) return PublicAuthResult.Error("Unexpected response to 'none' auth: $noneResult")
 
@@ -823,12 +819,7 @@ class SshConnection(
             }
             setMethodSpecificFields(pubkeyAuth)
         }
-        var response = channel.receive()
-        while (response is InternalAuthResult.Banner) {
-            handler.onBanner(response.message)
-            response = channel.receive()
-        }
-        return response
+        return receiveAuthResult(channel, handler)
     }
 
     private suspend fun signPublicKey(
@@ -881,11 +872,7 @@ class SshConnection(
             }
         }
 
-        var response = channel.receive()
-        while (response is InternalAuthResult.Banner) {
-            handler.onBanner(response.message)
-            response = channel.receive()
-        }
+        val response = receiveAuthResult(channel, handler)
         return when (response) {
             is InternalAuthResult.Success -> true
             else -> false
@@ -965,11 +952,7 @@ class SshConnection(
             setMethodSpecificFields(passAuth)
         }
 
-        var response = channel.receive()
-        while (response is InternalAuthResult.Banner) {
-            handler.onBanner(response.message)
-            response = channel.receive()
-        }
+        val response = receiveAuthResult(channel, handler)
         return when (val result = response) {
             is InternalAuthResult.Success -> true
 
@@ -980,6 +963,18 @@ class SshConnection(
 
             else -> false
         }
+    }
+
+    private suspend fun receiveAuthResult(
+        channel: Channel<InternalAuthResult>,
+        handler: AuthHandler,
+    ): InternalAuthResult {
+        var result = channel.receive()
+        while (result is InternalAuthResult.Banner) {
+            handler.onBanner(result.message)
+            result = channel.receive()
+        }
+        return result
     }
 
     private suspend fun sendAuthRequest(

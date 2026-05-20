@@ -549,28 +549,24 @@ class FakeSshServer(
         }
     }
 
-    fun sendUserauthBanner(message: String) {
-        scope.launch(coroutineContext) {
-            val banner = SshMsgUserauthBanner()
-            val utf8 = createUtf8String(message)
-            banner.setMessage(utf8)
-            banner.setLanguageTag(createByteString(ByteArray(0)))
-            banner._check()
-            writeMutex.withLock {
-                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER.id().toInt(), banner.toByteArray())
-            }
+    suspend fun sendUserauthBanner(message: String) {
+        val banner = SshMsgUserauthBanner()
+        val utf8 = createUtf8String(message)
+        banner.setMessage(utf8)
+        banner.setLanguageTag(createByteString(ByteArray(0)))
+        banner._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER.id().toInt(), banner.toByteArray())
         }
     }
 
-    fun sendUserauthFailure(allowedMethods: Set<String>, partialSuccess: Boolean) {
-        scope.launch(coroutineContext) {
-            val failure = SshMsgUserauthFailure()
-            failure.setValidAuthentications(createNameList(allowedMethods.joinToString(",")))
-            failure.setPartialSuccess(if (partialSuccess) 1 else 0)
-            failure._check()
-            writeMutex.withLock {
-                serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE.id().toInt(), failure.toByteArray())
-            }
+    suspend fun sendUserauthFailure(allowedMethods: Set<String>, partialSuccess: Boolean) {
+        val failure = SshMsgUserauthFailure()
+        failure.setValidAuthentications(createNameList(allowedMethods.joinToString(",")))
+        failure.setPartialSuccess(if (partialSuccess) 1 else 0)
+        failure._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE.id().toInt(), failure.toByteArray())
         }
     }
 
