@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@ internal class ChaCha20Poly1305Cipher(private val key: ByteArray) : PacketAead {
         const val KEY_SIZE = 64
         const val TAG_SIZE = 16
         const val BLOCK_SIZE = 8
+        const val KEYSPEC_ALGO = "ChaCha20"
+        const val CIPHER_ALGO = "ChaCha20/None/NoPadding"
     }
 
     override val tagLength: Int = TAG_SIZE
@@ -58,12 +60,12 @@ internal class ChaCha20Poly1305Cipher(private val key: ByteArray) : PacketAead {
     init {
         require(key.size == KEY_SIZE) { "ChaCha20-Poly1305 requires 64 bytes of key material" }
 
-        mainKeySpec = SecretKeySpec(key, 0, 32, "ChaCha20")
-        headerKeySpec = SecretKeySpec(key, 32, 32, "ChaCha20")
+        mainKeySpec = SecretKeySpec(key, 0, 32, KEYSPEC_ALGO)
+        headerKeySpec = SecretKeySpec(key, 32, 32, KEYSPEC_ALGO)
 
-        headerCipher = Cipher.getInstance("ChaCha20")
-        polyKeyCipher = Cipher.getInstance("ChaCha20")
-        payloadCipher = Cipher.getInstance("ChaCha20")
+        headerCipher = Cipher.getInstance(CIPHER_ALGO)
+        polyKeyCipher = Cipher.getInstance(CIPHER_ALGO)
+        payloadCipher = Cipher.getInstance(CIPHER_ALGO)
     }
 
     private fun updateNonce(seqNum: Long) {
