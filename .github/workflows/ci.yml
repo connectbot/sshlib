@@ -50,7 +50,7 @@ jobs:
       - name: Upload to Sonatype
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
         run: |
-          ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername=${ORG_GRADLE_PROJECT_mavenCentralUsername} -PmavenCentralPassword=${ORG_GRADLE_PROJECT_mavenCentralPassword}
+          ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername="${ORG_GRADLE_PROJECT_mavenCentralUsername}" -PmavenCentralPassword="${ORG_GRADLE_PROJECT_mavenCentralPassword}"
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.MAVEN_GPG_KEYID }}
@@ -58,11 +58,9 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_PASSWORD }}
 
-      - name: Upload coverage to Qlty
-        if: matrix.java == '25'
-        uses: qltysh/qlty-action/coverage@a19242102d17e497f437d7466aa01b528537e899 # v2.2.0
-        with:
-          token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
-          format: jacoco
-          add-prefix: sshlib/src/main/kotlin/
-          files: ${{ github.workspace }}/build/reports/kover/report.xml
+      - name: Run SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: "${{ matrix.java == '25' && env.SONAR_TOKEN != '' }}"
+        run: ./gradlew :sshlib:sonar -Dsonar.projectVersion=${{ github.sha }}

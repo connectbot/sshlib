@@ -24,6 +24,7 @@ plugins {
     alias(libs.plugins.metalava)
     alias(libs.plugins.kover)
     alias(libs.plugins.cyclonedx)
+    alias(libs.plugins.sonarqube)
     `java-library`
 }
 
@@ -144,5 +145,14 @@ mavenPublishing {
             developerConnection.set("$gitHubUrl.git")
             url.set(gitHubUrl)
         }
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "connectbot_cbssh")
+        property("sonar.organization", "connectbot")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
     }
 }
