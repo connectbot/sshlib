@@ -110,3 +110,7 @@ local.properties
 
 # Git worktrees
 .worktrees/
+
+# Gradle dependency verification caches and backups
+gradle/verification-keyring.gpg
+gradle/verification-keyring.keys.bak
