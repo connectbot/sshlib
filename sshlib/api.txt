@@ -73,6 +73,7 @@ package org.connectbot.sshlib {
 
   public interface AuthHandler {
     method public default suspend java.lang.Object? onAuthMethodsAvailable(java.util.Set<java.lang.String> methods, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    method public default suspend java.lang.Object? onBanner(java.lang.String message, kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? onKeyboardInteractivePrompt(java.lang.String name, java.lang.String instruction, java.util.List<org.connectbot.sshlib.KeyboardInteractiveCallback.Prompt> prompts, kotlin.coroutines.Continuation<? super java.util.List<java.lang.String>?>);
     method public suspend java.lang.Object? onPasswordNeeded(kotlin.coroutines.Continuation<? super java.lang.String?>);
     method public suspend java.lang.Object? onPublicKeysNeeded(kotlin.coroutines.Continuation<? super java.util.List<org.connectbot.sshlib.AuthPublicKey>>);
@@ -546,9 +547,9 @@ package org.connectbot.sshlib {
   }
 
   public static final class SshClient.Companion {
-    method public operator org.connectbot.sshlib.SshClient invoke(java.lang.String host, optional int port, optional java.lang.String clientVersion);
+    method public operator org.connectbot.sshlib.SshClient invoke(java.lang.String host, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional int port, optional java.lang.String clientVersion);
     method public operator org.connectbot.sshlib.SshClient invoke(org.connectbot.sshlib.SshClientConfig config);
-    method public operator org.connectbot.sshlib.SshClient invoke(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional java.lang.String clientVersion);
+    method public operator org.connectbot.sshlib.SshClient invoke(org.connectbot.sshlib.transport.TransportFactory transportFactory, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String clientVersion);
   }
 
   public final class SshClientConfig {
@@ -693,7 +694,7 @@ package org.connectbot.sshlib.blocking {
     ctor public BlockingSshClient(java.lang.String host, optional int port, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String clientVersion);
     ctor public BlockingSshClient(java.lang.String host, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier);
     ctor public BlockingSshClient(org.connectbot.sshlib.SshClientConfig config);
-    ctor public BlockingSshClient(org.connectbot.sshlib.transport.TransportFactory transportFactory, optional java.lang.String clientVersion);
+    ctor public BlockingSshClient(org.connectbot.sshlib.transport.TransportFactory transportFactory, org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier, optional java.lang.String clientVersion);
     method @kotlin.jvm.Throws(exceptionClasses=SshException::class) public void authenticate(java.lang.String username, org.connectbot.sshlib.AuthHandler handler) throws org.connectbot.sshlib.SshException;
     method @kotlin.jvm.Throws(exceptionClasses=SshException::class) public void authenticateKeyboardInteractive(java.lang.String username, org.connectbot.sshlib.KeyboardInteractiveCallback callback) throws org.connectbot.sshlib.SshException;
     method @kotlin.jvm.Throws(exceptionClasses=SshException::class) public void authenticatePassword(java.lang.String username, java.lang.String password) throws org.connectbot.sshlib.SshException;

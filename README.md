@@ -65,7 +65,7 @@ You can use it by running the following commands:
 ### Library API
 
 ```kotlin
-val client = SshClient("example.com", 22)
+val client = SshClient("example.com", port = 22, hostKeyVerifier = myVerifier)
 client.connect()
 client.authenticatePassword("user", "pass")
 
@@ -146,7 +146,7 @@ class MyAgentProvider : AgentProvider {
 }
 
 // Enable agent forwarding
-val client = SshClient("bastion.example.com")
+val client = SshClient("bastion.example.com", hostKeyVerifier = myVerifier)
 client.connect()
 client.authenticatePassword("user", "pass")
 client.enableAgentForwarding(MyAgentProvider())

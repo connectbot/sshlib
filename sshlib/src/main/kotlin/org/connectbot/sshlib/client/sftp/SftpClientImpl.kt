@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -385,8 +385,9 @@ internal class SftpClientImpl private constructor(
         /**
          * Create an SFTP client by performing the INIT/VERSION handshake.
          */
-        suspend fun create(session: SshSession): SftpResult<SftpClient> {
-            val packetIO = SftpPacketIO(session)
+        suspend fun create(session: SshSession): SftpResult<SftpClient> = create(session, SftpPacketIO(session))
+
+        internal suspend fun create(session: SshSession, packetIO: SftpPacketTransport): SftpResult<SftpClient> {
             val dispatcher = SftpDispatcher(packetIO)
 
             // Send SSH_FXP_INIT

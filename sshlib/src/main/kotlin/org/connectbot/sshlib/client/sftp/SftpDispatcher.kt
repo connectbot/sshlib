@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Each outbound request gets a unique request ID. A background read loop
  * parses incoming SFTP packets and completes the matching deferred.
  */
-internal class SftpDispatcher(private val packetIO: SftpPacketIO) {
+internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
     private val nextRequestId = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<SftpRawPacket>>()
     private val writeMutex = Mutex()
