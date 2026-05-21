@@ -1,5 +1,11 @@
 # ConnectBot SSH Client Library
 
+[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/connectbot/cbssh/ci.yml?branch=main&label=CI)](https://github.com/connectbot/cbssh/actions/workflows/ci.yml?query=branch%3Amain)
+[![Maven Central](https://img.shields.io/maven-central/v/org.connectbot.sshlib/sshlib?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/org.connectbot.sshlib/sshlib)
+[![License](https://img.shields.io/github/license/connectbot/cbssh?label=License&color=blue)](LICENSE)
+[![Quality Gate Status](https://img.shields.io/sonar/quality_gate/connectbot_cbssh?server=https%3A%2F%2Fsonarcloud.io&label=Quality%20Gate)](https://sonarcloud.io/summary/overall?id=connectbot_cbssh)
+[![Coverage](https://img.shields.io/sonar/coverage/connectbot_cbssh?server=https%3A%2F%2Fsonarcloud.io&label=Coverage)](https://sonarcloud.io/summary/overall?id=connectbot_cbssh)
+
 This is ConnectBot SSH library built with Kotlin. Internally it uses coroutines,
 protocol definition files, and a state machine to run the SSH protocol. It
 currently connects to SSH servers, authenticates, and provide interactive shell
