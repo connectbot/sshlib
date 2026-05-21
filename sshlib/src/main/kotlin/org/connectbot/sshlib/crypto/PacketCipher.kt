@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,10 @@ import javax.security.auth.Destroyable
  * Interface for SSH packet encryption/decryption.
  */
 internal interface PacketCipher : Destroyable {
-    override fun destroy() {}
+    override fun destroy() {
+        // Stateless implementations have no key material to clear.
+    }
+
     override fun isDestroyed() = false
 
     /**

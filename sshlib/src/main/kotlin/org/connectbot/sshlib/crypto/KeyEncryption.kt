@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+private const val AES_CBC_NO_PADDING = "AES/CBC/NoPadding"
+private const val AES_CTR_NO_PADDING = "AES/CTR/NoPadding"
+
 internal object KeyEncryption {
 
     fun encryptPem(
@@ -34,9 +37,9 @@ internal object KeyEncryption {
         val (jcaCipher, keySize) = when (cipherName.uppercase()) {
             "DES-EDE3-CBC" -> "DESede/CBC/NoPadding" to 24
             "DES-CBC" -> "DES/CBC/NoPadding" to 8
-            "AES-128-CBC" -> "AES/CBC/NoPadding" to 16
-            "AES-192-CBC" -> "AES/CBC/NoPadding" to 24
-            "AES-256-CBC" -> "AES/CBC/NoPadding" to 32
+            "AES-128-CBC" -> AES_CBC_NO_PADDING to 16
+            "AES-192-CBC" -> AES_CBC_NO_PADDING to 24
+            "AES-256-CBC" -> AES_CBC_NO_PADDING to 32
             else -> throw SshException("Unsupported PEM cipher: $cipherName")
         }
 
@@ -66,10 +69,10 @@ internal object KeyEncryption {
         cipherName: String,
     ): ByteArray {
         val (jcaCipher, keySize, ivSize) = when (cipherName.lowercase()) {
-            "aes256-ctr" -> Triple("AES/CTR/NoPadding", 32, 16)
-            "aes256-cbc" -> Triple("AES/CBC/NoPadding", 32, 16)
-            "aes128-ctr" -> Triple("AES/CTR/NoPadding", 16, 16)
-            "aes128-cbc" -> Triple("AES/CBC/NoPadding", 16, 16)
+            "aes256-ctr" -> Triple(AES_CTR_NO_PADDING, 32, 16)
+            "aes256-cbc" -> Triple(AES_CBC_NO_PADDING, 32, 16)
+            "aes128-ctr" -> Triple(AES_CTR_NO_PADDING, 16, 16)
+            "aes128-cbc" -> Triple(AES_CBC_NO_PADDING, 16, 16)
             else -> throw SshException("Unsupported OpenSSH cipher: $cipherName")
         }
 

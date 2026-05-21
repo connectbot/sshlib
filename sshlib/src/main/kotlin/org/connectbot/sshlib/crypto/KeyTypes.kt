@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,15 @@ import java.security.KeyPair
 import java.security.PublicKey
 import java.security.interfaces.ECPublicKey
 
+private const val KEY_TYPE_ED25519 = "ssh-ed25519"
+
 internal fun inferKeyType(publicKey: PublicKey): String = when (publicKey.algorithm) {
-    "Ed25519" -> "ssh-ed25519"
+    "Ed25519" -> KEY_TYPE_ED25519
 
     "Ed448" -> "ssh-ed448"
 
     "EdDSA" -> {
-        if (publicKey.encoded.size <= 44) "ssh-ed25519" else "ssh-ed448"
+        if (publicKey.encoded.size <= 44) KEY_TYPE_ED25519 else "ssh-ed448"
     }
 
     "EC", "ECDSA" -> {
@@ -45,7 +47,7 @@ internal fun inferKeyType(publicKey: PublicKey): String = when (publicKey.algori
 
     else -> {
         if (isEd25519Key(publicKey)) {
-            "ssh-ed25519"
+            KEY_TYPE_ED25519
         } else {
             throw SshException("Unsupported key type: ${publicKey.algorithm}")
         }

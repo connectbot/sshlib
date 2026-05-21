@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import java.security.SecureRandom
 internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : KexAlgorithm {
     companion object {
         private val secureRandom = SecureRandom()
+        private const val ERROR_GROUP_NOT_SET = "DH group not set; call setGroup() first"
     }
 
     val min = 2048
@@ -48,8 +49,8 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
     }
 
     override fun generateClientKeys(): ByteArray {
-        val p = this.p ?: throw SshException("DH group not set; call setGroup() first")
-        val g = this.g ?: throw SshException("DH group not set; call setGroup() first")
+        val p = this.p ?: throw SshException(ERROR_GROUP_NOT_SET)
+        val g = this.g ?: throw SshException(ERROR_GROUP_NOT_SET)
 
         val x = BigInteger(p.bitLength(), secureRandom).mod(p - BigInteger.ONE) + BigInteger.ONE
         privateKey = x
@@ -60,7 +61,7 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
     override fun computeSharedSecret(serverPublicKey: ByteArray): ByteArray {
         val x = privateKey
             ?: throw SshException("Client keys not generated; call generateClientKeys() first")
-        val p = this.p ?: throw SshException("DH group not set; call setGroup() first")
+        val p = this.p ?: throw SshException(ERROR_GROUP_NOT_SET)
         val f = BigInteger(1, serverPublicKey)
 
         if (f <= BigInteger.ONE || f >= p - BigInteger.ONE) {
@@ -89,8 +90,8 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
         serverPublicKey: ByteArray,
         sharedSecret: ByteArray,
     ): ByteArray {
-        val p = this.p ?: throw SshException("DH group not set; call setGroup() first")
-        val g = this.g ?: throw SshException("DH group not set; call setGroup() first")
+        val p = this.p ?: throw SshException(ERROR_GROUP_NOT_SET)
+        val g = this.g ?: throw SshException(ERROR_GROUP_NOT_SET)
 
         val transcript = ByteArrayOutputStream()
 

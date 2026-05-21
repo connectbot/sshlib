@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
  */
 
 package org.connectbot.sshlib.crypto
+
+private const val HASH_SHA256 = "SHA-256"
+private const val HASH_SHA512 = "SHA-512"
+private const val KEY_TYPE_SSH_RSA = "ssh-rsa"
 
 internal sealed interface EncryptionInstance {
     data class Cipher(val cipher: PacketCipher) : EncryptionInstance
@@ -180,21 +184,21 @@ internal enum class KexEntry(
 ) {
     MLKEM768X25519_SHA256(
         "mlkem768x25519-sha256",
-        "SHA-256",
+        HASH_SHA256,
         KexType.ECDH,
         true,
         { MlKemHybridKeyExchange() },
     ),
     CURVE25519_SHA256(
         "curve25519-sha256",
-        "SHA-256",
+        HASH_SHA256,
         KexType.ECDH,
         false,
         { Curve25519KeyExchange() },
     ),
     ECDH_SHA2_NISTP256(
         "ecdh-sha2-nistp256",
-        "SHA-256",
+        HASH_SHA256,
         KexType.ECDH,
         false,
         { EcdhKeyExchange("nistp256") },
@@ -208,38 +212,38 @@ internal enum class KexEntry(
     ),
     ECDH_SHA2_NISTP521(
         "ecdh-sha2-nistp521",
-        "SHA-512",
+        HASH_SHA512,
         KexType.ECDH,
         false,
         { EcdhKeyExchange("nistp521") },
     ),
     DH_GROUP18_SHA512(
         "diffie-hellman-group18-sha512",
-        "SHA-512",
+        HASH_SHA512,
         KexType.DH,
         false,
-        { DiffieHellman("SHA-512", DhGroups.GROUP18_P, DhGroups.GENERATOR) },
+        { DiffieHellman(HASH_SHA512, DhGroups.GROUP18_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP16_SHA512(
         "diffie-hellman-group16-sha512",
-        "SHA-512",
+        HASH_SHA512,
         KexType.DH,
         false,
-        { DiffieHellman("SHA-512", DhGroups.GROUP16_P, DhGroups.GENERATOR) },
+        { DiffieHellman(HASH_SHA512, DhGroups.GROUP16_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP_EXCHANGE_SHA256(
         "diffie-hellman-group-exchange-sha256",
-        "SHA-256",
+        HASH_SHA256,
         KexType.DH_GEX,
         false,
-        { DiffieHellmanGroupExchange("SHA-256") },
+        { DiffieHellmanGroupExchange(HASH_SHA256) },
     ),
     DH_GROUP14_SHA256(
         "diffie-hellman-group14-sha256",
-        "SHA-256",
+        HASH_SHA256,
         KexType.DH,
         false,
-        { DiffieHellman("SHA-256", DhGroups.GROUP14_P, DhGroups.GENERATOR) },
+        { DiffieHellman(HASH_SHA256, DhGroups.GROUP14_P, DhGroups.GENERATOR) },
     ),
     DH_GROUP14_SHA1(
         "diffie-hellman-group14-sha1",
@@ -287,7 +291,7 @@ internal enum class SignatureEntry(
     ECDSA_SHA2_NISTP521("ecdsa-sha2-nistp521", EcdsaSignatureAlgorithm),
     RSA_SHA2_256("rsa-sha2-256", RsaSignatureAlgorithm),
     RSA_SHA2_512("rsa-sha2-512", RsaSignatureAlgorithm),
-    SSH_RSA("ssh-rsa", RsaSignatureAlgorithm),
+    SSH_RSA(KEY_TYPE_SSH_RSA, RsaSignatureAlgorithm),
     ;
 
     companion object {
@@ -297,7 +301,7 @@ internal enum class SignatureEntry(
 
         fun fromSshName(name: String): SignatureEntry? = entries.firstOrNull { it.sshName == name }
 
-        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256", "ssh-rsa")
+        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256", KEY_TYPE_SSH_RSA)
 
         /**
          * Picks the best RSA signing algorithm given the server's advertised list.
@@ -305,8 +309,8 @@ internal enum class SignatureEntry(
          * or if no supported RSA algorithms were advertised.
          */
         fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String {
-            if (serverSigAlgs == null) return "ssh-rsa"
-            return rsaPreferenceOrder.firstOrNull { it in serverSigAlgs } ?: "ssh-rsa"
+            if (serverSigAlgs == null) return KEY_TYPE_SSH_RSA
+            return rsaPreferenceOrder.firstOrNull { it in serverSigAlgs } ?: KEY_TYPE_SSH_RSA
         }
     }
 }

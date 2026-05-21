@@ -21,6 +21,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.publish)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
     alias(libs.plugins.cyclonedx)
     `java-library`
 }

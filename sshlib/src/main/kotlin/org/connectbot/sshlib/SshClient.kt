@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,6 +78,10 @@ class SshClient private constructor(
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(SshClient::class.java)
+        private const val ERROR_NOT_CONNECTED = "Not connected"
+        private const val ERROR_NOT_CONNECTED_CONNECT_FIRST = "Not connected - call connect() first"
+        private const val ERROR_NOT_AUTHENTICATED = "Not authenticated"
+        private const val LOCALHOST = "127.0.0.1"
 
         /**
          * Create an SshClient for TCP connection to the specified host.
@@ -198,8 +202,8 @@ class SshClient private constructor(
     suspend fun authenticatePassword(username: String, password: String): AuthResult {
         val conn = connection
         if (conn == null) {
-            logger.error("Not connected - call connect() first")
-            return AuthResult.Error("Not connected")
+            logger.error(ERROR_NOT_CONNECTED_CONNECT_FIRST)
+            return AuthResult.Error(ERROR_NOT_CONNECTED)
         }
 
         return try {
@@ -234,8 +238,8 @@ class SshClient private constructor(
     ): AuthResult {
         val conn = connection
         if (conn == null) {
-            logger.error("Not connected - call connect() first")
-            return AuthResult.Error("Not connected")
+            logger.error(ERROR_NOT_CONNECTED_CONNECT_FIRST)
+            return AuthResult.Error(ERROR_NOT_CONNECTED)
         }
 
         return try {
@@ -287,8 +291,8 @@ class SshClient private constructor(
     ): AuthResult {
         val conn = connection
         if (conn == null) {
-            logger.error("Not connected - call connect() first")
-            return AuthResult.Error("Not connected")
+            logger.error(ERROR_NOT_CONNECTED_CONNECT_FIRST)
+            return AuthResult.Error(ERROR_NOT_CONNECTED)
         }
 
         return try {
@@ -325,8 +329,8 @@ class SshClient private constructor(
     suspend fun authenticate(username: String, handler: AuthHandler): AuthResult {
         val conn = connection
         if (conn == null) {
-            logger.error("Not connected - call connect() first")
-            return AuthResult.Error("Not connected")
+            logger.error(ERROR_NOT_CONNECTED_CONNECT_FIRST)
+            return AuthResult.Error(ERROR_NOT_CONNECTED)
         }
 
         return try {
@@ -427,7 +431,7 @@ class SshClient private constructor(
         val conn = connection
         if (conn == null || !authenticated) {
             logger.error("Not authenticated - call connect() and authenticate first")
-            return SftpResult.IoError(IllegalStateException("Not authenticated"))
+            return SftpResult.IoError(IllegalStateException(ERROR_NOT_AUTHENTICATED))
         }
 
         return try {
@@ -463,7 +467,7 @@ class SshClient private constructor(
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
-            logger.error("Not authenticated")
+            logger.error(ERROR_NOT_AUTHENTICATED)
             return null
         }
 
@@ -487,7 +491,7 @@ class SshClient private constructor(
         bindPort: Int,
         remoteHost: String,
         remotePort: Int,
-    ): PortForwarder? = localPortForward(InetSocketAddress("127.0.0.1", bindPort), remoteHost, remotePort)
+    ): PortForwarder? = localPortForward(InetSocketAddress(LOCALHOST, bindPort), remoteHost, remotePort)
 
     /**
      * Start remote port forwarding (RFC 4254 section 7.1).
@@ -509,7 +513,7 @@ class SshClient private constructor(
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
-            logger.error("Not authenticated")
+            logger.error(ERROR_NOT_AUTHENTICATED)
             return null
         }
 
@@ -537,7 +541,7 @@ class SshClient private constructor(
     ): PortForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
-            logger.error("Not authenticated")
+            logger.error(ERROR_NOT_AUTHENTICATED)
             return null
         }
 
@@ -559,7 +563,7 @@ class SshClient private constructor(
     suspend fun dynamicPortForward(
         bindPort: Int,
         authenticator: Socks5Authenticator? = null,
-    ): PortForwarder? = dynamicPortForward(InetSocketAddress("127.0.0.1", bindPort), authenticator)
+    ): PortForwarder? = dynamicPortForward(InetSocketAddress(LOCALHOST, bindPort), authenticator)
 
     /**
      * Forward a pair of streams through an SSH direct-tcpip channel.
@@ -580,12 +584,12 @@ class SshClient private constructor(
         writeChannel: ByteWriteChannel,
         remoteHost: String,
         remotePort: Int,
-        originAddr: String = "127.0.0.1",
+        originAddr: String = LOCALHOST,
         originPort: Int = 0,
     ): StreamForwarder? {
         val conn = connection
         if (conn == null || !authenticated) {
-            logger.error("Not authenticated")
+            logger.error(ERROR_NOT_AUTHENTICATED)
             return null
         }
 
@@ -635,12 +639,12 @@ class SshClient private constructor(
     fun openDirectTcpipTransport(
         remoteHost: String,
         remotePort: Int,
-        originAddr: String = "127.0.0.1",
+        originAddr: String = LOCALHOST,
         originPort: Int = 0,
     ): TransportFactory? {
         val conn = connection
         if (conn == null || !authenticated) {
-            logger.error("Not authenticated")
+            logger.error(ERROR_NOT_AUTHENTICATED)
             return null
         }
 

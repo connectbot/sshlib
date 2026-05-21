@@ -168,17 +168,25 @@ class SshConnection(
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
+        private const val KEX_EXT_INFO_C = "ext-info-c"
+        private const val SERVICE_SSH_CONNECTION = "ssh-connection"
+        private const val KEY_TYPE_SSH_RSA = "ssh-rsa"
+        private const val METHOD_PUBLICKEY_HOSTBOUND = "publickey-hostbound-v00@openssh.com"
+        private const val CHANNEL_FORWARDED_TCPIP = "forwarded-tcpip"
+        private const val ERROR_SESSION_ID_NOT_ESTABLISHED = "Session ID not established"
+        private const val ERROR_CLIENT_PUBLIC_KEY_NOT_GENERATED = "Client public key not generated"
+        private const val ERROR_NO_KEX_ALGORITHM_INITIALIZED = "No KEX algorithm initialized"
 
         private fun stripExtInfoC(kexAlgorithms: String): String = kexAlgorithms.split(",")
-            .filter { it.isNotEmpty() && it != "ext-info-c" }
+            .filter { it.isNotEmpty() && it != KEX_EXT_INFO_C }
             .joinToString(",")
 
         private fun appendExtInfoC(kexAlgorithms: String): String {
             val algorithms = kexAlgorithms.split(",").filter { it.isNotEmpty() }
-            return if ("ext-info-c" in algorithms) {
+            return if (KEX_EXT_INFO_C in algorithms) {
                 kexAlgorithms
             } else {
-                (algorithms + "ext-info-c").joinToString(",")
+                (algorithms + KEX_EXT_INFO_C).joinToString(",")
             }
         }
 
@@ -448,7 +456,7 @@ class SshConnection(
         try {
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
-                setServiceName(createAsciiString("ssh-connection"))
+                setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
                 setMethodName(createAsciiString("password"))
 
                 val passAuth = UserauthRequestPassword().apply {
@@ -498,7 +506,7 @@ class SshConnection(
         try {
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
-                setServiceName(createAsciiString("ssh-connection"))
+                setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
                 setMethodName(createAsciiString("keyboard-interactive"))
 
                 val kbdInteractive = UserauthRequestKeyboardInteractive().apply {
@@ -584,11 +592,11 @@ class SshConnection(
      */
     internal suspend fun authenticatePublicKey(username: String, privateKey: SshPrivateKey): PublicAuthResult {
         try {
-            val sid = sessionId ?: throw SshException("Session ID not established")
+            val sid = sessionId ?: throw SshException(ERROR_SESSION_ID_NOT_ESTABLISHED)
 
             val publicKeyBlob = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
 
-            val sigAlgorithmName = if (privateKey.keyType == "ssh-rsa") {
+            val sigAlgorithmName = if (privateKey.keyType == KEY_TYPE_SSH_RSA) {
                 negotiateRsaAlgorithm()
             } else {
                 privateKey.signatureAlgorithm
@@ -600,9 +608,9 @@ class SshConnection(
             val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
 
             val signatureData = if (useHostBound && hostKeyBlob != null) {
-                buildHostBoundSignatureData(sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob, hostKeyBlob)
+                buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, sigAlgorithmName, publicKeyBlob, hostKeyBlob)
             } else {
-                buildSignatureData(sid, username, "ssh-connection", sigAlgorithmName, publicKeyBlob)
+                buildSignatureData(sid, username, SERVICE_SSH_CONNECTION, sigAlgorithmName, publicKeyBlob)
             }
 
             val signature = sigEntry.algorithm.sign(
@@ -613,10 +621,10 @@ class SshConnection(
 
             val req = SshMsgUserauthRequest().apply {
                 setUserName(createAsciiString(username))
-                setServiceName(createAsciiString("ssh-connection"))
+                setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
 
                 if (useHostBound && hostKeyBlob != null) {
-                    setMethodName(createAsciiString("publickey-hostbound-v00@openssh.com"))
+                    setMethodName(createAsciiString(METHOD_PUBLICKEY_HOSTBOUND))
                     val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
                         setHasSignature(1)
                         setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
@@ -698,7 +706,7 @@ class SshConnection(
             setMessageType(byteArrayOf(50))
             setUserName(createByteString(username.toByteArray(Charsets.UTF_8)))
             setServiceName(createByteString(serviceName.toByteArray(Charsets.US_ASCII)))
-            setMethodName(createByteString("publickey-hostbound-v00@openssh.com".toByteArray(Charsets.US_ASCII)))
+            setMethodName(createByteString(METHOD_PUBLICKEY_HOSTBOUND.toByteArray(Charsets.US_ASCII)))
             setHasSignature(byteArrayOf(1))
             setPublicKeyAlgorithmName(createByteString(algorithmName.toByteArray(Charsets.US_ASCII)))
             setPublicKeyBlob(createByteString(publicKeyBlob))
@@ -805,7 +813,7 @@ class SshConnection(
         handler: AuthHandler,
         channel: Channel<InternalAuthResult>,
     ): InternalAuthResult {
-        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == "ssh-rsa") {
+        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == KEY_TYPE_SSH_RSA) {
             negotiateRsaAlgorithm()
         } else {
             key.algorithmName
@@ -828,27 +836,27 @@ class SshConnection(
         handler: AuthHandler,
         channel: Channel<InternalAuthResult>,
     ): Boolean {
-        val sid = sessionId ?: throw SshException("Session ID not established")
+        val sid = sessionId ?: throw SshException(ERROR_SESSION_ID_NOT_ESTABLISHED)
         val hostKeyBlob = serverHostKeyBlob
         val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
 
-        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == "ssh-rsa") {
+        val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == KEY_TYPE_SSH_RSA) {
             negotiateRsaAlgorithm()
         } else {
             key.algorithmName
         }
 
         val signatureData = if (useHostBound && hostKeyBlob != null) {
-            buildHostBoundSignatureData(sid, username, "ssh-connection", effectiveAlgorithmName, key.publicKeyBlob, hostKeyBlob)
+            buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, effectiveAlgorithmName, key.publicKeyBlob, hostKeyBlob)
         } else {
-            buildSignatureData(sid, username, "ssh-connection", effectiveAlgorithmName, key.publicKeyBlob)
+            buildSignatureData(sid, username, SERVICE_SSH_CONNECTION, effectiveAlgorithmName, key.publicKeyBlob)
         }
 
         val signingKey = if (effectiveAlgorithmName != key.algorithmName) key.copy(algorithmName = effectiveAlgorithmName) else key
         val signature = handler.onSignatureRequest(signingKey, signatureData) ?: return false
 
         if (useHostBound && hostKeyBlob != null) {
-            sendAuthRequest(username, "publickey-hostbound-v00@openssh.com") {
+            sendAuthRequest(username, METHOD_PUBLICKEY_HOSTBOUND) {
                 val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
                     setHasSignature(1)
                     setPublicKeyAlgorithmName(createAsciiString(effectiveAlgorithmName))
@@ -984,7 +992,7 @@ class SshConnection(
     ) {
         val req = SshMsgUserauthRequest().apply {
             setUserName(createAsciiString(username))
-            setServiceName(createAsciiString("ssh-connection"))
+            setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
             setMethodName(createAsciiString(method))
             configure()
             _check()
@@ -1151,7 +1159,7 @@ class SshConnection(
         clientPublicKey = dh.generateClientKeys()
 
         val pubKey = clientPublicKey
-            ?: throw SshException("Client public key not generated")
+            ?: throw SshException(ERROR_CLIENT_PUBLIC_KEY_NOT_GENERATED)
 
         val msg = SshMsgKexdhInit().apply {
             setE(createMpint(pubKey))
@@ -1169,7 +1177,7 @@ class SshConnection(
         clientPublicKey = ecdh.generateClientKeys()
 
         val pubKey = clientPublicKey
-            ?: throw SshException("Client public key not generated")
+            ?: throw SshException(ERROR_CLIENT_PUBLIC_KEY_NOT_GENERATED)
 
         val msg = SshMsgKexEcdhInit().apply {
             setQC(createByteString(pubKey))
@@ -1267,11 +1275,11 @@ class SshConnection(
     }
 
     private suspend fun completeKex(serverHostKey: ByteArray, serverPublicKey: ByteArray, signature: ByteArray) {
-        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+        val kexAlg = kex ?: throw SshException(ERROR_NO_KEX_ALGORITHM_INITIALIZED)
         val sv = serverVersion ?: throw SshException("Server version not received")
         val cki = clientKexInit ?: throw SshException("Client KEX_INIT not sent")
         val ski = serverKexInit ?: throw SshException("Server KEX_INIT not received")
-        val cpk = clientPublicKey ?: throw SshException("Client public key not generated")
+        val cpk = clientPublicKey ?: throw SshException(ERROR_CLIENT_PUBLIC_KEY_NOT_GENERATED)
 
         sharedSecret = kexAlg.computeSharedSecret(serverPublicKey)
 
@@ -1493,8 +1501,8 @@ class SshConnection(
 
         val secret = sharedSecret ?: throw SshException("Shared secret not computed")
         val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
-        val sid = sessionId ?: throw SshException("Session ID not established")
-        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+        val sid = sessionId ?: throw SshException(ERROR_SESSION_ID_NOT_ESTABLISHED)
+        val kexAlg = kex ?: throw SshException(ERROR_NO_KEX_ALGORITHM_INITIALIZED)
 
         val keyDerivation = KeyDerivation(
             secret,
@@ -1552,8 +1560,8 @@ class SshConnection(
 
         val secret = sharedSecret ?: throw SshException("Shared secret not computed")
         val hash = exchangeHash ?: throw SshException("Exchange hash not computed")
-        val sid = sessionId ?: throw SshException("Session ID not established")
-        val kexAlg = kex ?: throw SshException("No KEX algorithm initialized")
+        val sid = sessionId ?: throw SshException(ERROR_SESSION_ID_NOT_ESTABLISHED)
+        val kexAlg = kex ?: throw SshException(ERROR_NO_KEX_ALGORITHM_INITIALIZED)
 
         val keyDerivation = KeyDerivation(
             secret,
@@ -1732,7 +1740,7 @@ class SshConnection(
                     logger.info("Accepted agent channel: local=$localChannelNumber, remote=$senderChannel")
                 }
 
-                "forwarded-tcpip" -> {
+                CHANNEL_FORWARDED_TCPIP -> {
                     handleForwardedTcpip(msg, senderChannel, initialWindow, maxPacketSize)
                 }
 
@@ -1754,8 +1762,8 @@ class SshConnection(
         try {
             val channelData = msg.channelSpecificData()
             if (channelData !is ChannelOpenForwardedTcpip) {
-                logger.warn("Failed to parse forwarded-tcpip channel data")
-                rejectChannelOpen(senderChannel, "forwarded-tcpip")
+                logger.warn("Failed to parse $CHANNEL_FORWARDED_TCPIP channel data")
+                rejectChannelOpen(senderChannel, CHANNEL_FORWARDED_TCPIP)
                 return
             }
 
@@ -1768,14 +1776,14 @@ class SshConnection(
             val handler = remoteForwarders[key]
             if (handler == null) {
                 logger.warn("No remote forwarder registered for $key")
-                rejectChannelOpen(senderChannel, "forwarded-tcpip")
+                rejectChannelOpen(senderChannel, CHANNEL_FORWARDED_TCPIP)
                 return
             }
 
             handler(connectedAddr, connectedPort, originAddr, originPort, senderChannel, initialWindow, maxPacketSize)
         } catch (e: Exception) {
-            logger.error("Failed to handle forwarded-tcpip", e)
-            rejectChannelOpen(senderChannel, "forwarded-tcpip")
+            logger.error("Failed to handle $CHANNEL_FORWARDED_TCPIP", e)
+            rejectChannelOpen(senderChannel, CHANNEL_FORWARDED_TCPIP)
         }
     }
 

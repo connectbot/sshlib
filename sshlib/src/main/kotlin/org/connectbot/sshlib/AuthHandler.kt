@@ -29,7 +29,9 @@ interface AuthHandler {
      * Called when the server reports which authentication methods are available.
      * Override to observe or log.
      */
-    suspend fun onAuthMethodsAvailable(methods: Set<String>) {}
+    suspend fun onAuthMethodsAvailable(methods: Set<String>) {
+        // Optional notification hook; default handlers do not need to observe it.
+    }
 
     /**
      * Return public keys to probe. Empty list skips public key auth.
@@ -76,7 +78,9 @@ interface AuthHandler {
      * Called when the server sends an authentication banner (SSH_MSG_USERAUTH_BANNER).
      * This is often used for out-of-band authentication instructions (e.g., a URL to visit).
      */
-    suspend fun onBanner(message: String) {}
+    suspend fun onBanner(message: String) {
+        // Optional notification hook; default handlers may ignore banners.
+    }
 }
 
 /**
