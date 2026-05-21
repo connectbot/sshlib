@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("DEPRECATION", "removal")
+
 package org.connectbot.sshlib.crypto.ed25519
 
 import java.security.AccessController
@@ -22,10 +24,9 @@ import java.security.PrivilegedAction
 import java.security.Provider
 import java.security.Security
 
-@Suppress("DEPRECATION", "removal") // Android only has the Provider(String, double, String) constructor
+// Android only has the Provider(String, double, String) constructor.
 internal class Ed25519Provider : Provider(NAME, 1.0, "ConnectBot Ed25519 JCA Provider") {
     init {
-        @Suppress("DEPRECATION", "removal")
         AccessController.doPrivileged(
             PrivilegedAction {
                 setup()
