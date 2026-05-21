@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,13 @@ interface HostKeyVerifier {
      */
     suspend fun verify(key: PublicKey): Boolean
 
-    suspend fun addKeys(keys: List<PublicKey>) {}
-    suspend fun removeKeys(keys: List<PublicKey>) {}
+    suspend fun addKeys(keys: List<PublicKey>) {
+        // Optional persistence hook; read-only verifiers have nothing to store.
+    }
+
+    suspend fun removeKeys(keys: List<PublicKey>) {
+        // Optional persistence hook; read-only verifiers have nothing to remove.
+    }
 }
 
 /**

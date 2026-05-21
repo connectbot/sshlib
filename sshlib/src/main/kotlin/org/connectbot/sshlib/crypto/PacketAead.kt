@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,10 @@ internal data class AeadResult(val ciphertext: ByteArray, val tag: ByteArray)
  * as AAD (authenticated but not encrypted).
  */
 internal interface PacketAead : Destroyable {
-    override fun destroy() {}
+    override fun destroy() {
+        // Stateless implementations have no key material to clear.
+    }
+
     override fun isDestroyed() = false
     val tagLength: Int
 

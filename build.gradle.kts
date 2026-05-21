@@ -22,6 +22,7 @@ plugins {
     alias(libs.plugins.publish) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.cyclonedx)
+    alias(libs.plugins.sonarqube)
 }
 
 allprojects {
@@ -34,7 +35,35 @@ allprojects {
 }
 
 dependencies {
+    kover(project(":protocol"))
     kover(project(":sshlib"))
+}
+
+sonar {
+    properties {
+        property("sonar.projectName", "ConnectBot SSH Library")
+        property("sonar.projectKey", "connectbot_cbssh")
+        property("sonar.organization", "connectbot")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
+        property("sonar.exclusions", "**/build/generated/**")
+        property("sonar.issue.ignore.multicriteria", "cognitiveComplexityConnection,cognitiveComplexitySftp,cognitiveComplexityTransport")
+        property("sonar.issue.ignore.multicriteria.cognitiveComplexityConnection.ruleKey", "kotlin:S3776")
+        property(
+            "sonar.issue.ignore.multicriteria.cognitiveComplexityConnection.resourceKey",
+            "**/src/main/kotlin/org/connectbot/sshlib/client/SshConnection.kt",
+        )
+        property("sonar.issue.ignore.multicriteria.cognitiveComplexitySftp.ruleKey", "kotlin:S3776")
+        property(
+            "sonar.issue.ignore.multicriteria.cognitiveComplexitySftp.resourceKey",
+            "**/src/main/kotlin/org/connectbot/sshlib/client/sftp/SftpDispatcher.kt",
+        )
+        property("sonar.issue.ignore.multicriteria.cognitiveComplexityTransport.ruleKey", "kotlin:S3776")
+        property(
+            "sonar.issue.ignore.multicriteria.cognitiveComplexityTransport.resourceKey",
+            "**/src/main/kotlin/org/connectbot/sshlib/transport/KtorTcpTransport.kt",
+        )
+    }
 }
 
 spotless {

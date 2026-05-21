@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ package org.connectbot.sshlib.crypto
 
 import org.connectbot.sshlib.SshException
 
+private const val OPENSSH_PRIVATE_KEY_BEGIN = "-----BEGIN OPENSSH PRIVATE KEY-----"
+private const val OPENSSH_PRIVATE_KEY_END = "-----END OPENSSH PRIVATE KEY-----"
+
 internal object PrivateKeyReader {
 
     fun read(keyData: ByteArray, passphrase: String? = null): SshPrivateKey = read(String(keyData, Charsets.UTF_8), passphrase)
@@ -26,8 +29,8 @@ internal object PrivateKeyReader {
     fun read(keyData: String, passphrase: String? = null): SshPrivateKey {
         val trimmed = keyData.trim()
         return when {
-            trimmed.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----") -> {
-                val base64 = extractBase64(trimmed, "-----BEGIN OPENSSH PRIVATE KEY-----", "-----END OPENSSH PRIVATE KEY-----")
+            trimmed.startsWith(OPENSSH_PRIVATE_KEY_BEGIN) -> {
+                val base64 = extractBase64(trimmed, OPENSSH_PRIVATE_KEY_BEGIN, OPENSSH_PRIVATE_KEY_END)
                 val data = Base64Compat.decode(base64)
                 OpenSshKeyReader.read(data, passphrase)
             }
@@ -47,8 +50,8 @@ internal object PrivateKeyReader {
     fun isEncrypted(keyData: String): Boolean {
         val trimmed = keyData.trim()
         return when {
-            trimmed.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----") -> {
-                val base64 = extractBase64(trimmed, "-----BEGIN OPENSSH PRIVATE KEY-----", "-----END OPENSSH PRIVATE KEY-----")
+            trimmed.startsWith(OPENSSH_PRIVATE_KEY_BEGIN) -> {
+                val base64 = extractBase64(trimmed, OPENSSH_PRIVATE_KEY_BEGIN, OPENSSH_PRIVATE_KEY_END)
                 val data = Base64Compat.decode(base64)
                 OpenSshKeyReader.isEncrypted(data)
             }

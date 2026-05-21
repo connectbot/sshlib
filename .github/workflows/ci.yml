@@ -63,4 +63,4 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: "${{ matrix.java == '25' && env.SONAR_TOKEN != '' }}"
-        run: ./gradlew :sshlib:sonar -Dsonar.projectVersion=${{ github.sha }}
+        run: ./gradlew sonar -Dsonar.projectVersion=${{ github.sha }}

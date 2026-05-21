@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import javax.crypto.SecretKey
 internal class JavaMlKemProvider : MlKemProvider {
     companion object {
         private const val MLKEM768_PUBLIC_KEY_SIZE = 1184
+        private const val KEM_CLASS_NAME = "javax.crypto.KEM"
+        private const val ML_KEM_ALGORITHM = "ML-KEM"
 
         // X.509 wrapper for ML-KEM-768 public keys
         private val X509_PREFIX = byteArrayOf(
@@ -72,9 +74,9 @@ internal class JavaMlKemProvider : MlKemProvider {
 
     init {
         try {
-            val kemClass = Class.forName("javax.crypto.KEM")
+            val kemClass = Class.forName(KEM_CLASS_NAME)
             val getInstance = kemClass.getMethod("getInstance", String::class.java)
-            kemInstance = getInstance.invoke(null, "ML-KEM")
+            kemInstance = getInstance.invoke(null, ML_KEM_ALGORITHM)
         } catch (e: Exception) {
             throw IOException("Failed to initialize Java KEM API", e)
         }
@@ -98,10 +100,10 @@ internal class JavaMlKemProvider : MlKemProvider {
     override fun encapsulate(publicKey: ByteArray): MlKemEncapsulationResult {
         try {
             val x509Encoded = wrapRawMlKemPublicKey(publicKey)
-            val kf = KeyFactory.getInstance("ML-KEM")
+            val kf = KeyFactory.getInstance(ML_KEM_ALGORITHM)
             val pubKey = kf.generatePublic(X509EncodedKeySpec(x509Encoded))
 
-            val kemClass = Class.forName("javax.crypto.KEM")
+            val kemClass = Class.forName(KEM_CLASS_NAME)
             val newEncapsulator = kemClass.getMethod("newEncapsulator", PublicKey::class.java)
             val encapsulator = newEncapsulator.invoke(kemInstance, pubKey)
 
@@ -125,10 +127,10 @@ internal class JavaMlKemProvider : MlKemProvider {
 
     override fun decapsulate(privateKey: ByteArray, ciphertext: ByteArray): ByteArray {
         try {
-            val kf = KeyFactory.getInstance("ML-KEM")
+            val kf = KeyFactory.getInstance(ML_KEM_ALGORITHM)
             val privKey: PrivateKey = kf.generatePrivate(PKCS8EncodedKeySpec(privateKey))
 
-            val kemClass = Class.forName("javax.crypto.KEM")
+            val kemClass = Class.forName(KEM_CLASS_NAME)
             val newDecapsulator = kemClass.getMethod("newDecapsulator", PrivateKey::class.java)
             val decapsulator = newDecapsulator.invoke(kemInstance, privKey)
 
