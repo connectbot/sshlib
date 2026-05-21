@@ -604,11 +604,10 @@ class SshConnection(
             val sigEntry = SignatureEntry.fromSshName(sigAlgorithmName)
                 ?: throw SshException("Unknown signature algorithm: $sigAlgorithmName")
 
-            val hostKeyBlob = serverHostKeyBlob
-            val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
+            val hostBoundKeyBlob = serverHostKeyBlob.takeIf { serverAdvertisesHostBound }
 
-            val signatureData = if (useHostBound && hostKeyBlob != null) {
-                buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, sigAlgorithmName, publicKeyBlob, hostKeyBlob)
+            val signatureData = if (hostBoundKeyBlob != null) {
+                buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, sigAlgorithmName, publicKeyBlob, hostBoundKeyBlob)
             } else {
                 buildSignatureData(sid, username, SERVICE_SSH_CONNECTION, sigAlgorithmName, publicKeyBlob)
             }
@@ -623,13 +622,13 @@ class SshConnection(
                 setUserName(createAsciiString(username))
                 setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
 
-                if (useHostBound && hostKeyBlob != null) {
+                if (hostBoundKeyBlob != null) {
                     setMethodName(createAsciiString(METHOD_PUBLICKEY_HOSTBOUND))
                     val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
                         setHasSignature(1)
                         setPublicKeyAlgorithmName(createAsciiString(sigAlgorithmName))
                         setPublicKeyBlob(createByteString(publicKeyBlob))
-                        setServerHostKey(createByteString(hostKeyBlob))
+                        setServerHostKey(createByteString(hostBoundKeyBlob))
                         setSignature(createByteString(signature))
                         _check()
                     }
@@ -837,8 +836,7 @@ class SshConnection(
         channel: Channel<InternalAuthResult>,
     ): Boolean {
         val sid = sessionId ?: throw SshException(ERROR_SESSION_ID_NOT_ESTABLISHED)
-        val hostKeyBlob = serverHostKeyBlob
-        val useHostBound = serverAdvertisesHostBound && hostKeyBlob != null
+        val hostBoundKeyBlob = serverHostKeyBlob.takeIf { serverAdvertisesHostBound }
 
         val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == KEY_TYPE_SSH_RSA) {
             negotiateRsaAlgorithm()
@@ -846,8 +844,8 @@ class SshConnection(
             key.algorithmName
         }
 
-        val signatureData = if (useHostBound && hostKeyBlob != null) {
-            buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, effectiveAlgorithmName, key.publicKeyBlob, hostKeyBlob)
+        val signatureData = if (hostBoundKeyBlob != null) {
+            buildHostBoundSignatureData(sid, username, SERVICE_SSH_CONNECTION, effectiveAlgorithmName, key.publicKeyBlob, hostBoundKeyBlob)
         } else {
             buildSignatureData(sid, username, SERVICE_SSH_CONNECTION, effectiveAlgorithmName, key.publicKeyBlob)
         }
@@ -855,13 +853,13 @@ class SshConnection(
         val signingKey = if (effectiveAlgorithmName != key.algorithmName) key.copy(algorithmName = effectiveAlgorithmName) else key
         val signature = handler.onSignatureRequest(signingKey, signatureData) ?: return false
 
-        if (useHostBound && hostKeyBlob != null) {
+        if (hostBoundKeyBlob != null) {
             sendAuthRequest(username, METHOD_PUBLICKEY_HOSTBOUND) {
                 val pubkeyAuth = UserauthRequestPublickeyHostbound().apply {
                     setHasSignature(1)
                     setPublicKeyAlgorithmName(createAsciiString(effectiveAlgorithmName))
                     setPublicKeyBlob(createByteString(key.publicKeyBlob))
-                    setServerHostKey(createByteString(hostKeyBlob))
+                    setServerHostKey(createByteString(hostBoundKeyBlob))
                     setSignature(createByteString(signature))
                     _check()
                 }
