@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,12 @@ import java.nio.ByteBuffer
  * packet boundaries. This class accumulates bytes until a complete packet
  * is available.
  */
-internal class SftpPacketIO(private val session: SshSession) {
+internal interface SftpPacketTransport {
+    suspend fun readPacket(): SftpResult<SftpRawPacket>
+    suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit>
+}
+
+internal class SftpPacketIO(private val session: SshSession) : SftpPacketTransport {
     private val buffer = ByteArrayOutputStream()
     private var bufferedBytes = ByteArray(0)
     private var bufferedOffset = 0
@@ -46,7 +51,7 @@ internal class SftpPacketIO(private val session: SshSession) {
      * explicitly. (Reviewed by @kruton on PR #112: Kotlin library APIs
      * shouldn't throw for things they can manage themselves.)
      */
-    suspend fun readPacket(): SftpResult<SftpRawPacket> {
+    override suspend fun readPacket(): SftpResult<SftpRawPacket> {
         return try {
             // Read the 4-byte length prefix
             val lengthBytes = readExact(4)
@@ -73,7 +78,7 @@ internal class SftpPacketIO(private val session: SshSession) {
      * Returns [SftpResult.Success] on send or [SftpResult.IoError] if the
      * underlying SSH session write fails.
      */
-    suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit> = try {
+    override suspend fun writePacket(type: Int, payload: ByteArray): SftpResult<Unit> = try {
         val length = 1 + payload.size // type byte + payload
         val packet = ByteBuffer.allocate(4 + length)
         packet.putInt(length)

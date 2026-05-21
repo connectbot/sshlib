@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 
 package org.connectbot.sshlib.crypto
 
+import java.lang.reflect.InvocationTargetException
 import java.util.Base64
 
 /**
@@ -70,6 +71,10 @@ internal object Base64Compat {
 
         override fun encodeWithPadding(data: ByteArray): String = encodeMethod.invoke(null, data, NO_WRAP) as String
 
-        override fun decode(data: String): ByteArray = decodeMethod.invoke(null, data, DEFAULT) as ByteArray
+        override fun decode(data: String): ByteArray = try {
+            decodeMethod.invoke(null, data, DEFAULT) as ByteArray
+        } catch (e: InvocationTargetException) {
+            throw e.targetException
+        }
     }
 }

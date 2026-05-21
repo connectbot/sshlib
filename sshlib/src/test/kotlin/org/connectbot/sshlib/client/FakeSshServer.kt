@@ -36,6 +36,13 @@ import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.crypto.X25519ProviderFactory
 import org.connectbot.sshlib.crypto.encodeMpint
 import org.connectbot.sshlib.protocol.SshEnums
+import org.connectbot.sshlib.protocol.SshMsgChannelFailure
+import org.connectbot.sshlib.protocol.SshMsgChannelOpen
+import org.connectbot.sshlib.protocol.SshMsgChannelOpenConfirmation
+import org.connectbot.sshlib.protocol.SshMsgChannelOpenFailure
+import org.connectbot.sshlib.protocol.SshMsgChannelRequest
+import org.connectbot.sshlib.protocol.SshMsgChannelSuccess
+import org.connectbot.sshlib.protocol.SshMsgDisconnect
 import org.connectbot.sshlib.protocol.SshMsgExtInfo
 import org.connectbot.sshlib.protocol.SshMsgIgnore
 import org.connectbot.sshlib.protocol.SshMsgKexEcdhInit
@@ -46,7 +53,10 @@ import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
 import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
 import org.connectbot.sshlib.protocol.SshMsgUserauthFailure
+import org.connectbot.sshlib.protocol.SshMsgUserauthInfoRequest
+import org.connectbot.sshlib.protocol.SshMsgUserauthPkOk
 import org.connectbot.sshlib.protocol.SshMsgUserauthRequest
+import org.connectbot.sshlib.protocol.SshMsgUserauthSuccess
 import org.connectbot.sshlib.protocol.createAsciiString
 import org.connectbot.sshlib.protocol.createByteString
 import org.connectbot.sshlib.protocol.createNameList
@@ -94,6 +104,10 @@ class FakeSshServer(
     private val receivedExtInfo = Channel<SshMsgExtInfo>(Channel.UNLIMITED)
     private val receivedUserauthRequests = Channel<SshMsgUserauthRequest>(Channel.UNLIMITED)
     private val receivedClientKexInits = Channel<SshMsgKexinit>(Channel.UNLIMITED)
+    private val receivedChannelOpens = Channel<SshMsgChannelOpen>(Channel.UNLIMITED)
+    private val receivedChannelRequests = Channel<SshMsgChannelRequest>(Channel.UNLIMITED)
+    private val receivedChannelOpenConfirmations = Channel<SshMsgChannelOpenConfirmation>(Channel.UNLIMITED)
+    private val receivedChannelOpenFailures = Channel<SshMsgChannelOpenFailure>(Channel.UNLIMITED)
 
     fun start() {
         scope.launch(coroutineContext) { serve() }
@@ -202,6 +216,34 @@ class FakeSshServer(
                             val request = SshMsgUserauthRequest(ByteBufferKaitaiStream(bodyBytes))
                             request._read()
                             receivedUserauthRequests.trySend(request)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val request = SshMsgChannelOpen(ByteBufferKaitaiStream(bodyBytes))
+                            request._read()
+                            receivedChannelOpens.trySend(request)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val request = SshMsgChannelRequest(ByteBufferKaitaiStream(bodyBytes))
+                            request._read()
+                            receivedChannelRequests.trySend(request)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val confirmation = SshMsgChannelOpenConfirmation(ByteBufferKaitaiStream(bodyBytes))
+                            confirmation._read()
+                            receivedChannelOpenConfirmations.trySend(confirmation)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val failure = SshMsgChannelOpenFailure(ByteBufferKaitaiStream(bodyBytes))
+                            failure._read()
+                            receivedChannelOpenFailures.trySend(failure)
                         }
 
                         SshEnums.MessageType.SSH_MSG_PING -> {
@@ -549,6 +591,15 @@ class FakeSshServer(
         }
     }
 
+    suspend fun sendServerPong(data: ByteArray) {
+        val pong = SshMsgPong()
+        pong.setData(createByteString(data))
+        pong._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
+        }
+    }
+
     suspend fun sendUserauthBanner(message: String) {
         val banner = SshMsgUserauthBanner()
         val utf8 = createUtf8String(message)
@@ -570,6 +621,217 @@ class FakeSshServer(
         }
     }
 
+    suspend fun sendUserauthSuccess() {
+        val success = SshMsgUserauthSuccess()
+        success._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS.id().toInt(), success.toByteArray())
+        }
+    }
+
+    suspend fun sendUserauthPkOk(algorithmName: String, publicKeyBlob: ByteArray) {
+        val pkOk = SshMsgUserauthPkOk()
+        pkOk.setPublicKeyAlgorithmName(createAsciiString(algorithmName))
+        pkOk.setPublicKeyBlob(createByteString(publicKeyBlob))
+        pkOk._check()
+        writeMutex.withLock {
+            serverIo.writePacket(
+                SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60.id().toInt(),
+                pkOk.toByteArray(),
+            )
+        }
+    }
+
+    suspend fun sendUserauthInfoRequest(
+        name: String,
+        instruction: String,
+        prompts: List<Pair<String, Boolean>>,
+    ) {
+        val request = SshMsgUserauthInfoRequest()
+        request.setName(createByteString(name.toByteArray(Charsets.UTF_8)))
+        request.setInstruction(createByteString(instruction.toByteArray(Charsets.UTF_8)))
+        request.setLanguageTag(createByteString(ByteArray(0)))
+        request.setNumPrompts(prompts.size.toLong())
+        val promptMessages = prompts.map { (prompt, echo) ->
+            SshMsgUserauthInfoRequest.Prompt().apply {
+                set_root(request)
+                set_parent(request)
+                setPrompt(createByteString(prompt.toByteArray(Charsets.UTF_8)))
+                setEcho(if (echo) 1 else 0)
+                _check()
+            }
+        }
+        request.setPrompts(ArrayList(promptMessages))
+        request._check()
+        writeMutex.withLock {
+            serverIo.writePacket(
+                SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60.id().toInt(),
+                request.toByteArray(),
+            )
+        }
+    }
+
+    suspend fun sendChannelOpenConfirmation(
+        recipientChannel: Int,
+        senderChannel: Int,
+        initialWindowSize: Int = 64 * 1024,
+        maximumPacketSize: Int = 32 * 1024,
+    ) {
+        val confirmation = SshMsgChannelOpenConfirmation()
+        confirmation.setRecipientChannel(recipientChannel.toLong())
+        confirmation.setSenderChannel(senderChannel.toLong())
+        confirmation.setInitialWindowSize(initialWindowSize.toLong())
+        confirmation.setMaximumPacketSize(maximumPacketSize.toLong())
+        confirmation._check()
+        writeMutex.withLock {
+            serverIo.writePacket(
+                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION.id().toInt(),
+                confirmation.toByteArray(),
+            )
+        }
+    }
+
+    suspend fun sendChannelOpenFailure(recipientChannel: Int) {
+        val failure = SshMsgChannelOpenFailure()
+        failure.setRecipientChannel(recipientChannel.toLong())
+        failure.setReasonCode(2)
+        failure.setDescription(createByteString("open failed".toByteArray(Charsets.UTF_8)))
+        failure.setLanguageTag(createByteString(ByteArray(0)))
+        failure._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE.id().toInt(), failure.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelSuccess(recipientChannel: Int) {
+        val success = SshMsgChannelSuccess()
+        success.setRecipientChannel(recipientChannel.toLong())
+        success._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS.id().toInt(), success.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelFailure(recipientChannel: Int) {
+        val failure = SshMsgChannelFailure()
+        failure.setRecipientChannel(recipientChannel.toLong())
+        failure._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE.id().toInt(), failure.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelData(recipientChannel: Int, data: ByteArray) {
+        val payload = ByteArrayOutputStream()
+        payload.write(ByteBuffer.allocate(4).putInt(recipientChannel).array())
+        payload.writeString(data)
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_DATA.id().toInt(), payload.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelExtendedData(recipientChannel: Int, dataTypeCode: Int, data: ByteArray) {
+        val payload = ByteArrayOutputStream()
+        payload.write(ByteBuffer.allocate(4).putInt(recipientChannel).array())
+        payload.write(ByteBuffer.allocate(4).putInt(dataTypeCode).array())
+        payload.writeString(data)
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA.id().toInt(), payload.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelWindowAdjust(recipientChannel: Int, bytesToAdd: Long) {
+        val payload = ByteBuffer.allocate(8)
+            .putInt(recipientChannel)
+            .putInt(bytesToAdd.toInt())
+            .array()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(), payload)
+        }
+    }
+
+    suspend fun sendChannelEof(recipientChannel: Int) {
+        val payload = ByteBuffer.allocate(4).putInt(recipientChannel).array()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_EOF.id().toInt(), payload)
+        }
+    }
+
+    suspend fun sendChannelClose(recipientChannel: Int) {
+        val payload = ByteBuffer.allocate(4).putInt(recipientChannel).array()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE.id().toInt(), payload)
+        }
+    }
+
+    suspend fun sendRequestSuccess(payload: ByteArray = ByteArray(0)) {
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_SUCCESS.id().toInt(), payload)
+        }
+    }
+
+    suspend fun sendRequestFailure() {
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE.id().toInt())
+        }
+    }
+
+    suspend fun sendDisconnect(description: String = "bye") {
+        val msg = SshMsgDisconnect()
+        msg.setReasonCode(SshEnums.DisconnectReason.SSH_DISCONNECT_BY_APPLICATION)
+        msg.setDescription(createUtf8String(description))
+        msg.setLanguage(createAsciiString(""))
+        msg._check()
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(), msg.toByteArray())
+        }
+    }
+
+    suspend fun sendGlobalRequest(requestName: String, wantReply: Boolean) {
+        val payload = ByteArrayOutputStream()
+        payload.writeString(requestName.toByteArray(Charsets.US_ASCII))
+        payload.write(if (wantReply) 1 else 0)
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST.id().toInt(), payload.toByteArray())
+        }
+    }
+
+    suspend fun sendChannelOpen(channelType: String, senderChannel: Int) {
+        sendChannelOpenPacket(channelType, senderChannel, channelSpecificData = ByteArray(0))
+    }
+
+    suspend fun sendForwardedTcpipChannelOpen(
+        senderChannel: Int,
+        connectedAddress: String,
+        connectedPort: Int,
+        originatorAddress: String,
+        originatorPort: Int,
+    ) {
+        val data = ByteArrayOutputStream()
+        data.writeString(connectedAddress.toByteArray(Charsets.US_ASCII))
+        data.write(ByteBuffer.allocate(4).putInt(connectedPort).array())
+        data.writeString(originatorAddress.toByteArray(Charsets.US_ASCII))
+        data.write(ByteBuffer.allocate(4).putInt(originatorPort).array())
+        sendChannelOpenPacket("forwarded-tcpip", senderChannel, data.toByteArray())
+    }
+
+    private suspend fun sendChannelOpenPacket(channelType: String, senderChannel: Int, channelSpecificData: ByteArray) {
+        val payload = ByteArrayOutputStream()
+        payload.writeString(channelType.toByteArray(Charsets.US_ASCII))
+        payload.write(ByteBuffer.allocate(4).putInt(senderChannel).array())
+        payload.write(ByteBuffer.allocate(4).putInt(64 * 1024).array())
+        payload.write(ByteBuffer.allocate(4).putInt(32 * 1024).array())
+        payload.write(channelSpecificData)
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN.id().toInt(), payload.toByteArray())
+        }
+    }
+
+    private fun ByteArrayOutputStream.writeString(data: ByteArray) {
+        write(ByteBuffer.allocate(4).putInt(data.size).array())
+        write(data)
+    }
+
     suspend fun awaitPong(): ByteArray = receivedPongs.receive()
 
     suspend fun awaitExtInfo(): SshMsgExtInfo = receivedExtInfo.receive()
@@ -577,4 +839,12 @@ class FakeSshServer(
     suspend fun awaitUserauthRequest(): SshMsgUserauthRequest = receivedUserauthRequests.receive()
 
     suspend fun awaitClientKexInit(): SshMsgKexinit = receivedClientKexInits.receive()
+
+    suspend fun awaitChannelOpen(): SshMsgChannelOpen = receivedChannelOpens.receive()
+
+    suspend fun awaitChannelRequest(): SshMsgChannelRequest = receivedChannelRequests.receive()
+
+    suspend fun awaitChannelOpenConfirmation(): SshMsgChannelOpenConfirmation = receivedChannelOpenConfirmations.receive()
+
+    suspend fun awaitChannelOpenFailure(): SshMsgChannelOpenFailure = receivedChannelOpenFailures.receive()
 }

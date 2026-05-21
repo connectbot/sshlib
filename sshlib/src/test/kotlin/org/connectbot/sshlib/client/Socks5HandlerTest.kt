@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -212,6 +212,72 @@ class Socks5HandlerTest {
         val result = handler.handleHandshake(readChannel, writeChannel)
 
         assertNull(result)
+    }
+
+    @Test
+    fun `zero auth methods returns null`() = runTest {
+        val handler = Socks5Handler()
+        val readChannel = ByteReadChannel(byteArrayOf(0x05, 0x00))
+        val writeChannel = ByteChannel(true)
+
+        assertNull(handler.handleHandshake(readChannel, writeChannel))
+    }
+
+    @Test
+    fun `bad username password auth version returns null`() = runTest {
+        val authenticator = object : Socks5Authenticator {
+            override fun authenticate(username: String, password: String): Boolean = true
+        }
+        val handler = Socks5Handler(authenticator)
+        val input = byteArrayOf(
+            0x05,
+            0x01,
+            0x02,
+            0x02, // invalid RFC 1929 auth version
+        )
+        val readChannel = ByteReadChannel(input)
+        val writeChannel = ByteChannel(true)
+
+        assertNull(handler.handleHandshake(readChannel, writeChannel))
+    }
+
+    @Test
+    fun `bad connect request version returns null`() = runTest {
+        val handler = Socks5Handler()
+        val input = byteArrayOf(
+            0x05, 0x01, 0x00,
+            0x04, 0x01, 0x00, 0x03, 0x00, 0x00, 0x50,
+        )
+        val readChannel = ByteReadChannel(input)
+        val writeChannel = ByteChannel(true)
+
+        assertNull(handler.handleHandshake(readChannel, writeChannel))
+    }
+
+    @Test
+    fun `unsupported command returns null`() = runTest {
+        val handler = Socks5Handler()
+        val input = byteArrayOf(
+            0x05, 0x01, 0x00,
+            0x05, 0x02, 0x00, 0x03, 0x00, 0x00, 0x50,
+        )
+        val readChannel = ByteReadChannel(input)
+        val writeChannel = ByteChannel(true)
+
+        assertNull(handler.handleHandshake(readChannel, writeChannel))
+    }
+
+    @Test
+    fun `unsupported address type returns null`() = runTest {
+        val handler = Socks5Handler()
+        val input = byteArrayOf(
+            0x05, 0x01, 0x00,
+            0x05, 0x01, 0x00, 0x7f, 0x00, 0x50,
+        )
+        val readChannel = ByteReadChannel(input)
+        val writeChannel = ByteChannel(true)
+
+        assertNull(handler.handleHandshake(readChannel, writeChannel))
     }
 
     @Test

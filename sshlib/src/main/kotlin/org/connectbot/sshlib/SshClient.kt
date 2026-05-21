@@ -48,7 +48,7 @@ import java.net.InetSocketAddress
  *
  * Usage with TCP (default):
  * ```kotlin
- * val client = SshClient("example.com")
+ * val client = SshClient("example.com", hostKeyVerifier = myVerifier)
  * if (client.connect() is ConnectResult.Success) {
  *     if (client.authenticatePassword("user", "password") is AuthResult.Success) {
  *         val session = client.openSession()
@@ -75,6 +75,9 @@ import java.net.InetSocketAddress
  */
 class SshClient private constructor(
     private val config: SshClientConfig,
+    initialTransport: Transport? = null,
+    initialConnection: SshConnection? = null,
+    initialAuthenticated: Boolean = false,
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(SshClient::class.java)
@@ -92,12 +95,14 @@ class SshClient private constructor(
          */
         operator fun invoke(
             host: String,
+            hostKeyVerifier: HostKeyVerifier,
             port: Int = 22,
             clientVersion: String = "SSH-2.0-CBSSH_1.0",
         ): SshClient {
             val config = SshClientConfig {
                 this.host = host
                 this.port = port
+                this.hostKeyVerifier = hostKeyVerifier
                 this.clientVersion = clientVersion
             }
             return SshClient(config)
@@ -116,19 +121,29 @@ class SshClient private constructor(
          */
         operator fun invoke(
             transportFactory: TransportFactory,
+            hostKeyVerifier: HostKeyVerifier,
             clientVersion: String = "SSH-2.0-CBSSH_1.0",
         ): SshClient {
             val config = SshClientConfig {
                 this.transportFactory = transportFactory
+                this.hostKeyVerifier = hostKeyVerifier
                 this.clientVersion = clientVersion
             }
             return SshClient(config)
         }
+
+        @JvmSynthetic
+        internal fun createForTesting(
+            config: SshClientConfig,
+            initialTransport: Transport? = null,
+            initialConnection: SshConnection? = null,
+            initialAuthenticated: Boolean = false,
+        ): SshClient = SshClient(config, initialTransport, initialConnection, initialAuthenticated)
     }
 
-    private var transport: Transport? = null
-    private var connection: SshConnection? = null
-    private var authenticated = false
+    private var transport: Transport? = initialTransport
+    private var connection: SshConnection? = initialConnection
+    private var authenticated = initialAuthenticated
     private val forwardingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var disconnectForwardJob: Job? = null
 
@@ -618,7 +633,7 @@ class SshClient private constructor(
      * ProxyJump pattern).
      *
      * ```kotlin
-     * val jump = SshClient("jump.example.com")
+     * val jump = SshClient("jump.example.com", hostKeyVerifier = jumpVerifier)
      * jump.connect()
      * jump.authenticatePassword("user", "pass")
      *

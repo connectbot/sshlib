@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ import java.net.InetSocketAddress
  *
  * With custom transport:
  * ```java
- * BlockingSshClient client = new BlockingSshClient(myTransportFactory);
+ * BlockingSshClient client = new BlockingSshClient(myTransportFactory, myHostKeyVerifier);
  * ```
  */
 class BlockingSshClient internal constructor(
@@ -99,8 +99,9 @@ class BlockingSshClient internal constructor(
      */
     constructor(
         transportFactory: TransportFactory,
+        hostKeyVerifier: HostKeyVerifier,
         clientVersion: String = "SSH-2.0-CBSSH_1.0",
-    ) : this(SshClient(transportFactory, clientVersion))
+    ) : this(SshClient(transportFactory, hostKeyVerifier, clientVersion))
 
     /**
      * Connect to the SSH server and perform key exchange.

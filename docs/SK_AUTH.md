@@ -48,7 +48,7 @@ class SkAuthHandler(
     override suspend fun onKeyboardInteractivePrompt(...) = null
 }
 
-val client = SshClient("server.example.com")
+val client = SshClient("server.example.com", hostKeyVerifier = myVerifier)
 client.connect()
 val result = client.authenticate("user", SkAuthHandler(...))
 ```
