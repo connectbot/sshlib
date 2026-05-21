@@ -77,7 +77,20 @@ sourceSets {
 dependencies {
     api(libs.kaitai.runtime)
     implementation(kotlin("stdlib"))
+    testImplementation(kotlin("test"))
     kaitaiCompiler(libs.kaitai.compiler)
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+kover {
+    currentProject {
+        sources {
+            excludeJava.set(true)
+        }
+    }
 }
 
 java {
