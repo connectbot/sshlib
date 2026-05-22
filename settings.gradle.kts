@@ -1,4 +1,4 @@
-rootProject.name = "ssh-proto"
+rootProject.name = "cbssh"
 
 include(":sshlib")
 include(":testapp")
