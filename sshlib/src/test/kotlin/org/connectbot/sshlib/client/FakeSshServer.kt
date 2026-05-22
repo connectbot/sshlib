@@ -109,8 +109,14 @@ class FakeSshServer(
     private val receivedChannelOpenConfirmations = Channel<SshMsgChannelOpenConfirmation>(Channel.UNLIMITED)
     private val receivedChannelOpenFailures = Channel<SshMsgChannelOpenFailure>(Channel.UNLIMITED)
 
-    fun start() {
-        scope.launch(coroutineContext) { serve() }
+    fun start(ignoreTransportErrors: Boolean = false) {
+        scope.launch(coroutineContext) {
+            if (ignoreTransportErrors) {
+                runCatching { serve() }
+            } else {
+                serve()
+            }
+        }
     }
 
     /**
@@ -741,6 +747,7 @@ class FakeSshServer(
     }
 
     suspend fun sendChannelWindowAdjust(recipientChannel: Int, bytesToAdd: Long) {
+        require(bytesToAdd in 0..0xFFFF_FFFFL) { "bytesToAdd must fit SSH uint32" }
         val payload = ByteBuffer.allocate(8)
             .putInt(recipientChannel)
             .putInt(bytesToAdd.toInt())

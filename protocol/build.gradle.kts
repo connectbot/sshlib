@@ -78,6 +78,8 @@ dependencies {
     api(libs.kaitai.runtime)
     implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
     kaitaiCompiler(libs.kaitai.compiler)
 }
 
