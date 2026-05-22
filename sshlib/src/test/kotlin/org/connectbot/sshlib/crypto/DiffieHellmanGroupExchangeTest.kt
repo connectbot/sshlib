@@ -37,9 +37,6 @@ class DiffieHellmanGroupExchangeTest {
     // A tiny 16-bit prime — far below the min=2048 requested by the client
     private val tinyPrime = BigInteger("65537")
 
-    // A 2048-bit composite (GROUP14_P with the last bit flipped) — not a safe prime
-    private val compositeLikePrime = DhGroups.GROUP14_P.subtract(BigInteger.ONE)
-
     @Test
     fun `setGroup rejects p smaller than min bits`() {
         val gex = DiffieHellmanGroupExchange("SHA-256")
