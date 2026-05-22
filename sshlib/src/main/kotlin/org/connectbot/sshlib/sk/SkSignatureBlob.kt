@@ -49,11 +49,11 @@ import org.connectbot.sshlib.crypto.encodeSshString
  * For ECDSA-P256, [pack] accepts the DER `SEQUENCE { INTEGER r, INTEGER s }`
  * format that CTAP2 returns and converts it to `mpint r || mpint s` internally.
  *
- * What [flags] and [counter] mean (from `PROTOCOL.u2f` §3.2): the FIDO2 device
+ * The `flags` and `counter` parameters of [pack] come from the CTAP2
+ * GetAssertion response. Per OpenSSH `PROTOCOL.u2f` §3.2, the FIDO2 device
  * sets `flags = SK_USER_PRESENCE_REQUIRED (0x01)` if user presence was tested
  * and `| SK_USER_VERIFICATION_REQUIRED (0x04)` if user verification was also
- * tested; `counter` is the device's monotonic signature counter. Both come
- * from the CTAP2 GetAssertion response.
+ * tested; `counter` is the device's monotonic signature counter.
  */
 public object SkSignatureBlob {
 
