@@ -1,0 +1,59 @@
+name: Compatibility report
+description: Report interoperability with a specific SSH server, algorithm, or client workflow.
+title: "Compatibility: "
+labels: [compatibility]
+body:
+  - type: input
+    id: server
+    attributes:
+      label: SSH server
+      description: Server implementation and version.
+      placeholder: "OpenSSH_9.9p2"
+    validations:
+      required: true
+  - type: input
+    id: library-version
+    attributes:
+      label: Library version
+      placeholder: "0.2.2-SNAPSHOT"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Connection setup
+        - Key exchange
+        - Host key verification
+        - Authentication
+        - Shell/session channel
+        - SFTP
+        - Port forwarding
+        - Agent forwarding
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: algorithms
+    attributes:
+      label: Algorithms and configuration
+      description: Include negotiated algorithms, client config, auth methods, or server config if known.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: What works or fails? Include logs or packet-level details if available.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect based on other clients, server docs, or protocol references?
+    validations:
+      required: false
