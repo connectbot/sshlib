@@ -81,4 +81,14 @@ internal class LocalChannelWindow(
     fun consumeRemote(size: Int) {
         remoteRemaining -= size
     }
+
+    /**
+     * Return the next send chunk size without narrowing the uint32 remote
+     * window until it is bounded by Int-sized data and packet limits.
+     */
+    fun sendChunkSize(remainingData: Int, maxPacketSize: Int): Int = minOf(
+        remainingData.toLong(),
+        remoteRemaining,
+        maxPacketSize.toLong(),
+    ).toInt()
 }

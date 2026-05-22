@@ -84,4 +84,11 @@ class LocalChannelWindowTest {
         w.consumeRemote(300)
         assertEquals(700L, w.remoteRemaining)
     }
+
+    @Test
+    fun `sendChunkSize handles uint32 remote window without overflow`() {
+        val w = LocalChannelWindow(initialSize = 1024, remoteInitial = LocalChannelWindow.MAX_WINDOW_SIZE)
+
+        assertEquals(32768, w.sendChunkSize(64 * 1024, 32768))
+    }
 }

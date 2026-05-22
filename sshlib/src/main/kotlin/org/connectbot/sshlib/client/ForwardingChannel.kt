@@ -31,11 +31,16 @@ internal class ForwardingChannel(
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(ForwardingChannel::class.java)
+        private const val WINDOW_ADJUST_THRESHOLD = 64 * 1024
     }
 
     private var _isOpen = true
     private var closeSent = false
-    private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
+    private val window = LocalChannelWindow(
+        initialWindowSize,
+        adjustThreshold = WINDOW_ADJUST_THRESHOLD,
+        remoteInitial = remoteWindowSizeInitial,
+    )
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val _incomingData = Channel<ByteArray>(Channel.UNLIMITED)
@@ -85,11 +90,7 @@ internal class ForwardingChannel(
             while (window.remoteRemaining <= 0) {
                 windowAvailable.receive()
             }
-            val chunkSize = minOf(
-                data.size - offset,
-                window.remoteRemaining.toInt(),
-                maxPacketSize,
-            )
+            val chunkSize = window.sendChunkSize(data.size - offset, maxPacketSize)
             val chunk = data.copyOfRange(offset, offset + chunkSize)
             connection.sendChannelData(remoteChannelNumber, chunk)
             window.consumeRemote(chunkSize)
