@@ -61,6 +61,50 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `connect returns host key rejected when verifier rejects server key`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val (clientTransport, serverTransport) = PipedTransport.create()
+        val server = FakeSshServer(serverTransport, backgroundScope, dispatcher)
+        server.start(ignoreTransportErrors = true)
+
+        val rejectingVerifier = object : HostKeyVerifier {
+            override suspend fun verify(key: PublicKey): Boolean = false
+        }
+        val connection = SshConnection(
+            transport = clientTransport,
+            hostKeyVerifier = rejectingVerifier,
+            coroutineDispatcher = dispatcher,
+        )
+
+        try {
+            assertIs<ConnectResult.HostKeyRejected>(connectInBackground(connection, backgroundScope, dispatcher))
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    fun `connect returns algorithm mismatch when kex negotiation has no match`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val (clientTransport, serverTransport) = PipedTransport.create()
+        val server = FakeSshServer(serverTransport, backgroundScope, dispatcher)
+        server.kexAlgorithms = "unsupported-kex@example.com"
+        server.start(ignoreTransportErrors = true)
+
+        val connection = SshConnection(
+            transport = clientTransport,
+            hostKeyVerifier = acceptAllVerifier,
+            coroutineDispatcher = dispatcher,
+        )
+
+        try {
+            assertIs<ConnectResult.AlgorithmMismatch>(connectInBackground(connection, backgroundScope, dispatcher))
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
     fun `password authentication handles success and failure replies`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             val success = async(dispatcher) { connection.authenticatePassword("user", "pass") }
@@ -96,6 +140,21 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `public key authentication handles failure reply`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val privateKeyData = Files.readString(Paths.get("src/test/resources/keys/ed25519_unencrypted"))
+            val privateKey = PrivateKeyReader.read(privateKeyData)
+
+            val auth = async(dispatcher) { connection.authenticatePublicKey("user", privateKey) }
+            val request = withTimeout(5_000) { server.awaitUserauthRequest() }
+            assertEquals("publickey", request.methodName().value())
+            server.sendUserauthFailure(setOf("password"), partialSuccess = false)
+
+            assertIs<AuthResult.Failure>(withTimeout(5_000) { auth.await() })
+        }
+    }
+
+    @Test
     fun `direct keyboard interactive authentication handles info request`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             val callback = object : KeyboardInteractiveCallback {
@@ -124,6 +183,49 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `strategy authentication succeeds when none auth is accepted`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val auth = async(dispatcher) { connection.authenticate("user", EmptyAuthHandler()) }
+            val none = withTimeout(5_000) { server.awaitUserauthRequest() }
+            assertEquals("none", none.methodName().value())
+            server.sendUserauthSuccess()
+
+            assertEquals(AuthResult.Success, withTimeout(5_000) { auth.await() })
+        }
+    }
+
+    @Test
+    fun `strategy authentication delivers banners while discovering methods`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val banners = mutableListOf<String>()
+            val observedMethods = mutableListOf<Set<String>>()
+            val handler = object : EmptyAuthHandler() {
+                override suspend fun onAuthMethodsAvailable(methods: Set<String>) {
+                    observedMethods.add(methods)
+                }
+
+                override suspend fun onPasswordNeeded(): String = "secret"
+
+                override suspend fun onBanner(message: String) {
+                    banners.add(message)
+                }
+            }
+
+            val auth = async(dispatcher) { connection.authenticate("user", handler) }
+            assertEquals("none", withTimeout(5_000) { server.awaitUserauthRequest() }.methodName().value())
+            server.sendUserauthBanner("maintenance window")
+            server.sendUserauthFailure(setOf("password"), partialSuccess = false)
+
+            assertEquals("password", withTimeout(5_000) { server.awaitUserauthRequest() }.methodName().value())
+            server.sendUserauthSuccess()
+
+            assertEquals(AuthResult.Success, withTimeout(5_000) { auth.await() })
+            assertEquals(listOf("maintenance window"), banners)
+            assertEquals(listOf(setOf("password")), observedMethods)
+        }
+    }
+
+    @Test
     fun `strategy authentication discovers methods and succeeds with password`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             val handler = object : EmptyAuthHandler() {
@@ -140,6 +242,17 @@ class SshConnectionFlowTest {
             server.sendUserauthSuccess()
 
             assertEquals(AuthResult.Success, withTimeout(5_000) { auth.await() })
+        }
+    }
+
+    @Test
+    fun `strategy authentication fails when password is unavailable`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val auth = async(dispatcher) { connection.authenticate("user", EmptyAuthHandler()) }
+            assertEquals("none", withTimeout(5_000) { server.awaitUserauthRequest() }.methodName().value())
+            server.sendUserauthFailure(setOf("password"), partialSuccess = false)
+
+            assertIs<AuthResult.Failure>(withTimeout(5_000) { auth.await() })
         }
     }
 
