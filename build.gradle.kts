@@ -46,6 +46,7 @@ sonar {
         property("sonar.organization", "connectbot")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
+        property("sonar.coverage.exclusions", "testapp/**")
         property("sonar.exclusions", "**/build/generated/**")
         property("sonar.issue.ignore.multicriteria", "cognitiveComplexityConnection,cognitiveComplexitySftp,cognitiveComplexityTransport")
         property("sonar.issue.ignore.multicriteria.cognitiveComplexityConnection.ruleKey", "kotlin:S3776")

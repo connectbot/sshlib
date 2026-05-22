@@ -59,11 +59,33 @@ class SignatureVerifierTest {
         return buf.toByteArray()
     }
 
+    private fun buildUnknownHostKey(algorithmName: String = "unknown-key@example.com"): ByteArray {
+        val buf = ByteArrayOutputStream()
+        val out = DataOutputStream(buf)
+        encodeString(out, algorithmName)
+        encodeString(out, byteArrayOf(1, 2, 3))
+        return buf.toByteArray()
+    }
+
     private fun signData(data: ByteArray, jcaAlgorithm: String, kp: java.security.KeyPair): ByteArray {
         val sig = Signature.getInstance(jcaAlgorithm)
         sig.initSign(kp.private)
         sig.update(data)
         return sig.sign()
+    }
+
+    private fun readKey(resourcePath: String): SshPrivateKey {
+        val data = requireNotNull(javaClass.getResourceAsStream("/keys/$resourcePath")) {
+            "Missing test key resource: /keys/$resourcePath"
+        }.use { stream ->
+            stream.bufferedReader().use { reader -> reader.readText() }
+        }
+        return PrivateKeyReader.read(data)
+    }
+
+    private fun signWithSshAlgorithm(privateKey: SshPrivateKey, algorithmName: String, data: ByteArray): ByteArray {
+        val entry = SignatureEntry.fromSshName(algorithmName) ?: error("Unknown algorithm: $algorithmName")
+        return entry.algorithm.sign(algorithmName, privateKey.jcaKeyPair.private, data)
     }
 
     @Test
@@ -131,5 +153,69 @@ class SignatureVerifierTest {
         val sigBlob = buildSignatureBlob("unknown-algo", sigBytes)
 
         assertFalse(SignatureVerifier.verify(hostKey, sigBlob, data, "rsa-sha2-256"))
+    }
+
+    @Test
+    fun `rejects negotiated unknown signature algorithm`() {
+        val kp = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        val data = "exchange hash".toByteArray()
+        val hostKey = buildRsaHostKey(kp.public as RSAPublicKey)
+        val sigBlob = buildSignatureBlob("unknown-algo", byteArrayOf(1, 2, 3))
+
+        assertFalse(SignatureVerifier.verify(hostKey, sigBlob, data, "unknown-algo"))
+    }
+
+    @Test
+    fun `verifyWithKeyType accepts RSA-compatible signature algorithms`() {
+        val privateKey = readKey("rsa_unencrypted")
+        val data = "session binding".toByteArray()
+        val hostKey = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
+
+        for (algorithmName in listOf("ssh-rsa", "rsa-sha2-256", "rsa-sha2-512")) {
+            val sigBlob = signWithSshAlgorithm(privateKey, algorithmName, data)
+
+            assertTrue(SignatureVerifier.verifyWithKeyType(hostKey, sigBlob, data), algorithmName)
+        }
+    }
+
+    @Test
+    fun `verifyWithKeyType accepts matching Ed25519 signature algorithm`() {
+        val privateKey = readKey("ed25519_unencrypted")
+        val data = "session binding".toByteArray()
+        val hostKey = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
+        val sigBlob = signWithSshAlgorithm(privateKey, "ssh-ed25519", data)
+
+        assertTrue(SignatureVerifier.verifyWithKeyType(hostKey, sigBlob, data))
+    }
+
+    @Test
+    fun `verifyWithKeyType rejects signature algorithm incompatible with key type`() {
+        val privateKey = readKey("ed25519_unencrypted")
+        val rsaKey = readKey("rsa_unencrypted")
+        val data = "session binding".toByteArray()
+        val ed25519HostKey = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, privateKey.keyType)
+        val rsaSigBlob = signWithSshAlgorithm(rsaKey, "rsa-sha2-256", data)
+
+        assertFalse(SignatureVerifier.verifyWithKeyType(ed25519HostKey, rsaSigBlob, data))
+    }
+
+    @Test
+    fun `verifyWithKeyType rejects non-RSA signature algorithm for RSA key`() {
+        val rsaKey = readKey("rsa_unencrypted")
+        val ed25519Key = readKey("ed25519_unencrypted")
+        val data = "session binding".toByteArray()
+        val rsaHostKey = SshPublicKeyEncoder.encode(rsaKey.jcaKeyPair, rsaKey.keyType)
+        val ed25519SigBlob = signWithSshAlgorithm(ed25519Key, "ssh-ed25519", data)
+
+        assertFalse(SignatureVerifier.verifyWithKeyType(rsaHostKey, ed25519SigBlob, data))
+    }
+
+    @Test
+    fun `verifyWithKeyType rejects unknown self-described signature algorithm`() {
+        val data = "session binding".toByteArray()
+        val hostKey = buildUnknownHostKey()
+        val sigBlob = buildSignatureBlob("unknown-key@example.com", byteArrayOf(4, 5, 6))
+
+        assertFalse(SignatureVerifier.verifyWithKeyType(hostKey, sigBlob, data))
     }
 }
