@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Publish release
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  checks: read
+  statuses: read
+
+jobs:
+  publish:
+    name: Publish release tag and branch
+    if: github.event.label.name == 'release:publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      RELEASE_ACTOR: ${{ github.event.sender.login }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Create release app token
+        id: release-app-token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Publish release
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+        run: |
+          set -o pipefail
+          bash .github/scripts/publish-release.sh 2>&1 | tee "${RUNNER_TEMP}/release-publish.log"
+
+      - name: Comment on failure
+        if: failure()
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+        run: bash .github/scripts/comment-issue-failure.sh "${RUNNER_TEMP}/release-publish.log" "Publish release"
