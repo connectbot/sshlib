@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Prepare release
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Prepare release pull request
+    if: github.event.label.name == 'release:prepare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      PUSH_TOKEN: ${{ github.token }}
+      RELEASE_ACTOR: ${{ github.event.sender.login }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          validate-wrappers: true
+
+      - name: Prepare release branch
+        id: release
+        run: |
+          set -o pipefail
+          bash .github/scripts/prepare-release.sh 2>&1 | tee "${RUNNER_TEMP}/release-prepare.log"
+
+      - name: Open or update release pull request
+        run: |
+          set -o pipefail
+          bash .github/scripts/upsert-release-pr.sh \
+          "${{ steps.release.outputs.release_version }}" \
+          "${{ steps.release.outputs.next_version }}" \
+          "${{ steps.release.outputs.target_branch }}" \
+          "${{ steps.release.outputs.work_branch }}" \
+          "${{ steps.release.outputs.tag_name }}" \
+          2>&1 | tee -a "${RUNNER_TEMP}/release-prepare.log"
+
+      - name: Comment on failure
+        if: failure()
+        run: bash .github/scripts/comment-issue-failure.sh "${RUNNER_TEMP}/release-prepare.log" "Prepare release"

@@ -1,0 +1,41 @@
+name: Release
+description: Prepare and publish a library release.
+title: "Release "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This release automation is for maintainers only. Submissions from non-maintainers will be rejected by the workflow.
+  - type: input
+    id: releaseVersion
+    attributes:
+      label: Release version
+      description: Version to publish, without the v tag prefix.
+      placeholder: "1.0.4"
+    validations:
+      required: true
+  - type: input
+    id: nextVersion
+    attributes:
+      label: Next version
+      description: Next development version after the release.
+      placeholder: "1.0.5-SNAPSHOT"
+    validations:
+      required: true
+  - type: input
+    id: targetBranch
+    attributes:
+      label: Target branch
+      description: Branch to release from and fast-forward on publish.
+      placeholder: "main"
+      value: "main"
+    validations:
+      required: true
+  - type: textarea
+    id: releaseNotes
+    attributes:
+      label: Release notes
+      description: Optional text to include in the annotated tag message.
+    validations:
+      required: false

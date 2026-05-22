@@ -2,16 +2,42 @@
 name: Continuous Integration
 on:
   push:
-    branches: ['*']
+    branches: ['**']
+    tags: ['v*.*.*']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
   schedule:
     - cron: '30 5 * * *'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  workflow-tests:
+    name: Workflow scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
+        with:
+          install: true
+          install_args: actionlint bats jq shellcheck
+
+      - name: Check workflow syntax
+        run: mise exec -- actionlint
+
+      - name: Check shell scripts
+        run: mise exec -- shellcheck -x .github/scripts/*.sh
+
+      - name: Test release scripts
+        run: mise exec -- bats --print-output-on-failure .github/tests/release-scripts.bats
+
   build:
     name: Build and test
     runs-on: ubuntu-latest
@@ -36,7 +62,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
         with:
-          dependency-graph: generate-and-submit
+          dependency-graph: disabled
           validate-wrappers: true
 
       - name: Configure Docker mirror
@@ -47,8 +73,40 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build koverXmlReport --info -PjdkVersion=${{ matrix.java }}
 
-      - name: Upload to Sonatype
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.java == '17'
+      - name: Read project version
+        id: project-version
+        if: matrix.java == '17'
+        run: |
+          version="$(sed -n 's/^version=//p' gradle.properties)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify release tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && matrix.java == '17'
+        run: |
+          test "$(git cat-file -t "${GITHUB_REF_NAME}")" = "tag"
+          git fetch origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/release/*:refs/remotes/origin/release/*"
+          tag_commit="$(git rev-list -n 1 "${GITHUB_REF_NAME}")"
+          git branch -r --contains "${tag_commit}" | grep -E 'origin/(main|release/[0-9]+\.[0-9]+)$'
+
+      - name: Upload snapshot to Sonatype
+        if: >
+          github.event_name == 'push' &&
+          matrix.java == '17' &&
+          endsWith(steps.project-version.outputs.version, '-SNAPSHOT') &&
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+        run: |
+          ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername="${ORG_GRADLE_PROJECT_mavenCentralUsername}" -PmavenCentralPassword="${ORG_GRADLE_PROJECT_mavenCentralPassword}"
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.MAVEN_GPG_KEYID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_PASSWORD }}
+
+      - name: Upload release to Sonatype
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && matrix.java == '17'
         run: |
           ./gradlew publishToMavenCentral --no-configuration-cache -PmavenCentralUsername="${ORG_GRADLE_PROJECT_mavenCentralUsername}" -PmavenCentralPassword="${ORG_GRADLE_PROJECT_mavenCentralPassword}"
         env:

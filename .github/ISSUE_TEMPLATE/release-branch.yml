@@ -1,0 +1,34 @@
+name: Release branch
+description: Create a maintenance release branch.
+title: "Create release branch "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This release branch automation is for maintainers only. Submissions from non-maintainers will be rejected by the workflow.
+  - type: input
+    id: maintenanceBranch
+    attributes:
+      label: Maintenance branch
+      description: Branch to create for maintenance releases.
+      placeholder: "release/1.1"
+    validations:
+      required: true
+  - type: input
+    id: sourceBranch
+    attributes:
+      label: Source branch
+      description: Branch to cut from.
+      placeholder: "main"
+      value: "main"
+    validations:
+      required: true
+  - type: input
+    id: sourceRef
+    attributes:
+      label: Source ref
+      description: Optional exact ref or SHA. Leave blank to use the source branch tip.
+      placeholder: "main"
+    validations:
+      required: false

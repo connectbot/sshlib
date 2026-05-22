@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Create release branch
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  branch:
+    name: Create maintenance branch
+    if: github.event.label.name == 'release:branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      PUSH_TOKEN: ${{ github.token }}
+      RELEASE_ACTOR: ${{ github.event.sender.login }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Create branch
+        run: |
+          set -o pipefail
+          bash .github/scripts/create-release-branch.sh 2>&1 | tee "${RUNNER_TEMP}/release-branch.log"
+
+      - name: Comment on failure
+        if: failure()
+        run: bash .github/scripts/comment-issue-failure.sh "${RUNNER_TEMP}/release-branch.log" "Create release branch"

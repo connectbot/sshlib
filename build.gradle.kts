@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import net.researchgate.release.ReleaseExtension
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.dokka) apply false
@@ -37,6 +39,22 @@ allprojects {
 dependencies {
     kover(project(":protocol"))
     kover(project(":sshlib"))
+}
+
+configure<ReleaseExtension> {
+    tagTemplate.set("v\${version}")
+    preTagCommitMessage.set("chore(release): ")
+    tagCommitMessage.set("Release ")
+    newVersionCommitMessage.set("chore(release): start ")
+    buildTasks.set(listOf("build"))
+
+    git {
+        requireBranch.set("^(main|release/.+|release-work/.+)$")
+        commitVersionFileOnly.set(true)
+        if (providers.gradleProperty("cbssh.release.noPush").isPresent) {
+            pushToRemote.set(false)
+        }
+    }
 }
 
 sonar {
@@ -67,8 +85,22 @@ sonar {
     }
 }
 
+val spotlessRatchetRef = providers.environmentVariable("GITHUB_BASE_REF")
+    .map { "origin/$it" }
+    .orElse(
+        providers.environmentVariable("GITHUB_REF_NAME")
+            .map { refName ->
+                if (refName.startsWith("release/")) {
+                    "origin/$refName"
+                } else {
+                    "origin/main"
+                }
+            },
+    )
+    .getOrElse("origin/main")
+
 spotless {
-    ratchetFrom = "origin/main"
+    ratchetFrom = spotlessRatchetRef
 
     kotlin {
         target("**/src/**/*.kt")

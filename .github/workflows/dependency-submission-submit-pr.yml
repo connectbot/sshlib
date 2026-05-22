@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Submit pull request dependency graph
+on:
+  workflow_run:
+    workflows: ['Dependency Submission']
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  submit-dependency-graph:
+    name: Submit pull request dependency graph
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download and submit dependency graph
+        uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+        with:
+          dependency-graph: download-and-submit
