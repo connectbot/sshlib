@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ package org.connectbot.sshlib
  * Callback for keyboard-interactive authentication (RFC 4256).
  *
  * The server sends one or more info requests, each containing prompts
- * that the user must answer. Call [respond] with the answers to send
- * them back to the server.
+ * that the user must answer. [onInfoRequest] receives a `respond`
+ * callback; call it with the answers to send them back to the server.
  */
 interface KeyboardInteractiveCallback {
     /**
