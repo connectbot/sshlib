@@ -62,7 +62,6 @@ fi
 gh pr checks "${pr_number}" --required --fail-fast
 
 configure_git_author
-configure_git_credentials
 git fetch origin \
   "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}" \
   "+refs/heads/${work_branch}:refs/remotes/origin/${work_branch}" \
@@ -106,5 +105,6 @@ if [[ "$(git cat-file -t "${tag_name}")" != "tag" ]]; then
   exit 1
 fi
 
+configure_git_credentials
 git push --atomic --follow-tags origin "refs/remotes/origin/${work_branch}:refs/heads/${target_branch}"
 gh issue comment "${ISSUE_NUMBER}" --body "Published ${tag_name} to ${target_branch}."

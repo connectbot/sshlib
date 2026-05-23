@@ -27,12 +27,12 @@ fi
 require_missing_remote_branch "${maintenance_branch}"
 require_remote_branch "${source_branch}"
 
-configure_git_credentials
 git fetch origin "+refs/heads/${source_branch}:refs/remotes/origin/${source_branch}" --tags
 git rev-parse --verify --end-of-options "${source_ref}^{commit}" >/dev/null
 if ! git merge-base --is-ancestor -- "${source_ref}^{commit}" "origin/${source_branch}"; then
   echo "Source ref ${source_ref} is not reachable from origin/${source_branch}."
   exit 1
 fi
+configure_git_credentials
 git push origin "${source_ref}^{commit}:refs/heads/${maintenance_branch}"
 gh issue comment "${ISSUE_NUMBER}" --body "Created ${maintenance_branch} from ${source_ref}."

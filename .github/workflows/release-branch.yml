@@ -5,7 +5,7 @@ on:
     types: [labeled]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 jobs:
@@ -18,7 +18,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE_BODY: ${{ github.event.issue.body }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      PUSH_TOKEN: ${{ github.token }}
       RELEASE_ACTOR: ${{ github.event.sender.login }}
     steps:
       - name: Checkout
@@ -28,11 +27,27 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Authorize release actor
+        run: bash -c 'source .github/scripts/release-common.sh; require_maintainer'
+
+      - name: Create release app token
+        id: release-app-token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Create branch
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -o pipefail
           bash .github/scripts/create-release-branch.sh 2>&1 | tee "${RUNNER_TEMP}/release-branch.log"
 
       - name: Comment on failure
         if: failure()
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: bash .github/scripts/comment-issue-failure.sh "${RUNNER_TEMP}/release-branch.log" "Create release branch"

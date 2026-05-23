@@ -24,7 +24,6 @@ require_remote_branch "${target_branch}"
 require_missing_remote_branch "${work_branch}"
 
 configure_git_author
-configure_git_credentials
 git fetch origin "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}" --tags
 git checkout -B "${work_branch}" "origin/${target_branch}"
 
@@ -34,6 +33,7 @@ git checkout -B "${work_branch}" "origin/${target_branch}"
   -Prelease.releaseVersion="${release_version}" \
   -Prelease.newVersion="${next_version}"
 
+configure_git_credentials
 git push origin "HEAD:refs/heads/${work_branch}"
 
 {
