@@ -85,19 +85,18 @@ sonar {
     }
 }
 
-val spotlessRatchetRef = providers.environmentVariable("GITHUB_BASE_REF")
-    .map { "origin/$it" }
-    .orElse(
-        providers.environmentVariable("GITHUB_REF_NAME")
-            .map { refName ->
-                if (refName.startsWith("release/")) {
-                    "origin/$refName"
-                } else {
-                    "origin/main"
-                }
-            },
-    )
-    .getOrElse("origin/main")
+val spotlessRatchetRef = providers.provider {
+    val baseRef = providers.environmentVariable("GITHUB_BASE_REF").orNull
+        ?.takeIf { it.isNotBlank() }
+    val refName = providers.environmentVariable("GITHUB_REF_NAME").orNull
+        ?.takeIf { it.isNotBlank() }
+
+    when {
+        baseRef != null -> "origin/$baseRef"
+        refName != null && refName.startsWith("release/") -> "origin/$refName"
+        else -> "origin/main"
+    }
+}.get()
 
 spotless {
     ratchetFrom = spotlessRatchetRef
