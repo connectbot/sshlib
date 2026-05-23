@@ -5,9 +5,8 @@ on:
     types: [labeled]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
-  pull-requests: write
 
 jobs:
   prepare:
@@ -19,7 +18,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE_BODY: ${{ github.event.issue.body }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      PUSH_TOKEN: ${{ github.token }}
       RELEASE_ACTOR: ${{ github.event.sender.login }}
     steps:
       - name: Checkout
@@ -28,6 +26,9 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
+
+      - name: Authorize release actor
+        run: bash -c 'source .github/scripts/release-common.sh; require_maintainer'
 
       - name: Set up JDK
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -40,13 +41,26 @@ jobs:
         with:
           validate-wrappers: true
 
+      - name: Create release app token
+        id: release-app-token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Prepare release branch
         id: release
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -o pipefail
           bash .github/scripts/prepare-release.sh 2>&1 | tee "${RUNNER_TEMP}/release-prepare.log"
 
       - name: Open or update release pull request
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
           set -o pipefail
           bash .github/scripts/upsert-release-pr.sh \
@@ -59,4 +73,6 @@ jobs:
 
       - name: Comment on failure
         if: failure()
+        env:
+          PUSH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: bash .github/scripts/comment-issue-failure.sh "${RUNNER_TEMP}/release-prepare.log" "Prepare release"
