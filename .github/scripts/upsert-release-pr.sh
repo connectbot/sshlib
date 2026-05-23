@@ -38,5 +38,3 @@ else
     --title "chore(release): ${release_version}" \
     --body-file "${body_file}"
 fi
-
-gh issue comment "${ISSUE_NUMBER}" --body "Prepared release PR for ${tag_name} targeting ${target_branch}."

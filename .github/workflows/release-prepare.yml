@@ -49,6 +49,8 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Prepare release branch
         id: release
@@ -70,6 +72,12 @@ jobs:
           "${{ steps.release.outputs.work_branch }}" \
           "${{ steps.release.outputs.tag_name }}" \
           2>&1 | tee -a "${RUNNER_TEMP}/release-prepare.log"
+
+      - name: Comment on prepared release
+        run: >
+          gh issue comment "${ISSUE_NUMBER}"
+          --body "Prepared release PR for ${{ steps.release.outputs.tag_name }}
+          targeting ${{ steps.release.outputs.target_branch }}."
 
       - name: Comment on failure
         if: failure()
