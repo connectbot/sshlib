@@ -1,4 +1,4 @@
-name: Release branch
+name: (Maintainers only) Release branch
 description: Create a maintenance release branch.
 title: "Create release branch "
 labels: []
