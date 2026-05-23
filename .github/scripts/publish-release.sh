@@ -59,7 +59,16 @@ if [[ "${review_decision}" != "APPROVED" ]]; then
   exit 1
 fi
 
-gh pr checks "${pr_number}" --required --fail-fast
+required_checks="$(gh pr checks "${pr_number}" --required --json bucket,name,state,workflow)"
+if [[ "$(jq 'length' <<<"${required_checks}")" -eq 0 ]]; then
+  echo "Release PR has no reported required checks."
+  exit 1
+fi
+if jq -e '.[] | select(.bucket != "pass")' <<<"${required_checks}" >/dev/null; then
+  echo "Release PR required checks have not all passed."
+  jq -r '.[] | select(.bucket != "pass") | "- \(.name) [\(.workflow)]: \(.state)"' <<<"${required_checks}"
+  exit 1
+fi
 
 configure_git_author
 git fetch origin \

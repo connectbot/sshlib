@@ -118,6 +118,12 @@ elif [[ "$1 $2" == "pr list" ]]; then
   echo "77"
 elif [[ "$1 $2" == "pr view" ]]; then
   echo '{"baseRefName":"main","headRefName":"release-work/1.2.3","headRefOid":"head-sha","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":"APPROVED"}'
+elif [[ "$1 $2" == "pr checks" ]]; then
+  if [[ -n "${GH_PR_CHECKS_JSON:-}" ]]; then
+    echo "${GH_PR_CHECKS_JSON}"
+  else
+    echo '[{"bucket":"pass","name":"Build and test","state":"SUCCESS","workflow":"Continuous Integration"}]'
+  fi
 fi
 STUB
   chmod +x "${BIN_DIR}/gh"
@@ -222,12 +228,39 @@ EOF
   run bash .github/scripts/publish-release.sh
 
   [ "$status" -eq 0 ]
-  grep -F "gh pr checks 77 --required --fail-fast" "${LOG_FILE}"
+  grep -E "gh pr checks 77 --required --json .*bucket.*name.*state.*workflow" "${LOG_FILE}"
   grep -F "git config --global credential.helper store" "${LOG_FILE}"
   grep -F "git tag -a v1.2.3 release-commit -F" "${LOG_FILE}"
   grep -F "git push --atomic --follow-tags origin refs/remotes/origin/release-work/1.2.3:refs/heads/main" "${LOG_FILE}"
   grep -F "gh issue comment 123 --body Published\ v1.2.3\ to\ main." "${LOG_FILE}"
   grep -F "https://x-access-token:push-token@github.com" "${HOME}/.git-credentials"
+}
+
+@test "publish-release rejects missing required checks" {
+  export ISSUE_BODY
+  export GH_PR_CHECKS_JSON="[]"
+  ISSUE_BODY="$(release_issue_body)"
+
+  run bash .github/scripts/publish-release.sh
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Release PR has no reported required checks."* ]]
+  ! grep -F "git tag -a v1.2.3" "${LOG_FILE}"
+  ! grep -F "git push --atomic --follow-tags" "${LOG_FILE}"
+}
+
+@test "publish-release rejects non-passing required checks" {
+  export ISSUE_BODY
+  export GH_PR_CHECKS_JSON='[{"bucket":"fail","name":"Build and test","state":"FAILURE","workflow":"Continuous Integration"}]'
+  ISSUE_BODY="$(release_issue_body)"
+
+  run bash .github/scripts/publish-release.sh
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Release PR required checks have not all passed."* ]]
+  [[ "$output" == *"- Build and test [Continuous Integration]: FAILURE"* ]]
+  ! grep -F "git tag -a v1.2.3" "${LOG_FILE}"
+  ! grep -F "git push --atomic --follow-tags" "${LOG_FILE}"
 }
 
 @test "create-release-branch cuts from the remote source branch tip by default" {
