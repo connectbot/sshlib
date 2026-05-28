@@ -72,6 +72,7 @@
          <trusted-key id="7B121B76A7ED6CE6E60AD51784E913A8E3A748C0" group="org.bouncycastle"/>
          <trusted-key id="7B381D196BA74C9FA7CEEE84854D0560FEF4601F" group="asia.hombre"/>
          <trusted-key id="7B72C18D9C362314BF8E981B0CAEBC0883C5BB65" group="com.vanniktech"/>
+         <trusted-key id="7B79ADD11F8A779FE90FD3D0893A028475557671" group="org.gradle"/>
          <trusted-key id="7C669810892CBD3148FA92995B05CCDE140C2876" group="org.eclipse.jgit"/>
          <trusted-key id="84789D24DF77A32433CE1F079EB80E92EB2135B1">
             <trusting group="org.codehaus.plexus"/>
@@ -131,7 +132,6 @@
             <trusting group="org.opentest4j"/>
             <trusting group="^org[.]junit($|([.].*))" regex="true"/>
          </trusted-key>
-         <trusted-key id="7B79ADD11F8A779FE90FD3D0893A028475557671" group="org.gradle"/>
       </trusted-keys>
    </configuration>
    <components>
