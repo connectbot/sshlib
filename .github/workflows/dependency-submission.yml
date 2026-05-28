@@ -31,33 +31,9 @@ jobs:
         with:
           dependency-graph: generate-and-submit
 
-  submit-pull-request-dependency-graph:
-    name: Submit pull request dependency graph
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Set up JDK
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
-        with:
-          dependency-graph: generate-and-submit
-
-  generate-fork-dependency-graph:
-    name: Generate fork dependency graph
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+  generate-pull-request-dependency-graph:
+    name: Generate pull request dependency graph
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -66,6 +42,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Set up JDK
