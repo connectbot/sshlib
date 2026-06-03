@@ -21,7 +21,7 @@ publish = "0.36.0"
 release = "3.1.0"
 kover = "0.9.8"
 cyclonedx = "3.2.4"
-sonarqube = "7.3.0.8198"
+sonarqube = "7.3.1.8318"
 
 [libraries]
 kaitai-runtime = { module = "io.kaitai:kaitai-struct-runtime", version.ref = "kaitai" }
