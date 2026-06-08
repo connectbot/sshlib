@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,6 +128,45 @@ class PrivateKeyReaderTest {
         assertEquals("ecdsa-sha2-nistp256", key.keyType)
     }
 
+    @Test
+    fun `rejects excessive integer allocation in PKCS1 RSA key`() {
+        val der = byteArrayOf(
+            0x30,
+            0x06,
+            0x02,
+            0x84.toByte(),
+            0x7F,
+            0xFF.toByte(),
+            0xFF.toByte(),
+            0xFF.toByte(),
+        )
+
+        assertFailsWith<SshException> {
+            PrivateKeyReader.read(pem("RSA PRIVATE KEY", der))
+        }
+    }
+
+    @Test
+    fun `rejects excessive octet string allocation in SEC1 EC key`() {
+        val der = byteArrayOf(
+            0x30,
+            0x09,
+            0x02,
+            0x01,
+            0x01,
+            0x04,
+            0x84.toByte(),
+            0x7F,
+            0xFF.toByte(),
+            0xFF.toByte(),
+            0xFF.toByte(),
+        )
+
+        assertFailsWith<SshException> {
+            PrivateKeyReader.read(pem("EC PRIVATE KEY", der))
+        }
+    }
+
     // PKCS#8 format
 
     @Test
@@ -190,5 +229,11 @@ class PrivateKeyReaderTest {
         assertFailsWith<SshException> {
             PrivateKeyReader.read(readKey("ed25519_encrypted"), "wrongpass")
         }
+    }
+
+    private fun pem(type: String, der: ByteArray): String = buildString {
+        appendLine("-----BEGIN $type-----")
+        appendLine(Base64Compat.encodeWithPadding(der))
+        appendLine("-----END $type-----")
     }
 }

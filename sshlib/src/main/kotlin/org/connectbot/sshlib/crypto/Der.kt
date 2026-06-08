@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,11 +125,9 @@ internal class DerReader(private val data: ByteBuffer) {
     constructor(bytes: ByteArray) : this(ByteBuffer.wrap(bytes))
 
     fun <T> readSequence(block: (DerReader) -> T): T {
-        val tag = data.get().toInt() and 0xFF
-        if (tag != 0x30) {
-            throw SshException("Expected SEQUENCE (0x30) but got 0x${tag.toString(16)}")
-        }
+        readExpectedTag(0x30, "SEQUENCE")
         val length = readLength()
+        requireAvailable(length, "SEQUENCE")
         val end = data.position() + length
 
         val oldLimit = data.limit()
@@ -156,51 +154,43 @@ internal class DerReader(private val data: ByteBuffer) {
     fun hasRemaining(): Boolean = data.hasRemaining()
 
     fun readInteger(): BigInteger {
-        val tag = data.get().toInt() and 0xFF
-        if (tag != 0x02) {
-            throw SshException("Expected INTEGER (0x02) but got 0x${tag.toString(16)}")
+        readExpectedTag(0x02, "INTEGER")
+        val bytes = readBytes(readLength(), "INTEGER", allowEmpty = false)
+        if (bytes.size > 1) {
+            val first = bytes[0].toInt() and 0xFF
+            val second = bytes[1].toInt() and 0xFF
+            if (first == 0x00 && second and 0x80 == 0) {
+                throw SshException("INTEGER has redundant leading zero")
+            }
+            if (first == 0xFF && second and 0x80 != 0) {
+                throw SshException("INTEGER has redundant leading 0xff")
+            }
         }
-        val length = readLength()
-        val bytes = ByteArray(length)
-        data.get(bytes)
         return BigInteger(bytes)
     }
 
     fun readOctetString(): ByteArray {
-        val tag = data.get().toInt() and 0xFF
-        if (tag != 0x04) {
-            throw SshException("Expected OCTET STRING (0x04) but got 0x${tag.toString(16)}")
-        }
-        val length = readLength()
-        val bytes = ByteArray(length)
-        data.get(bytes)
-        return bytes
+        readExpectedTag(0x04, "OCTET STRING")
+        return readBytes(readLength(), "OCTET STRING")
     }
 
     fun readBitString(): ByteArray {
-        val tag = data.get().toInt() and 0xFF
-        if (tag != 0x03) {
-            throw SshException("Expected BIT STRING (0x03) but got 0x${tag.toString(16)}")
-        }
+        readExpectedTag(0x03, "BIT STRING")
         val length = readLength()
+        if (length == 0) {
+            throw SshException("BIT STRING must include an unused-bits octet")
+        }
+        requireAvailable(length, "BIT STRING")
         val unusedBits = data.get().toInt() and 0xFF
         if (unusedBits != 0) {
             throw SshException("Non-zero unused bits ($unusedBits) in BIT STRING not supported")
         }
-        val bytes = ByteArray(length - 1)
-        data.get(bytes)
-        return bytes
+        return readBytes(length - 1, "BIT STRING")
     }
 
     fun readObjectIdentifier(): ByteArray {
-        val tag = data.get().toInt() and 0xFF
-        if (tag != 0x06) {
-            throw SshException("Expected OBJECT IDENTIFIER (0x06) but got 0x${tag.toString(16)}")
-        }
-        val length = readLength()
-        val bytes = ByteArray(length)
-        data.get(bytes)
-        return bytes
+        readExpectedTag(0x06, "OBJECT IDENTIFIER")
+        return readBytes(readLength(), "OBJECT IDENTIFIER", allowEmpty = false)
     }
 
     fun peekTag(): Int {
@@ -210,12 +200,10 @@ internal class DerReader(private val data: ByteBuffer) {
     }
 
     fun <T> readContextTag(tag: Int, block: (DerReader) -> T): T {
-        val actualTag = data.get().toInt() and 0xFF
         val expectedTag = 0xA0 or tag
-        if (actualTag != expectedTag) {
-            throw SshException("Expected context tag [$tag] (0x${expectedTag.toString(16)}) but got 0x${actualTag.toString(16)}")
-        }
+        readExpectedTag(expectedTag, "context tag [$tag]")
         val length = readLength()
+        requireAvailable(length, "context tag [$tag]")
         val end = data.position() + length
 
         val oldLimit = data.limit()
@@ -234,21 +222,73 @@ internal class DerReader(private val data: ByteBuffer) {
     }
 
     fun skipTag() {
-        data.get() // skip tag byte
+        readByte("DER tag")
         val length = readLength()
+        requireAvailable(length, "DER value")
         data.position(data.position() + length)
     }
 
     private fun readLength(): Int {
-        val first = data.get().toInt() and 0xFF
+        val first = readByte("DER length")
         if (first < 128) {
             return first
         }
         val octets = first and 0x7F
-        var length = 0
-        for (i in 0 until octets) {
-            length = (length shl 8) or (data.get().toInt() and 0xFF)
+        if (octets == 0) {
+            throw SshException("Indefinite lengths are not valid DER")
         }
-        return length
+        if (octets > Int.SIZE_BYTES) {
+            throw SshException("DER length uses too many octets: $octets")
+        }
+        if (octets > data.remaining()) {
+            throw SshException("Truncated DER length")
+        }
+
+        val firstLengthOctet = readByte("DER length")
+        if (firstLengthOctet == 0) {
+            throw SshException("DER length has redundant leading zero")
+        }
+
+        var length = firstLengthOctet.toLong()
+        repeat(octets - 1) {
+            length = (length shl 8) or readByte("DER length").toLong()
+        }
+        if (length < 128) {
+            throw SshException("DER length is not minimally encoded")
+        }
+        if (length > Int.MAX_VALUE) {
+            throw SshException("DER length exceeds supported size: $length")
+        }
+        return length.toInt()
+    }
+
+    private fun readExpectedTag(expectedTag: Int, name: String) {
+        val actualTag = readByte("$name tag")
+        if (actualTag != expectedTag) {
+            throw SshException("Expected $name (0x${expectedTag.toString(16)}) but got 0x${actualTag.toString(16)}")
+        }
+    }
+
+    private fun readByte(description: String): Int {
+        if (!data.hasRemaining()) {
+            throw SshException("Truncated $description")
+        }
+        return data.get().toInt() and 0xFF
+    }
+
+    private fun requireAvailable(length: Int, description: String) {
+        if (length > data.remaining()) {
+            throw SshException(
+                "$description length $length exceeds remaining DER data (${data.remaining()} bytes)",
+            )
+        }
+    }
+
+    private fun readBytes(length: Int, description: String, allowEmpty: Boolean = true): ByteArray {
+        if (!allowEmpty && length == 0) {
+            throw SshException("$description must not be empty")
+        }
+        requireAvailable(length, description)
+        return ByteArray(length).also(data::get)
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,5 +177,216 @@ class DerTest {
             assertEquals(BigInteger.valueOf(127), seq.readInteger())
         }
         reader.ensureFullyConsumed()
+    }
+
+    @Test
+    fun `rejects long-form length that would overflow to a small positive value`() {
+        // The five length octets encode 0x1_0000_0001 (2^32 + 1).
+        val data = byteArrayOf(
+            0x02,
+            0x85.toByte(),
+            0x01,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x7F,
+        )
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `rejects four-octet length that would overflow to a negative value`() {
+        // 0x8000_0000 cannot be represented as a positive Int.
+        val data = byteArrayOf(
+            0x02,
+            0x84.toByte(),
+            0x80.toByte(),
+            0x00,
+            0x00,
+            0x00,
+        )
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `rejects excessive allocation before creating byte array`() {
+        // Declares a 1 GiB INTEGER but provides no content.
+        val data = byteArrayOf(
+            0x02,
+            0x84.toByte(),
+            0x40,
+            0x00,
+            0x00,
+            0x00,
+        )
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `rejects maximum integer length before creating byte array`() {
+        assertRejectsMaximumLength(0x02) { readInteger() }
+    }
+
+    @Test
+    fun `rejects maximum octet string length before creating byte array`() {
+        assertRejectsMaximumLength(0x04) { readOctetString() }
+    }
+
+    @Test
+    fun `rejects maximum bit string length before reading content`() {
+        assertRejectsMaximumLength(0x03) { readBitString() }
+    }
+
+    @Test
+    fun `rejects maximum object identifier length before creating byte array`() {
+        assertRejectsMaximumLength(0x06) { readObjectIdentifier() }
+    }
+
+    @Test
+    fun `rejects maximum sequence length before changing buffer limit`() {
+        assertRejectsMaximumLength(0x30) { readSequence { } }
+    }
+
+    @Test
+    fun `rejects maximum context tag length before changing buffer limit`() {
+        assertRejectsMaximumLength(0xA0) { readContextTag(0) { } }
+    }
+
+    @Test
+    fun `rejects maximum skipped value length before advancing position`() {
+        assertRejectsMaximumLength(0x05) { skipTag() }
+    }
+
+    @Test
+    fun `rejects indefinite length`() {
+        val data = byteArrayOf(0x04, 0x80.toByte(), 0x00, 0x00)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readOctetString()
+        }
+    }
+
+    @Test
+    fun `rejects long-form length for short value`() {
+        val data = byteArrayOf(0x04, 0x81.toByte(), 0x01, 0x7F)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readOctetString()
+        }
+    }
+
+    @Test
+    fun `rejects long-form length with leading zero`() {
+        val data = byteArrayOf(0x04, 0x82.toByte(), 0x00, 0x80.toByte())
+
+        assertFailsWith<SshException> {
+            DerReader(data).readOctetString()
+        }
+    }
+
+    @Test
+    fun `rejects truncated long-form length`() {
+        val data = byteArrayOf(0x04, 0x82.toByte(), 0x01)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readOctetString()
+        }
+    }
+
+    @Test
+    fun `rejects zero-length integer`() {
+        val data = byteArrayOf(0x02, 0x00)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `rejects redundant positive integer sign octet`() {
+        val data = byteArrayOf(0x02, 0x02, 0x00, 0x7F)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `rejects redundant negative integer sign octet`() {
+        val data = byteArrayOf(0x02, 0x02, 0xFF.toByte(), 0x80.toByte())
+
+        assertFailsWith<SshException> {
+            DerReader(data).readInteger()
+        }
+    }
+
+    @Test
+    fun `accepts required positive integer sign octet`() {
+        val data = byteArrayOf(0x02, 0x02, 0x00, 0x80.toByte())
+        val reader = DerReader(data)
+
+        assertEquals(BigInteger.valueOf(128), reader.readInteger())
+        reader.ensureFullyConsumed()
+    }
+
+    @Test
+    fun `rejects zero-length bit string`() {
+        val data = byteArrayOf(0x03, 0x00)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readBitString()
+        }
+    }
+
+    @Test
+    fun `rejects zero-length object identifier`() {
+        val data = byteArrayOf(0x06, 0x00)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readObjectIdentifier()
+        }
+    }
+
+    @Test
+    fun `rejects sequence length beyond containing buffer`() {
+        val data = byteArrayOf(0x30, 0x7F)
+
+        assertFailsWith<SshException> {
+            DerReader(data).readSequence { }
+        }
+    }
+
+    @Test
+    fun `rejects skipped value length beyond containing buffer`() {
+        val data = byteArrayOf(0x05, 0x7F)
+
+        assertFailsWith<SshException> {
+            DerReader(data).skipTag()
+        }
+    }
+
+    private fun assertRejectsMaximumLength(tag: Int, read: DerReader.() -> Unit) {
+        val data = byteArrayOf(
+            tag.toByte(),
+            0x84.toByte(),
+            0x7F,
+            0xFF.toByte(),
+            0xFF.toByte(),
+            0xFF.toByte(),
+        )
+
+        assertFailsWith<SshException> {
+            DerReader(data).read()
+        }
     }
 }
