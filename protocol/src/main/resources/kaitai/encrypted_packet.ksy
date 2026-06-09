@@ -29,6 +29,8 @@ params:
 seq:
 - id: len_encrypted_payload
   type: u4
+  valid:
+    expr: _ <= _io.size - _io.pos - len_mac
 - id: encrypted_payload
   size: len_encrypted_payload
 - id: mac

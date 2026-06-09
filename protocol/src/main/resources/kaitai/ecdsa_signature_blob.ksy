@@ -7,6 +7,8 @@ doc-ref: RFC 5656 section 3.1.2
 seq:
 - id: len_blob
   type: u4
+  valid:
+    expr: _ <= _io.size - _io.pos
 - id: blob
   type: ecdsa_signature_inner
   size: len_blob

@@ -12,5 +12,7 @@ doc: >
 seq:
   - id: len_data
     type: u4
+    valid:
+      expr: _ <= _io.size - _io.pos
   - id: data
     size: len_data

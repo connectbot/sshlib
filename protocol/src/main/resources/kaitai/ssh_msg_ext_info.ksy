@@ -11,6 +11,8 @@ doc: >
 seq:
 - id: num_extensions
   type: u4
+  valid:
+    expr: _ <= (_io.size - _io.pos) / 8
   doc: Number of extension name-value pairs
 - id: extensions
   type: extension

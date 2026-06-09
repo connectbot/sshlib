@@ -10,6 +10,8 @@ doc: |
 seq:
   - id: nkeys
     type: u4
+    valid:
+      expr: _ <= (_io.size - _io.pos) / 8
     doc: Number of keys in the response
   - id: identities
     type: identity

@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 package org.connectbot.sshlib
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import io.kaitai.struct.KaitaiStream
 import kotlinx.coroutines.test.runTest
 import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.client.AgentProtocolHandler
@@ -40,9 +41,12 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.BufferUnderflowException
 import java.nio.ByteBuffer
+import kotlin.test.assertFailsWith
 
 class AgentProtocolTest {
 
@@ -106,6 +110,113 @@ class AgentProtocolTest {
         assertArrayEquals(byteArrayOf(1, 2, 3, 4), payload.keyBlob().data())
         assertArrayEquals(byteArrayOf(5, 6, 7, 8), payload.data().data())
         assertEquals(0, payload.flags().toInt())
+    }
+
+    @Test
+    fun `rejects agent frame length larger than containing channel data`() {
+        val request = byteArrayOf(
+            0x40,
+            0x00,
+            0x00,
+            0x00,
+            11,
+        )
+
+        assertFailsWith<KaitaiStream.ValidationExprError> {
+            SshAgentMessage(ByteBufferKaitaiStream(request))._read()
+        }
+    }
+
+    @Test
+    fun `rejects sign request byte string length larger than agent payload`() {
+        val request = byteArrayOf(
+            0x00,
+            0x00,
+            0x00,
+            0x05,
+            13,
+            0x40,
+            0x00,
+            0x00,
+            0x00,
+        )
+
+        assertFailsWith<KaitaiStream.ValidationExprError> {
+            SshAgentMessage(ByteBufferKaitaiStream(request))._read()
+        }
+    }
+
+    @Test
+    fun `handler returns failure for malformed agent frame`() = runTest {
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+
+                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            },
+            sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
+        )
+        val request = byteArrayOf(
+            0x40,
+            0x00,
+            0x00,
+            0x00,
+            11,
+        )
+
+        val response = handler.handleRequest(request)
+
+        val (messageType, payload) = parseAgentMessage(response)
+        assertEquals(5, messageType)
+        assertEquals(0, payload.size)
+    }
+
+    @Test
+    fun `handler returns failure for malformed sign request payload`() = runTest {
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+
+                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            },
+            sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
+        )
+        val request = byteArrayOf(
+            0x00,
+            0x00,
+            0x00,
+            0x05,
+            13,
+            0x40,
+            0x00,
+            0x00,
+            0x00,
+        )
+
+        val response = handler.handleRequest(request)
+
+        val (messageType, payload) = parseAgentMessage(response)
+        assertEquals(5, messageType)
+        assertEquals(0, payload.size)
+    }
+
+    @Test
+    fun `handler does not mistake provider exception for malformed input`() = runTest {
+        val providerFailure = BufferUnderflowException()
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities(): List<AgentIdentity> = throw providerFailure
+
+                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            },
+            sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
+        )
+
+        val error = assertFailsWith<BufferUnderflowException> {
+            handler.handleRequest(buildAgentMessage(11, ByteArray(0)))
+        }
+
+        assertSame(providerFailure, error)
     }
 
     @Test

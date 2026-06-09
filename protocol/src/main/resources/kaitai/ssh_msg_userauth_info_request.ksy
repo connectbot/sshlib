@@ -13,6 +13,8 @@ seq:
   type: byte_string
 - id: num_prompts
   type: u4
+  valid:
+    expr: _ <= (_io.size - _io.pos) / 5
 - id: prompts
   type: prompt
   repeat: expr

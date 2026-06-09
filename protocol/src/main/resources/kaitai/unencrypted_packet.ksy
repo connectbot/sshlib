@@ -16,8 +16,12 @@ meta:
 seq:
 - id: len_packet
   type: u4
+  valid:
+    expr: _ >= 6 and _ == _io.size - _io.pos
 - id: len_random_padding
   type: u1
+  valid:
+    expr: _ >= 4 and _ <= len_packet - 2
 - id: payload
   type: unencrypted_payload
   size: len_packet - len_random_padding - 1

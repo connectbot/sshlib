@@ -7,6 +7,8 @@ doc-ref: RFC 4256 section 3.4
 seq:
 - id: num_responses
   type: u4
+  valid:
+    expr: _ <= (_io.size - _io.pos) / 4
 - id: responses
   type: byte_string
   repeat: expr

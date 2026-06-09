@@ -23,13 +23,16 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import nl.jqno.equalsverifier.EqualsVerifier
 import org.connectbot.sshlib.client.ForwardingChannel
 import org.connectbot.sshlib.client.SessionChannel
 import org.connectbot.sshlib.client.SshConnection
 import org.connectbot.sshlib.crypto.SshPrivateKey
+import org.connectbot.sshlib.transport.ByteArrayTransport
 import org.connectbot.sshlib.transport.Transport
+import org.connectbot.sshlib.transport.TransportException
 import org.connectbot.sshlib.transport.TransportFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -94,6 +97,31 @@ class SshClientTest {
 
         val result = client.connect()
         assertIs<ConnectResult.TransportError>(result)
+    }
+
+    @Test
+    fun `connect returns ProtocolError for malformed server packet`() {
+        runBlocking {
+            val malformedIgnore = byteArrayOf(
+                0, 0, 0, 14,
+                4,
+                2,
+                0x40, 0, 0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0,
+            )
+            val serverInput = "SSH-2.0-TestServer\r\n".toByteArray() + malformedIgnore
+            val config = SshClientConfig {
+                transportFactory = TransportFactory { ByteArrayTransport(serverInput) }
+                hostKeyVerifier = acceptAllVerifier
+            }
+
+            val result = SshClient(config).connect()
+
+            val error = assertIs<ConnectResult.ProtocolError>(result)
+            assertEquals("Malformed SSH packet payload", error.message)
+            assertIs<TransportException>(error.cause)
+        }
     }
 
     @Test

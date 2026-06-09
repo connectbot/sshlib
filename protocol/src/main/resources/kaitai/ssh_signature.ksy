@@ -17,6 +17,8 @@ doc: >
 seq:
 - id: algorithm_name_len
   type: u4
+  valid:
+    expr: _ <= _io.size - _io.pos
 - id: algorithm_name
   type: str
   size: algorithm_name_len
