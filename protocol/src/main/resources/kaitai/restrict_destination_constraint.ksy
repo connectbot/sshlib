@@ -13,6 +13,8 @@ seq:
     doc: Hostname of the previous hop (empty for origin)
   - id: num_from_keyspecs
     type: u4
+    valid:
+      expr: _ <= (_io.size - _io.pos) / 5
     doc: Number of from host key specs
   - id: from_keyspecs
     type: keyspec
@@ -27,6 +29,8 @@ seq:
     doc: Destination hostname
   - id: num_to_hostspecs
     type: u4
+    valid:
+      expr: _ <= (_io.size - _io.pos) / 5
     doc: Number of destination host key specs
   - id: to_hostspecs
     type: keyspec

@@ -12,6 +12,8 @@ doc: |
 seq:
   - id: length
     type: u4
+    valid:
+      expr: _ >= 1 and _ == _io.size - _io.pos
     doc: Length of message_type + payload
   - id: message_type
     type: u1

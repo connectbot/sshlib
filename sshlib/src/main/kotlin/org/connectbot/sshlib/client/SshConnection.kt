@@ -68,6 +68,7 @@ import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.crypto.SshPrivateKey
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
+import org.connectbot.sshlib.kaitaiParseFailureOrNull
 import org.connectbot.sshlib.protocol.AsciiString
 import org.connectbot.sshlib.protocol.ChannelOpenDirectTcpip
 import org.connectbot.sshlib.protocol.ChannelOpenForwardedTcpip
@@ -130,6 +131,7 @@ import org.connectbot.sshlib.protocol.createUtf8String
 import org.connectbot.sshlib.protocol.toByteArray
 import org.connectbot.sshlib.transport.PacketIO
 import org.connectbot.sshlib.transport.Transport
+import org.connectbot.sshlib.transport.TransportException
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -2545,15 +2547,21 @@ class SshConnection(
             } catch (_: CancellationException) {
                 logger.debug("Packet loop cancelled")
             } catch (e: Exception) {
-                pendingConnect?.completeExceptionally(e)
+                val packetFailure = e.kaitaiParseFailureOrNull()
+                val loopFailure = when {
+                    e is SshException -> e
+                    packetFailure != null -> TransportException("Malformed SSH packet", packetFailure)
+                    else -> e
+                }
+                pendingConnect?.completeExceptionally(loopFailure)
                 pendingConnect = null
                 val allClosed = channels.values.all { !it.isOpen }
                 if (allClosed) {
                     logger.debug("Packet loop ended (all channels closed)")
                 } else {
-                    logger.warn("Packet loop ended unexpectedly", e)
+                    logger.warn("Packet loop ended unexpectedly", loopFailure)
                 }
-                loopException = e
+                loopException = loopFailure
             } finally {
                 for (ch in channels.values) {
                     ch.onClose()

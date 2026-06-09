@@ -10,6 +10,8 @@ doc-ref: 'https://tools.ietf.org/html/rfc4251#section-5'
 seq:
   - id: len_body
     type: u4
+    valid:
+      expr: _ <= _io.size - _io.pos
   - id: body
     size: len_body
 instances:

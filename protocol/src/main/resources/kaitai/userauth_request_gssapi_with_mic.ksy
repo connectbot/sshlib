@@ -7,6 +7,8 @@ doc-ref: RFC 4462 section 3.2
 seq:
 - id: num_mechanisms
   type: u4
+  valid:
+    expr: _ <= (_io.size - _io.pos) / 4
   doc: The number of mechanism OIDs client supports
 - id: mechanisms
   type: byte_string

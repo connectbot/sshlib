@@ -113,6 +113,26 @@ class PacketIOTest {
     }
 
     @Test
+    fun `readPacket wraps Kaitai validation failure as TransportException`() {
+        val malformedIgnore = byteArrayOf(
+            0, 0, 0, 14,
+            4,
+            SshEnums.MessageType.SSH_MSG_IGNORE.id().toByte(),
+            0x40, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+        )
+        val io = PacketIO(ByteArrayTransport(malformedIgnore))
+
+        val error = assertThrows(TransportException::class.java) {
+            runBlocking { io.readPacket() }
+        }
+
+        assertEquals("Malformed SSH packet payload", error.message)
+        assertTrue(error.cause is io.kaitai.struct.KaitaiStream.ValidationExprError)
+    }
+
+    @Test
     fun `reset sequence numbers works`() = runBlocking {
         val transport = ByteArrayTransport()
         val io = PacketIO(transport)

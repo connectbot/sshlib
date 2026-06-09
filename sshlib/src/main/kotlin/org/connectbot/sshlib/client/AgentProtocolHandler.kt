@@ -26,6 +26,7 @@ import org.connectbot.sshlib.AgentProvider
 import org.connectbot.sshlib.AgentSigningContext
 import org.connectbot.sshlib.DestinationConstraint
 import org.connectbot.sshlib.crypto.SignatureVerifier
+import org.connectbot.sshlib.kaitaiParseFailureOrNull
 import org.connectbot.sshlib.protocol.SshAgentIdentitiesAnswer
 import org.connectbot.sshlib.protocol.SshAgentMessage
 import org.connectbot.sshlib.protocol.SshAgentSignResponse
@@ -157,24 +158,32 @@ internal class AgentProtocolHandler(
     suspend fun handleRequest(requestBytes: ByteArray): ByteArray {
         logger.debug("Handling agent request (${requestBytes.size} bytes)")
 
-        val stream = ByteBufferKaitaiStream(requestBytes)
-        val message = SshAgentMessage(stream)
-        message._read()
+        val message = try {
+            parseAgentMessage(requestBytes)
+        } catch (e: MalformedAgentRequestException) {
+            logger.warn("Malformed SSH agent request", e.cause)
+            return createFailureResponse()
+        }
 
         val messageType = message.messageType()
         logger.debug("Agent message type: $messageType")
 
-        return when (messageType) {
-            SSH_AGENTC_REQUEST_IDENTITIES -> handleRequestIdentities()
+        return try {
+            when (messageType) {
+                SSH_AGENTC_REQUEST_IDENTITIES -> handleRequestIdentities()
 
-            SSH_AGENTC_SIGN_REQUEST -> handleSignRequest(message)
+                SSH_AGENTC_SIGN_REQUEST -> handleSignRequest(message)
 
-            SSH_AGENTC_EXTENSION -> handleExtension(message)
+                SSH_AGENTC_EXTENSION -> handleExtension(message)
 
-            else -> {
-                logger.warn("Unknown agent message type: $messageType")
-                createFailureResponse()
+                else -> {
+                    logger.warn("Unknown agent message type: $messageType")
+                    createFailureResponse()
+                }
             }
+        } catch (e: MalformedAgentRequestException) {
+            logger.warn("Malformed SSH agent request", e.cause)
+            return createFailureResponse()
         }
     }
 
@@ -340,16 +349,34 @@ internal class AgentProtocolHandler(
         return createSuccessResponse()
     }
 
-    private inline fun <reified T : KaitaiStruct.ReadWrite> parsePayload(message: SshAgentMessage): T {
+    private fun parseAgentMessage(requestBytes: ByteArray): SshAgentMessage = try {
+        val stream = ByteBufferKaitaiStream(requestBytes)
+        val message = SshAgentMessage(stream)
+        message._read()
+        message
+    } catch (e: RuntimeException) {
+        throwMalformedAgentRequest(e)
+    }
+
+    private inline fun <reified T : KaitaiStruct.ReadWrite> parsePayload(message: SshAgentMessage): T = try {
         val stream = ByteBufferKaitaiStream(message._raw_payload())
         val payload = T::class.java.getConstructor(KaitaiStream::class.java).newInstance(stream)
         payload._read()
-        return payload
+        payload
+    } catch (e: Exception) {
+        throwMalformedAgentRequest(e)
     }
 
     private fun createFailureResponse(): ByteArray = buildAgentMessage(SSH_AGENT_FAILURE, ByteArray(0))
 
     private fun createSuccessResponse(): ByteArray = buildAgentMessage(SSH_AGENT_SUCCESS, ByteArray(0))
+
+    private fun throwMalformedAgentRequest(e: Exception): Nothing {
+        val parseFailure = e.kaitaiParseFailureOrNull() ?: throw e
+        throw MalformedAgentRequestException(parseFailure)
+    }
+
+    private class MalformedAgentRequestException(cause: Throwable) : Exception(cause)
 }
 
 internal data class AgentSessionInfo(

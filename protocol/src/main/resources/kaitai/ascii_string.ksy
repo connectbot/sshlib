@@ -14,7 +14,7 @@ seq:
   - id: len
     type: u4
     valid:
-      expr: _ <= 65535
+      expr: _ <= 65535 and _ <= _io.size - _io.pos
   - id: value
     type: str
     size: len

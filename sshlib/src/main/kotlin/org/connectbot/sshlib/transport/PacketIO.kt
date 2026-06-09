@@ -22,6 +22,7 @@ import org.connectbot.sshlib.crypto.PacketAead
 import org.connectbot.sshlib.crypto.PacketCipher
 import org.connectbot.sshlib.crypto.PacketCompressor
 import org.connectbot.sshlib.crypto.PacketMac
+import org.connectbot.sshlib.kaitaiParseFailureOrNull
 import org.connectbot.sshlib.protocol.IdBanner
 import org.connectbot.sshlib.protocol.UnencryptedPacket
 import org.slf4j.LoggerFactory
@@ -216,18 +217,23 @@ internal class PacketIO(private val transport: Transport) {
      * can parse them with proper parent context for body length calculation.
      */
     private fun parsePayloadBytes(payloadBytes: ByteArray): UnencryptedPacket.UnencryptedPayload {
-        val paddingLength = 4
-        val packetLength = 1 + payloadBytes.size + paddingLength
-        val buffer = ByteArrayOutputStream()
-        buffer.write(ByteBuffer.allocate(4).putInt(packetLength).array())
-        buffer.write(paddingLength)
-        buffer.write(payloadBytes)
-        buffer.write(ByteArray(paddingLength))
-        val fullPacket = buffer.toByteArray()
-        val stream = ByteBufferKaitaiStream(fullPacket)
-        val packet = UnencryptedPacket(stream)
-        packet._read()
-        return packet.payload()
+        try {
+            val paddingLength = 4
+            val packetLength = 1 + payloadBytes.size + paddingLength
+            val buffer = ByteArrayOutputStream()
+            buffer.write(ByteBuffer.allocate(4).putInt(packetLength).array())
+            buffer.write(paddingLength)
+            buffer.write(payloadBytes)
+            buffer.write(ByteArray(paddingLength))
+            val fullPacket = buffer.toByteArray()
+            val stream = ByteBufferKaitaiStream(fullPacket)
+            val packet = UnencryptedPacket(stream)
+            packet._read()
+            return packet.payload()
+        } catch (e: RuntimeException) {
+            val parseFailure = e.kaitaiParseFailureOrNull() ?: throw e
+            throw TransportException("Malformed SSH packet payload", parseFailure)
+        }
     }
 
     /**
