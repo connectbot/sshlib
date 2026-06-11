@@ -31,14 +31,16 @@ import kotlin.test.assertIs
 class SftpPacketIOTest {
 
     @Test
-    fun `readPacket rejects invalid lengths`() = runBlocking {
-        val tooSmall = FakeSshSession()
-        tooSmall.enqueue(ByteBuffer.allocate(4).putInt(0).array())
-        assertIs<SftpResult.ProtocolError>(SftpPacketIO(tooSmall).readPacket())
+    fun `readPacket rejects invalid lengths`() {
+        runBlocking {
+            val tooSmall = FakeSshSession()
+            tooSmall.enqueue(ByteBuffer.allocate(4).putInt(0).array())
+            assertIs<SftpResult.ProtocolError>(SftpPacketIO(tooSmall).readPacket())
 
-        val tooLarge = FakeSshSession()
-        tooLarge.enqueue(ByteBuffer.allocate(4).putInt(256 * 1024 + 1).array())
-        assertIs<SftpResult.ProtocolError>(SftpPacketIO(tooLarge).readPacket())
+            val tooLarge = FakeSshSession()
+            tooLarge.enqueue(ByteBuffer.allocate(4).putInt(256 * 1024 + 1).array())
+            assertIs<SftpResult.ProtocolError>(SftpPacketIO(tooLarge).readPacket())
+        }
     }
 
     @Test

@@ -57,19 +57,21 @@ class SftpDispatcherTest {
     }
 
     @Test
-    fun `request returns write protocol server and io failures`() = runBlocking {
-        val io = IllegalStateException("no channel")
-        assertIs<SftpResult.IoError>(
-            requestWithWriteResult(SftpResult.IoError(io)),
-        )
+    fun `request returns write protocol server and io failures`() {
+        runBlocking {
+            val io = IllegalStateException("no channel")
+            assertIs<SftpResult.IoError>(
+                requestWithWriteResult(SftpResult.IoError(io)),
+            )
 
-        assertIs<SftpResult.ProtocolError>(
-            requestWithWriteResult(SftpResult.ProtocolError("bad packet")),
-        )
+            assertIs<SftpResult.ProtocolError>(
+                requestWithWriteResult(SftpResult.ProtocolError("bad packet")),
+            )
 
-        assertIs<SftpResult.ServerError>(
-            requestWithWriteResult(SftpResult.ServerError(SftpStatusCode.FAILURE, "server said no")),
-        )
+            assertIs<SftpResult.ServerError>(
+                requestWithWriteResult(SftpResult.ServerError(SftpStatusCode.FAILURE, "server said no")),
+            )
+        }
     }
 
     @Test
@@ -120,16 +122,18 @@ class SftpDispatcherTest {
     }
 
     @Test
-    fun `read loop server error exits and pending request times out`() = runBlocking {
-        val packetIO = FakePacketTransport()
-        val dispatcher = SftpDispatcher(packetIO)
-        dispatcher.startReadLoop(this)
+    fun `read loop server error exits and pending request times out`() {
+        runBlocking {
+            val packetIO = FakePacketTransport()
+            val dispatcher = SftpDispatcher(packetIO)
+            dispatcher.startReadLoop(this)
 
-        val response = async { dispatcher.request(14, ByteArray(0), timeoutMs = 50) }
-        packetIO.awaitWrite()
-        packetIO.enqueue(SftpResult.ServerError(SftpStatusCode.FAILURE, "framing server error"))
+            val response = async { dispatcher.request(14, ByteArray(0), timeoutMs = 50) }
+            packetIO.awaitWrite()
+            packetIO.enqueue(SftpResult.ServerError(SftpStatusCode.FAILURE, "framing server error"))
 
-        assertIs<SftpResult.IoError>(response.await())
+            assertIs<SftpResult.IoError>(response.await())
+        }
     }
 
     @Test
