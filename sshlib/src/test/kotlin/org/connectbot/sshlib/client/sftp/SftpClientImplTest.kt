@@ -54,51 +54,58 @@ class SftpClientImplTest {
     }
 
     @Test
-    fun `create returns protocol errors for malformed version response`() = runBlocking {
-        val wrongTypeSession = FakeSshSession()
-        wrongTypeSession.enqueueRead(packet(SSH_FXP_STATUS, statusPayload(SftpStatusCode.OK)))
-        assertIs<SftpResult.ProtocolError>(SftpClientImpl.create(wrongTypeSession))
+    fun `create returns protocol errors for malformed version response`() {
+        runBlocking {
+            val wrongTypeSession = FakeSshSession()
+            wrongTypeSession.enqueueRead(packet(SSH_FXP_STATUS, statusPayload(SftpStatusCode.OK)))
+            assertIs<SftpResult.ProtocolError>(SftpClientImpl.create(wrongTypeSession))
 
-        val shortPayloadSession = FakeSshSession()
-        shortPayloadSession.enqueueRead(packet(SSH_FXP_VERSION, byteArrayOf(0, 0, 0)))
-        assertIs<SftpResult.ProtocolError>(SftpClientImpl.create(shortPayloadSession))
+            val shortPayloadSession = FakeSshSession()
+            shortPayloadSession.enqueueRead(packet(SSH_FXP_VERSION, byteArrayOf(0, 0, 0)))
+            assertIs<SftpResult.ProtocolError>(SftpClientImpl.create(shortPayloadSession))
+        }
     }
 
     @Test
-    fun `create propagates write and read errors`() = runBlocking {
-        val writeFailureSession = FakeSshSession(writeFailure = IllegalStateException("cannot write"))
-        assertIs<SftpResult.IoError>(SftpClientImpl.create(writeFailureSession))
+    fun `create propagates write and read errors`() {
+        runBlocking {
+            val writeFailureSession = FakeSshSession(writeFailure = IllegalStateException("cannot write"))
+            assertIs<SftpResult.IoError>(SftpClientImpl.create(writeFailureSession))
 
-        val readFailureSession = FakeSshSession()
-        assertIs<SftpResult.IoError>(SftpClientImpl.create(readFailureSession))
+            val readFailureSession = FakeSshSession()
+            readFailureSession.closeReads()
+            assertIs<SftpResult.IoError>(SftpClientImpl.create(readFailureSession))
+        }
     }
 
     @Test
-    fun `create propagates protocol and server handshake results`() = runBlocking {
-        assertIs<SftpResult.ProtocolError>(
-            SftpClientImpl.create(
-                FakeSshSession(),
-                FakeHandshakeTransport(writeResult = SftpResult.ProtocolError("init rejected")),
-            ),
-        )
-        assertIs<SftpResult.ServerError>(
-            SftpClientImpl.create(
-                FakeSshSession(),
-                FakeHandshakeTransport(writeResult = SftpResult.ServerError(SftpStatusCode.FAILURE, "init failed")),
-            ),
-        )
-        assertIs<SftpResult.ProtocolError>(
-            SftpClientImpl.create(
-                FakeSshSession(),
-                FakeHandshakeTransport(readResult = SftpResult.ProtocolError("bad version")),
-            ),
-        )
-        assertIs<SftpResult.ServerError>(
-            SftpClientImpl.create(
-                FakeSshSession(),
-                FakeHandshakeTransport(readResult = SftpResult.ServerError(SftpStatusCode.FAILURE, "version failed")),
-            ),
-        )
+    fun `create propagates protocol and server handshake results`() {
+        runBlocking {
+            assertIs<SftpResult.ProtocolError>(
+                SftpClientImpl.create(
+                    FakeSshSession(),
+                    FakeHandshakeTransport(writeResult = SftpResult.ProtocolError("init rejected")),
+                ),
+            )
+            assertIs<SftpResult.ServerError>(
+                SftpClientImpl.create(
+                    FakeSshSession(),
+                    FakeHandshakeTransport(writeResult = SftpResult.ServerError(SftpStatusCode.FAILURE, "init failed")),
+                ),
+            )
+            assertIs<SftpResult.ProtocolError>(
+                SftpClientImpl.create(
+                    FakeSshSession(),
+                    FakeHandshakeTransport(readResult = SftpResult.ProtocolError("bad version")),
+                ),
+            )
+            assertIs<SftpResult.ServerError>(
+                SftpClientImpl.create(
+                    FakeSshSession(),
+                    FakeHandshakeTransport(readResult = SftpResult.ServerError(SftpStatusCode.FAILURE, "version failed")),
+                ),
+            )
+        }
     }
 
     @Test
@@ -231,41 +238,48 @@ class SftpClientImplTest {
     }
 
     @Test
-    fun `directory and path operations map eof empty names and protocol errors`() = runBlocking {
-        val handle = SftpFileHandle(byteArrayOf(1))
-        val eofClient = createClient(
-            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.EOF)) }),
-        )
-        assertEquals(SftpResult.Success(null), eofClient.readdir(handle))
+    fun `directory and path operations map eof empty names and protocol errors`() {
+        runBlocking {
+            val handle = SftpFileHandle(byteArrayOf(1))
+            val eofClient = createClient(
+                FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.EOF)) }),
+            )
+            assertEquals(SftpResult.Success(null), eofClient.readdir(handle))
 
-        val errorClient = createClient(
-            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.FAILURE, "failed")) }),
-        )
-        assertIs<SftpResult.ServerError>(errorClient.opendir("/dir"))
-        assertIs<SftpResult.ServerError>(errorClient.readdir(handle))
-        assertIs<SftpResult.ServerError>(errorClient.realpath("."))
-        assertIs<SftpResult.ServerError>(errorClient.readlink("/link"))
+            val errorClient = createClient(
+                FakeSshSession(
+                    responseFor = { _, _ -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.FAILURE, "failed")) },
+                ),
+            )
+            assertIs<SftpResult.ServerError>(errorClient.opendir("/dir"))
+            assertIs<SftpResult.ServerError>(errorClient.readdir(handle))
+            assertIs<SftpResult.ServerError>(errorClient.realpath("."))
+            assertIs<SftpResult.ServerError>(errorClient.readlink("/link"))
 
-        val emptyNameClient = createClient(
-            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_NAME, namePayload(emptyList())) }),
-        )
-        assertIs<SftpResult.ProtocolError>(emptyNameClient.realpath("."))
-        assertIs<SftpResult.ProtocolError>(emptyNameClient.readlink("/link"))
+            val emptyNameClient = createClient(
+                FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_NAME, namePayload(emptyList())) }),
+            )
+            assertIs<SftpResult.ProtocolError>(emptyNameClient.realpath("."))
+            assertIs<SftpResult.ProtocolError>(emptyNameClient.readlink("/link"))
 
-        val protocolClient = createClient(FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_VERSION, byteArrayOf()) }))
-        assertIs<SftpResult.ProtocolError>(protocolClient.opendir("/dir"))
-        assertIs<SftpResult.ProtocolError>(protocolClient.readdir(handle))
-        assertIs<SftpResult.ProtocolError>(protocolClient.realpath("."))
-        assertIs<SftpResult.ProtocolError>(protocolClient.readlink("/link"))
+            val protocolClient =
+                createClient(FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_VERSION, byteArrayOf()) }))
+            assertIs<SftpResult.ProtocolError>(protocolClient.opendir("/dir"))
+            assertIs<SftpResult.ProtocolError>(protocolClient.readdir(handle))
+            assertIs<SftpResult.ProtocolError>(protocolClient.realpath("."))
+            assertIs<SftpResult.ProtocolError>(protocolClient.readlink("/link"))
+        }
     }
 
     @Test
-    fun `dispatcher propagates request write failures`() = runBlocking {
-        val client = createClient(FakeSshSession(failAfterHandshake = IllegalStateException("write failed")))
+    fun `dispatcher propagates request write failures`() {
+        runBlocking {
+            val client = createClient(FakeSshSession(failAfterHandshake = IllegalStateException("write failed")))
 
-        val result = client.remove("/file")
+            val result = client.remove("/file")
 
-        assertIs<SftpResult.IoError>(result)
+            assertIs<SftpResult.IoError>(result)
+        }
     }
 
     private suspend fun createClient(session: FakeSshSession): SftpClient {
@@ -354,6 +368,10 @@ class SftpClientImplTest {
 
         fun enqueueRead(data: ByteArray) {
             reads.trySend(data).getOrThrow()
+        }
+
+        fun closeReads() {
+            reads.close()
         }
 
         override suspend fun requestPty(

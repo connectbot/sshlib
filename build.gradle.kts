@@ -15,6 +15,7 @@
  */
 
 import net.researchgate.release.ReleaseExtension
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
@@ -33,6 +34,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+
+    tasks.withType<Test>().configureEach {
+        systemProperty("junit.platform.discovery.issue.severity.critical", "WARNING")
     }
 }
 
