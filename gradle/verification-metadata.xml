@@ -248,6 +248,11 @@
             <pgp value="7B72C18D9C362314BF8E981B0CAEBC0883C5BB65"/>
          </artifact>
       </component>
+      <component group="com.vanniktech.maven.publish" name="com.vanniktech.maven.publish.gradle.plugin" version="0.37.0">
+         <artifact name="com.vanniktech.maven.publish.gradle.plugin-0.37.0.pom">
+            <pgp value="7B72C18D9C362314BF8E981B0CAEBC0883C5BB65"/>
+         </artifact>
+      </component>
       <component group="commons-logging" name="commons-logging" version="1.2">
          <artifact name="commons-logging-1.2.jar">
             <pgp value="0CC641C3A62453AB390066C4A41F13C999945293"/>
