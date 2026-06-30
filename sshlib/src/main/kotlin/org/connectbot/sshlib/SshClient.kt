@@ -23,9 +23,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.client.DynamicPortForwarder
@@ -146,6 +148,8 @@ class SshClient private constructor(
     private var authenticated = initialAuthenticated
     private val forwardingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var disconnectForwardJob: Job? = null
+    private var keepAliveJob: Job? = null
+    private val keepAliveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
 
@@ -227,6 +231,7 @@ class SshClient private constructor(
             val result = conn.authenticatePassword(username, password)
 
             if (result is AuthResult.Success) {
+                startKeepAlive()
                 authenticated = true
                 logger.info("Authentication successful")
             } else {
@@ -263,6 +268,7 @@ class SshClient private constructor(
             val result = conn.authenticateKeyboardInteractive(username, callback)
 
             if (result is AuthResult.Success) {
+                startKeepAlive()
                 authenticated = true
                 logger.info("Keyboard-interactive authentication successful")
             } else {
@@ -317,6 +323,7 @@ class SshClient private constructor(
             val result = conn.authenticatePublicKey(username, privateKey)
 
             if (result is AuthResult.Success) {
+                startKeepAlive()
                 authenticated = true
                 logger.info("Public key authentication successful")
             } else {
@@ -354,6 +361,7 @@ class SshClient private constructor(
             val result = conn.authenticate(username, handler)
 
             if (result is AuthResult.Success) {
+                startKeepAlive()
                 authenticated = true
                 logger.info("Auth handler authentication successful")
             } else {
@@ -695,6 +703,30 @@ class SshClient private constructor(
     }
 
     /**
+     * Start sending SSH_MSG_IGNORE heartbeats periodically.
+     * Called internally after successful authentication.
+     * No-op if keepAliveIntervalMs is 0 or keepalive already running.
+     */
+    private fun startKeepAlive() {
+        val intervalMs = config.keepAliveIntervalMs
+        if (intervalMs <= 0) return
+        if (keepAliveJob?.isActive == true) return
+        val connRef = connection ?: return
+        keepAliveJob = keepAliveScope.launch {
+            logger.info("Starting SSH keepalive every ${intervalMs}ms (SSH_MSG_IGNORE)")
+            while (isActive) {
+                delay(intervalMs)
+                try {
+                    connRef.writeIgnore()
+                } catch (e: Exception) {
+                    logger.warn("Keepalive failed, stopping: ${e.message}")
+                    break
+                }
+            }
+        }
+    }
+
+    /**
      * Disconnect from the SSH server.
      */
     suspend fun disconnect() {
@@ -702,6 +734,9 @@ class SshClient private constructor(
 
         disconnectForwardJob?.cancel()
         disconnectForwardJob = null
+
+        keepAliveJob?.cancel()
+        keepAliveJob = null
 
         connection?.close()
         connection = null

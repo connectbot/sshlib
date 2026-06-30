@@ -620,6 +620,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public java.lang.String getEncryptionAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getHostKeyAlgorithms();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.HostKeyVerifier getHostKeyVerifier();
+    method @InaccessibleFromKotlin public long getKeepAliveIntervalMs();
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
     method @InaccessibleFromKotlin public long getObscureKeystrokeTimingIntervalMs();
@@ -632,6 +633,7 @@ package org.connectbot.sshlib {
     property public String encryptionAlgorithms;
     property public String hostKeyAlgorithms;
     property public org.connectbot.sshlib.HostKeyVerifier hostKeyVerifier;
+    property public long keepAliveIntervalMs;
     property public String kexAlgorithms;
     property public String macAlgorithms;
     property public long obscureKeystrokeTimingIntervalMs;
@@ -653,6 +655,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public java.lang.String getHostKeyAlgorithms();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.HostKeyVerifier? getHostKeyVerifier();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.IpVersion getIpVersion();
+    method @InaccessibleFromKotlin public long getKeepAliveIntervalMs();
     method @InaccessibleFromKotlin public java.lang.String getKexAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getMacAlgorithms();
     method @InaccessibleFromKotlin public long getObscureKeystrokeTimingIntervalMs();
@@ -669,6 +672,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public void setHostKeyAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setHostKeyVerifier(org.connectbot.sshlib.HostKeyVerifier?);
     method @InaccessibleFromKotlin public void setIpVersion(org.connectbot.sshlib.transport.IpVersion);
+    method @InaccessibleFromKotlin public void setKeepAliveIntervalMs(long);
     method @InaccessibleFromKotlin public void setKexAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setMacAlgorithms(java.lang.String);
     method @InaccessibleFromKotlin public void setObscureKeystrokeTimingIntervalMs(long);
@@ -685,6 +689,7 @@ package org.connectbot.sshlib {
     property public String hostKeyAlgorithms;
     property public org.connectbot.sshlib.HostKeyVerifier? hostKeyVerifier;
     property public org.connectbot.sshlib.transport.IpVersion ipVersion;
+    property public long keepAliveIntervalMs;
     property public String kexAlgorithms;
     property public String macAlgorithms;
     property public long obscureKeystrokeTimingIntervalMs;

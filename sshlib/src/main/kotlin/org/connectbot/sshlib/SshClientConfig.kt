@@ -59,6 +59,7 @@ class SshClientConfig private constructor(
     val rekeyBytesLimit: Long,
     val obscureKeystrokeTimingIntervalMs: Long,
     val autoDisconnectOnLastChannelClose: Boolean,
+    val keepAliveIntervalMs: Long,
 ) {
     class Builder {
         /**
@@ -134,6 +135,21 @@ class SshClientConfig private constructor(
          */
         var autoDisconnectOnLastChannelClose: Boolean = true
 
+        /**
+         * Send an SSH_MSG_IGNORE heartbeat every N milliseconds to keep the
+         * connection alive across NAT/VPN/firewall idle timeouts.
+         *
+         * The message is a single empty payload that the server silently ignores
+         * (RFC 4253 §11.2). It does NOT expect a response — this is purely to
+         * prevent intermediaries from killing the TCP connection during idle.
+         *
+         * Recommended for long-lived connections behind aggressive firewalls.
+         * Set to 0 to disable (default).
+         *
+         * Common values: 15000 (15s, sshj default), 30000 (30s).
+         */
+        var keepAliveIntervalMs: Long = 0L
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -142,6 +158,9 @@ class SshClientConfig private constructor(
             }
             require(obscureKeystrokeTimingIntervalMs >= 0) {
                 "obscureKeystrokeTimingIntervalMs must be non-negative"
+            }
+            require(keepAliveIntervalMs >= 0) {
+                "keepAliveIntervalMs must be non-negative"
             }
 
             val verifier = hostKeyVerifier
@@ -166,6 +185,7 @@ class SshClientConfig private constructor(
                 rekeyBytesLimit,
                 obscureKeystrokeTimingIntervalMs,
                 autoDisconnectOnLastChannelClose,
+                keepAliveIntervalMs,
             )
         }
     }

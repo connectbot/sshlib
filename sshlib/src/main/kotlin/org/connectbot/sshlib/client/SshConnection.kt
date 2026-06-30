@@ -567,6 +567,15 @@ class SshConnection(
     }
 
     /**
+     * Send an SSH_MSG_IGNORE heartbeat to the server.
+     * The server silently discards this message (RFC 4253 §11.2).
+     * Used to keep NAT/VPN/firewall connections alive during idle.
+     */
+    internal suspend fun writeIgnore() {
+        writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt(), byteArrayOf())
+    }
+
+    /**
      * Initiate SSH connection.
      * Performs SSH version exchange, key exchange, and service negotiation.
      * Returns [ConnectResult.Success] when the transport is ready for authentication calls.
