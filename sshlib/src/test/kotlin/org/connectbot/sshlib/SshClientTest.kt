@@ -481,7 +481,7 @@ class SshClientTest {
 
         assertNull(client.forwardStream(ByteChannel(autoFlush = true), ByteChannel(autoFlush = true), "remote", 22))
 
-        val channel = ForwardingChannel(connection, 1, 2, 32768, 32768)
+        val channel = ForwardingChannel(connection, backgroundScope, 1, 2, 32768, 32768)
         coEvery { connection.openDirectTcpipChannel("remote", 22, "127.0.0.1", 0) } returns channel
         val forwarder = client.forwardStream(ByteChannel(autoFlush = true), ByteChannel(autoFlush = true), "remote", 22)
 
@@ -500,7 +500,7 @@ class SshClientTest {
     @Test
     fun `openDirectTcpipTransport opens direct tcpip channel from factory`() = runTest {
         val connection = mockk<SshConnection>(relaxed = true)
-        val channel = ForwardingChannel(connection, 1, 2, 32768, 32768)
+        val channel = ForwardingChannel(connection, backgroundScope, 1, 2, 32768, 32768)
         coEvery { connection.openDirectTcpipChannel("remote", 22, "127.0.0.1", 0) } returns channel
 
         val factory = connectedClient(connection, authenticated = true)

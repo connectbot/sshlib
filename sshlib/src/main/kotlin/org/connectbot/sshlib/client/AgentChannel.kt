@@ -46,14 +46,11 @@ internal class AgentChannel(
             logger.warn("Received data on closed agent channel")
             return
         }
-        val adjust = window.consumeLocal(data.size)
+        window.consumeLocal(data.size)
 
         logger.debug("Agent channel received ${data.size} bytes")
-        if (adjust > 0) {
-            connection.sendWindowAdjust(remoteChannelNumber, adjust)
-        }
-
         val response = handler.handleRequest(data)
+        connection.sendWindowAdjust(remoteChannelNumber, window.releaseLocal(data.size))
 
         logger.debug("Sending agent response (${response.size} bytes)")
         sendData(response)
