@@ -37,7 +37,8 @@ internal object PrivateKeyReader {
 
             trimmed.startsWith("-----BEGIN RSA PRIVATE KEY-----") ||
                 trimmed.startsWith("-----BEGIN EC PRIVATE KEY-----") ||
-                trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> {
+                trimmed.startsWith("-----BEGIN PRIVATE KEY-----") ||
+                trimmed.startsWith("-----BEGIN ENCRYPTED PRIVATE KEY-----") -> {
                 PemKeyReader.read(trimmed, passphrase)
             }
 
@@ -62,6 +63,8 @@ internal object PrivateKeyReader {
             }
 
             trimmed.startsWith("-----BEGIN PRIVATE KEY-----") -> false
+
+            trimmed.startsWith("-----BEGIN ENCRYPTED PRIVATE KEY-----") -> true
 
             // PKCS#8 unencrypted
             else -> throw SshException("Unrecognized private key format")

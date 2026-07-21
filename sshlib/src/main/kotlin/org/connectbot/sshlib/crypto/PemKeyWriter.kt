@@ -102,7 +102,12 @@ internal object PemKeyWriter {
 
     private fun writeEd25519(keyPair: KeyPair, password: String?): String {
         val der = keyPair.private.encoded
-        return wrapPem("PRIVATE KEY", der, password)
+        return if (password == null) {
+            wrapPem("PRIVATE KEY", der, null)
+        } else {
+            val encrypted = Pkcs8Encryption.encrypt(der, password)
+            wrapPem("ENCRYPTED PRIVATE KEY", encrypted, null)
+        }
     }
 
     private fun wrapPem(label: String, data: ByteArray, password: String?): String {
