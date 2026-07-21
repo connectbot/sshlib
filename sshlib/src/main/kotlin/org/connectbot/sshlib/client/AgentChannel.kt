@@ -18,11 +18,16 @@
 package org.connectbot.sshlib.client
 
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
 internal class AgentChannel(
     private val handler: AgentProtocolHandler,
     private val connection: SshConnection,
+    scope: CoroutineScope,
     private val localChannelNumber: Int,
     private var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
@@ -38,6 +43,16 @@ internal class AgentChannel(
 
     private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
+    private val requests = Channel<ByteArray>(Channel.UNLIMITED)
+    private val requestWorker: Job = scope.launch {
+        for (data in requests) {
+            val response = handler.handleRequest(data)
+            connection.sendWindowAdjust(remoteChannelNumber, window.releaseLocal(data.size))
+
+            logger.debug("Sending agent response (${response.size} bytes)")
+            sendData(response)
+        }
+    }
 
     val isOpen: Boolean get() = _isOpen
 
@@ -48,12 +63,11 @@ internal class AgentChannel(
         }
         window.consumeLocal(data.size)
 
-        logger.debug("Agent channel received ${data.size} bytes")
-        val response = handler.handleRequest(data)
-        connection.sendWindowAdjust(remoteChannelNumber, window.releaseLocal(data.size))
-
-        logger.debug("Sending agent response (${response.size} bytes)")
-        sendData(response)
+        logger.debug("Queueing ${data.size} bytes received on agent channel")
+        if (requests.trySend(data).isFailure) {
+            window.releaseLocal(data.size)
+            logger.warn("Discarding data received while agent channel is closing")
+        }
     }
 
     fun onWindowAdjust(bytesToAdd: Long) {
@@ -79,6 +93,8 @@ internal class AgentChannel(
             }
         }
         _isOpen = false
+        requests.close()
+        requestWorker.cancelAndJoin()
         windowAvailable.close()
     }
 

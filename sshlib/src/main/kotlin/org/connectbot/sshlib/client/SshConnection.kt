@@ -146,6 +146,12 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import org.connectbot.sshlib.AuthResult as PublicAuthResult
 
+internal fun boundRemotePacketSize(packetSize: Long): Int? = when {
+    packetSize <= 0L -> null
+    packetSize > 0xFFFFFFFFL -> null
+    else -> minOf(packetSize, 32L * 1024L).toInt()
+}
+
 private sealed interface PendingProtection {
     fun installOutbound(packetIO: PacketIO)
     fun installInbound(packetIO: PacketIO)
@@ -1815,7 +1821,12 @@ class SshConnection(
             val channelType = msg.channelType().value()
             val senderChannel = msg.senderChannel().toInt()
             val initialWindow = msg.initialWindowSize()
-            val maxPacketSize = msg.maximumPacketSize().toInt()
+            val maxPacketSize = boundRemotePacketSize(msg.maximumPacketSize())
+            if (maxPacketSize == null) {
+                logger.warn("Rejecting channel with invalid maximum packet size: ${msg.maximumPacketSize()}")
+                rejectChannelOpen(senderChannel, channelType)
+                return
+            }
 
             logger.info("Received CHANNEL_OPEN: type=$channelType, sender=$senderChannel")
 
@@ -1845,6 +1856,7 @@ class SshConnection(
                     val agentChannel = AgentChannel(
                         handler,
                         this,
+                        connectionScope,
                         localChannelNumber,
                         senderChannel,
                         maxPacketSize,
@@ -2264,18 +2276,25 @@ class SshConnection(
                     if (pending != null) {
                         val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
                         val remoteWindow = confirmationMsg.initialWindowSize()
-                        logger.info("Direct-tcpip channel opened: local=$recipientChannel, remote=$remoteChannelNumber")
-                        val channel = ForwardingChannel(
-                            this@SshConnection,
-                            connectionScope,
-                            recipientChannel,
-                            remoteChannelNumber,
-                            pending.maxPacketSize,
-                            remoteWindowSizeInitial = remoteWindow,
-                            initialWindowSize = pending.initialWindowSize,
-                        )
-                        registerForwardingChannel(channel)
-                        pending.deferred.complete(channel)
+                        val remoteMaxPacketSize = boundRemotePacketSize(confirmationMsg.maximumPacketSize())
+                        if (remoteMaxPacketSize == null) {
+                            logger.warn("Rejecting channel confirmation with invalid maximum packet size: ${confirmationMsg.maximumPacketSize()}")
+                            pending.deferred.complete(null)
+                            sendChannelClose(remoteChannelNumber)
+                        } else {
+                            logger.info("Direct-tcpip channel opened: local=$recipientChannel, remote=$remoteChannelNumber")
+                            val channel = ForwardingChannel(
+                                this@SshConnection,
+                                connectionScope,
+                                recipientChannel,
+                                remoteChannelNumber,
+                                remoteMaxPacketSize,
+                                remoteWindowSizeInitial = remoteWindow,
+                                initialWindowSize = pending.initialWindowSize,
+                            )
+                            registerForwardingChannel(channel)
+                            pending.deferred.complete(channel)
+                        }
                     } else {
                         stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
                     }
@@ -2756,6 +2775,12 @@ class SshConnection(
 
         val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
         val remoteWindow = confirmationMsg.initialWindowSize()
+        val remoteMaxPacketSize = boundRemotePacketSize(confirmationMsg.maximumPacketSize())
+        if (remoteMaxPacketSize == null) {
+            logger.warn("Rejecting session channel confirmation with invalid maximum packet size: ${confirmationMsg.maximumPacketSize()}")
+            sendChannelClose(remoteChannelNumber)
+            return null
+        }
         logger.info("Channel opened: local=$localChannelNumber, remote=$remoteChannelNumber, remoteWindow=$remoteWindow")
 
         val channel = SessionChannel(
@@ -2763,7 +2788,7 @@ class SshConnection(
             connectionScope,
             localChannelNumber,
             remoteChannelNumber,
-            maxPacketSize,
+            remoteMaxPacketSize,
             remoteWindowSizeInitial = remoteWindow,
             initialWindowSize = initialWindowSize,
             canSendChaff = serverSupportsPing,
