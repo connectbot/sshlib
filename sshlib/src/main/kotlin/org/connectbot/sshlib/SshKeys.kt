@@ -57,7 +57,8 @@ object SshKeys {
      * - Ed25519 keys are encoded as PKCS#8 (`BEGIN PRIVATE KEY`)
      *
      * @param keyPair JCA key pair to encode
-     * @param password Optional passphrase to encrypt the key (AES-256-CBC)
+     * @param password Optional passphrase to encrypt the key. RSA and EC use legacy
+     *   PEM AES-256-CBC encryption; Ed25519 uses PBES2 encrypted PKCS#8.
      * @return PEM-encoded private key string
      * @throws SshException if the key type is unsupported
      */

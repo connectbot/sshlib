@@ -17,11 +17,13 @@
 
 package org.connectbot.sshlib.crypto
 
+import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Test
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class PemKeyWriterTest {
@@ -64,6 +66,36 @@ class PemKeyWriterTest {
     @Test
     fun `round-trip Ed25519 unencrypted`() {
         roundTrip("ed25519_unencrypted")
+    }
+
+    @Test
+    fun `round-trip Ed25519 encrypted PKCS8`() {
+        val original = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+        val encoded = PemKeyWriter.write(original, "testpass")
+
+        assertTrue(encoded.contains("-----BEGIN ENCRYPTED PRIVATE KEY-----"))
+        assertTrue(PrivateKeyReader.isEncrypted(encoded))
+        val decoded = PrivateKeyReader.read(encoded, "testpass").jcaKeyPair
+        assertEquals(original.public, decoded.public)
+    }
+
+    @Test
+    fun `encrypted Ed25519 PKCS8 rejects missing and incorrect passwords`() {
+        val original = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+        val encoded = PemKeyWriter.write(original, "testpass")
+
+        assertFailsWith<SshException> { PrivateKeyReader.read(encoded) }
+        assertFailsWith<SshException> { PrivateKeyReader.read(encoded, "wrongpass") }
+    }
+
+    @Test
+    fun `encrypted Ed25519 PKCS8 uses fresh salt and IV`() {
+        val original = PrivateKeyReader.read(readKey("ed25519_unencrypted")).jcaKeyPair
+
+        val first = PemKeyWriter.write(original, "testpass")
+        val second = PemKeyWriter.write(original, "testpass")
+
+        assertTrue(first != second)
     }
 
     @Test

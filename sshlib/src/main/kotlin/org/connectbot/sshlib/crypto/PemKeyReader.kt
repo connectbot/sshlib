@@ -40,7 +40,7 @@ import java.security.spec.RSAPublicKeySpec
 
 internal object PemKeyReader {
 
-    private enum class PemType { RSA, EC, PKCS8 }
+    private enum class PemType { RSA, EC, PKCS8, ENCRYPTED_PKCS8 }
 
     private class PemStructure(
         val type: PemType,
@@ -51,7 +51,8 @@ internal object PemKeyReader {
 
     fun isEncrypted(text: String): Boolean {
         val ps = parsePem(text)
-        return ps.procType != null && ps.procType!!.size == 2 && ps.procType!![1] == "ENCRYPTED"
+        return ps.type == PemType.ENCRYPTED_PKCS8 ||
+            (ps.procType != null && ps.procType!!.size == 2 && ps.procType!![1] == "ENCRYPTED")
     }
 
     fun read(text: String, passphrase: String?): SshPrivateKey {
@@ -68,6 +69,10 @@ internal object PemKeyReader {
             PemType.RSA -> readPkcs1Rsa(ps.data)
             PemType.EC -> readSec1Ec(ps.data)
             PemType.PKCS8 -> readPkcs8(ps.data)
+            PemType.ENCRYPTED_PKCS8 -> {
+                val password = passphrase ?: throw SshException("PKCS#8 key is encrypted, but no passphrase was specified")
+                readPkcs8(Pkcs8Encryption.decrypt(ps.data, password))
+            }
         }
     }
 
@@ -93,6 +98,11 @@ internal object PemKeyReader {
                 line.startsWith("-----BEGIN PRIVATE KEY-----") -> {
                     type = PemType.PKCS8
                     endMarker = "-----END PRIVATE KEY-----"
+                }
+
+                line.startsWith("-----BEGIN ENCRYPTED PRIVATE KEY-----") -> {
+                    type = PemType.ENCRYPTED_PKCS8
+                    endMarker = "-----END ENCRYPTED PRIVATE KEY-----"
                 }
             }
             i++
