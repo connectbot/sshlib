@@ -335,35 +335,46 @@ class AlgorithmsTest {
 
     @Test
     fun `negotiateRsaAlgorithm skips RSA when serverSigAlgs is null`() {
-        assertNull(SignatureEntry.negotiateRsaAlgorithm(null))
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(null, setOf("rsa-sha2-512", "rsa-sha2-256")))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm uses explicitly allowed ssh-rsa when serverSigAlgs is null`() {
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(null, setOf("ssh-rsa")))
     }
 
     @Test
     fun `negotiateRsaAlgorithm prefers rsa-sha2-512 when server supports it`() {
         val serverAlgs = setOf("rsa-sha2-256", "rsa-sha2-512", "ssh-ed25519")
-        assertEquals("rsa-sha2-512", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertEquals("rsa-sha2-512", SignatureEntry.negotiateRsaAlgorithm(serverAlgs, setOf("rsa-sha2-256", "rsa-sha2-512")))
     }
 
     @Test
     fun `negotiateRsaAlgorithm falls back to rsa-sha2-256 when 512 not supported`() {
         val serverAlgs = setOf("rsa-sha2-256", "ssh-ed25519")
-        assertEquals("rsa-sha2-256", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertEquals("rsa-sha2-256", SignatureEntry.negotiateRsaAlgorithm(serverAlgs, setOf("rsa-sha2-256", "rsa-sha2-512")))
     }
 
     @Test
-    fun `negotiateRsaAlgorithm skips ssh-rsa-only advertisement`() {
+    fun `negotiateRsaAlgorithm accepts explicitly allowed ssh-rsa advertisement`() {
         val serverAlgs = setOf("ssh-rsa", "ssh-ed25519")
-        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(serverAlgs, setOf("ssh-rsa")))
+    }
+
+    @Test
+    fun `negotiateRsaAlgorithm skips ssh-rsa when it is not allowed`() {
+        val serverAlgs = setOf("ssh-rsa", "ssh-ed25519")
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs, setOf("rsa-sha2-512", "rsa-sha2-256")))
     }
 
     @Test
     fun `negotiateRsaAlgorithm skips when no RSA algorithm is advertised`() {
         val serverAlgs = setOf("ssh-ed25519", "ecdsa-sha2-nistp256")
-        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs, setOf("rsa-sha2-512", "rsa-sha2-256")))
     }
 
     @Test
     fun `negotiateRsaAlgorithm skips when serverSigAlgs is empty`() {
-        assertNull(SignatureEntry.negotiateRsaAlgorithm(emptySet()))
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(emptySet(), setOf("rsa-sha2-512", "rsa-sha2-256", "ssh-rsa")))
     }
 }

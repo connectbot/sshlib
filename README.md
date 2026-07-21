@@ -44,9 +44,11 @@ The defaults intentionally exclude SHA-1 key exchange and MACs, CBC/3DES
 ciphers, and `ssh-rsa` host-key signatures. These legacy algorithms remain
 available only through the explicit `kexAlgorithms`, `hostKeyAlgorithms`,
 `encryptionAlgorithms`, and `macAlgorithms` settings in `SshClientConfig`.
-RSA user authentication is attempted only when the server advertises
-`rsa-sha2-256` or `rsa-sha2-512` through `server-sig-algs`; the client does not
-guess an RSA algorithm or fall back to SHA-1 when that extension is absent.
+RSA user authentication normally requires the server to advertise
+`rsa-sha2-256` or `rsa-sha2-512` through `server-sig-algs`. Explicitly including
+`ssh-rsa` in the configured host-key algorithm wishlist also permits the legacy
+RSA/SHA-1 signature when advertised, or as the base-key algorithm when that
+extension is absent.
 
 ## Quick Start
 

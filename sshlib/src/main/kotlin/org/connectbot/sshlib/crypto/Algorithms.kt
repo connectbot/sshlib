@@ -309,15 +309,20 @@ internal enum class SignatureEntry(
 
         fun fromSshName(name: String): SignatureEntry? = entries.firstOrNull { it.sshName == name }
 
-        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256")
+        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256", KEY_TYPE_SSH_RSA)
 
         /**
-         * Picks the best RSA signing algorithm given the server's advertised list.
-         * Returns null if the RFC 8308 server-sig-algs extension is absent or does
-         * not contain a modern RSA algorithm. The client must skip that RSA key
-         * rather than guess an unadvertised algorithm or fall back to SHA-1.
+         * Picks the best RSA signing algorithm allowed by the client's configured
+         * algorithm wishlist and the server's advertised list. When RFC 8308
+         * server-sig-algs is absent, only an explicitly allowed ssh-rsa is usable,
+         * matching OpenSSH's base-key fallback behavior.
          */
-        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String? = serverSigAlgs?.let { advertised -> rsaPreferenceOrder.firstOrNull { it in advertised } }
+        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?, allowedAlgorithms: Set<String>): String? {
+            if (serverSigAlgs == null) {
+                return KEY_TYPE_SSH_RSA.takeIf { it in allowedAlgorithms }
+            }
+            return rsaPreferenceOrder.firstOrNull { it in allowedAlgorithms && it in serverSigAlgs }
+        }
     }
 }
 
