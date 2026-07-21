@@ -492,7 +492,7 @@ class SshClientIntegrationTest {
         .bufferedReader().readText()
 
     @Test
-    fun `explicit ssh-rsa host key does not enable SHA-1 RSA authentication`() = runBlocking {
+    fun `explicit ssh-rsa wishlist enables SHA-1 RSA authentication`() = runBlocking {
         val host = opensshRsaOnlyContainer.host
         val port = opensshRsaOnlyContainer.getMappedPort(22)
 
@@ -526,8 +526,8 @@ class SshClientIntegrationTest {
             }
 
             val result = withTimeout(10_000) { client.authenticate(USERNAME, handler) }
-            assertTrue(result is AuthResult.Failure, "Should reject SHA-1-only RSA authentication")
-            assertFalse(client.isAuthenticated, "Client should not be authenticated")
+            assertTrue(result is AuthResult.Success, "Should authenticate with explicitly enabled ssh-rsa")
+            assertTrue(client.isAuthenticated, "Client should be authenticated")
         } finally {
             client.disconnect()
         }

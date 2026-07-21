@@ -798,7 +798,10 @@ class SshConnection(
         return data.toByteArray()
     }
 
-    private fun negotiateRsaAlgorithm(): String? = SignatureEntry.negotiateRsaAlgorithm(serverSigAlgs)
+    private fun negotiateRsaAlgorithm(): String? = SignatureEntry.negotiateRsaAlgorithm(
+        serverSigAlgs,
+        hostKeyAlgorithms.split(',').filter { it.isNotEmpty() }.toSet(),
+    )
 
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
