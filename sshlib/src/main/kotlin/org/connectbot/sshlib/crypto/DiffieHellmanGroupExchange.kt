@@ -33,6 +33,22 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
     companion object {
         private val secureRandom = SecureRandom()
         private const val ERROR_GROUP_NOT_SET = "DH group not set; call setGroup() first"
+        private const val PRIMALITY_CERTAINTY = 80
+        private const val GROUP_CACHE_LIMIT = 16
+        private val groupValidationCache = object : LinkedHashMap<BigInteger, Boolean>(GROUP_CACHE_LIMIT, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<BigInteger, Boolean>?): Boolean =
+                size > GROUP_CACHE_LIMIT
+        }
+
+        @Synchronized
+        private fun isSafeGroup(p: BigInteger): Boolean =
+            groupValidationCache.getOrPut(p) {
+                p.isProbablePrime(PRIMALITY_CERTAINTY) &&
+                    p.subtract(BigInteger.ONE).shiftRight(1).isProbablePrime(PRIMALITY_CERTAINTY)
+            }
+
+        @Synchronized
+        internal fun cachedGroupValidationCount(): Int = groupValidationCache.size
     }
 
     val min = 2048
@@ -59,6 +75,9 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
         if (g <= BigInteger.ONE || g >= p - BigInteger.ONE) {
             throw SshException("DH group generator g is out of range: must be 1 < g < p-1")
         }
+        if (!isSafeGroup(p)) {
+            throw SshException("DH group modulus is not a safe prime")
+        }
         this.p = p
         this.g = g
     }
@@ -77,17 +96,21 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
         val x = privateKey
             ?: throw SshException("Client keys not generated; call generateClientKeys() first")
         val p = this.p ?: throw SshException(ERROR_GROUP_NOT_SET)
-        val f = BigInteger(1, serverPublicKey)
+        try {
+            val f = BigInteger(1, serverPublicKey)
 
-        if (f <= BigInteger.ONE || f >= p - BigInteger.ONE) {
-            throw SshException("Invalid server public key")
+            if (f <= BigInteger.ONE || f >= p - BigInteger.ONE) {
+                throw SshException("Invalid server public key")
+            }
+
+            val secret = f.modPow(x, p)
+            if (secret <= BigInteger.ONE || secret >= p - BigInteger.ONE) {
+                throw SshException("Invalid DH shared secret")
+            }
+            return encodeMpint(secret.toByteArray())
+        } finally {
+            privateKey = null
         }
-
-        val sharedSecret = encodeMpint(f.modPow(x, p).toByteArray())
-
-        privateKey = null
-
-        return sharedSecret
     }
 
     /**

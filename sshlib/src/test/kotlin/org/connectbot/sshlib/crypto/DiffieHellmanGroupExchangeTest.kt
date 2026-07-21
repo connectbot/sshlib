@@ -89,6 +89,16 @@ class DiffieHellmanGroupExchangeTest {
     }
 
     @Test
+    fun `setGroup rejects odd composite modulus`() {
+        val composite = BigInteger.ONE.shiftLeft(2047).add(BigInteger.ONE).multiply(BigInteger.valueOf(3))
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+
+        assertFailsWith<SshException> {
+            gex.setGroup(composite, DhGroups.GENERATOR)
+        }
+    }
+
+    @Test
     fun `setGroup accepts valid group 14 parameters`() {
         val gex = DiffieHellmanGroupExchange("SHA-256")
         gex.setGroup(DhGroups.GROUP14_P, DhGroups.GENERATOR)
@@ -145,6 +155,29 @@ class DiffieHellmanGroupExchangeTest {
         val serverSecret = encodeMpint(BigInteger(1, serverRawSecret).toByteArray())
 
         assertContentEquals(serverSecret, clientSecret)
+    }
+
+    @Test
+    fun `failed server public value discards ephemeral private exponent`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        gex.setGroup(DhGroups.GROUP14_P, DhGroups.GENERATOR)
+        gex.generateClientKeys()
+
+        assertFailsWith<SshException> { gex.computeSharedSecret(BigInteger.ONE.toByteArray()) }
+        assertFailsWith<SshException> { gex.computeSharedSecret(BigInteger.TWO.toByteArray()) }
+    }
+
+    @Test
+    fun `validated group cache remains bounded`() {
+        val gex = DiffieHellmanGroupExchange("SHA-256")
+        repeat(20) { index ->
+            val composite = BigInteger.ONE.shiftLeft(2047)
+                .add(BigInteger.valueOf((index * 2L) + 1L))
+                .multiply(BigInteger.valueOf(3))
+            assertFailsWith<SshException> { gex.setGroup(composite, DhGroups.GENERATOR) }
+        }
+
+        assertTrue(DiffieHellmanGroupExchange.cachedGroupValidationCount() <= 16)
     }
 
     @Test
