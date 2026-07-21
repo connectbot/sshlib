@@ -29,8 +29,18 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
+import java.security.SecureRandom
 
 class PacketIOTest {
+
+    private class TrackingSecureRandom : SecureRandom() {
+        var requestedBytes = 0
+
+        override fun nextBytes(bytes: ByteArray) {
+            requestedBytes += bytes.size
+            bytes.fill(0x5a)
+        }
+    }
 
     private class TrackingAead : PacketAead {
         var destroyed = false
@@ -283,6 +293,20 @@ class PacketIOTest {
             val padding = writtenPaddingLength(payloadSize)
             assertTrue(padding >= 4, "payload=$payloadSize: padding $padding < 4")
         }
+    }
+
+    @Test
+    fun `packet padding comes from cryptographically secure random source`() = runBlocking {
+        val transport = ByteArrayTransport()
+        val random = TrackingSecureRandom()
+        val io = PacketIO(transport, random)
+
+        io.writePacket(SshEnums.MessageType.SSH_MSG_IGNORE.id().toInt())
+
+        val wire = transport.getWrittenData()
+        val paddingLength = wire[4].toInt() and 0xFF
+        assertEquals(paddingLength, random.requestedBytes)
+        assertTrue(wire.takeLast(paddingLength).all { it == 0x5a.toByte() })
     }
 
     @Test

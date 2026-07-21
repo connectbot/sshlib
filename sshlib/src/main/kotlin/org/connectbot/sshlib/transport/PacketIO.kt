@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.security.MessageDigest
-import kotlin.random.Random
+import java.security.SecureRandom
 
 /**
  * Handles SSH packet framing and unframing according to RFC 4253.
@@ -45,7 +45,10 @@ import kotlin.random.Random
  *
  * @param transport Underlying transport layer
  */
-internal class PacketIO(private val transport: Transport) {
+internal class PacketIO(
+    private val transport: Transport,
+    private val secureRandom: SecureRandom = SecureRandom(),
+) {
     companion object {
         private val logger = LoggerFactory.getLogger(PacketIO::class.java)
 
@@ -514,7 +517,7 @@ internal class PacketIO(private val transport: Transport) {
         buffer.write(payload)
 
         // padding (random bytes)
-        val padding = Random.nextBytes(paddingLength)
+        val padding = securePadding(paddingLength)
         buffer.write(padding)
 
         val data = buffer.toByteArray()
@@ -552,7 +555,7 @@ internal class PacketIO(private val transport: Transport) {
         buffer.write(payload)
 
         // padding (random bytes)
-        val padding = Random.nextBytes(paddingLength)
+        val padding = securePadding(paddingLength)
         buffer.write(padding)
 
         val unencryptedPacket = buffer.toByteArray()
@@ -594,7 +597,7 @@ internal class PacketIO(private val transport: Transport) {
         payloadBuffer.write(paddingLength)
         payloadBuffer.write(messageType)
         payloadBuffer.write(payload)
-        val padding = Random.nextBytes(paddingLength)
+        val padding = securePadding(paddingLength)
         payloadBuffer.write(padding)
 
         val payloadToEncrypt = payloadBuffer.toByteArray()
@@ -639,7 +642,7 @@ internal class PacketIO(private val transport: Transport) {
         plaintextBuffer.write(paddingLength)
         plaintextBuffer.write(messageType)
         plaintextBuffer.write(payload)
-        plaintextBuffer.write(Random.nextBytes(paddingLength))
+        plaintextBuffer.write(securePadding(paddingLength))
 
         val plaintext = plaintextBuffer.toByteArray()
         val lengthBytes = ByteBuffer.allocate(4).putInt(packetLength).array()
@@ -684,6 +687,8 @@ internal class PacketIO(private val transport: Transport) {
 
         return paddingLength
     }
+
+    private fun securePadding(length: Int): ByteArray = ByteArray(length).also(secureRandom::nextBytes)
 
     /**
      * Calculate padding length for ETM/AEAD packets.
