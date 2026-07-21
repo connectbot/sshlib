@@ -65,6 +65,17 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `unsolicited authentication success is rejected as a protocol error`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val disconnected = async(dispatcher) { connection.disconnectedFlow.first() }
+            server.sendUserauthSuccess()
+
+            val failure = assertNotNull(withTimeout(5_000) { disconnected.await() })
+            assertTrue(failure.message.orEmpty().contains("Unexpected SSH packet SSH_MSG_USERAUTH_SUCCESS"))
+        }
+    }
+
+    @Test
     fun `connect returns host key rejected when verifier rejects server key`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val (clientTransport, serverTransport) = PipedTransport.create()
@@ -360,13 +371,13 @@ class SshConnectionFlowTest {
             val exec = async(dispatcher) { session.requestExec("true") }
             val request = withTimeout(5_000) { server.awaitChannelRequest() }
             assertEquals("exec", request.requestType().value())
-            server.sendChannelSuccess(request.recipientChannel().toInt())
+            server.sendChannelSuccess(session.localChannelNumber)
             assertTrue(withTimeout(5_000) { exec.await() })
 
             val shell = async(dispatcher) { session.requestShell() }
             val shellRequest = withTimeout(5_000) { server.awaitChannelRequest() }
             assertEquals("shell", shellRequest.requestType().value())
-            server.sendChannelFailure(shellRequest.recipientChannel().toInt())
+            server.sendChannelFailure(session.localChannelNumber)
             assertEquals(false, withTimeout(5_000) { shell.await() })
         }
     }

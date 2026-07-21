@@ -115,6 +115,35 @@ class PingConnectionTest {
     }
 
     @Test
+    fun `opaque chaff pong does not terminate packet processing`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val (clientTransport, serverTransport) = PipedTransport.create()
+        val server = FakeSshServer(serverTransport, backgroundScope, dispatcher)
+        server.advertiseExtInfo = true
+        server.advertisePing = true
+        server.start()
+
+        val connection = SshConnection(
+            transport = clientTransport,
+            hostKeyVerifier = acceptAllVerifier,
+            rekeyIntervalMs = Long.MAX_VALUE,
+            rekeyBytesLimit = Long.MAX_VALUE,
+            coroutineDispatcher = dispatcher,
+        )
+
+        try {
+            assertIs<ConnectResult.Success>(connectInBackground(connection, backgroundScope, dispatcher))
+
+            server.sendServerPong("PING!".encodeToByteArray())
+            yield()
+
+            assertIs<PingResult.Success>(connection.ping())
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
     fun `client responds to server ping with pong containing same data`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val (clientTransport, serverTransport) = PipedTransport.create()
