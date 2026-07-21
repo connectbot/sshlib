@@ -2,6 +2,10 @@
 
 This document lists the cryptographic algorithms supported by the ConnectBot SSH library.
 
+Algorithms labeled **legacy opt-in** are implemented for compatibility but are
+not offered by the default `SshClientConfig`. Applications must add them
+explicitly to the corresponding algorithm string.
+
 ## Authentication
 - `keyboard-interactive`
 - `password`
@@ -15,7 +19,7 @@ This document lists the cryptographic algorithms supported by the ConnectBot SSH
 - `ecdsa-sha2-nistp521` ([RFC 5656](https://tools.ietf.org/html/rfc5656#section-3))
 - `rsa-sha2-512` ([RFC 8332](https://tools.ietf.org/html/rfc8332#section-3))
 - `rsa-sha2-256` ([RFC 8332](https://tools.ietf.org/html/rfc8332#section-3))
-- `ssh-rsa` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
+- `ssh-rsa` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1)) — **legacy opt-in**
 
 ## Key Exchange
 - `mlkem768x25519-sha256` ([draft-ietf-sshm-mlkem-hybrid-kex](https://datatracker.ietf.org/doc/draft-ietf-sshm-mlkem-hybrid-kex/)) (depends on JEP-496 support)
@@ -27,9 +31,9 @@ This document lists the cryptographic algorithms supported by the ConnectBot SSH
 - `diffie-hellman-group16-sha512` ([RFC 8268](https://tools.ietf.org/html/rfc8268))
 - `diffie-hellman-group14-sha256` ([RFC 8268](https://tools.ietf.org/html/rfc8268))
 - `diffie-hellman-group-exchange-sha256` ([RFC 4419](https://tools.ietf.org/html/rfc4419))
-- `diffie-hellman-group14-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
-- `diffie-hellman-group-exchange-sha1` ([RFC 4419](https://tools.ietf.org/html/rfc4419))
-- `diffie-hellman-group1-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1))
+- `diffie-hellman-group14-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1)) — **legacy opt-in**
+- `diffie-hellman-group-exchange-sha1` ([RFC 4419](https://tools.ietf.org/html/rfc4419)) — **legacy opt-in**
+- `diffie-hellman-group1-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-8.1)) — **legacy opt-in**
 
 ## Encryption
 - `chacha20-poly1305@openssh.com` ([draft-ietf-sshm-chacha20-poly1305](https://datatracker.ietf.org/doc/html/draft-ietf-sshm-chacha20-poly1305))
@@ -37,14 +41,14 @@ This document lists the cryptographic algorithms supported by the ConnectBot SSH
 - `aes128-gcm@openssh.com` ([draft-miller-sshm-aes-gcm](https://datatracker.ietf.org/doc/html/draft-miller-sshm-aes-gcm))
 - `aes256-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
 - `aes128-ctr` ([RFC 4344](https://tools.ietf.org/html/rfc4344#section-4))
-- `aes256-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
-- `aes128-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3))
-- `3des-cbc` ([RFC 4253](https://datatracker.ietf.org/doc/html/rfc4253#section-6.3))
+- `aes256-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3)) — **legacy opt-in**
+- `aes128-cbc` ([RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.3)) — **legacy opt-in**
+- `3des-cbc` ([RFC 4253](https://datatracker.ietf.org/doc/html/rfc4253#section-6.3)) — **legacy opt-in**
 
 ## MACs
 - `hmac-sha2-512-etm@openssh.com` ([OpenSSH PROTOCOL](https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
 - `hmac-sha2-256-etm@openssh.com` ([OpenSSH PROTOCOL](https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
-- `hmac-sha1-etm@openssh.com` ([OpenSSH PROTOCOL](https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50))
-- `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
-- `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868))
-- `hmac-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253))
+- `hmac-sha1-etm@openssh.com` ([OpenSSH PROTOCOL](https://github.com/openssh/openssh-portable/blob/60b909fb110f77c1ffd15cceb5d09b8e3f79b27e/PROTOCOL#L50)) — **legacy opt-in**
+- `hmac-sha2-512` ([RFC 4868](https://tools.ietf.org/html/rfc4868)) — **legacy opt-in**
+- `hmac-sha2-256` ([RFC 4868](https://tools.ietf.org/html/rfc4868)) — **legacy opt-in**
+- `hmac-sha1` ([RFC 4253](https://tools.ietf.org/html/rfc4253)) — **legacy opt-in**

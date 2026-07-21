@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -492,7 +492,7 @@ class SshClientIntegrationTest {
         .bufferedReader().readText()
 
     @Test
-    fun `should connect to server only supporting ssh-rsa`() = runBlocking {
+    fun `explicit ssh-rsa host key does not enable SHA-1 RSA authentication`() = runBlocking {
         val host = opensshRsaOnlyContainer.host
         val port = opensshRsaOnlyContainer.getMappedPort(22)
 
@@ -526,8 +526,8 @@ class SshClientIntegrationTest {
             }
 
             val result = withTimeout(10_000) { client.authenticate(USERNAME, handler) }
-            assertTrue(result is AuthResult.Success, "Should authenticate with ssh-rsa")
-            assertTrue(client.isAuthenticated, "Client should be authenticated")
+            assertTrue(result is AuthResult.Failure, "Should reject SHA-1-only RSA authentication")
+            assertFalse(client.isAuthenticated, "Client should not be authenticated")
         } finally {
             client.disconnect()
         }
