@@ -91,10 +91,12 @@ import org.connectbot.sshlib.protocol.SshMsgChannelClose
 import org.connectbot.sshlib.protocol.SshMsgChannelData
 import org.connectbot.sshlib.protocol.SshMsgChannelEof
 import org.connectbot.sshlib.protocol.SshMsgChannelExtendedData
+import org.connectbot.sshlib.protocol.SshMsgChannelFailure
 import org.connectbot.sshlib.protocol.SshMsgChannelOpen
 import org.connectbot.sshlib.protocol.SshMsgChannelOpenConfirmation
 import org.connectbot.sshlib.protocol.SshMsgChannelOpenFailure
 import org.connectbot.sshlib.protocol.SshMsgChannelRequest
+import org.connectbot.sshlib.protocol.SshMsgChannelSuccess
 import org.connectbot.sshlib.protocol.SshMsgChannelWindowAdjust
 import org.connectbot.sshlib.protocol.SshMsgDebug
 import org.connectbot.sshlib.protocol.SshMsgDisconnect
@@ -278,6 +280,8 @@ class SshConnection(
 
     private class HostKeyRejectedException(val key: PublicKey) : Exception("Host key rejected")
 
+    private class ProtocolViolationException(message: String, cause: Throwable? = null) : SshException(message, cause)
+
     private val packetIO = PacketIO(transport)
 
     private val callbacks = object : SshClientCallbacks {
@@ -308,8 +312,8 @@ class SshConnection(
         override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) = this@SshConnection.receiveChannelOpenConfirmation(msg)
         override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) = this@SshConnection.receiveChannelOpenFailure(msg)
         override suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) = this@SshConnection.sendChannelRequest(recipientChannel, requestType, wantReply, message)
-        override fun receiveChannelSuccess() = this@SshConnection.receiveChannelSuccess()
-        override fun receiveChannelFailure() = this@SshConnection.receiveChannelFailure()
+        override fun receiveChannelSuccess(recipientChannel: Int) = this@SshConnection.receiveChannelSuccess(recipientChannel)
+        override fun receiveChannelFailure(recipientChannel: Int) = this@SshConnection.receiveChannelFailure(recipientChannel)
         override suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest) = this@SshConnection.receiveGlobalRequest(msg)
         override fun debug(msg: SshMsgDebug) = this@SshConnection.debug(msg)
         override fun ignore() = this@SshConnection.ignore()
@@ -319,6 +323,7 @@ class SshConnection(
     }
 
     private val stateMachine = SshClientStateMachine(callbacks)
+    private val inboundPacketController = InboundPacketController()
     internal val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
     private val writeMutex = Mutex()
 
@@ -384,6 +389,7 @@ class SshConnection(
 
         suspend fun set(value: CompletableDeferred<T>) {
             withContext(stateMachineDispatcher) {
+                check(deferred == null) { "Operation already has a pending reply" }
                 deferred = value
             }
         }
@@ -392,6 +398,7 @@ class SshConnection(
          * Set the deferred directly. Must only be called from within [stateMachineDispatcher].
          */
         fun setDirect(value: CompletableDeferred<T>) {
+            check(deferred == null) { "Operation already has a pending reply" }
             deferred = value
         }
 
@@ -428,14 +435,14 @@ class SshConnection(
 
     // Pending async operations - completed by callbacks
     private val pendingAuth = PendingValue<Boolean>()
-    private val pendingChannelOpen = PendingValue<SshMsgChannelOpenConfirmation?>()
+    private val pendingSessionChannelOpens = HashMap<Int, CompletableDeferred<SshMsgChannelOpenConfirmation?>>()
     private class PendingChannelOpen(
         val deferred: CompletableDeferred<ForwardingChannel?>,
         val maxPacketSize: Int,
         val initialWindowSize: Int,
     )
     private val pendingChannelOpens = ConcurrentHashMap<Int, PendingChannelOpen>()
-    private val pendingChannelRequest = PendingValue<Boolean>()
+    private val pendingChannelRequests = HashMap<Int, CompletableDeferred<Boolean>>()
     private val pendingGlobalRequest = PendingValue<ByteArray?>()
 
     private val remoteForwarders = ConcurrentHashMap<String, suspend (connectedAddr: String, connectedPort: Int, originAddr: String, originPort: Int, senderChannel: Int, initialWindow: Long, maxPacketSize: Int) -> Unit>()
@@ -463,14 +470,14 @@ class SshConnection(
     private var pendingReceiveCompressor: PacketCompressor? = null
     private var pendingCompressionImmediate = false
 
-    private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
-        logger.debug("Dispatching event: $event")
+    private suspend fun dispatchCommand(name: String, command: suspend SshClientStateMachine.() -> Boolean) {
+        logger.debug("Dispatching command: $name")
         try {
             withContext(stateMachineDispatcher) {
-                stateMachine.processEvent(event)
+                check(stateMachine.command()) { "Command $name is not valid in the current SSH state" }
             }
         } catch (e: Exception) {
-            logger.error("State machine failed to process event: $event", e)
+            logger.error("State machine failed to process command: $name", e)
             throw e
         }
     }
@@ -494,12 +501,12 @@ class SshConnection(
         pendingConnect = deferred
 
         return try {
-            dispatchEvent(SshClientStateMachine.SshEvent.Connect)
+            dispatchCommand("Connect") { connect() }
 
             // Version exchange — text protocol, handled inline
             packetIO.writeBanner(clientVersion)
             val banner = packetIO.readBanner()
-            dispatchEvent(SshClientStateMachine.SshEvent.ReceiveVersion(banner))
+            dispatchCommand("ReceiveVersion") { receiveVersion(banner) }
 
             // Start packet loop — handles all binary SSH packets from here
             startPacketLoop()
@@ -552,6 +559,7 @@ class SshConnection(
             }
 
             val deferred = CompletableDeferred<Boolean>()
+            dispatchCommand("BeginPasswordAuthentication") { beginAuthentication() }
             pendingAuth.set(deferred)
 
             writePacket(
@@ -602,6 +610,7 @@ class SshConnection(
 
             val deferred = CompletableDeferred<Boolean>()
             val channel = Channel<SshMsgUserauthInfoRequest>(Channel.UNLIMITED)
+            dispatchCommand("BeginKeyboardInteractiveAuthentication") { beginAuthentication() }
             pendingAuth.set(deferred)
             withContext(stateMachineDispatcher) {
                 infoRequestChannel = channel
@@ -731,6 +740,7 @@ class SshConnection(
             }
 
             val deferred = CompletableDeferred<Boolean>()
+            dispatchCommand("BeginPublicKeyAuthentication") { beginAuthentication() }
             pendingAuth.set(deferred)
 
             writePacket(
@@ -1075,6 +1085,7 @@ class SshConnection(
         method: String,
         configure: SshMsgUserauthRequest.() -> Unit,
     ) {
+        dispatchCommand("BeginAuthenticationRequest") { beginAuthentication() }
         val req = SshMsgUserauthRequest().apply {
             setUserName(createAsciiString(username))
             setServiceName(createAsciiString(SERVICE_SSH_CONNECTION))
@@ -1313,9 +1324,9 @@ class SshConnection(
         rekeyTimerJob?.cancel()
         rekeyTimerJob = connectionScope.launch {
             delay(rekeyIntervalMs)
-            if (!isRekeying && stateMachine.isInState("PostAuthenticated")) {
+            if (!isRekeying && stateMachine.isPostAuthenticated()) {
                 connectionScope.launch {
-                    dispatchEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+                    dispatchCommand("TimerRekey") { requestRekey() }
                 }
             }
         }
@@ -2024,12 +2035,18 @@ class SshConnection(
 
     private fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
         logger.info("Channel open confirmed")
-        pendingChannelOpen.complete(msg)
+        val recipientChannel = msg.recipientChannel().toInt()
+        val pending = pendingSessionChannelOpens.remove(recipientChannel)
+            ?: throw ProtocolViolationException("Channel confirmation with no pending open for channel $recipientChannel")
+        pending.complete(msg)
     }
 
     private fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
         logger.error("Channel open failed: ${msg.reasonCode()}")
-        pendingChannelOpen.complete(null)
+        val recipientChannel = msg.recipientChannel().toInt()
+        val pending = pendingSessionChannelOpens.remove(recipientChannel)
+            ?: throw ProtocolViolationException("Channel failure with no pending open for channel $recipientChannel")
+        pending.complete(null)
     }
 
     private suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest) {
@@ -2040,14 +2057,18 @@ class SshConnection(
         )
     }
 
-    private fun receiveChannelSuccess() {
+    private fun receiveChannelSuccess(recipientChannel: Int) {
         logger.debug("Channel request succeeded")
-        pendingChannelRequest.complete(true)
+        val pending = pendingChannelRequests.remove(recipientChannel)
+            ?: throw ProtocolViolationException("Channel success with no pending request for channel $recipientChannel")
+        pending.complete(true)
     }
 
-    private fun receiveChannelFailure() {
+    private fun receiveChannelFailure(recipientChannel: Int) {
         logger.warn("Channel request failed")
-        pendingChannelRequest.complete(false)
+        val pending = pendingChannelRequests.remove(recipientChannel)
+            ?: throw ProtocolViolationException("Channel failure with no pending request for channel $recipientChannel")
+        pending.complete(false)
     }
 
     private suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest) {
@@ -2220,357 +2241,400 @@ class SshConnection(
      * Read and dispatch the next packet through the state machine.
      * This is the central packet processing loop that converts packets to events.
      */
-    private suspend fun processNextPacket() {
-        val packet = packetIO.readPacket()
-        val msgType = packet.messageType()
-        logger.debug("Received packet: $msgType")
+    private inner class InboundPacketController {
+        private fun requireAccepted(accepted: Boolean, messageType: Any) {
+            if (!accepted) {
+                throw ProtocolViolationException("Unexpected SSH packet $messageType in the current protocol state")
+            }
+        }
 
-        withContext(stateMachineDispatcher) {
-            when (msgType) {
-                SshEnums.MessageType.SSH_MSG_KEXINIT -> {
-                    val kexInitMsgType = msgType.id().toByte()
-                    serverKexInit = byteArrayOf(kexInitMsgType) + packet._raw_body()
-                    val kexInit = packet.body() as SshMsgKexinit
-                    if (stateMachine.isInState("PostAuthenticated")) {
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+        suspend fun processNextPacket() {
+            val packet = packetIO.readPacket()
+            val msgType = packet.messageType()
+            logger.debug("Received packet: $msgType")
+
+            withContext(stateMachineDispatcher) {
+                when (msgType) {
+                    SshEnums.MessageType.SSH_MSG_KEXINIT -> {
+                        val kexInitMsgType = msgType.id().toByte()
+                        serverKexInit = byteArrayOf(kexInitMsgType) + packet._raw_body()
+                        val kexInit = packet.body() as SshMsgKexinit
+                        if (stateMachine.isPostAuthenticated()) {
+                            requireAccepted(stateMachine.requestRekey(), msgType)
+                        }
+                        requireAccepted(stateMachine.receiveKexInit(kexInit), msgType)
                     }
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKexInit(kexInit))
-                }
 
-                SshEnums.MessageType.SSH_MSG_NEWKEYS -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveNewKeys)
-                }
+                    SshEnums.MessageType.SSH_MSG_NEWKEYS -> {
+                        requireAccepted(stateMachine.receiveNewKeys(), msgType)
+                    }
 
-                SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT -> {
-                    val msg = parseBody<SshMsgServiceAccept>(packet)
-                    stateMachine.processEvent(
-                        SshClientStateMachine.SshEvent.ReceiveServiceAccept(msg.serviceName().value()),
-                    )
-                }
+                    SshEnums.MessageType.SSH_MSG_SERVICE_ACCEPT -> {
+                        val msg = parseBody<SshMsgServiceAccept>(packet)
+                        requireAccepted(stateMachine.receiveServiceAccept(msg.serviceName().value()), msgType)
+                    }
 
-                SshEnums.MessageType.SSH_MSG_IGNORE -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveIgnore)
-                }
+                    SshEnums.MessageType.SSH_MSG_IGNORE -> {
+                        if (strictKexEnabled && stateMachine.isKexInProgress()) {
+                            throw ProtocolViolationException("SSH_MSG_IGNORE is forbidden during strict key exchange")
+                        }
+                        requireAccepted(stateMachine.receiveIgnore(), msgType)
+                    }
 
-                SshEnums.MessageType.SSH_MSG_DEBUG -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveDebug(packet.body() as SshMsgDebug))
-                }
+                    SshEnums.MessageType.SSH_MSG_DEBUG -> {
+                        if (strictKexEnabled && stateMachine.isKexInProgress()) {
+                            throw ProtocolViolationException("SSH_MSG_DEBUG is forbidden during strict key exchange")
+                        }
+                        requireAccepted(stateMachine.receiveDebug(packet.body() as SshMsgDebug), msgType)
+                    }
 
-                SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
-                    try {
+                    SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
+                        try {
+                            val rawBody = packet._raw_body()
+                            val stream = ByteBufferKaitaiStream(rawBody)
+                            val globalRequestMsg = SshMsgGlobalRequest(stream)
+                            globalRequestMsg._read()
+                            requireAccepted(stateMachine.receiveGlobalRequest(globalRequestMsg), msgType)
+                        } catch (e: ProtocolViolationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            throw ProtocolViolationException("Malformed SSH_MSG_GLOBAL_REQUEST", e)
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        handleIncomingChannelOpen(packet)
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val confirmationMsg = parseBody<SshMsgChannelOpenConfirmation>(packet)
+                        val recipientChannel = confirmationMsg.recipientChannel().toInt()
+                        val pending = pendingChannelOpens.remove(recipientChannel)
+                        if (pending != null) {
+                            val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
+                            val remoteWindow = confirmationMsg.initialWindowSize()
+                            val remoteMaxPacketSize = boundRemotePacketSize(confirmationMsg.maximumPacketSize())
+                            if (remoteMaxPacketSize == null) {
+                                logger.warn("Rejecting channel confirmation with invalid maximum packet size: ${confirmationMsg.maximumPacketSize()}")
+                                pending.deferred.complete(null)
+                                sendChannelClose(remoteChannelNumber)
+                            } else {
+                                logger.info("Direct-tcpip channel opened: local=$recipientChannel, remote=$remoteChannelNumber")
+                                val channel = ForwardingChannel(
+                                    this@SshConnection,
+                                    connectionScope,
+                                    recipientChannel,
+                                    remoteChannelNumber,
+                                    remoteMaxPacketSize,
+                                    remoteWindowSizeInitial = remoteWindow,
+                                    initialWindowSize = pending.initialWindowSize,
+                                )
+                                registerForwardingChannel(channel)
+                                pending.deferred.complete(channel)
+                            }
+                        } else {
+                            requireAccepted(stateMachine.receiveChannelOpenConfirmation(confirmationMsg), msgType)
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val failureMsg = parseBody<SshMsgChannelOpenFailure>(packet)
+                        val recipientChannel = failureMsg.recipientChannel().toInt()
+                        val pending = pendingChannelOpens.remove(recipientChannel)
+                        if (pending != null) {
+                            pending.deferred.complete(null)
+                        } else {
+                            requireAccepted(stateMachine.receiveChannelOpenFailure(failureMsg), msgType)
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val msg = parseBody<SshMsgChannelData>(packet)
+                        val recipientChannel = msg.recipientChannel().toInt()
+                        val channel = channelsByRemote[recipientChannel]
+                        val agentChannel = agentChannelsByRemote[recipientChannel]
+                        val fwdChannel = forwardingChannelsByRemote[recipientChannel]
+                        when {
+                            channel != null -> channel.onData(msg.data().data())
+                            agentChannel != null -> agentChannel.handleData(msg.data().data())
+                            fwdChannel != null -> fwdChannel.onData(msg.data().data())
+                            else -> throw ProtocolViolationException("Channel data for unknown channel $recipientChannel")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val msg = parseBody<SshMsgChannelExtendedData>(packet)
+                        val channel = channelsByRemote[msg.recipientChannel().toInt()]
+                        if (channel != null) {
+                            channel.onExtendedData(msg.dataTypeCode().toInt(), msg.data().data())
+                        } else {
+                            throw ProtocolViolationException("Extended data for unknown channel ${msg.recipientChannel()}")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val msg = parseBody<SshMsgChannelWindowAdjust>(packet)
+                        val recipientChannel = msg.recipientChannel().toInt()
+                        val channel = channelsByRemote[recipientChannel]
+                        val agentChannel = agentChannelsByRemote[recipientChannel]
+                        val fwdChannel = forwardingChannelsByRemote[recipientChannel]
+                        when {
+                            channel != null -> channel.onWindowAdjust(msg.bytesToAdd())
+                            agentChannel != null -> agentChannel.onWindowAdjust(msg.bytesToAdd())
+                            fwdChannel != null -> fwdChannel.onWindowAdjust(msg.bytesToAdd())
+                            else -> throw ProtocolViolationException("Window adjust for unknown channel $recipientChannel")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_EOF -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val msg = parseBody<SshMsgChannelEof>(packet)
+                        val recipientChannel = msg.recipientChannel().toInt()
+                        val channel = channelsByRemote[recipientChannel]
+                        val agentChannel = agentChannelsByRemote[recipientChannel]
+                        val fwdChannel = forwardingChannelsByRemote[recipientChannel]
+                        when {
+                            channel != null -> channel.onEof()
+                            agentChannel != null -> agentChannel.onEof()
+                            fwdChannel != null -> fwdChannel.onEof()
+                            else -> throw ProtocolViolationException("EOF for unknown channel $recipientChannel")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val msg = parseBody<SshMsgChannelClose>(packet)
+                        val recipientChannel = msg.recipientChannel().toInt()
+                        logger.debug("Received CHANNEL_CLOSE for remote channel $recipientChannel (channels: ${channels.size}, forwardingChannels: ${forwardingChannels.size})")
+                        val channel = channelsByRemote[recipientChannel]
+                        val agentChannel = agentChannelsByRemote[recipientChannel]
+                        val fwdChannel = forwardingChannelsByRemote[recipientChannel]
+                        when {
+                            channel != null -> channel.onClose()
+
+                            agentChannel != null -> agentChannel.onClose()
+
+                            fwdChannel != null -> {
+                                fwdChannel.onClose()
+                                unregisterForwardingChannel(fwdChannel)
+                            }
+
+                            else -> throw ProtocolViolationException("Close for unknown channel $recipientChannel")
+                        }
+                        checkAllChannelsClosed()
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
                         val rawBody = packet._raw_body()
                         val stream = ByteBufferKaitaiStream(rawBody)
-                        val globalRequestMsg = SshMsgGlobalRequest(stream)
-                        globalRequestMsg._read()
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveGlobalRequest(globalRequestMsg))
-                    } catch (e: Exception) {
-                        logger.error("Failed to parse SSH_MSG_GLOBAL_REQUEST", e)
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN -> {
-                    handleIncomingChannelOpen(packet)
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_CONFIRMATION -> {
-                    val confirmationMsg = parseBody<SshMsgChannelOpenConfirmation>(packet)
-                    val recipientChannel = confirmationMsg.recipientChannel().toInt()
-                    val pending = pendingChannelOpens.remove(recipientChannel)
-                    if (pending != null) {
-                        val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
-                        val remoteWindow = confirmationMsg.initialWindowSize()
-                        val remoteMaxPacketSize = boundRemotePacketSize(confirmationMsg.maximumPacketSize())
-                        if (remoteMaxPacketSize == null) {
-                            logger.warn("Rejecting channel confirmation with invalid maximum packet size: ${confirmationMsg.maximumPacketSize()}")
-                            pending.deferred.complete(null)
-                            sendChannelClose(remoteChannelNumber)
-                        } else {
-                            logger.info("Direct-tcpip channel opened: local=$recipientChannel, remote=$remoteChannelNumber")
-                            val channel = ForwardingChannel(
-                                this@SshConnection,
-                                connectionScope,
-                                recipientChannel,
-                                remoteChannelNumber,
-                                remoteMaxPacketSize,
-                                remoteWindowSizeInitial = remoteWindow,
-                                initialWindowSize = pending.initialWindowSize,
-                            )
-                            registerForwardingChannel(channel)
-                            pending.deferred.complete(channel)
+                        val msg = SshMsgChannelRequest(stream)
+                        msg._read()
+                        val recipientChannel = msg.recipientChannel().toInt()
+                        if (
+                            !channelsByRemote.containsKey(recipientChannel) &&
+                            !agentChannelsByRemote.containsKey(recipientChannel) &&
+                            !forwardingChannelsByRemote.containsKey(recipientChannel)
+                        ) {
+                            throw ProtocolViolationException("Channel request for unknown channel $recipientChannel")
                         }
-                    } else {
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenConfirmation(confirmationMsg))
+                        logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
                     }
-                }
 
-                SshEnums.MessageType.SSH_MSG_CHANNEL_OPEN_FAILURE -> {
-                    val failureMsg = parseBody<SshMsgChannelOpenFailure>(packet)
-                    val recipientChannel = failureMsg.recipientChannel().toInt()
-                    val pending = pendingChannelOpens.remove(recipientChannel)
-                    if (pending != null) {
-                        pending.deferred.complete(null)
-                    } else {
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelOpenFailure(failureMsg))
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
+                        val msg = parseBody<SshMsgChannelSuccess>(packet)
+                        requireAccepted(stateMachine.receiveChannelSuccess(msg.recipientChannel().toInt()), msgType)
                     }
-                }
 
-                SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
-                    val msg = parseBody<SshMsgChannelData>(packet)
-                    val recipientChannel = msg.recipientChannel().toInt()
-                    val channel = channelsByRemote[recipientChannel]
-                    val agentChannel = agentChannelsByRemote[recipientChannel]
-                    val fwdChannel = forwardingChannelsByRemote[recipientChannel]
-                    when {
-                        channel != null -> channel.onData(msg.data().data())
-                        agentChannel != null -> agentChannel.handleData(msg.data().data())
-                        fwdChannel != null -> fwdChannel.onData(msg.data().data())
-                        else -> logger.warn("Data for unknown channel $recipientChannel")
+                    SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE -> {
+                        val msg = parseBody<SshMsgChannelFailure>(packet)
+                        requireAccepted(stateMachine.receiveChannelFailure(msg.recipientChannel().toInt()), msgType)
                     }
-                }
 
-                SshEnums.MessageType.SSH_MSG_CHANNEL_EXTENDED_DATA -> {
-                    val msg = parseBody<SshMsgChannelExtendedData>(packet)
-                    val channel = channelsByRemote[msg.recipientChannel().toInt()]
-                    if (channel != null) {
-                        channel.onExtendedData(msg.dataTypeCode().toInt(), msg.data().data())
-                    } else {
-                        logger.warn("Extended data for unknown channel ${msg.recipientChannel()}")
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
-                    val msg = parseBody<SshMsgChannelWindowAdjust>(packet)
-                    val recipientChannel = msg.recipientChannel().toInt()
-                    val channel = channelsByRemote[recipientChannel]
-                    val agentChannel = agentChannelsByRemote[recipientChannel]
-                    val fwdChannel = forwardingChannelsByRemote[recipientChannel]
-                    when {
-                        channel != null -> channel.onWindowAdjust(msg.bytesToAdd())
-                        agentChannel != null -> agentChannel.onWindowAdjust(msg.bytesToAdd())
-                        fwdChannel != null -> fwdChannel.onWindowAdjust(msg.bytesToAdd())
-                        else -> logger.warn("Window adjust for unknown channel $recipientChannel")
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_EOF -> {
-                    val msg = parseBody<SshMsgChannelEof>(packet)
-                    val recipientChannel = msg.recipientChannel().toInt()
-                    val channel = channelsByRemote[recipientChannel]
-                    val agentChannel = agentChannelsByRemote[recipientChannel]
-                    val fwdChannel = forwardingChannelsByRemote[recipientChannel]
-                    when {
-                        channel != null -> channel.onEof()
-                        agentChannel != null -> agentChannel.onEof()
-                        fwdChannel != null -> fwdChannel.onEof()
-                        else -> logger.warn("EOF for unknown channel $recipientChannel")
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_CLOSE -> {
-                    val msg = parseBody<SshMsgChannelClose>(packet)
-                    val recipientChannel = msg.recipientChannel().toInt()
-                    logger.debug("Received CHANNEL_CLOSE for remote channel $recipientChannel (channels: ${channels.size}, forwardingChannels: ${forwardingChannels.size})")
-                    val channel = channelsByRemote[recipientChannel]
-                    val agentChannel = agentChannelsByRemote[recipientChannel]
-                    val fwdChannel = forwardingChannelsByRemote[recipientChannel]
-                    when {
-                        channel != null -> channel.onClose()
-
-                        agentChannel != null -> agentChannel.onClose()
-
-                        fwdChannel != null -> {
-                            fwdChannel.onClose()
-                            unregisterForwardingChannel(fwdChannel)
+                    SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
+                        requireAccepted(stateMachine.authenticationSuccess(), msgType)
+                        val ch = authResultChannel
+                        if (ch != null) {
+                            ch.trySend(InternalAuthResult.Success)
                         }
-
-                        else -> logger.warn("Close for unknown channel $recipientChannel")
                     }
-                    checkAllChannelsClosed()
-                }
 
-                SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
-                    val rawBody = packet._raw_body()
-                    val stream = ByteBufferKaitaiStream(rawBody)
-                    val msg = SshMsgChannelRequest(stream)
-                    msg._read()
-                    logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_SUCCESS -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelSuccess)
-                }
-
-                SshEnums.MessageType.SSH_MSG_CHANNEL_FAILURE -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveChannelFailure)
-                }
-
-                SshEnums.MessageType.SSH_MSG_USERAUTH_SUCCESS -> {
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationSuccess)
-                    val ch = authResultChannel
-                    if (ch != null) {
-                        ch.trySend(InternalAuthResult.Success)
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
-                    val ch = authResultChannel
-                    if (ch != null) {
+                    SshEnums.MessageType.SSH_MSG_USERAUTH_FAILURE -> {
+                        val ch = authResultChannel
                         val msg = parseBody<SshMsgUserauthFailure>(packet)
-                        val methods = msg.validAuthentications().entries().data().toSet()
-                        val partial = msg.partialSuccess() != 0
-                        ch.trySend(InternalAuthResult.Failure(methods, partial))
-                    } else {
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.AuthenticationFailure)
+                        requireAccepted(stateMachine.authenticationFailure(), msgType)
+                        if (ch != null) {
+                            val methods = msg.validAuthentications().entries().data().toSet()
+                            val partial = msg.partialSuccess() != 0
+                            ch.trySend(InternalAuthResult.Failure(methods, partial))
+                        }
                     }
-                }
 
-                SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER -> {
-                    val msg = parseBody<SshMsgUserauthBanner>(packet)
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveUserauthBanner(msg))
-                }
+                    SshEnums.MessageType.SSH_MSG_USERAUTH_BANNER -> {
+                        val msg = parseBody<SshMsgUserauthBanner>(packet)
+                        requireAccepted(stateMachine.receiveUserauthBanner(msg), msgType)
+                    }
 
-                SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
-                    val ch = authResultChannel
-                    if (ch != null && currentAuthMethod is AuthMethod.PublicKey) {
-                        val msg = parseBody<SshMsgUserauthPkOk>(packet)
-                        ch.trySend(
-                            InternalAuthResult.PkOk(
-                                msg.publicKeyAlgorithmName().value(),
-                                msg.publicKeyBlob().data(),
-                            ),
-                        )
-                    } else if (ch != null && currentAuthMethod is AuthMethod.KeyboardInteractive) {
-                        val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
-                        val name = String(msg.name().data(), Charsets.UTF_8)
-                        val instruction = String(msg.instruction().data(), Charsets.UTF_8)
-                        val prompts = msg.prompts().map { prompt ->
-                            KeyboardInteractiveCallback.Prompt(
-                                text = String(prompt.prompt().data(), Charsets.UTF_8),
-                                echo = prompt.echo() != 0,
+                    SshEnums.MessageType.SSH_MSG_USERAUTH_METHOD_SPECIFIC_60 -> {
+                        requireAccepted(stateMachine.authorizeAuthenticationPacket(), msgType)
+                        val ch = authResultChannel
+                        if (ch != null && currentAuthMethod is AuthMethod.PublicKey) {
+                            val msg = parseBody<SshMsgUserauthPkOk>(packet)
+                            ch.trySend(
+                                InternalAuthResult.PkOk(
+                                    msg.publicKeyAlgorithmName().value(),
+                                    msg.publicKeyBlob().data(),
+                                ),
                             )
-                        }
-                        ch.trySend(InternalAuthResult.InfoRequest(name, instruction, prompts))
-                    } else {
-                        val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
-                        stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveUserauthInfoRequest(msg))
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_REQUEST_SUCCESS -> {
-                    val rawBody = packet._raw_body()
-                    if (!pendingGlobalRequest.complete(rawBody)) {
-                        logger.warn("Received SSH_MSG_REQUEST_SUCCESS with no pending global request")
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE -> {
-                    if (!pendingGlobalRequest.complete(null)) {
-                        logger.warn("Received SSH_MSG_REQUEST_FAILURE with no pending global request")
-                    }
-                }
-
-                SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
-                    val msg = parseBody<SshMsgDisconnect>(packet)
-                    logger.info("Received SSH_MSG_DISCONNECT from server: reason=${msg.reasonCode()}, description=${msg.description().value()}")
-                    stateMachine.processEvent(SshClientStateMachine.SshEvent.Disconnect)
-                }
-
-                SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
-                    processServerExtInfo(parseBody(packet))
-                }
-
-                SshEnums.MessageType.SSH_MSG_PING -> {
-                    val msg = parseBody<SshMsgPing>(packet)
-                    val pongSend: suspend () -> Unit = {
-                        val pong = SshMsgPong()
-                        pong.setData(createByteString(msg.data().data()))
-                        pong._check()
-                        writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
-                    }
-                    val sendNow = withContext(stateMachineDispatcher) {
-                        if (isRekeying) {
-                            pendingPingQueue.addLast(pongSend)
-                            false
+                        } else if (ch != null && currentAuthMethod is AuthMethod.KeyboardInteractive) {
+                            val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
+                            val name = String(msg.name().data(), Charsets.UTF_8)
+                            val instruction = String(msg.instruction().data(), Charsets.UTF_8)
+                            val prompts = msg.prompts().map { prompt ->
+                                KeyboardInteractiveCallback.Prompt(
+                                    text = String(prompt.prompt().data(), Charsets.UTF_8),
+                                    echo = prompt.echo() != 0,
+                                )
+                            }
+                            ch.trySend(InternalAuthResult.InfoRequest(name, instruction, prompts))
                         } else {
-                            true
+                            val msg = parseBody<SshMsgUserauthInfoRequest>(packet)
+                            requireAccepted(stateMachine.receiveUserauthInfoRequest(msg), msgType)
                         }
                     }
-                    if (sendNow) {
-                        pongSend()
-                    }
-                }
 
-                SshEnums.MessageType.SSH_MSG_PONG -> {
-                    val msg = parseBody<SshMsgPong>(packet)
-                    val seqBytes = msg.data().data()
-                    if (seqBytes.size == 8) {
-                        val seq = ByteBuffer.wrap(seqBytes).getLong()
-                        withContext(stateMachineDispatcher) {
-                            val pending = pendingPings.remove(seq)
-                            if (pending != null) {
-                                val sentTimeNs = pending.sentTimeNs
-                                if (sentTimeNs != null) {
-                                    pending.deferred.complete(PingResult.Success(System.nanoTime() - sentTimeNs))
-                                } else {
-                                    pendingPings[seq] = pending
-                                    logger.warn("Received SSH_MSG_PONG before ping send timestamp was recorded: $seq")
-                                }
+                    SshEnums.MessageType.SSH_MSG_REQUEST_SUCCESS -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        val rawBody = packet._raw_body()
+                        if (!pendingGlobalRequest.complete(rawBody)) {
+                            throw ProtocolViolationException("Received SSH_MSG_REQUEST_SUCCESS with no pending global request")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_REQUEST_FAILURE -> {
+                        requireAccepted(stateMachine.authorizeAuthenticatedPacket(), msgType)
+                        if (!pendingGlobalRequest.complete(null)) {
+                            throw ProtocolViolationException("Received SSH_MSG_REQUEST_FAILURE with no pending global request")
+                        }
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_DISCONNECT -> {
+                        val msg = parseBody<SshMsgDisconnect>(packet)
+                        logger.info("Received SSH_MSG_DISCONNECT from server: reason=${msg.reasonCode()}, description=${msg.description().value()}")
+                        requireAccepted(stateMachine.disconnect(), msgType)
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_EXT_INFO -> {
+                        requireAccepted(stateMachine.authorizeExtInfo(), msgType)
+                        processServerExtInfo(parseBody(packet))
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_PING -> {
+                        requireAccepted(stateMachine.authorizeConnectionPacket(), msgType)
+                        val msg = parseBody<SshMsgPing>(packet)
+                        val pongSend: suspend () -> Unit = {
+                            val pong = SshMsgPong()
+                            pong.setData(createByteString(msg.data().data()))
+                            pong._check()
+                            writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
+                        }
+                        val sendNow = withContext(stateMachineDispatcher) {
+                            if (isRekeying) {
+                                pendingPingQueue.addLast(pongSend)
+                                false
                             } else {
-                                logger.warn("Received SSH_MSG_PONG with unknown sequence: $seq")
+                                true
                             }
                         }
-                    } else {
-                        logger.warn("Received SSH_MSG_PONG with unexpected data length: ${seqBytes.size}")
+                        if (sendNow) {
+                            pongSend()
+                        }
                     }
-                }
 
-                else -> {
-                    // KEX-specific messages 30-49 are not in MessageType enum.
-                    // Disambiguate by negotiated KEX type since ECDH reply, DH reply,
-                    // and DH-GEX group all share message ID 31.
-                    val msgId = msgType.id().toInt()
-                    val rawBody = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
-                    val kexEntry = negotiatedKex?.let { KexEntry.fromSshName(it) }
-                    when {
-                        kexEntry?.type == KexType.ECDH &&
-                            msgId == SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_REPLY.id().toInt() -> {
-                            val stream = ByteBufferKaitaiStream(rawBody)
-                            val ecdhPayload = KexEcdhPayload(stream)
-                            ecdhPayload._read()
-                            val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
-                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.EcdhReply(ecdhReply))
+                    SshEnums.MessageType.SSH_MSG_PONG -> {
+                        requireAccepted(stateMachine.authorizeConnectionPacket(), msgType)
+                        val msg = parseBody<SshMsgPong>(packet)
+                        val seqBytes = msg.data().data()
+                        if (seqBytes.size == 8) {
+                            val seq = ByteBuffer.wrap(seqBytes).getLong()
+                            withContext(stateMachineDispatcher) {
+                                val pending = pendingPings.remove(seq)
+                                if (pending != null) {
+                                    val sentTimeNs = pending.sentTimeNs
+                                    if (sentTimeNs != null) {
+                                        pending.deferred.complete(PingResult.Success(System.nanoTime() - sentTimeNs))
+                                    } else {
+                                        pendingPings[seq] = pending
+                                        logger.warn("Received SSH_MSG_PONG before ping send timestamp was recorded: $seq")
+                                    }
+                                } else {
+                                    logger.debug("Ignoring SSH_MSG_PONG with no pending latency probe: $seq")
+                                }
+                            }
+                        } else {
+                            logger.trace("Ignoring opaque SSH_MSG_PONG payload (${seqBytes.size} bytes)")
                         }
+                    }
 
-                        kexEntry?.type == KexType.DH &&
-                            msgId == SshEnums.KexDh.SSH_MSG_KEXDH_REPLY.id().toInt() -> {
-                            val stream = ByteBufferKaitaiStream(rawBody)
-                            val kexdhPayload = KexdhPayload(stream)
-                            kexdhPayload._read()
-                            val dhReply = kexdhPayload.body() as SshMsgKexdhReply
-                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhReply(dhReply))
-                        }
+                    else -> {
+                        // KEX-specific messages 30-49 are not in MessageType enum.
+                        // Disambiguate by negotiated KEX type since ECDH reply, DH reply,
+                        // and DH-GEX group all share message ID 31.
+                        val msgId = msgType.id().toInt()
+                        val rawBody = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
+                        val kexEntry = negotiatedKex?.let { KexEntry.fromSshName(it) }
+                        when {
+                            kexEntry?.type == KexType.ECDH &&
+                                msgId == SshEnums.KexEcdh.SSH_MSG_KEX_ECDH_REPLY.id().toInt() -> {
+                                val stream = ByteBufferKaitaiStream(rawBody)
+                                val ecdhPayload = KexEcdhPayload(stream)
+                                ecdhPayload._read()
+                                val ecdhReply = ecdhPayload.body() as SshMsgKexEcdhReply
+                                requireAccepted(stateMachine.receiveKexEcdhReply(ecdhReply), msgType)
+                            }
 
-                        kexEntry?.type == KexType.DH_GEX &&
-                            msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_GROUP.id().toInt() -> {
-                            val stream = ByteBufferKaitaiStream(rawBody)
-                            val payload = KexDhGexPayload(stream)
-                            payload._read()
-                            val group = payload.body() as SshMsgKexDhGexGroup
-                            dhGexGroup = group
-                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexGroup(group))
-                        }
+                            kexEntry?.type == KexType.DH &&
+                                msgId == SshEnums.KexDh.SSH_MSG_KEXDH_REPLY.id().toInt() -> {
+                                val stream = ByteBufferKaitaiStream(rawBody)
+                                val kexdhPayload = KexdhPayload(stream)
+                                kexdhPayload._read()
+                                val dhReply = kexdhPayload.body() as SshMsgKexdhReply
+                                requireAccepted(stateMachine.receiveKexDhReply(dhReply), msgType)
+                            }
 
-                        kexEntry?.type == KexType.DH_GEX &&
-                            msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REPLY.id().toInt() -> {
-                            val stream = ByteBufferKaitaiStream(rawBody)
-                            val replyPayload = KexDhGexPayload(stream)
-                            replyPayload._read()
-                            val reply = replyPayload.body() as SshMsgKexDhGexReply
-                            stateMachine.processEvent(SshClientStateMachine.SshEvent.ReceiveKex.DhGexReply(reply))
-                        }
+                            kexEntry?.type == KexType.DH_GEX &&
+                                msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_GROUP.id().toInt() -> {
+                                val stream = ByteBufferKaitaiStream(rawBody)
+                                val payload = KexDhGexPayload(stream)
+                                payload._read()
+                                val group = payload.body() as SshMsgKexDhGexGroup
+                                dhGexGroup = group
+                                requireAccepted(stateMachine.receiveKexDhGexGroup(group), msgType)
+                            }
 
-                        else -> {
-                            logger.warn("Unhandled message type: ${packet.messageType()}")
+                            kexEntry?.type == KexType.DH_GEX &&
+                                msgId == SshEnums.KexDhGex.SSH_MSG_KEX_DH_GEX_REPLY.id().toInt() -> {
+                                val stream = ByteBufferKaitaiStream(rawBody)
+                                val replyPayload = KexDhGexPayload(stream)
+                                replyPayload._read()
+                                val reply = replyPayload.body() as SshMsgKexDhGexReply
+                                requireAccepted(stateMachine.receiveKexDhGexReply(reply), msgType)
+                            }
+
+                            else -> {
+                                if (msgId in 30..49) {
+                                    throw ProtocolViolationException(
+                                        "Unexpected key-exchange packet ${packet.messageType()} for negotiated algorithm $negotiatedKex",
+                                    )
+                                }
+                                logger.warn("Unhandled message type: ${packet.messageType()}")
+                            }
                         }
                     }
                 }
@@ -2672,6 +2736,19 @@ class SshConnection(
         transport.close()
     }
 
+    private suspend fun sendProtocolError(description: String) {
+        val msg = SshMsgDisconnect().apply {
+            setReasonCode(SshEnums.DisconnectReason.SSH_DISCONNECT_PROTOCOL_ERROR)
+            setDescription(createUtf8String(description))
+            setLanguage(createAsciiString(""))
+            _check()
+        }
+        writePacket(
+            SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(),
+            msg.toByteArray(),
+        )
+    }
+
     private fun startPacketLoop() {
         if (packetLoopJob != null) return
         packetLoopJob = connectionScope.launch {
@@ -2679,18 +2756,25 @@ class SshConnection(
             try {
                 while (isActive) {
                     logger.debug("Packet loop: waiting for next packet")
-                    processNextPacket()
-                    if (!isRekeying && stateMachine.isInState("PostAuthenticated") && (
+                    inboundPacketController.processNextPacket()
+                    if (!isRekeying && stateMachine.isPostAuthenticated() && (
                             packetIO.bytesSentOnWire >= rekeyBytesLimit ||
                                 packetIO.bytesReceivedOnWire >= rekeyBytesLimit
                             )
                     ) {
-                        dispatchEvent(SshClientStateMachine.SshEvent.RekeyStarted)
+                        dispatchCommand("ByteLimitRekey") { requestRekey() }
                     }
                 }
             } catch (_: CancellationException) {
                 logger.debug("Packet loop cancelled")
             } catch (e: Exception) {
+                if (e is ProtocolViolationException) {
+                    try {
+                        sendProtocolError(e.message ?: "Unexpected SSH packet")
+                    } catch (sendFailure: Exception) {
+                        logger.debug("Failed to send protocol-error disconnect", sendFailure)
+                    }
+                }
                 val packetFailure = e.kaitaiParseFailureOrNull()
                 val loopFailure = when {
                     e is SshException -> e
@@ -2716,8 +2800,10 @@ class SshConnection(
                 val loopError = loopException ?: Exception("Packet loop terminated")
                 withContext(stateMachineDispatcher) {
                     pendingAuth.completeExceptionally(loopError)
-                    pendingChannelOpen.completeExceptionally(loopError)
-                    pendingChannelRequest.completeExceptionally(loopError)
+                    pendingSessionChannelOpens.values.forEach { it.completeExceptionally(loopError) }
+                    pendingSessionChannelOpens.clear()
+                    pendingChannelRequests.values.forEach { it.completeExceptionally(loopError) }
+                    pendingChannelRequests.clear()
                     pendingGlobalRequest.completeExceptionally(loopError)
                     for ((_, pending) in pendingChannelOpens) {
                         pending.deferred.completeExceptionally(loopError)
@@ -2759,13 +2845,13 @@ class SshConnection(
 
         val deferred = CompletableDeferred<SshMsgChannelOpenConfirmation?>()
         withContext(stateMachineDispatcher) {
-            pendingChannelOpen.setDirect(deferred)
-            stateMachine.processEvent(
-                SshClientStateMachine.SshEvent.OpenChannel(
-                    channelType = "session",
-                    localChannelNumber = localChannelNumber,
-                    initialWindowSize = initialWindowSize,
-                    maxPacketSize = maxPacketSize,
+            check(pendingSessionChannelOpens.put(localChannelNumber, deferred) == null)
+            check(
+                stateMachine.openChannel(
+                    "session",
+                    localChannelNumber,
+                    initialWindowSize,
+                    maxPacketSize,
                 ),
             )
         }
@@ -2773,7 +2859,9 @@ class SshConnection(
         val confirmationMsg = try {
             deferred.await()
         } finally {
-            pendingChannelOpen.clearIfSame(deferred)
+            withContext(stateMachineDispatcher) {
+                pendingSessionChannelOpens.remove(localChannelNumber, deferred)
+            }
         } ?: return null
 
         val remoteChannelNumber = confirmationMsg.senderChannel().toInt()
@@ -2831,14 +2919,18 @@ class SshConnection(
         val deferred = if (wantReply) CompletableDeferred<Boolean>() else null
         withContext(stateMachineDispatcher) {
             if (deferred != null) {
-                pendingChannelRequest.setDirect(deferred)
+                val localChannelNumber = channels.values.singleOrNull { it.remoteChannelNumber == recipientChannel }?.localChannelNumber
+                    ?: throw IllegalStateException("No session channel has remote channel number $recipientChannel")
+                check(pendingChannelRequests.put(localChannelNumber, deferred) == null) {
+                    "Channel $localChannelNumber already has a pending request"
+                }
             }
-            stateMachine.processEvent(
-                SshClientStateMachine.SshEvent.SendChannelRequest(
-                    recipientChannel = recipientChannel,
-                    requestType = requestType,
-                    wantReply = wantReply,
-                    message = msg,
+            check(
+                stateMachine.sendChannelRequest(
+                    recipientChannel,
+                    requestType,
+                    wantReply,
+                    msg,
                 ),
             )
         }
@@ -2850,7 +2942,9 @@ class SshConnection(
         return try {
             deferred.await()
         } finally {
-            pendingChannelRequest.clearIfSame(deferred)
+            withContext(stateMachineDispatcher) {
+                pendingChannelRequests.entries.removeIf { it.value === deferred }
+            }
         }
     }
 

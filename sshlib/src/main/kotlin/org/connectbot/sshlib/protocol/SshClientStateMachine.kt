@@ -29,6 +29,7 @@ import ru.nsk.kstatemachine.state.onEntry
 import ru.nsk.kstatemachine.state.onExit
 import ru.nsk.kstatemachine.state.state
 import ru.nsk.kstatemachine.state.transition
+import ru.nsk.kstatemachine.statemachine.ProcessingResult
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStdLibStateMachine
 import ru.nsk.kstatemachine.transition.onTriggered
@@ -56,7 +57,7 @@ import ru.nsk.kstatemachine.transition.onTriggered
 internal class SshClientStateMachine(
     private val callbacks: SshClientCallbacks,
 ) {
-    sealed class SshEvent : Event {
+    private sealed class SshEvent : Event {
         object Connect : SshEvent()
         data class ReceiveVersion(val banner: IdBanner) : SshEvent()
         data class ReceiveKexInit(val msg: SshMsgKexinit) : SshEvent()
@@ -68,6 +69,7 @@ internal class SshClientStateMachine(
         }
         object ReceiveNewKeys : SshEvent()
         data class ReceiveServiceAccept(val service: String) : SshEvent()
+        object BeginAuthentication : SshEvent()
         object AuthenticationSuccess : SshEvent()
         object AuthenticationFailure : SshEvent()
         data class ReceiveUserauthInfoRequest(val msg: SshMsgUserauthInfoRequest) : SshEvent()
@@ -86,16 +88,20 @@ internal class SshClientStateMachine(
             val wantReply: Boolean,
             val message: SshMsgChannelRequest,
         ) : SshEvent()
-        object ReceiveChannelSuccess : SshEvent()
-        object ReceiveChannelFailure : SshEvent()
+        data class ReceiveChannelSuccess(val recipientChannel: Int) : SshEvent()
+        data class ReceiveChannelFailure(val recipientChannel: Int) : SshEvent()
         data class ReceiveGlobalRequest(val msg: SshMsgGlobalRequest) : SshEvent()
         data class ReceiveDebug(val msg: SshMsgDebug) : SshEvent()
         object ReceiveIgnore : SshEvent()
+        object AuthorizeAuthenticationPacket : SshEvent()
+        object AuthorizeAuthenticatedPacket : SshEvent()
+        object AuthorizeConnectionPacket : SshEvent()
+        object AuthorizeExtInfo : SshEvent()
         object Disconnect : SshEvent()
         object RekeyStarted : SshEvent()
     }
 
-    val stateMachine: StateMachine = createStdLibStateMachine {
+    private val stateMachine: StateMachine = createStdLibStateMachine {
         val waitVersion = state("WaitVersion")
         val waitKexInit = state("WaitKexInit")
         val waitKex = state("WaitKex")
@@ -107,17 +113,53 @@ internal class SshClientStateMachine(
         lateinit var postAuthHistory: HistoryState
 
         val postAuthenticated = state("PostAuthenticated") {
-            val authenticated = initialState("Authenticated")
-            val waitChannelOpenConfirmation = state("WaitChannelOpenConfirmation")
-            val channelOpen = state("ChannelOpen")
-            val waitChannelRequestReply = state("WaitChannelRequestReply")
+            val authenticationReady = initialState("AuthenticationReady")
+            val authenticating = state("Authenticating")
+            val authenticated = state("Authenticated")
+
+            authenticationReady {
+                onEntry { callbacks.onStateEnter("AuthenticationReady") }
+                onExit { callbacks.onStateExit("AuthenticationReady") }
+
+                transition<SshEvent.BeginAuthentication> {
+                    targetState = authenticating
+                }
+                transition<SshEvent.ReceiveUserauthBanner> {
+                    onTriggered { callbacks.receiveUserauthBanner(it.event.msg) }
+                }
+            }
+
+            authenticating {
+                onEntry { callbacks.onStateEnter("Authenticating") }
+                onExit { callbacks.onStateExit("Authenticating") }
+
+                transition<SshEvent.BeginAuthentication> {}
+                transition<SshEvent.AuthenticationSuccess> {
+                    targetState = authenticated
+                    onTriggered { callbacks.authenticationSuccess() }
+                }
+                transition<SshEvent.AuthenticationFailure> {
+                    targetState = authenticationReady
+                    onTriggered { callbacks.authenticationFailure() }
+                }
+                transition<SshEvent.ReceiveUserauthInfoRequest> {
+                    onTriggered { callbacks.receiveUserauthInfoRequest(it.event.msg) }
+                }
+                transition<SshEvent.ReceiveUserauthBanner> {
+                    onTriggered { callbacks.receiveUserauthBanner(it.event.msg) }
+                }
+                transition<SshEvent.AuthorizeAuthenticationPacket> {}
+            }
 
             authenticated {
                 onEntry { callbacks.onStateEnter("Authenticated") }
                 onExit { callbacks.onStateExit("Authenticated") }
 
+                transition<SshEvent.AuthorizeAuthenticatedPacket> {}
+                transition<SshEvent.ReceiveGlobalRequest> {
+                    onTriggered { callbacks.receiveGlobalRequest(it.event.msg) }
+                }
                 transition<SshEvent.OpenChannel> {
-                    targetState = waitChannelOpenConfirmation
                     onTriggered {
                         callbacks.sendChannelOpen(
                             it.event.channelType,
@@ -127,28 +169,13 @@ internal class SshClientStateMachine(
                         )
                     }
                 }
-            }
-
-            waitChannelOpenConfirmation {
-                onEntry { callbacks.onStateEnter("WaitChannelOpenConfirmation") }
-                onExit { callbacks.onStateExit("WaitChannelOpenConfirmation") }
-
                 transition<SshEvent.ReceiveChannelOpenConfirmation> {
-                    targetState = channelOpen
                     onTriggered { callbacks.receiveChannelOpenConfirmation(it.event.msg) }
                 }
                 transition<SshEvent.ReceiveChannelOpenFailure> {
-                    targetState = authenticated
                     onTriggered { callbacks.receiveChannelOpenFailure(it.event.msg) }
                 }
-            }
-
-            channelOpen {
-                onEntry { callbacks.onStateEnter("ChannelOpen") }
-                onExit { callbacks.onStateExit("ChannelOpen") }
-
                 transition<SshEvent.SendChannelRequest> {
-                    targetState = waitChannelRequestReply
                     onTriggered {
                         callbacks.sendChannelRequest(
                             it.event.recipientChannel,
@@ -158,26 +185,18 @@ internal class SshClientStateMachine(
                         )
                     }
                 }
-            }
-
-            waitChannelRequestReply {
-                onEntry { callbacks.onStateEnter("WaitChannelRequestReply") }
-                onExit { callbacks.onStateExit("WaitChannelRequestReply") }
-
                 transition<SshEvent.ReceiveChannelSuccess> {
-                    targetState = channelOpen
-                    onTriggered { callbacks.receiveChannelSuccess() }
+                    onTriggered { callbacks.receiveChannelSuccess(it.event.recipientChannel) }
                 }
                 transition<SshEvent.ReceiveChannelFailure> {
-                    targetState = channelOpen
-                    onTriggered { callbacks.receiveChannelFailure() }
+                    onTriggered { callbacks.receiveChannelFailure(it.event.recipientChannel) }
                 }
             }
 
             postAuthHistory = historyState(
                 name = "PostAuthHistory",
-                defaultState = authenticated,
-                historyType = HistoryType.SHALLOW,
+                defaultState = authenticationReady,
+                historyType = HistoryType.DEEP,
             )
 
             transition<SshEvent.RekeyStarted> {
@@ -187,6 +206,8 @@ internal class SshClientStateMachine(
                     callbacks.sendKexInit()
                 }
             }
+            transition<SshEvent.AuthorizeExtInfo> {}
+            transition<SshEvent.AuthorizeConnectionPacket> {}
         }
 
         initialState("Unconnected") {
@@ -298,28 +319,14 @@ internal class SshClientStateMachine(
                     callbacks.startAuthentication()
                 }
             }
+            transition<SshEvent.AuthorizeExtInfo> {}
         }
 
-        transition<SshEvent.AuthenticationSuccess> {
-            onTriggered { callbacks.authenticationSuccess() }
-        }
-        transition<SshEvent.AuthenticationFailure> {
-            onTriggered { callbacks.authenticationFailure() }
-        }
-        transition<SshEvent.ReceiveUserauthInfoRequest> {
-            onTriggered { callbacks.receiveUserauthInfoRequest(it.event.msg) }
-        }
-        transition<SshEvent.ReceiveUserauthBanner> {
-            onTriggered { callbacks.receiveUserauthBanner(it.event.msg) }
-        }
         transition<SshEvent.ReceiveDebug> {
             onTriggered { callbacks.debug(it.event.msg) }
         }
         transition<SshEvent.ReceiveIgnore> {
             onTriggered { callbacks.ignore() }
-        }
-        transition<SshEvent.ReceiveGlobalRequest> {
-            onTriggered { callbacks.receiveGlobalRequest(it.event.msg) }
         }
         transition<SshEvent.Disconnect> {
             targetState = disconnected
@@ -327,14 +334,76 @@ internal class SshClientStateMachine(
         }
     }
 
-    suspend fun processEvent(event: SshEvent) {
-        stateMachine.processEvent(event)
+    suspend fun connect(): Boolean = process(SshEvent.Connect)
+
+    suspend fun receiveVersion(banner: IdBanner): Boolean = process(SshEvent.ReceiveVersion(banner))
+
+    suspend fun receiveKexInit(msg: SshMsgKexinit): Boolean = process(SshEvent.ReceiveKexInit(msg))
+
+    suspend fun receiveKexDhReply(msg: SshMsgKexdhReply): Boolean = process(SshEvent.ReceiveKex.DhReply(msg))
+
+    suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply): Boolean = process(SshEvent.ReceiveKex.EcdhReply(msg))
+
+    suspend fun receiveKexDhGexGroup(msg: SshMsgKexDhGexGroup): Boolean = process(SshEvent.ReceiveKex.DhGexGroup(msg))
+
+    suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply): Boolean = process(SshEvent.ReceiveKex.DhGexReply(msg))
+
+    suspend fun receiveNewKeys(): Boolean = process(SshEvent.ReceiveNewKeys)
+
+    suspend fun receiveServiceAccept(service: String): Boolean = service == "ssh-userauth" && process(SshEvent.ReceiveServiceAccept(service))
+
+    suspend fun beginAuthentication(): Boolean = process(SshEvent.BeginAuthentication)
+
+    suspend fun authenticationSuccess(): Boolean = process(SshEvent.AuthenticationSuccess)
+
+    suspend fun authenticationFailure(): Boolean = process(SshEvent.AuthenticationFailure)
+
+    suspend fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest): Boolean = process(SshEvent.ReceiveUserauthInfoRequest(msg))
+
+    suspend fun receiveUserauthBanner(msg: SshMsgUserauthBanner): Boolean = process(SshEvent.ReceiveUserauthBanner(msg))
+
+    suspend fun openChannel(channelType: String, localChannelNumber: Int, initialWindowSize: Int, maxPacketSize: Int): Boolean = process(SshEvent.OpenChannel(channelType, localChannelNumber, initialWindowSize, maxPacketSize))
+
+    suspend fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation): Boolean = process(SshEvent.ReceiveChannelOpenConfirmation(msg))
+
+    suspend fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure): Boolean = process(SshEvent.ReceiveChannelOpenFailure(msg))
+
+    suspend fun sendChannelRequest(
+        recipientChannel: Int,
+        requestType: String,
+        wantReply: Boolean,
+        message: SshMsgChannelRequest,
+    ): Boolean = process(SshEvent.SendChannelRequest(recipientChannel, requestType, wantReply, message))
+
+    suspend fun receiveChannelSuccess(recipientChannel: Int): Boolean = process(SshEvent.ReceiveChannelSuccess(recipientChannel))
+
+    suspend fun receiveChannelFailure(recipientChannel: Int): Boolean = process(SshEvent.ReceiveChannelFailure(recipientChannel))
+
+    suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest): Boolean = process(SshEvent.ReceiveGlobalRequest(msg))
+
+    suspend fun receiveDebug(msg: SshMsgDebug): Boolean = process(SshEvent.ReceiveDebug(msg))
+
+    suspend fun receiveIgnore(): Boolean = process(SshEvent.ReceiveIgnore)
+
+    suspend fun authorizeAuthenticationPacket(): Boolean = process(SshEvent.AuthorizeAuthenticationPacket)
+
+    suspend fun authorizeAuthenticatedPacket(): Boolean = process(SshEvent.AuthorizeAuthenticatedPacket)
+
+    suspend fun authorizeConnectionPacket(): Boolean = process(SshEvent.AuthorizeConnectionPacket)
+
+    suspend fun authorizeExtInfo(): Boolean = process(SshEvent.AuthorizeExtInfo)
+
+    suspend fun disconnect(): Boolean = process(SshEvent.Disconnect)
+
+    suspend fun requestRekey(): Boolean = process(SshEvent.RekeyStarted)
+
+    fun isPostAuthenticated(): Boolean = stateMachine.activeStates().any { it.name == "PostAuthenticated" }
+
+    fun isKexInProgress(): Boolean = stateMachine.activeStates().any {
+        it.name == "WaitKexInit" || it.name == "WaitKex" || it.name == "WaitKexDhGexInit" || it.name == "WaitNewKeys"
     }
 
-    val currentState: String
-        get() = stateMachine.activeStates().firstOrNull()?.name ?: "Unknown"
-
-    fun isInState(stateName: String): Boolean = stateMachine.activeStates().any { it.name == stateName }
+    private suspend fun process(event: SshEvent): Boolean = stateMachine.processEvent(event) == ProcessingResult.PROCESSED
 }
 
 internal interface SshClientCallbacks {
@@ -365,8 +434,8 @@ internal interface SshClientCallbacks {
     fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation)
     fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure)
     suspend fun sendChannelRequest(recipientChannel: Int, requestType: String, wantReply: Boolean, message: SshMsgChannelRequest)
-    fun receiveChannelSuccess()
-    fun receiveChannelFailure()
+    fun receiveChannelSuccess(recipientChannel: Int)
+    fun receiveChannelFailure(recipientChannel: Int)
     suspend fun receiveGlobalRequest(msg: SshMsgGlobalRequest)
     fun debug(msg: SshMsgDebug)
     fun ignore()
