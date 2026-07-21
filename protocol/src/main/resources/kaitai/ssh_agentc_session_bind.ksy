@@ -14,6 +14,8 @@ seq:
   - id: session_identifier
     type: byte_string
     doc: SSH session identifier (H from key exchange)
+    valid:
+      expr: _.data.size <= 128
   - id: signature
     type: byte_string
     doc: Signature of (hostkey || session_identifier) by host key

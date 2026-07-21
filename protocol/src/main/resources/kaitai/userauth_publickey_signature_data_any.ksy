@@ -22,9 +22,13 @@ seq:
   - id: service_name
     type: ascii_string
     doc: Service name
+    valid:
+      expr: _.value == "ssh-connection"
   - id: method_name
     type: ascii_string
     doc: Authentication method name
+    valid:
+      expr: _.value == "publickey" or _.value == "publickey-hostbound-v00@openssh.com"
   - id: has_signature
     contents: [1]
     doc: TRUE (1)
