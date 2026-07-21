@@ -94,6 +94,7 @@ internal class RemotePortForwarder(
 
             val fwdChannel = ForwardingChannel(
                 connection,
+                scope,
                 localChannelNumber,
                 senderChannel,
                 maxPacketSize,

@@ -26,29 +26,23 @@ class LocalChannelWindowTest {
 
     @Test
     fun `consumeLocal rejects data exceeding window`() {
-        val w = LocalChannelWindow(initialSize = 1024, adjustThreshold = 0)
+        val w = LocalChannelWindow(initialSize = 1024)
         assertFailsWith<SshException> { w.consumeLocal(1025) }
     }
 
     @Test
     fun `consumeLocal accepts data exactly filling window`() {
-        val w = LocalChannelWindow(initialSize = 1024, adjustThreshold = 0)
-        val adjust = w.consumeLocal(1024)
-        assertEquals(0, adjust)
+        val w = LocalChannelWindow(initialSize = 1024)
+        w.consumeLocal(1024)
+        assertFailsWith<SshException> { w.consumeLocal(1) }
     }
 
     @Test
-    fun `consumeLocal returns adjust when below threshold`() {
-        val w = LocalChannelWindow(initialSize = 1024, adjustThreshold = 512)
-        val adjust = w.consumeLocal(600)
-        assertEquals(1024 - (1024 - 600), adjust)
-    }
-
-    @Test
-    fun `consumeLocal returns 0 when above threshold`() {
-        val w = LocalChannelWindow(initialSize = 1024, adjustThreshold = 64)
-        val adjust = w.consumeLocal(100)
-        assertEquals(0, adjust)
+    fun `releaseLocal restores consumed capacity`() {
+        val w = LocalChannelWindow(initialSize = 1024)
+        w.consumeLocal(600)
+        assertEquals(600, w.releaseLocal(600))
+        w.consumeLocal(1024)
     }
 
     @Test

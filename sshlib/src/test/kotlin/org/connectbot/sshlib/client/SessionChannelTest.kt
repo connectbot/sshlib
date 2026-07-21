@@ -124,8 +124,21 @@ class SessionChannelTest {
         val (channel, conn) = createChannel(initialWindowSize = 128)
 
         channel.onData(ByteArray(100))
+        coVerify(exactly = 0) { conn.sendWindowAdjust(any(), any()) }
+        channel.stdout.receive()
 
         coVerify { conn.sendWindowAdjust(1, any()) }
+    }
+
+    @Test
+    fun `unconsumed data does not refill local window`() = runTest {
+        val (channel, _) = createChannel(initialWindowSize = 128)
+
+        channel.onData(ByteArray(100))
+
+        assertFailsWith<SshException> {
+            channel.onData(ByteArray(29))
+        }
     }
 
     @Test

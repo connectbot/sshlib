@@ -17,12 +17,15 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
 internal class ForwardingChannel(
     private val connection: SshConnection,
+    private val connectionScope: CoroutineScope,
     val localChannelNumber: Int,
     var remoteChannelNumber: Int,
     private val maxPacketSize: Int,
@@ -31,28 +34,37 @@ internal class ForwardingChannel(
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(ForwardingChannel::class.java)
-        private const val WINDOW_ADJUST_THRESHOLD = 64 * 1024
     }
 
     private var _isOpen = true
     private var closeSent = false
     private val window = LocalChannelWindow(
         initialWindowSize,
-        adjustThreshold = WINDOW_ADJUST_THRESHOLD,
         remoteInitial = remoteWindowSizeInitial,
     )
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
-    private val _incomingData = Channel<ByteArray>(Channel.UNLIMITED)
+    private val incomingIngress = Channel<ByteArray>(Channel.UNLIMITED)
+    private val _incomingData = Channel<ByteArray>(Channel.RENDEZVOUS)
     val incomingData: ReceiveChannel<ByteArray> get() = _incomingData
+    private val incomingDeliveryJob = connectionScope.launch {
+        try {
+            for (data in incomingIngress) {
+                _incomingData.send(data)
+                val adjust = window.releaseLocal(data.size)
+                connection.sendWindowAdjust(remoteChannelNumber, adjust)
+            }
+        } finally {
+            _incomingData.close()
+        }
+    }
 
     val isOpen: Boolean get() = _isOpen
 
     internal suspend fun onData(data: ByteArray) {
-        val adjust = window.consumeLocal(data.size)
-        _incomingData.trySend(data)
-        if (adjust > 0) {
-            connection.sendWindowAdjust(remoteChannelNumber, adjust)
+        window.consumeLocal(data.size)
+        if (incomingIngress.trySend(data).isFailure) {
+            throw org.connectbot.sshlib.SshException("Received data for a closed forwarding stream")
         }
     }
 
@@ -66,7 +78,7 @@ internal class ForwardingChannel(
 
     internal fun onEof() {
         logger.debug("Forwarding channel $localChannelNumber received EOF")
-        _incomingData.close()
+        incomingIngress.close()
     }
 
     internal suspend fun onClose() {
@@ -80,6 +92,8 @@ internal class ForwardingChannel(
             }
         }
         _isOpen = false
+        incomingIngress.close()
+        incomingDeliveryJob.cancel()
         _incomingData.close()
         windowAvailable.close()
     }
@@ -106,6 +120,8 @@ internal class ForwardingChannel(
         if (!_isOpen) return
         closeSent = true
         _isOpen = false
+        incomingIngress.close()
+        incomingDeliveryJob.cancel()
         _incomingData.close()
         connection.sendChannelClose(remoteChannelNumber)
     }

@@ -78,6 +78,10 @@ interface SshSession : AutoCloseable {
 
     suspend fun read(): ByteArray?
 
+    /**
+     * Read non-stderr extended data. RFC 4254 data type 1 is exposed exclusively
+     * through [stderr] so the same remote bytes are not buffered twice.
+     */
     suspend fun readExtended(): Pair<Int, ByteArray>?
 
     suspend fun sendEof()

@@ -58,9 +58,22 @@ class SessionChannel internal constructor(
     private val window = LocalChannelWindow(initialWindowSize, remoteInitial = remoteWindowSizeInitial)
     private val windowAvailable = Channel<Unit>(Channel.CONFLATED)
 
-    private val _stdout = Channel<ByteArray>(Channel.UNLIMITED)
-    private val _stderr = Channel<ByteArray>(Channel.UNLIMITED)
-    private val _extendedData = Channel<Pair<Int, ByteArray>>(Channel.UNLIMITED)
+    private val stdoutIngress = Channel<ByteArray>(Channel.UNLIMITED)
+    private val stderrIngress = Channel<ByteArray>(Channel.UNLIMITED)
+    private val extendedDataIngress = Channel<Pair<Int, ByteArray>>(Channel.UNLIMITED)
+    private val _stdout = Channel<ByteArray>(Channel.RENDEZVOUS)
+    private val _stderr = Channel<ByteArray>(Channel.RENDEZVOUS)
+    private val _extendedData = Channel<Pair<Int, ByteArray>>(Channel.RENDEZVOUS)
+
+    private val stdoutDeliveryJob = connectionScope.launch {
+        deliverData(stdoutIngress, _stdout) { it.size }
+    }
+    private val stderrDeliveryJob = connectionScope.launch {
+        deliverData(stderrIngress, _stderr) { it.size }
+    }
+    private val extendedDeliveryJob = connectionScope.launch {
+        deliverData(extendedDataIngress, _extendedData) { it.second.size }
+    }
 
     override val isOpen: Boolean get() = _isOpen
     override val remoteChannelNumber: Int get() = _remoteChannelNumber
@@ -83,21 +96,36 @@ class SessionChannel internal constructor(
         get() = ptyGranted && canSendChaff && obscureKeystrokeTimingIntervalMs > 0
 
     internal suspend fun onData(data: ByteArray) {
-        val adjust = window.consumeLocal(data.size)
-        _stdout.trySend(data)
-        if (adjust > 0) {
-            connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+        window.consumeLocal(data.size)
+        if (stdoutIngress.trySend(data).isFailure) {
+            throw org.connectbot.sshlib.SshException("Received data for a closed stdout stream")
         }
     }
 
     internal suspend fun onExtendedData(dataType: Int, data: ByteArray) {
-        val adjust = window.consumeLocal(data.size)
-        _extendedData.trySend(dataType to data)
+        window.consumeLocal(data.size)
         if (dataType == 1) {
-            _stderr.trySend(data)
+            if (stderrIngress.trySend(data).isFailure) {
+                throw org.connectbot.sshlib.SshException("Received data for a closed stderr stream")
+            }
+        } else if (extendedDataIngress.trySend(dataType to data).isFailure) {
+            throw org.connectbot.sshlib.SshException("Received data for a closed extended-data stream")
         }
-        if (adjust > 0) {
-            connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+    }
+
+    private suspend fun <T> deliverData(
+        ingress: ReceiveChannel<T>,
+        output: Channel<T>,
+        sizeOf: (T) -> Int,
+    ) {
+        try {
+            for (value in ingress) {
+                output.send(value)
+                val adjust = window.releaseLocal(sizeOf(value))
+                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+            }
+        } finally {
+            output.close()
         }
     }
 
@@ -111,9 +139,9 @@ class SessionChannel internal constructor(
 
     internal fun onEof() {
         logger.debug("Received EOF on channel $localChannelNumber")
-        _stdout.close()
-        _stderr.close()
-        _extendedData.close()
+        stdoutIngress.close()
+        stderrIngress.close()
+        extendedDataIngress.close()
     }
 
     internal suspend fun onClose() {
@@ -131,6 +159,12 @@ class SessionChannel internal constructor(
             }
         }
         _isOpen = false
+        stdoutIngress.close()
+        stderrIngress.close()
+        extendedDataIngress.close()
+        stdoutDeliveryJob.cancel()
+        stderrDeliveryJob.cancel()
+        extendedDeliveryJob.cancel()
         _stdout.close()
         _stderr.close()
         _extendedData.close()
@@ -350,6 +384,12 @@ class SessionChannel internal constructor(
         chaffJob?.cancel()
         closeSent = true
         _isOpen = false
+        stdoutIngress.close()
+        stderrIngress.close()
+        extendedDataIngress.close()
+        stdoutDeliveryJob.cancel()
+        stderrDeliveryJob.cancel()
+        extendedDeliveryJob.cancel()
         _stdout.close()
         _stderr.close()
         _extendedData.close()

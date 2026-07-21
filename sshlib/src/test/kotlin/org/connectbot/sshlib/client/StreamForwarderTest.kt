@@ -42,7 +42,7 @@ class StreamForwarderTest {
     fun `start forwards data from read channel to ssh`() = runTest {
         val connection = mockk<SshConnection>(relaxed = true)
         coEvery { connection.openDirectTcpipChannel("example.com", 80, "127.0.0.1", 0) } returns
-            ForwardingChannel(connection, 0, 1, 32 * 1024, 256L * 1024)
+            ForwardingChannel(connection, backgroundScope, 0, 1, 32 * 1024, 256L * 1024)
 
         val input = ByteChannel(autoFlush = true)
         val output = ByteChannel(autoFlush = true)
@@ -87,7 +87,7 @@ class StreamForwarderTest {
     fun `stop is idempotent`() = runTest {
         val connection = mockk<SshConnection>(relaxed = true)
         coEvery { connection.openDirectTcpipChannel("example.com", 80, "127.0.0.1", 0) } returns
-            ForwardingChannel(connection, 0, 1, 32 * 1024, 256L * 1024)
+            ForwardingChannel(connection, backgroundScope, 0, 1, 32 * 1024, 256L * 1024)
 
         val input = ByteChannel(autoFlush = true)
         val output = ByteChannel(autoFlush = true)

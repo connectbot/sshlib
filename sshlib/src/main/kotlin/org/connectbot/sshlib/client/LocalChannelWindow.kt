@@ -23,14 +23,13 @@ import org.connectbot.sshlib.SshException
  * Tracks SSH channel flow control windows per RFC 4254 §5.2.
  *
  * Local window: bytes we are willing to receive. Enforces that the server never
- * exceeds it; auto-refills when below [adjustThreshold].
+ * exceeds it; callers explicitly release capacity after consuming buffered data.
  *
  * Remote window: bytes the server is willing to receive. Enforces uint32 max
  * and positive-only adjustments per the protocol.
  */
 internal class LocalChannelWindow(
     private val initialSize: Int,
-    private val adjustThreshold: Int = 16 * 1024,
     remoteInitial: Long = 0,
 ) {
     companion object {
@@ -44,20 +43,27 @@ internal class LocalChannelWindow(
 
     /**
      * Consume [size] bytes from the local window, rejecting excess data.
-     * Returns the window-adjust amount to send back (0 if no adjust needed).
      */
-    fun consumeLocal(size: Int): Int {
+    @Synchronized
+    fun consumeLocal(size: Int) {
+        if (size < 0) throw SshException("Cannot consume a negative local window size: $size")
         if (size > localRemaining) {
             throw SshException("Server sent $size bytes exceeding local window ($localRemaining)")
         }
         localRemaining -= size
-        return if (localRemaining < adjustThreshold) {
-            val adjust = initialSize - localRemaining.toInt()
-            localRemaining += adjust
-            adjust
-        } else {
-            0
+    }
+
+    /**
+     * Release locally consumed bytes and return the window credit to advertise.
+     */
+    @Synchronized
+    fun releaseLocal(size: Int): Int {
+        if (size <= 0) throw SshException("Local window release must be positive: $size")
+        if (localRemaining + size > initialSize) {
+            throw SshException("Local window release exceeds initial size")
         }
+        localRemaining += size
+        return size
     }
 
     /**

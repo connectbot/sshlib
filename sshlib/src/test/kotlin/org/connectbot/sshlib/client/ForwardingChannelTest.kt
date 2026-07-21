@@ -20,6 +20,8 @@ package org.connectbot.sshlib.client
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -37,6 +39,7 @@ class ForwardingChannelTest {
     ): Pair<ForwardingChannel, SshConnection> {
         val channel = ForwardingChannel(
             connection = connection,
+            connectionScope = CoroutineScope(UnconfinedTestDispatcher()),
             localChannelNumber = 0,
             remoteChannelNumber = 1,
             maxPacketSize = maxPacketSize,
@@ -63,6 +66,8 @@ class ForwardingChannelTest {
         val data = ByteArray(100)
 
         channel.onData(data)
+        coVerify(exactly = 0) { conn.sendWindowAdjust(any(), any()) }
+        channel.incomingData.receive()
 
         coVerify { conn.sendWindowAdjust(1, any()) }
     }
@@ -109,6 +114,7 @@ class ForwardingChannelTest {
 
         val channel = ForwardingChannel(
             connection = conn,
+            connectionScope = CoroutineScope(UnconfinedTestDispatcher()),
             localChannelNumber = 0,
             remoteChannelNumber = 1,
             maxPacketSize = 10,

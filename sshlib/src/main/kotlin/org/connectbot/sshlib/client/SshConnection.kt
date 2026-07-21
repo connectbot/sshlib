@@ -2265,6 +2265,7 @@ class SshConnection(
                         logger.info("Direct-tcpip channel opened: local=$recipientChannel, remote=$remoteChannelNumber")
                         val channel = ForwardingChannel(
                             this@SshConnection,
+                            connectionScope,
                             recipientChannel,
                             remoteChannelNumber,
                             pending.maxPacketSize,
