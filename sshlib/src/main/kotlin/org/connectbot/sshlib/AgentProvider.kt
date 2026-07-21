@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,15 +69,18 @@ data class DestinationConstraint(
  *
  * Implement this interface to handle agent requests from remote servers
  * when agent forwarding is enabled. The library will call these methods
- * when a remote server requests identities or signatures.
+ * when a remote server requests identities or signatures. Implementations
+ * should return [AgentResult.Failure] instead of throwing when a backend
+ * operation fails.
  */
 interface AgentProvider {
     /**
      * Return the list of identities available for forwarding.
      *
      * Called when a remote server requests the list of available keys.
+     * Return [AgentResult.Failure] if the identities cannot be loaded.
      */
-    suspend fun getIdentities(): List<AgentIdentity>
+    suspend fun getIdentities(): AgentResult<List<AgentIdentity>>
 
     /**
      * Sign data with the specified key.
@@ -85,12 +88,13 @@ interface AgentProvider {
      * Called when a remote server requests a signature. The provider should:
      * 1. Verify the request is legitimate (check context)
      * 2. Optionally prompt the user for approval
-     * 3. Return the signature, or null to deny the request
+     * 3. Return the signature, or a successful null value to deny the request
      *
      * @param context Rich context about the signing request
-     * @return SSH-encoded signature blob, or null to refuse
+     * @return Successful SSH-encoded signature blob, successful null to refuse,
+     * or [AgentResult.Failure] if the provider could not process the request
      */
-    suspend fun signData(context: AgentSigningContext): ByteArray?
+    suspend fun signData(context: AgentSigningContext): AgentResult<ByteArray?>
 }
 
 /**
@@ -145,7 +149,7 @@ data class AgentSigningContext(
     /** Server's host key from key exchange */
     val serverHostKey: ByteArray,
 
-    /** Whether session-bind extension was used */
+    /** Whether a trusted session binding is active */
     val isBound: Boolean,
 ) {
     override fun equals(other: Any?): Boolean {

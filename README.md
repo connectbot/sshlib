@@ -125,23 +125,23 @@ Enable SSH agent forwarding to allow remote servers to use your keys:
 ```kotlin
 // Implement an agent provider
 class MyAgentProvider : AgentProvider {
-    override suspend fun getIdentities(): List<AgentIdentity> {
+    override suspend fun getIdentities(): AgentResult<List<AgentIdentity>> {
         val keyBlob = loadPublicKeyBlob()
-        return listOf(AgentIdentity(keyBlob, "my-key"))
+        return AgentResult.Success(listOf(AgentIdentity(keyBlob, "my-key")))
     }
 
-    override suspend fun signData(context: AgentSigningContext): ByteArray? {
+    override suspend fun signData(context: AgentSigningContext): AgentResult<ByteArray?> {
         // Show approval UI to user with session context
         val approved = showSigningPrompt(
             "Remote server ${context.serverHostKey.toHex()} wants to use your key",
             "Session bound: ${context.isBound}"
         )
 
-        return if (approved) {
+        return AgentResult.Success(if (approved) {
             signWithPrivateKey(context.publicKeyBlob, context.dataToSign)
         } else {
             null  // Deny the request
-        }
+        })
     }
 }
 

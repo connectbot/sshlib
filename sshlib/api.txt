@@ -33,8 +33,36 @@ package org.connectbot.sshlib {
   }
 
   public interface AgentProvider {
-    method public suspend java.lang.Object? getIdentities(kotlin.coroutines.Continuation<? super java.util.List<org.connectbot.sshlib.AgentIdentity>>);
-    method public suspend java.lang.Object? signData(org.connectbot.sshlib.AgentSigningContext context, kotlin.coroutines.Continuation<? super byte[]?>);
+    method public suspend java.lang.Object? getIdentities(kotlin.coroutines.Continuation<? super org.connectbot.sshlib.AgentResult<? extends java.util.List<org.connectbot.sshlib.AgentIdentity>>>);
+    method public suspend java.lang.Object? signData(org.connectbot.sshlib.AgentSigningContext context, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.AgentResult<byte[]?>>);
+  }
+
+  public sealed exhaustive interface AgentResult<T> {
+  }
+
+  public static final class AgentResult.Failure implements org.connectbot.sshlib.AgentResult {
+    ctor public AgentResult.Failure(java.lang.String message, optional java.lang.Throwable? cause);
+    method public java.lang.String component1();
+    method public java.lang.Throwable? component2();
+    method public org.connectbot.sshlib.AgentResult.Failure copy(optional java.lang.String message, optional java.lang.Throwable? cause);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public java.lang.Throwable? getCause();
+    method @InaccessibleFromKotlin public java.lang.String getMessage();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public Throwable? cause;
+    property public String message;
+  }
+
+  public static final class AgentResult.Success<T> implements org.connectbot.sshlib.AgentResult<T> {
+    ctor public AgentResult.Success(T value);
+    method public T component1();
+    method public org.connectbot.sshlib.AgentResult.Success<T> copy(optional T value);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public T getValue();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public T value;
   }
 
   public final class AgentSignatureFlags {

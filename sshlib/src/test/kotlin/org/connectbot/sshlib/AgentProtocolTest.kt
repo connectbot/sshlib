@@ -41,7 +41,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.BufferUnderflowException
@@ -150,9 +149,9 @@ class AgentProtocolTest {
     fun `handler returns failure for malformed agent frame`() = runTest {
         val handler = AgentProtocolHandler(
             provider = object : AgentProvider {
-                override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+                override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
 
-                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
             },
             sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
         )
@@ -175,9 +174,9 @@ class AgentProtocolTest {
     fun `handler returns failure for malformed sign request payload`() = runTest {
         val handler = AgentProtocolHandler(
             provider = object : AgentProvider {
-                override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+                override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
 
-                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
             },
             sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
         )
@@ -201,33 +200,76 @@ class AgentProtocolTest {
     }
 
     @Test
-    fun `handler does not mistake provider exception for malformed input`() = runTest {
+    fun `handler converts provider exception to agent failure`() = runTest {
         val providerFailure = BufferUnderflowException()
         val handler = AgentProtocolHandler(
             provider = object : AgentProvider {
-                override suspend fun getIdentities(): List<AgentIdentity> = throw providerFailure
+                override suspend fun getIdentities(): AgentResult<List<AgentIdentity>> = throw providerFailure
 
-                override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
             },
             sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
         )
 
-        val error = assertFailsWith<BufferUnderflowException> {
-            handler.handleRequest(buildAgentMessage(11, ByteArray(0)))
+        val response = handler.handleRequest(buildAgentMessage(11, ByteArray(0)))
+
+        assertEquals(5, parseAgentMessage(response).first)
+    }
+
+    @Test
+    fun `handler converts explicit provider failure to agent failure`() = runTest {
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities() = AgentResult.Failure("agent backend unavailable")
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
+            },
+            sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
+        )
+
+        val response = handler.handleRequest(buildAgentMessage(11, ByteArray(0)))
+
+        assertEquals(5, parseAgentMessage(response).first)
+    }
+
+    @Test
+    fun `handler never throws across deterministic agent input sweeps`() = runTest {
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
+            },
+            sessionInfo = AgentSessionInfo(ByteArray(0), ByteArray(0)),
+        )
+        suspend fun assertHandled(request: ByteArray) {
+            val response = handler.handleRequest(request)
+            val messageType = parseAgentMessage(response).first
+            assertTrue(messageType == 5 || messageType == 12)
         }
 
-        assertSame(providerFailure, error)
+        for (messageType in 0..255) {
+            assertHandled(buildAgentMessage(messageType, ByteArray(0)))
+        }
+        for (value in 0..255) {
+            assertHandled(ByteArray(1) { value.toByte() })
+            assertHandled(ByteArray(5) { value.toByte() })
+            assertHandled(ByteArray(16) { value.toByte() })
+        }
+        for (size in 0..256) {
+            assertHandled(ByteArray(size) { index -> ((size + index) and 0xFF).toByte() })
+        }
     }
 
     @Test
     fun `handler returns identities answer`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = listOf(
-                AgentIdentity(byteArrayOf(1, 2, 3), "key1"),
-                AgentIdentity(byteArrayOf(4, 5, 6), "key2"),
+            override suspend fun getIdentities() = AgentResult.Success(
+                listOf(
+                    AgentIdentity(byteArrayOf(1, 2, 3), "key1"),
+                    AgentIdentity(byteArrayOf(4, 5, 6), "key2"),
+                ),
             )
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -255,10 +297,11 @@ class AgentProtocolTest {
 
     @Test
     fun `handler returns sign response when provider approves`() = runTest {
+        val signingKey = byteArrayOf(1, 2, 3, 4)
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = byteArrayOf(9, 8, 7, 6, 5)
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(byteArrayOf(9, 8, 7, 6, 5))
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -268,7 +311,7 @@ class AgentProtocolTest {
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
 
-        val keyBlob = createByteString(byteArrayOf(1, 2, 3, 4))
+        val keyBlob = createByteString(signingKey)
         val dataToSign = createByteString(byteArrayOf(5, 6, 7, 8))
         val signRequest = SshAgentcSignRequest()
         signRequest.setKeyBlob(keyBlob)
@@ -291,10 +334,11 @@ class AgentProtocolTest {
 
     @Test
     fun `handler returns failure when provider denies`() = runTest {
+        val signingKey = byteArrayOf(1, 2, 3, 4)
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionInfo = AgentSessionInfo(
@@ -304,7 +348,7 @@ class AgentProtocolTest {
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
 
-        val keyBlob = createByteString(byteArrayOf(1, 2, 3, 4))
+        val keyBlob = createByteString(signingKey)
         val dataToSign = createByteString(byteArrayOf(5, 6, 7, 8))
         val signRequest = SshAgentcSignRequest()
         signRequest.setKeyBlob(keyBlob)
@@ -320,15 +364,66 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun `handler converts signing provider failure to agent failure`() = runTest {
+        val signingKey = byteArrayOf(1, 2, 3, 4)
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
+
+                override suspend fun signData(context: AgentSigningContext) = AgentResult.Failure("signing device unavailable")
+            },
+            sessionInfo = AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)),
+        )
+        val signRequest = SshAgentcSignRequest().apply {
+            setKeyBlob(createByteString(signingKey))
+            setData(createByteString(byteArrayOf(5, 6, 7, 8)))
+            setFlags(0)
+            _check()
+        }
+
+        val response = handler.handleRequest(buildAgentMessage(13, signRequest.toByteArray()))
+
+        assertEquals(5, parseAgentMessage(response).first)
+    }
+
+    @Test
+    fun `handler does not invoke provider for an identity it did not expose`() = runTest {
+        var signCalled = false
+        val handler = AgentProtocolHandler(
+            provider = object : AgentProvider {
+                override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+
+                override suspend fun signData(context: AgentSigningContext): AgentResult<ByteArray?> {
+                    signCalled = true
+                    return AgentResult.Success(byteArrayOf(1))
+                }
+            },
+            sessionInfo = AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)),
+        )
+        val signRequest = SshAgentcSignRequest().apply {
+            setKeyBlob(createByteString(byteArrayOf(3)))
+            setData(createByteString(byteArrayOf(4)))
+            setFlags(0)
+            _check()
+        }
+
+        val response = handler.handleRequest(buildAgentMessage(13, signRequest.toByteArray()))
+
+        assertEquals(5, parseAgentMessage(response).first)
+        assertFalse(signCalled)
+    }
+
+    @Test
     fun `provider receives correct context`() = runTest {
         var capturedContext: AgentSigningContext? = null
+        val signingKey = byteArrayOf(1, 2, 3, 4)
 
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
+            override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? {
+            override suspend fun signData(context: AgentSigningContext): AgentResult<ByteArray?> {
                 capturedContext = context
-                return byteArrayOf(1, 2, 3)
+                return AgentResult.Success(byteArrayOf(1, 2, 3))
             }
         }
 
@@ -339,7 +434,7 @@ class AgentProtocolTest {
 
         val handler = AgentProtocolHandler(testProvider, sessionInfo)
 
-        val keyBlob = createByteString(byteArrayOf(1, 2, 3, 4))
+        val keyBlob = createByteString(signingKey)
         val dataToSign = createByteString(byteArrayOf(5, 6, 7, 8))
         val signRequest = SshAgentcSignRequest()
         signRequest.setKeyBlob(keyBlob)
@@ -356,7 +451,7 @@ class AgentProtocolTest {
         assertEquals(2, capturedContext.flags)
         assertArrayEquals(byteArrayOf(10, 11, 12), capturedContext.sessionId)
         assertArrayEquals(byteArrayOf(13, 14, 15), capturedContext.serverHostKey)
-        assertFalse(capturedContext.isBound)
+        assertTrue(capturedContext.isBound)
     }
 
     private fun buildSessionBindRequest(
@@ -383,10 +478,10 @@ class AgentProtocolTest {
     private val rejectingVerifier: SessionBindVerifier = SessionBindVerifier { _, _, _ -> false }
 
     @Test
-    fun `handler handles session bind extension`() = runTest {
+    fun `handler rejects peer replay of trusted initial binding`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionId = byteArrayOf(1, 2, 3)
@@ -397,14 +492,14 @@ class AgentProtocolTest {
         val response = handler.handleRequest(buildSessionBindRequest(hostKey, sessionId, isForwarding = 1))
 
         val (messageType, _) = parseAgentMessage(response)
-        assertEquals(6, messageType) // SSH_AGENT_SUCCESS
+        assertEquals(5, messageType) // SSH_AGENT_FAILURE
     }
 
     @Test
     fun `handler rejects session bind when signature verification fails`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionId = byteArrayOf(1, 2, 3)
@@ -412,7 +507,9 @@ class AgentProtocolTest {
         val sessionInfo = AgentSessionInfo(sessionId, hostKey)
         val handler = AgentProtocolHandler(testProvider, sessionInfo, rejectingVerifier)
 
-        val response = handler.handleRequest(buildSessionBindRequest(hostKey, sessionId, isForwarding = 1))
+        val response = handler.handleRequest(
+            buildSessionBindRequest(byteArrayOf(7, 8, 9), byteArrayOf(4, 5, 6), isForwarding = 1),
+        )
 
         val (messageType, _) = parseAgentMessage(response)
         assertEquals(5, messageType) // SSH_AGENT_FAILURE
@@ -421,8 +518,8 @@ class AgentProtocolTest {
     @Test
     fun `handler rejects duplicate session bind`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionId = byteArrayOf(1, 2, 3)
@@ -430,7 +527,7 @@ class AgentProtocolTest {
         val sessionInfo = AgentSessionInfo(sessionId, hostKey)
         val handler = AgentProtocolHandler(testProvider, sessionInfo, noopVerifier)
 
-        val requestMessage = buildSessionBindRequest(hostKey, sessionId, isForwarding = 1)
+        val requestMessage = buildSessionBindRequest(byteArrayOf(7, 8, 9), byteArrayOf(4, 5, 6), isForwarding = 1)
         handler.handleRequest(requestMessage)
         val response = handler.handleRequest(requestMessage)
 
@@ -439,16 +536,15 @@ class AgentProtocolTest {
     }
 
     @Test
-    fun `handler rejects non-forwarding session bind with mismatched hostkey`() = runTest {
+    fun `handler rejects replay of trusted session as non-forwarding bind`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val sessionInfo = AgentSessionInfo(byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6))
         val handler = AgentProtocolHandler(testProvider, sessionInfo, noopVerifier)
 
-        // is_forwarding = 0 means origin bind — hostkey must match sessionInfo.serverHostKey
         val response = handler.handleRequest(
             buildSessionBindRequest(byteArrayOf(9, 9, 9), byteArrayOf(1, 2, 3), isForwarding = 0),
         )
@@ -460,19 +556,23 @@ class AgentProtocolTest {
     @Test
     fun `handler accumulates multiple forwarding binds`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
 
         val hostKey = byteArrayOf(4, 5, 6)
         val sessionInfo = AgentSessionInfo(byteArrayOf(1, 2, 3), hostKey)
         val handler = AgentProtocolHandler(testProvider, sessionInfo, noopVerifier)
 
-        val response1 = handler.handleRequest(buildSessionBindRequest(hostKey, byteArrayOf(1, 2, 3), isForwarding = 0))
+        val response1 = handler.handleRequest(
+            buildSessionBindRequest(byteArrayOf(7, 8, 9), byteArrayOf(4, 5, 6), isForwarding = 1),
+        )
         val (type1, _) = parseAgentMessage(response1)
         assertEquals(6, type1)
 
-        val response2 = handler.handleRequest(buildSessionBindRequest(byteArrayOf(7, 8, 9), byteArrayOf(4, 5, 6), isForwarding = 1))
+        val response2 = handler.handleRequest(
+            buildSessionBindRequest(byteArrayOf(10, 11, 12), byteArrayOf(7, 8, 9), isForwarding = 1),
+        )
         val (type2, _) = parseAgentMessage(response2)
         assertEquals(6, type2)
     }
@@ -480,8 +580,8 @@ class AgentProtocolTest {
     @Test
     fun `handler returns failure for unknown extension`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
         val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(), byteArrayOf()))
 
@@ -501,8 +601,8 @@ class AgentProtocolTest {
     @Test
     fun `handler returns failure for unknown message type`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+            override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
         }
         val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(), byteArrayOf()))
 
@@ -525,13 +625,14 @@ class AgentProtocolTest {
         // A 255-byte signature makes the SIGN_RESPONSE payload large enough that byte[2] of the
         // length field is non-zero. Routes through the production buildAgentMessage (not the local helper).
         val largeSignature = ByteArray(255) { it.toByte() }
+        val signingKey = byteArrayOf(1)
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray = largeSignature
+            override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(largeSignature)
         }
         val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)))
         val signRequest = SshAgentcSignRequest()
-        signRequest.setKeyBlob(createByteString(byteArrayOf(1)))
+        signRequest.setKeyBlob(createByteString(signingKey))
         signRequest.setData(createByteString(byteArrayOf(2)))
         signRequest.setFlags(0)
         signRequest._check()
@@ -548,13 +649,14 @@ class AgentProtocolTest {
         // A 65535-byte signature forces byte[1] of the length field to be non-zero.
         // Routes through the production buildAgentMessage.
         val hugeSignature = ByteArray(65535) { it.toByte() }
+        val signingKey = byteArrayOf(1)
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-            override suspend fun signData(context: AgentSigningContext): ByteArray = hugeSignature
+            override suspend fun getIdentities() = AgentResult.Success(listOf(AgentIdentity(signingKey, "test")))
+            override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(hugeSignature)
         }
         val handler = AgentProtocolHandler(testProvider, AgentSessionInfo(byteArrayOf(1), byteArrayOf(2)))
         val signRequest = SshAgentcSignRequest()
-        signRequest.setKeyBlob(createByteString(byteArrayOf(1)))
+        signRequest.setKeyBlob(createByteString(signingKey))
         signRequest.setData(createByteString(byteArrayOf(2)))
         signRequest.setFlags(0)
         signRequest._check()
@@ -628,80 +730,105 @@ class IsConstraintSatisfiedTest {
 
     private fun keyspec(blob: ByteArray) = AgentKeySpec(blob, false)
 
-    private val hostKey = byteArrayOf(0x01, 0x02, 0x03)
-    private val sessionId = byteArrayOf(0x04, 0x05, 0x06)
+    private val hostKeyA = byteArrayOf(0x01)
+    private val hostKeyB = byteArrayOf(0x02)
+    private val hostKeyC = byteArrayOf(0x03)
 
     @Test
-    fun `direct connection - no constraints - always rejected`() {
-        val components = SignedDataComponents("publickey", "user", hostKey)
-        assertFalse(isConstraintSatisfied(emptyList(), components, emptyList()))
+    fun `empty path is rejected`() {
+        assertFalse(isConstraintSatisfied(emptyList(), emptyList(), "user"))
     }
 
     @Test
-    fun `direct connection - empty from constraint with matching toHostspec - satisfied`() {
-        val c = constraint(toHostspecs = listOf(keyspec(hostKey)))
-        val components = SignedDataComponents("publickey", "user", hostKey)
-        assertTrue(isConstraintSatisfied(listOf(c), components, emptyList()))
+    fun `trusted first binding must match an origin edge`() {
+        val bindings = listOf(BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true))
+        val constraints = listOf(
+            constraint(toHostspecs = listOf(keyspec(hostKeyA))),
+            constraint(fromKeyspecs = listOf(keyspec(hostKeyA)), toHostspecs = listOf(keyspec(hostKeyB))),
+        )
+
+        assertTrue(isConstraintSatisfied(constraints, bindings, destinationUsername = null))
     }
 
     @Test
-    fun `direct connection - empty from constraint with non-matching toHostspec - rejected`() {
-        val c = constraint(toHostspecs = listOf(keyspec(byteArrayOf(0x99.toByte()))))
-        val components = SignedDataComponents("publickey", "user", hostKey)
-        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    fun `missing origin edge rejects an otherwise matching final edge`() {
+        val bindings = listOf(
+            BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true),
+            BindingEntry(hostKeyB, byteArrayOf(2), isForwarding = false),
+        )
+        val constraints = listOf(
+            constraint(fromKeyspecs = listOf(keyspec(hostKeyA)), toHostspecs = listOf(keyspec(hostKeyB))),
+        )
+
+        assertFalse(isConstraintSatisfied(constraints, bindings, "user"))
     }
 
     @Test
-    fun `direct connection - toUsername mismatch - rejected`() {
-        val c = constraint(toHostspecs = listOf(keyspec(hostKey)), toUsername = "alice")
-        val components = SignedDataComponents("publickey", "bob", hostKey)
-        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    fun `all edges in a multi-hop path must be permitted`() {
+        val bindings = listOf(
+            BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true),
+            BindingEntry(hostKeyB, byteArrayOf(2), isForwarding = true),
+            BindingEntry(hostKeyC, byteArrayOf(3), isForwarding = false),
+        )
+        val complete = listOf(
+            constraint(toHostspecs = listOf(keyspec(hostKeyA))),
+            constraint(fromKeyspecs = listOf(keyspec(hostKeyA)), toHostspecs = listOf(keyspec(hostKeyB))),
+            constraint(fromKeyspecs = listOf(keyspec(hostKeyB)), toHostspecs = listOf(keyspec(hostKeyC))),
+        )
+        val missingMiddle = listOf(complete[0], complete[2])
+
+        assertTrue(isConstraintSatisfied(complete, bindings, "user"))
+        assertFalse(isConstraintSatisfied(missingMiddle, bindings, "user"))
     }
 
     @Test
-    fun `direct connection - toUsername matches - satisfied`() {
-        val c = constraint(toHostspecs = listOf(keyspec(hostKey)), toUsername = "alice")
-        val components = SignedDataComponents("publickey", "alice", hostKey)
-        assertTrue(isConstraintSatisfied(listOf(c), components, emptyList()))
+    fun `username is enforced on final edge only`() {
+        val bindings = listOf(
+            BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true),
+            BindingEntry(hostKeyB, byteArrayOf(2), isForwarding = false),
+        )
+        val constraints = listOf(
+            constraint(toUsername = "ignored", toHostspecs = listOf(keyspec(hostKeyA))),
+            constraint(
+                fromKeyspecs = listOf(keyspec(hostKeyA)),
+                toUsername = "alice",
+                toHostspecs = listOf(keyspec(hostKeyB)),
+            ),
+        )
+
+        assertTrue(isConstraintSatisfied(constraints, bindings, "alice"))
+        assertFalse(isConstraintSatisfied(constraints, bindings, "bob"))
     }
 
     @Test
-    fun `direct connection - null serverHostKeyBlob - rejected`() {
-        val c = constraint(toHostspecs = listOf(keyspec(hostKey)))
-        val components = SignedDataComponents("publickey", "user", null)
-        assertFalse(isConstraintSatisfied(listOf(c), components, emptyList()))
+    fun `signing rejects a forwarding-only final binding`() {
+        val bindings = listOf(BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true))
+        val constraints = listOf(constraint(toHostspecs = listOf(keyspec(hostKeyA))))
+
+        assertFalse(isConstraintSatisfied(constraints, bindings, "user"))
     }
 
     @Test
-    fun `forwarded connection - single binding - fromKeyspec matches hop - satisfied`() {
-        val hopKey = byteArrayOf(0xAA.toByte())
-        val destKey = byteArrayOf(0xBB.toByte())
-        val binding = BindingEntry(hopKey, sessionId)
-        val c = constraint(fromKeyspecs = listOf(keyspec(hopKey)), toHostspecs = listOf(keyspec(destKey)))
-        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
-        assertTrue(isConstraintSatisfied(listOf(c), components, listOf(binding)))
+    fun `listing on a forwarding binding requires a permitted outgoing edge`() {
+        val bindings = listOf(BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true))
+        val originOnly = listOf(constraint(toHostspecs = listOf(keyspec(hostKeyA))))
+        val reachable = originOnly + constraint(
+            fromKeyspecs = listOf(keyspec(hostKeyA)),
+            toHostspecs = listOf(keyspec(hostKeyB)),
+        )
+
+        assertFalse(isConstraintSatisfied(originOnly, bindings, destinationUsername = null))
+        assertTrue(isConstraintSatisfied(reachable, bindings, destinationUsername = null))
     }
 
     @Test
-    fun `forwarded connection - single binding - fromKeyspec does not match - rejected`() {
-        val hopKey = byteArrayOf(0xAA.toByte())
-        val wrongKey = byteArrayOf(0xCC.toByte())
-        val destKey = byteArrayOf(0xBB.toByte())
-        val binding = BindingEntry(hopKey, sessionId)
-        val c = constraint(fromKeyspecs = listOf(keyspec(wrongKey)), toHostspecs = listOf(keyspec(destKey)))
-        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
-        assertFalse(isConstraintSatisfied(listOf(c), components, listOf(binding)))
-    }
+    fun `CA keyspecs fail closed until host certificates are parsed`() {
+        val bindings = listOf(BindingEntry(hostKeyA, byteArrayOf(1), isForwarding = true))
+        val constraints = listOf(
+            constraint(toHostspecs = listOf(AgentKeySpec(hostKeyA, isCa = true))),
+        )
 
-    @Test
-    fun `forwarded connection - two bindings - uses second-to-last as hop key`() {
-        val hop1Key = byteArrayOf(0xAA.toByte())
-        val hop2Key = byteArrayOf(0xBB.toByte())
-        val destKey = byteArrayOf(0xCC.toByte())
-        val bindings = listOf(BindingEntry(hop1Key, byteArrayOf(1)), BindingEntry(hop2Key, byteArrayOf(2)))
-        val c = constraint(fromKeyspecs = listOf(keyspec(hop1Key)), toHostspecs = listOf(keyspec(destKey)))
-        val components = SignedDataComponents("publickey-hostbound-v00@openssh.com", "user", destKey)
-        assertTrue(isConstraintSatisfied(listOf(c), components, bindings))
+        assertFalse(isConstraintSatisfied(constraints, bindings, destinationUsername = null))
     }
 }
 

@@ -36,6 +36,7 @@ import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.crypto.X25519ProviderFactory
 import org.connectbot.sshlib.crypto.encodeMpint
 import org.connectbot.sshlib.protocol.SshEnums
+import org.connectbot.sshlib.protocol.SshMsgChannelData
 import org.connectbot.sshlib.protocol.SshMsgChannelFailure
 import org.connectbot.sshlib.protocol.SshMsgChannelOpen
 import org.connectbot.sshlib.protocol.SshMsgChannelOpenConfirmation
@@ -85,6 +86,8 @@ class FakeSshServer(
 
     private val hostKeyPair: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
     private val hostKeyBlob: ByteArray = SshPublicKeyEncoder.encode(hostKeyPair.public, "ssh-ed25519")
+    val serverHostKeyBlob: ByteArray
+        get() = hostKeyBlob.copyOf()
 
     private lateinit var serverIo: PacketIO
     private lateinit var clientVersionStr: String
@@ -108,6 +111,7 @@ class FakeSshServer(
     private val receivedChannelRequests = Channel<SshMsgChannelRequest>(Channel.UNLIMITED)
     private val receivedChannelOpenConfirmations = Channel<SshMsgChannelOpenConfirmation>(Channel.UNLIMITED)
     private val receivedChannelOpenFailures = Channel<SshMsgChannelOpenFailure>(Channel.UNLIMITED)
+    private val receivedChannelData = Channel<SshMsgChannelData>(Channel.UNLIMITED)
 
     fun start(ignoreTransportErrors: Boolean = false) {
         scope.launch(coroutineContext) {
@@ -250,6 +254,13 @@ class FakeSshServer(
                             val failure = SshMsgChannelOpenFailure(ByteBufferKaitaiStream(bodyBytes))
                             failure._read()
                             receivedChannelOpenFailures.trySend(failure)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_DATA -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val data = SshMsgChannelData(ByteBufferKaitaiStream(bodyBytes))
+                            data._read()
+                            receivedChannelData.trySend(data)
                         }
 
                         SshEnums.MessageType.SSH_MSG_PING -> {
@@ -854,4 +865,6 @@ class FakeSshServer(
     suspend fun awaitChannelOpenConfirmation(): SshMsgChannelOpenConfirmation = receivedChannelOpenConfirmations.receive()
 
     suspend fun awaitChannelOpenFailure(): SshMsgChannelOpenFailure = receivedChannelOpenFailures.receive()
+
+    suspend fun awaitChannelData(): SshMsgChannelData = receivedChannelData.receive()
 }

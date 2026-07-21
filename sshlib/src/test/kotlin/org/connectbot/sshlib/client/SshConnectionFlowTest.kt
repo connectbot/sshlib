@@ -30,12 +30,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.connectbot.sshlib.AgentIdentity
+import org.connectbot.sshlib.AgentKeySpec
 import org.connectbot.sshlib.AgentProvider
+import org.connectbot.sshlib.AgentResult
 import org.connectbot.sshlib.AgentSigningContext
 import org.connectbot.sshlib.AuthHandler
 import org.connectbot.sshlib.AuthPublicKey
 import org.connectbot.sshlib.AuthResult
 import org.connectbot.sshlib.ConnectResult
+import org.connectbot.sshlib.DestinationConstraint
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
@@ -422,8 +425,8 @@ class SshConnectionFlowTest {
 
             connection.enableAgentForwarding(
                 object : AgentProvider {
-                    override suspend fun getIdentities(): List<AgentIdentity> = emptyList()
-                    override suspend fun signData(context: AgentSigningContext): ByteArray? = null
+                    override suspend fun getIdentities() = AgentResult.Success(emptyList<AgentIdentity>())
+                    override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
                 },
             )
 
@@ -435,6 +438,56 @@ class SshConnectionFlowTest {
             server.sendChannelData(agentLocalChannel, ByteBuffer.allocate(5).putInt(1).put(11).array())
             server.sendChannelWindowAdjust(agentLocalChannel, 1024)
             server.sendChannelEof(agentLocalChannel)
+            server.sendChannelClose(agentLocalChannel)
+            yield()
+        }
+    }
+
+    @Test
+    fun `incoming agent channel starts with the verified connection binding`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+
+            val currentHostKey = server.serverHostKeyBlob
+            val nextHostKey = byteArrayOf(9, 8, 7)
+            val constrainedIdentity = AgentIdentity(
+                publicKeyBlob = byteArrayOf(1, 2, 3),
+                comment = "constrained",
+                destinationConstraints = listOf(
+                    DestinationConstraint(
+                        fromHostname = "",
+                        fromKeyspecs = emptyList(),
+                        toUsername = "",
+                        toHostname = "current",
+                        toHostspecs = listOf(AgentKeySpec(currentHostKey, isCa = false)),
+                    ),
+                    DestinationConstraint(
+                        fromHostname = "current",
+                        fromKeyspecs = listOf(AgentKeySpec(currentHostKey, isCa = false)),
+                        toUsername = "",
+                        toHostname = "next",
+                        toHostspecs = listOf(AgentKeySpec(nextHostKey, isCa = false)),
+                    ),
+                ),
+            )
+            connection.enableAgentForwarding(
+                object : AgentProvider {
+                    override suspend fun getIdentities() = AgentResult.Success(listOf(constrainedIdentity))
+                    override suspend fun signData(context: AgentSigningContext) = AgentResult.Success(null)
+                },
+            )
+
+            server.sendChannelOpen("auth-agent@openssh.com", senderChannel = 79)
+            val confirmation = withTimeout(5_000) { server.awaitChannelOpenConfirmation() }
+            val agentLocalChannel = confirmation.senderChannel().toInt()
+            server.sendChannelData(agentLocalChannel, ByteBuffer.allocate(5).putInt(1).put(11).array())
+
+            val responsePacket = withTimeout(5_000) { server.awaitChannelData() }
+            assertEquals(79, responsePacket.recipientChannel().toInt())
+            val response = ByteBuffer.wrap(responsePacket.data().data())
+            assertEquals(12, response.get(4).toInt() and 0xFF)
+            assertEquals(1, response.getInt(5))
+
             server.sendChannelClose(agentLocalChannel)
             yield()
         }
