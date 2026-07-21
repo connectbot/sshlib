@@ -18,6 +18,7 @@
 package org.connectbot.sshlib.crypto
 
 import io.kaitai.struct.ByteBufferKaitaiStream
+import org.connectbot.sshlib.protocol.EcdsaPublicKeyBlob
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
 
@@ -41,6 +42,15 @@ internal object SignatureVerifier {
 
         val pubKey = SshPublicKey(ByteBufferKaitaiStream(serverHostKey))
         pubKey._read()
+
+        if (!isAlgorithmCompatibleWithKeyType(expectedAlgorithm, pubKey.algorithmName())) {
+            return false
+        }
+        if (expectedAlgorithm.startsWith("ecdsa-sha2-") &&
+            (pubKey.keyBlob() as EcdsaPublicKeyBlob).curveIdentifier().value() != expectedAlgorithm.removePrefix("ecdsa-sha2-")
+        ) {
+            return false
+        }
 
         val algorithm = SignatureEntry.fromSshName(sig.algorithmName())?.algorithm
             ?: return false
@@ -72,8 +82,8 @@ internal object SignatureVerifier {
         return algorithm.verify(pubKey, sig, data)
     }
 
-    private fun isAlgorithmCompatibleWithKeyType(sigAlgorithm: String, keyType: String): Boolean = when (keyType) {
-        "ssh-rsa" -> sigAlgorithm in setOf("ssh-rsa", "rsa-sha2-256", "rsa-sha2-512")
-        else -> sigAlgorithm == keyType
+    private fun isAlgorithmCompatibleWithKeyType(algorithm: String, keyType: String): Boolean = when (algorithm) {
+        "ssh-rsa", "rsa-sha2-256", "rsa-sha2-512" -> keyType == "ssh-rsa"
+        else -> algorithm == keyType
     }
 }

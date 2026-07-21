@@ -1382,9 +1382,19 @@ class SshConnection(
         val hash = exchangeHash
             ?: throw SshException("Exchange hash computation failed")
 
-        if (sessionId == null) {
-            sessionId = hash.copyOf()
+        val existingKey = serverHostKeyBlob
+        if (existingKey != null && !serverHostKey.contentEquals(existingKey)) {
+            logger.error("Host key changed during re-key — possible MITM attack")
+            throw SshException("Host key changed during re-key")
         }
+
+        val negotiatedAlg = negotiatedHostKeyAlgorithm
+            ?: throw SshException("No host key algorithm negotiated")
+        if (!SignatureVerifier.verify(serverHostKey, signature, hash, negotiatedAlg)) {
+            logger.error("Server signature verification failed")
+            throw SshException("Server signature verification failed")
+        }
+        logger.info("Server signature verified")
 
         val keyType = try {
             val stream = ByteBufferKaitaiStream(serverHostKey)
@@ -1406,20 +1416,10 @@ class SshConnection(
         }
         logger.info("Host key verified")
 
-        val existingKey = serverHostKeyBlob
-        if (existingKey != null && !serverHostKey.contentEquals(existingKey)) {
-            logger.error("Host key changed during re-key — possible MITM attack")
-            throw SshException("Host key changed during re-key")
-        }
         serverHostKeyBlob = serverHostKey
-
-        val negotiatedAlg = negotiatedHostKeyAlgorithm
-            ?: throw SshException("No host key algorithm negotiated")
-        if (!SignatureVerifier.verify(serverHostKey, signature, hash, negotiatedAlg)) {
-            logger.error("Server signature verification failed")
-            throw SshException("Server signature verification failed")
+        if (sessionId == null) {
+            sessionId = hash.copyOf()
         }
-        logger.info("Server signature verified")
 
         clientKexInit?.fill(0)
         clientKexInit = null

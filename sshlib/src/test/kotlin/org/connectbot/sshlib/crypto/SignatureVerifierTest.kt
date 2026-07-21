@@ -166,6 +166,30 @@ class SignatureVerifierTest {
     }
 
     @Test
+    fun `rejects RSA key blob for a negotiated Ed25519 algorithm`() {
+        val kp = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        val data = "exchange hash".toByteArray()
+        val hostKey = buildRsaHostKey(kp.public as RSAPublicKey)
+        val sigBlob = buildSignatureBlob("ssh-ed25519", ByteArray(64))
+
+        assertFalse(SignatureVerifier.verify(hostKey, sigBlob, data, "ssh-ed25519"))
+    }
+
+    @Test
+    fun `rejects ECDSA key whose inner curve disagrees with negotiated algorithm`() {
+        val privateKey = readKey("ecdsa256_unencrypted")
+        val data = "exchange hash".toByteArray()
+        val hostKey = SshPublicKeyEncoder.encode(privateKey.jcaKeyPair, "ecdsa-sha2-nistp256")
+        val mismatchedOuterName = hostKey.copyOf().also {
+            val name = "ecdsa-sha2-nistp384".toByteArray(Charsets.US_ASCII)
+            name.copyInto(it, 4)
+        }
+        val sigBlob = signWithSshAlgorithm(privateKey, "ecdsa-sha2-nistp384", data)
+
+        assertFalse(SignatureVerifier.verify(mismatchedOuterName, sigBlob, data, "ecdsa-sha2-nistp384"))
+    }
+
+    @Test
     fun `verifyWithKeyType accepts RSA-compatible signature algorithms`() {
         val privateKey = readKey("rsa_unencrypted")
         val data = "session binding".toByteArray()
