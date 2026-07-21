@@ -54,6 +54,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,6 +82,35 @@ class SshConnectionFlowTest {
 
         try {
             assertIs<ConnectResult.HostKeyRejected>(connectInBackground(connection, backgroundScope, dispatcher))
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    fun `host key verifier is not called before server proves key possession`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val (clientTransport, serverTransport) = PipedTransport.create()
+        val server = FakeSshServer(serverTransport, backgroundScope, dispatcher).apply {
+            corruptKexSignature = true
+        }
+        server.start(ignoreTransportErrors = true)
+        var verifierCalled = false
+        val connection = SshConnection(
+            transport = clientTransport,
+            hostKeyVerifier = object : HostKeyVerifier {
+                override suspend fun verify(key: PublicKey): Boolean {
+                    verifierCalled = true
+                    return true
+                }
+            },
+            coroutineDispatcher = dispatcher,
+        )
+
+        try {
+            val result = connectInBackground(connection, backgroundScope, dispatcher)
+            assertFalse(result is ConnectResult.Success)
+            assertFalse(verifierCalled)
         } finally {
             connection.close()
         }

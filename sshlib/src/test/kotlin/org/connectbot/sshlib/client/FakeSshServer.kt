@@ -103,6 +103,7 @@ class FakeSshServer(
     var advertisePing: Boolean = false
     var advertiseExtInfo: Boolean = false
     var kexAlgorithms: String? = null
+    var corruptKexSignature: Boolean = false
     private val receivedPongs = Channel<ByteArray>(Channel.UNLIMITED)
     private val receivedExtInfo = Channel<SshMsgExtInfo>(Channel.UNLIMITED)
     private val receivedUserauthRequests = Channel<SshMsgUserauthRequest>(Channel.UNLIMITED)
@@ -410,7 +411,9 @@ class FakeSshServer(
             sessionId = exchangeHash
         }
 
-        val signature = signExchangeHash(exchangeHash)
+        val signature = signExchangeHash(exchangeHash).also {
+            if (corruptKexSignature) it[0] = (it[0].toInt() xor 1).toByte()
+        }
         val signatureBlob = buildSignatureBlob(signature)
 
         val reply = SshMsgKexEcdhReply().apply {
