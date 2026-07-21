@@ -352,7 +352,7 @@ internal interface SshClientCallbacks {
     suspend fun sendKexDhGexInit()
     suspend fun sendNewKeys()
     fun receiveNewKeys()
-    suspend fun activateEncryption()
+    fun activateEncryption()
     suspend fun sendClientExtInfo()
     suspend fun sendServiceRequest(service: String)
     fun receiveServiceAccept(service: String)
