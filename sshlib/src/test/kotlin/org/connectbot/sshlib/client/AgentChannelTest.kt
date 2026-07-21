@@ -21,8 +21,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -36,26 +38,20 @@ class AgentChannelTest {
     private val maxPacketSize = 1024
     private val initialWindowSize = 4096L
 
-    private val agentChannel = AgentChannel(
-        handler,
-        connection,
-        localChannel,
-        remoteChannel,
-        maxPacketSize,
-        initialWindowSize,
-    )
-
     @Test
     fun `handleData calls handler and sends response`() = runTest {
+        val agentChannel = newChannel(this)
         val request = byteArrayOf(1, 2, 3)
         val response = byteArrayOf(4, 5, 6)
 
         coEvery { handler.handleRequest(request) } returns response
 
         agentChannel.handleData(request)
+        advanceUntilIdle()
 
         coVerify { handler.handleRequest(request) }
         coVerify { connection.sendChannelData(remoteChannel, response) }
+        agentChannel.onClose()
     }
 
     @Test
@@ -63,6 +59,7 @@ class AgentChannelTest {
         val smallWindowChannel = AgentChannel(
             handler,
             connection,
+            this,
             localChannel,
             remoteChannel,
             maxPacketSize,
@@ -73,19 +70,21 @@ class AgentChannelTest {
         val response = byteArrayOf(4, 5, 6)
         coEvery { handler.handleRequest(request) } returns response
 
-        // This would suspend if we don't adjust window
-        val job = launch {
-            smallWindowChannel.handleData(request)
-        }
+        // Packet dispatch must return even while the response is blocked by the
+        // peer's zero-sized send window.
+        smallWindowChannel.handleData(request)
+        coVerify(exactly = 0) { connection.sendChannelData(any(), any()) }
 
         smallWindowChannel.onWindowAdjust(10L)
-        job.join()
+        advanceUntilIdle()
 
         coVerify { connection.sendChannelData(remoteChannel, response) }
+        smallWindowChannel.onClose()
     }
 
     @Test
     fun `onClose sends CHANNEL_CLOSE and closes channel`() = runTest {
+        val agentChannel = newChannel(backgroundScope)
         assertTrue(agentChannel.isOpen)
 
         agentChannel.onClose()
@@ -96,6 +95,7 @@ class AgentChannelTest {
 
     @Test
     fun `onClose only sends CHANNEL_CLOSE once`() = runTest {
+        val agentChannel = newChannel(backgroundScope)
         agentChannel.onClose()
         agentChannel.onClose()
 
@@ -104,6 +104,7 @@ class AgentChannelTest {
 
     @Test
     fun `handleData does nothing if channel is closed`() = runTest {
+        val agentChannel = newChannel(backgroundScope)
         agentChannel.onClose()
         agentChannel.handleData(byteArrayOf(1, 2, 3))
 
@@ -112,6 +113,26 @@ class AgentChannelTest {
 
     @Test
     fun `onEof does not throw`() {
+        val agentChannel = newChannel(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
         agentChannel.onEof()
     }
+
+    @Test
+    fun `remote packet size is rejected or safely bounded`() {
+        assertNull(boundRemotePacketSize(0))
+        assertNull(boundRemotePacketSize(-1))
+        assertNull(boundRemotePacketSize(0x1_0000_0000L))
+        assertEquals(1, boundRemotePacketSize(1))
+        assertEquals(32 * 1024, boundRemotePacketSize(0xFFFFFFFFL))
+    }
+
+    private fun newChannel(scope: kotlinx.coroutines.CoroutineScope) = AgentChannel(
+        handler,
+        connection,
+        scope,
+        localChannel,
+        remoteChannel,
+        maxPacketSize,
+        initialWindowSize,
+    )
 }
