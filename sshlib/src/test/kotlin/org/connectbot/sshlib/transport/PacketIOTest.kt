@@ -18,16 +18,37 @@
 package org.connectbot.sshlib.transport
 
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.crypto.AeadResult
 import org.connectbot.sshlib.crypto.AesCbcCipher
 import org.connectbot.sshlib.crypto.HmacSha256
+import org.connectbot.sshlib.crypto.PacketAead
 import org.connectbot.sshlib.protocol.SshEnums
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
 
 class PacketIOTest {
+
+    private class TrackingAead : PacketAead {
+        var destroyed = false
+
+        override val tagLength: Int = 16
+
+        override fun encrypt(packetLength: ByteArray, plaintext: ByteArray): AeadResult =
+            AeadResult(plaintext.copyOf(), ByteArray(tagLength))
+
+        override fun decrypt(packetLength: ByteArray, ciphertext: ByteArray, tag: ByteArray): ByteArray =
+            ciphertext.copyOf()
+
+        override fun destroy() {
+            destroyed = true
+        }
+
+        override fun isDestroyed(): Boolean = destroyed
+    }
 
     @Test
     fun `unencrypted round trip works`() = runBlocking {
@@ -139,6 +160,27 @@ class PacketIOTest {
 
         io.resetSendSequenceNumber()
         io.resetReceiveSequenceNumber()
+    }
+
+    @Test
+    fun `outbound and inbound AEAD keys are replaced independently`() {
+        val io = PacketIO(ByteArrayTransport())
+        val oldOutbound = TrackingAead()
+        val oldInbound = TrackingAead()
+        val newOutbound = TrackingAead()
+        val newInbound = TrackingAead()
+        io.enableAead(oldOutbound, oldInbound)
+
+        io.enableSendAead(newOutbound)
+
+        assertTrue(oldOutbound.destroyed)
+        assertFalse(oldInbound.destroyed)
+
+        io.enableReceiveAead(newInbound)
+
+        assertTrue(oldInbound.destroyed)
+        assertFalse(newOutbound.destroyed)
+        assertFalse(newInbound.destroyed)
     }
 
     @Test

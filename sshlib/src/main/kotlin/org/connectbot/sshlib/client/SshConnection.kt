@@ -64,6 +64,10 @@ import org.connectbot.sshlib.crypto.KexEntry
 import org.connectbot.sshlib.crypto.KexType
 import org.connectbot.sshlib.crypto.KeyDerivation
 import org.connectbot.sshlib.crypto.MacEntry
+import org.connectbot.sshlib.crypto.PacketAead
+import org.connectbot.sshlib.crypto.PacketCipher
+import org.connectbot.sshlib.crypto.PacketCompressor
+import org.connectbot.sshlib.crypto.PacketMac
 import org.connectbot.sshlib.crypto.SignatureEntry
 import org.connectbot.sshlib.crypto.SignatureVerifier
 import org.connectbot.sshlib.crypto.SshPrivateKey
@@ -142,6 +146,72 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import org.connectbot.sshlib.AuthResult as PublicAuthResult
 
+private sealed interface PendingProtection {
+    fun installOutbound(packetIO: PacketIO)
+    fun installInbound(packetIO: PacketIO)
+    fun destroy()
+}
+
+private class PendingAeadProtection(
+    private var outbound: PacketAead?,
+    private var inbound: PacketAead?,
+) : PendingProtection {
+    override fun installOutbound(packetIO: PacketIO) {
+        val aead = outbound ?: throw SshException("Outbound AEAD protection already installed")
+        packetIO.enableSendAead(aead)
+        outbound = null
+    }
+
+    override fun installInbound(packetIO: PacketIO) {
+        val aead = inbound ?: throw SshException("Inbound AEAD protection already installed")
+        packetIO.enableReceiveAead(aead)
+        inbound = null
+    }
+
+    override fun destroy() {
+        outbound?.destroy()
+        outbound = null
+        inbound?.destroy()
+        inbound = null
+    }
+}
+
+private class PendingCipherProtection(
+    private var outboundCipher: PacketCipher?,
+    private var outboundMac: PacketMac?,
+    private val outboundEtm: Boolean,
+    private var inboundCipher: PacketCipher?,
+    private var inboundMac: PacketMac?,
+    private val inboundEtm: Boolean,
+) : PendingProtection {
+    override fun installOutbound(packetIO: PacketIO) {
+        val cipher = outboundCipher ?: throw SshException("Outbound cipher protection already installed")
+        val mac = outboundMac ?: throw SshException("Outbound MAC protection already installed")
+        packetIO.enableSendEncryption(cipher, mac, outboundEtm)
+        outboundCipher = null
+        outboundMac = null
+    }
+
+    override fun installInbound(packetIO: PacketIO) {
+        val cipher = inboundCipher ?: throw SshException("Inbound cipher protection already installed")
+        val mac = inboundMac ?: throw SshException("Inbound MAC protection already installed")
+        packetIO.enableReceiveEncryption(cipher, mac, inboundEtm)
+        inboundCipher = null
+        inboundMac = null
+    }
+
+    override fun destroy() {
+        outboundCipher?.destroy()
+        outboundCipher = null
+        outboundMac?.destroy()
+        outboundMac = null
+        inboundCipher?.destroy()
+        inboundCipher = null
+        inboundMac?.destroy()
+        inboundMac = null
+    }
+}
+
 /**
  * SSH connection handler that manages the protocol flow.
  *
@@ -219,7 +289,7 @@ class SshConnection(
         override suspend fun sendKexDhGexInit() = this@SshConnection.sendKexDhGexInit()
         override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
         override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
-        override suspend fun activateEncryption() = this@SshConnection.activateEncryption()
+        override fun activateEncryption() = this@SshConnection.activateEncryption()
         override suspend fun sendClientExtInfo() = this@SshConnection.sendClientExtInfo()
         override suspend fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
         override fun receiveServiceAccept(service: String) = this@SshConnection.receiveServiceAccept(service)
@@ -382,6 +452,10 @@ class SshConnection(
 
     @Volatile private var pendingConnect: CompletableDeferred<ConnectResult>? = null
     private var dhGexGroup: SshMsgKexDhGexGroup? = null
+    private var pendingProtection: PendingProtection? = null
+    private var pendingSendCompressor: PacketCompressor? = null
+    private var pendingReceiveCompressor: PacketCompressor? = null
+    private var pendingCompressionImmediate = false
 
     private suspend fun dispatchEvent(event: SshClientStateMachine.SshEvent) {
         logger.debug("Dispatching event: $event")
@@ -1358,11 +1432,22 @@ class SshConnection(
 
     private suspend fun sendNewKeys() {
         logger.info("Sending NEW_KEYS")
-        writeMutex.withLock {
-            packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
-            if (strictKexEnabled) {
-                packetIO.resetSendSequenceNumber()
+        prepareEncryption()
+        try {
+            writeMutex.withLock {
+                packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
+                val protection = pendingProtection
+                    ?: throw SshException("No staged packet protection")
+                protection.installOutbound(packetIO)
+                packetIO.enableSendCompression(pendingSendCompressor, pendingCompressionImmediate)
+                pendingSendCompressor = null
+                if (strictKexEnabled) {
+                    packetIO.resetSendSequenceNumber()
+                }
             }
+        } catch (e: Exception) {
+            discardPendingEncryption()
+            throw e
         }
     }
 
@@ -1446,14 +1531,33 @@ class SshConnection(
 
     private fun receiveNewKeys() {
         logger.info("Received NEW_KEYS from server")
+        val protection = pendingProtection
+            ?: throw SshException("No staged packet protection")
+        protection.installInbound(packetIO)
+        packetIO.enableReceiveCompression(pendingReceiveCompressor, pendingCompressionImmediate)
+        pendingReceiveCompressor = null
         if (strictKexEnabled) {
             packetIO.resetReceiveSequenceNumber()
         }
     }
 
-    private suspend fun activateEncryption() {
-        logger.info("Activating encryption")
+    private fun activateEncryption() {
+        logger.info("Encryption active")
+        pendingProtection?.destroy()
+        pendingProtection = null
+        pendingSendCompressor = null
+        pendingReceiveCompressor = null
 
+        kex?.zeroize()
+        kex = null
+        sharedSecret?.fill(0)
+        sharedSecret = null
+        exchangeHash?.fill(0)
+        exchangeHash = null
+    }
+
+    private fun prepareEncryption() {
+        discardPendingEncryption()
         val encC2S = negotiatedEncryptionC2S
             ?: throw SshException("No encryption algorithm negotiated for client-to-server")
         val encS2C = negotiatedEncryptionS2C
@@ -1463,19 +1567,10 @@ class SshConnection(
             ?: throw SshException("Unknown cipher: $encC2S")
 
         if (cipherC2S.isAead) {
-            activateAeadEncryption(encC2S, encS2C)
+            pendingProtection = prepareAeadEncryption(encC2S, encS2C)
         } else {
-            activateNonAeadEncryption(encC2S, encS2C)
+            pendingProtection = prepareNonAeadEncryption(encC2S, encS2C)
         }
-
-        logger.info("Encryption active")
-
-        kex?.zeroize()
-        kex = null
-        sharedSecret?.fill(0)
-        sharedSecret = null
-        exchangeHash?.fill(0)
-        exchangeHash = null
 
         val compC2SName = negotiatedCompressionC2S
         val compS2CName = negotiatedCompressionS2C
@@ -1483,16 +1578,15 @@ class SshConnection(
             val compC2S = CompressionEntry.fromSshName(compC2SName)
             val compS2C = CompressionEntry.fromSshName(compS2CName)
             if (compC2S != null && compS2C != null) {
-                val immediateActivation = !compC2S.delayedActivation && !compS2C.delayedActivation
-                writeMutex.withLock {
-                    packetIO.enableCompression(compC2S.create(), compS2C.create(), immediateActivation)
-                }
-                logger.info("Compression configured: c2s=$compC2SName, s2c=$compS2CName, immediate=$immediateActivation")
+                pendingCompressionImmediate = isRekeying || (!compC2S.delayedActivation && !compS2C.delayedActivation)
+                pendingSendCompressor = compC2S.create()
+                pendingReceiveCompressor = compS2C.create()
+                logger.info("Compression staged: c2s=$compC2SName, s2c=$compS2CName, immediate=$pendingCompressionImmediate")
             }
         }
     }
 
-    private suspend fun activateAeadEncryption(encC2S: String, encS2C: String) {
+    private fun prepareAeadEncryption(encC2S: String, encS2C: String): PendingProtection {
         val entryC2S = CipherEntry.fromSshName(encC2S)
             ?: throw SshException("Unknown AEAD cipher: $encC2S")
         val entryS2C = CipherEntry.fromSshName(encS2C)
@@ -1526,11 +1620,13 @@ class SshConnection(
 
         try {
             val c2sAead = (entryC2S.create(c2sKey, c2sIv, true) as EncryptionInstance.Aead).aead
-            val s2cAead = (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
-
-            writeMutex.withLock {
-                packetIO.enableAead(c2sAead, s2cAead)
+            val s2cAead = try {
+                (entryS2C.create(s2cKey, s2cIv, false) as EncryptionInstance.Aead).aead
+            } catch (e: Exception) {
+                c2sAead.destroy()
+                throw e
             }
+            return PendingAeadProtection(c2sAead, s2cAead)
         } finally {
             keys.zeroize()
             c2sKey.fill(0)
@@ -1540,7 +1636,7 @@ class SshConnection(
         }
     }
 
-    private suspend fun activateNonAeadEncryption(encC2S: String, encS2C: String) {
+    private fun prepareNonAeadEncryption(encC2S: String, encS2C: String): PendingProtection {
         val cipherEntryC2S = CipherEntry.fromSshName(encC2S)
             ?: throw SshException("Unknown cipher: $encC2S")
         val cipherEntryS2C = CipherEntry.fromSshName(encS2C)
@@ -1585,20 +1681,25 @@ class SshConnection(
 
         try {
             val clientToServerCipher = (cipherEntryC2S.create(c2sCipherKey, c2sIv, true) as EncryptionInstance.Cipher).cipher
-            val serverToClientCipher = (cipherEntryS2C.create(s2cCipherKey, s2cIv, false) as EncryptionInstance.Cipher).cipher
-
-            val clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
-            val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
-
-            writeMutex.withLock {
-                packetIO.enableEncryption(
+            var serverToClientCipher: PacketCipher? = null
+            var clientToServerMac: PacketMac? = null
+            try {
+                serverToClientCipher = (cipherEntryS2C.create(s2cCipherKey, s2cIv, false) as EncryptionInstance.Cipher).cipher
+                clientToServerMac = macEntryC2S.create(keys.integrityKeyClientToServer)
+                val serverToClientMac = macEntryS2C.create(keys.integrityKeyServerToClient)
+                return PendingCipherProtection(
                     clientToServerCipher,
                     clientToServerMac,
+                    macEntryC2S.isEtm,
                     serverToClientCipher,
                     serverToClientMac,
-                    clientToServerEtm = macEntryC2S.isEtm,
-                    serverToClientEtm = macEntryS2C.isEtm,
+                    macEntryS2C.isEtm,
                 )
+            } catch (e: Exception) {
+                clientToServerCipher.destroy()
+                serverToClientCipher?.destroy()
+                clientToServerMac?.destroy()
+                throw e
             }
         } finally {
             keys.zeroize()
@@ -1607,6 +1708,14 @@ class SshConnection(
             c2sIv.fill(0)
             s2cIv.fill(0)
         }
+    }
+
+    private fun discardPendingEncryption() {
+        pendingProtection?.destroy()
+        pendingProtection = null
+        pendingSendCompressor = null
+        pendingReceiveCompressor = null
+        pendingCompressionImmediate = false
     }
 
     private suspend fun sendServiceRequest(service: String) {

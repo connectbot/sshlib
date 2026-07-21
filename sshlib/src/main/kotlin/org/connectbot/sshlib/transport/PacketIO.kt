@@ -100,20 +100,30 @@ internal class PacketIO(private val transport: Transport) {
         clientToServerEtm: Boolean = false,
         serverToClientEtm: Boolean = false,
     ) {
+        enableSendEncryption(clientToServerCipher, clientToServerMac, clientToServerEtm)
+        enableReceiveEncryption(serverToClientCipher, serverToClientMac, serverToClientEtm)
+    }
+
+    /** Install cipher and MAC protection for subsequent outbound packets. */
+    fun enableSendEncryption(cipher: PacketCipher, mac: PacketMac, etm: Boolean = false) {
         sendAead?.destroy()
         sendAead = null
-        receiveAead?.destroy()
-        receiveAead = null
         sendCipher?.destroy()
         sendMac?.destroy()
+        sendCipher = cipher
+        sendMac = mac
+        sendEtm = etm
+    }
+
+    /** Install cipher and MAC protection for subsequent inbound packets. */
+    fun enableReceiveEncryption(cipher: PacketCipher, mac: PacketMac, etm: Boolean = false) {
+        receiveAead?.destroy()
+        receiveAead = null
         receiveCipher?.destroy()
         receiveMac?.destroy()
-        this.sendCipher = clientToServerCipher
-        this.sendMac = clientToServerMac
-        this.receiveCipher = serverToClientCipher
-        this.receiveMac = serverToClientMac
-        this.sendEtm = clientToServerEtm
-        this.receiveEtm = serverToClientEtm
+        receiveCipher = cipher
+        receiveMac = mac
+        receiveEtm = etm
     }
 
     /**
@@ -126,20 +136,30 @@ internal class PacketIO(private val transport: Transport) {
         clientToServerAead: PacketAead,
         serverToClientAead: PacketAead,
     ) {
+        enableSendAead(clientToServerAead)
+        enableReceiveAead(serverToClientAead)
+    }
+
+    /** Install AEAD protection for subsequent outbound packets. */
+    fun enableSendAead(aead: PacketAead) {
         sendCipher?.destroy()
         sendCipher = null
         sendMac?.destroy()
         sendMac = null
+        sendEtm = false
+        sendAead?.destroy()
+        sendAead = aead
+    }
+
+    /** Install AEAD protection for subsequent inbound packets. */
+    fun enableReceiveAead(aead: PacketAead) {
         receiveCipher?.destroy()
         receiveCipher = null
         receiveMac?.destroy()
         receiveMac = null
-        sendEtm = false
         receiveEtm = false
-        sendAead?.destroy()
         receiveAead?.destroy()
-        this.sendAead = clientToServerAead
-        this.receiveAead = serverToClientAead
+        receiveAead = aead
     }
 
     /**
@@ -171,12 +191,20 @@ internal class PacketIO(private val transport: Transport) {
         serverToClient: PacketCompressor?,
         immediateActivation: Boolean,
     ) {
-        this.sendCompressor = clientToServer
-        this.receiveCompressor = serverToClient
-        if (immediateActivation) {
-            this.sendCompressionActive = clientToServer != null
-            this.receiveCompressionActive = serverToClient != null
-        }
+        enableSendCompression(clientToServer, immediateActivation)
+        enableReceiveCompression(serverToClient, immediateActivation)
+    }
+
+    /** Install the compressor used for subsequent outbound packets. */
+    fun enableSendCompression(compressor: PacketCompressor?, immediateActivation: Boolean) {
+        sendCompressor = compressor
+        sendCompressionActive = immediateActivation && compressor != null
+    }
+
+    /** Install the compressor used for subsequent inbound packets. */
+    fun enableReceiveCompression(compressor: PacketCompressor?, immediateActivation: Boolean) {
+        receiveCompressor = compressor
+        receiveCompressionActive = immediateActivation && compressor != null
     }
 
     /**
