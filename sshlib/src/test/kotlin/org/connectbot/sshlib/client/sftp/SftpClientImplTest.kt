@@ -282,6 +282,63 @@ class SftpClientImplTest {
         }
     }
 
+    @Test
+    fun `oversized HANDLE and DATA strings return protocol errors`() = runBlocking {
+        val maliciousLength = ByteBuffer.allocate(4).putInt(Int.MAX_VALUE).array()
+        val client = createClient(
+            FakeSshSession(responseFor = { type, _ ->
+                when (type) {
+                    SSH_FXP_OPEN -> response(SSH_FXP_HANDLE, maliciousLength)
+                    SSH_FXP_READ -> response(SSH_FXP_DATA, maliciousLength)
+                    else -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.OK))
+                }
+            }),
+        )
+
+        assertIs<SftpResult.ProtocolError>(client.open("/file", setOf(SftpOpenFlag.READ)))
+        assertIs<SftpResult.ProtocolError>(client.read(SftpFileHandle(byteArrayOf(1)), 0, 1))
+        Unit
+    }
+
+    @Test
+    fun `oversized STATUS message returns protocol error`() = runBlocking {
+        val payload = ByteBuffer.allocate(8)
+            .putInt(SftpStatusCode.FAILURE.code)
+            .putInt(Int.MAX_VALUE)
+            .array()
+        val client = createClient(
+            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_STATUS, payload) }),
+        )
+
+        assertIs<SftpResult.ProtocolError>(client.remove("/file"))
+        Unit
+    }
+
+    @Test
+    fun `excessive NAME count returns protocol error`() = runBlocking {
+        val payload = ByteBuffer.allocate(4).putInt(Int.MAX_VALUE).array()
+        val client = createClient(
+            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_NAME, payload) }),
+        )
+
+        assertIs<SftpResult.ProtocolError>(client.readdir(SftpFileHandle(byteArrayOf(1))))
+        Unit
+    }
+
+    @Test
+    fun `malformed extended attributes return protocol error`() = runBlocking {
+        val payload = ByteBuffer.allocate(8)
+            .putInt(0x80000000.toInt())
+            .putInt(Int.MAX_VALUE)
+            .array()
+        val client = createClient(
+            FakeSshSession(responseFor = { _, _ -> response(SSH_FXP_ATTRS, payload) }),
+        )
+
+        assertIs<SftpResult.ProtocolError>(client.stat("/file"))
+        Unit
+    }
+
     private suspend fun createClient(session: FakeSshSession): SftpClient {
         session.enqueueRead(packet(SSH_FXP_VERSION, ByteBuffer.allocate(4).putInt(3).array()))
         return assertSuccess(SftpClientImpl.create(session))

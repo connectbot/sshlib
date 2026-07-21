@@ -319,7 +319,11 @@ internal class SftpClientImpl private constructor(
         payload: ByteArray,
         map: (SftpRawPacket) -> SftpResult<T>,
     ): SftpResult<T> = when (val result = dispatcher.request(type, payload)) {
-        is SftpResult.Success -> map(result.value)
+        is SftpResult.Success -> try {
+            map(result.value)
+        } catch (e: SftpDecodeException) {
+            SftpResult.ProtocolError(e.message ?: "Malformed SFTP response")
+        }
         is SftpResult.ServerError -> result
         is SftpResult.ProtocolError -> result
         is SftpResult.IoError -> result
@@ -436,10 +440,7 @@ internal class SftpClientImpl private constructor(
 
         /** Read a length-prefixed string/byte array from a ByteBuffer. */
         private fun extractString(buf: ByteBuffer): ByteArray {
-            val len = buf.int
-            val data = ByteArray(len)
-            buf.get(data)
-            return data
+            return SftpDecoder.readString(buf, "SFTP string")
         }
 
         /** Decode a STATUS response to get the status code. */
@@ -452,7 +453,7 @@ internal class SftpClientImpl private constructor(
         /** Decode a STATUS response into an [SftpResult.ServerError]. */
         private fun decodeStatusError(payload: ByteArray): SftpResult.ServerError {
             val buf = ByteBuffer.wrap(payload)
-            val code = if (buf.remaining() >= 4) buf.int else 4
+            val code = if (buf.remaining() >= 4) SftpDecoder.readInt(buf, "status code") else 4
             val statusCode = SftpStatusCode.fromCode(code)
             val message = if (buf.remaining() >= 4) {
                 val msgBytes = extractString(buf)
@@ -466,8 +467,8 @@ internal class SftpClientImpl private constructor(
         /** Decode a NAME response (used by readdir, realpath, readlink). */
         private fun decodeName(payload: ByteArray): List<SftpDirectoryEntry> {
             val buf = ByteBuffer.wrap(payload)
-            val count = buf.int
-            val entries = mutableListOf<SftpDirectoryEntry>()
+            val count = SftpDecoder.readCount(buf, "NAME entry count", minimumElementSize = 12)
+            val entries = ArrayList<SftpDirectoryEntry>(count)
             repeat(count) {
                 val filename = String(extractString(buf), StandardCharsets.UTF_8)
                 val longname = String(extractString(buf), StandardCharsets.UTF_8)
