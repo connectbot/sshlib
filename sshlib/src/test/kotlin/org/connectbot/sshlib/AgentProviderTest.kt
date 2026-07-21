@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import kotlin.test.assertIs
 
 class AgentProviderTest {
 
@@ -50,25 +51,27 @@ class AgentProviderTest {
     @Test
     fun `AgentProvider can be implemented with custom logic`() = runTest {
         val testProvider = object : AgentProvider {
-            override suspend fun getIdentities(): List<AgentIdentity> = listOf(
-                AgentIdentity(
-                    publicKeyBlob = byteArrayOf(1, 2, 3),
-                    comment = "test-key-1",
-                ),
-                AgentIdentity(
-                    publicKeyBlob = byteArrayOf(4, 5, 6),
-                    comment = "test-key-2",
+            override suspend fun getIdentities() = AgentResult.Success(
+                listOf(
+                    AgentIdentity(
+                        publicKeyBlob = byteArrayOf(1, 2, 3),
+                        comment = "test-key-1",
+                    ),
+                    AgentIdentity(
+                        publicKeyBlob = byteArrayOf(4, 5, 6),
+                        comment = "test-key-2",
+                    ),
                 ),
             )
 
-            override suspend fun signData(context: AgentSigningContext): ByteArray? = if (context.isBound) {
-                byteArrayOf(1, 2, 3, 4)
+            override suspend fun signData(context: AgentSigningContext) = if (context.isBound) {
+                AgentResult.Success(byteArrayOf(1, 2, 3, 4))
             } else {
-                null
+                AgentResult.Success(null)
             }
         }
 
-        val identities = testProvider.getIdentities()
+        val identities = assertIs<AgentResult.Success<List<AgentIdentity>>>(testProvider.getIdentities()).value
         assertEquals(2, identities.size)
         assertEquals("test-key-1", identities[0].comment)
         assertEquals("test-key-2", identities[1].comment)
@@ -81,10 +84,10 @@ class AgentProviderTest {
             serverHostKey = byteArrayOf(10, 11, 12),
             isBound = true,
         )
-        assertNotNull(testProvider.signData(boundContext))
+        assertNotNull(assertIs<AgentResult.Success<ByteArray?>>(testProvider.signData(boundContext)).value)
 
         val unboundContext = boundContext.copy(isBound = false)
-        assertNull(testProvider.signData(unboundContext))
+        assertNull(assertIs<AgentResult.Success<ByteArray?>>(testProvider.signData(unboundContext)).value)
     }
 
     @Test

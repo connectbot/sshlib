@@ -1714,11 +1714,21 @@ class SshConnection(
                         rejectChannelOpen(senderChannel, channelType)
                         return
                     }
+                    val verifiedSessionId = sessionId
+                    val verifiedServerHostKey = serverHostKeyBlob
+                    if (verifiedSessionId == null || verifiedSessionId.isEmpty() ||
+                        verifiedSessionId.size > AGENT_MAX_SESSION_ID_LENGTH ||
+                        verifiedServerHostKey == null || verifiedServerHostKey.isEmpty()
+                    ) {
+                        logger.error("Rejecting agent channel without a verified SSH session binding")
+                        rejectChannelOpen(senderChannel, channelType)
+                        return
+                    }
                     val localChannelNumber = allocateChannelNumber()
 
                     val sessionInfo = AgentSessionInfo(
-                        sessionId = sessionId ?: ByteArray(0),
-                        serverHostKey = serverHostKeyBlob ?: ByteArray(0),
+                        sessionId = verifiedSessionId.copyOf(),
+                        serverHostKey = verifiedServerHostKey.copyOf(),
                     )
                     val handler = AgentProtocolHandler(agentProvider!!, sessionInfo)
                     val agentChannel = AgentChannel(
