@@ -44,22 +44,20 @@ internal object SftpFileAttributes {
      * Parse ATTRS from a ByteBuffer at its current position.
      */
     fun decode(buf: ByteBuffer): SftpAttributes {
-        val flags = buf.int
-        val size = if (flags and SSH_FILEXFER_ATTR_SIZE != 0) buf.long else null
-        val uid = if (flags and SSH_FILEXFER_ATTR_UIDGID != 0) buf.int else null
-        val gid = if (flags and SSH_FILEXFER_ATTR_UIDGID != 0) buf.int else null
-        val permissions = if (flags and SSH_FILEXFER_ATTR_PERMISSIONS != 0) buf.int else null
-        val atime = if (flags and SSH_FILEXFER_ATTR_ACMODTIME != 0) buf.int else null
-        val mtime = if (flags and SSH_FILEXFER_ATTR_ACMODTIME != 0) buf.int else null
+        val flags = SftpDecoder.readInt(buf, "attribute flags")
+        val size = if (flags and SSH_FILEXFER_ATTR_SIZE != 0) SftpDecoder.readLong(buf, "file size") else null
+        val uid = if (flags and SSH_FILEXFER_ATTR_UIDGID != 0) SftpDecoder.readInt(buf, "uid") else null
+        val gid = if (flags and SSH_FILEXFER_ATTR_UIDGID != 0) SftpDecoder.readInt(buf, "gid") else null
+        val permissions = if (flags and SSH_FILEXFER_ATTR_PERMISSIONS != 0) SftpDecoder.readInt(buf, "permissions") else null
+        val atime = if (flags and SSH_FILEXFER_ATTR_ACMODTIME != 0) SftpDecoder.readInt(buf, "access time") else null
+        val mtime = if (flags and SSH_FILEXFER_ATTR_ACMODTIME != 0) SftpDecoder.readInt(buf, "modification time") else null
 
         // Skip extended attributes if present
         if (flags and SSH_FILEXFER_ATTR_EXTENDED != 0) {
-            val extCount = buf.int
+            val extCount = SftpDecoder.readCount(buf, "extended attribute count", minimumElementSize = 8)
             repeat(extCount) {
-                val typeLen = buf.int
-                buf.position(buf.position() + typeLen) // skip type string
-                val dataLen = buf.int
-                buf.position(buf.position() + dataLen) // skip data string
+                SftpDecoder.readString(buf, "extended attribute type")
+                SftpDecoder.readString(buf, "extended attribute data")
             }
         }
 
