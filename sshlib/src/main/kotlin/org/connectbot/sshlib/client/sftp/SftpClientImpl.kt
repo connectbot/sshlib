@@ -324,8 +324,11 @@ internal class SftpClientImpl private constructor(
         } catch (e: SftpDecodeException) {
             SftpResult.ProtocolError(e.message ?: "Malformed SFTP response")
         }
+
         is SftpResult.ServerError -> result
+
         is SftpResult.ProtocolError -> result
+
         is SftpResult.IoError -> result
     }
 
@@ -439,9 +442,7 @@ internal class SftpClientImpl private constructor(
         }
 
         /** Read a length-prefixed string/byte array from a ByteBuffer. */
-        private fun extractString(buf: ByteBuffer): ByteArray {
-            return SftpDecoder.readString(buf, "SFTP string")
-        }
+        private fun extractString(buf: ByteBuffer): ByteArray = SftpDecoder.readString(buf, "SFTP string")
 
         /** Decode a STATUS response to get the status code. */
         private fun decodeStatus(payload: ByteArray): SftpStatusCode {

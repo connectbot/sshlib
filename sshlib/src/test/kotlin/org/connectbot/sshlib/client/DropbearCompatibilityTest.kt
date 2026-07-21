@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -219,6 +219,7 @@ class DropbearCompatibilityTest {
     fun `can connect with encryption algorithm`(algorithm: String) {
         authenticateWithPassword {
             encryptionAlgorithms = algorithm
+            macAlgorithms = "hmac-sha2-256"
         }
     }
 

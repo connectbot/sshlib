@@ -17,10 +17,10 @@
 
 package org.connectbot.sshlib.client
 
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 

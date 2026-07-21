@@ -317,8 +317,7 @@ internal enum class SignatureEntry(
          * not contain a modern RSA algorithm. The client must skip that RSA key
          * rather than guess an unadvertised algorithm or fall back to SHA-1.
          */
-        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String? =
-            serverSigAlgs?.let { advertised -> rsaPreferenceOrder.firstOrNull { it in advertised } }
+        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String? = serverSigAlgs?.let { advertised -> rsaPreferenceOrder.firstOrNull { it in advertised } }
     }
 }
 

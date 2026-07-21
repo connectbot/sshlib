@@ -36,16 +36,14 @@ internal class DiffieHellmanGroupExchange(override val hashAlgorithm: String) : 
         private const val PRIMALITY_CERTAINTY = 80
         private const val GROUP_CACHE_LIMIT = 16
         private val groupValidationCache = object : LinkedHashMap<BigInteger, Boolean>(GROUP_CACHE_LIMIT, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<BigInteger, Boolean>?): Boolean =
-                size > GROUP_CACHE_LIMIT
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<BigInteger, Boolean>?): Boolean = size > GROUP_CACHE_LIMIT
         }
 
         @Synchronized
-        private fun isSafeGroup(p: BigInteger): Boolean =
-            groupValidationCache.getOrPut(p) {
-                p.isProbablePrime(PRIMALITY_CERTAINTY) &&
-                    p.subtract(BigInteger.ONE).shiftRight(1).isProbablePrime(PRIMALITY_CERTAINTY)
-            }
+        private fun isSafeGroup(p: BigInteger): Boolean = groupValidationCache.getOrPut(p) {
+            p.isProbablePrime(PRIMALITY_CERTAINTY) &&
+                p.subtract(BigInteger.ONE).shiftRight(1).isProbablePrime(PRIMALITY_CERTAINTY)
+        }
 
         @Synchronized
         internal fun cachedGroupValidationCount(): Int = groupValidationCache.size

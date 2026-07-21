@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,8 +67,11 @@ internal object PemKeyReader {
 
         return when (ps.type) {
             PemType.RSA -> readPkcs1Rsa(ps.data)
+
             PemType.EC -> readSec1Ec(ps.data)
+
             PemType.PKCS8 -> readPkcs8(ps.data)
+
             PemType.ENCRYPTED_PKCS8 -> {
                 val password = passphrase ?: throw SshException("PKCS#8 key is encrypted, but no passphrase was specified")
                 readPkcs8(Pkcs8Encryption.decrypt(ps.data, password))

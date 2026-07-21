@@ -47,11 +47,9 @@ class PacketIOTest {
 
         override val tagLength: Int = 16
 
-        override fun encrypt(packetLength: ByteArray, plaintext: ByteArray): AeadResult =
-            AeadResult(plaintext.copyOf(), ByteArray(tagLength))
+        override fun encrypt(packetLength: ByteArray, plaintext: ByteArray): AeadResult = AeadResult(plaintext.copyOf(), ByteArray(tagLength))
 
-        override fun decrypt(packetLength: ByteArray, ciphertext: ByteArray, tag: ByteArray): ByteArray =
-            ciphertext.copyOf()
+        override fun decrypt(packetLength: ByteArray, ciphertext: ByteArray, tag: ByteArray): ByteArray = ciphertext.copyOf()
 
         override fun destroy() {
             destroyed = true
