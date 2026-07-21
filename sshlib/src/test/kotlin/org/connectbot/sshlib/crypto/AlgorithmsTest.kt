@@ -122,13 +122,17 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `CipherEntry defaults contain all entries`() {
-        for (entry in CipherEntry.entries) {
-            assertTrue(
-                CipherEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString",
-            )
-        }
+    fun `CipherEntry defaults contain only modern ciphers`() {
+        assertEquals(
+            listOf(
+                CipherEntry.CHACHA20_POLY1305,
+                CipherEntry.AES128_GCM,
+                CipherEntry.AES256_GCM,
+                CipherEntry.AES128_CTR,
+                CipherEntry.AES256_CTR,
+            ),
+            CipherEntry.defaults,
+        )
     }
 
     // MacEntry lookup
@@ -187,13 +191,11 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `MacEntry defaults contain all entries`() {
-        for (entry in MacEntry.entries) {
-            assertTrue(
-                MacEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString",
-            )
-        }
+    fun `MacEntry defaults contain only SHA2 ETM`() {
+        assertEquals(
+            listOf(MacEntry.HMAC_SHA2_256_ETM, MacEntry.HMAC_SHA2_512_ETM),
+            MacEntry.defaults,
+        )
     }
 
     // KexEntry lookup
@@ -258,9 +260,11 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `KexEntry defaults exclude DH_GROUP1_SHA1`() {
+    fun `KexEntry defaults exclude SHA1`() {
+        assertFalse(KexEntry.defaults.contains(KexEntry.DH_GROUP14_SHA1))
+        assertFalse(KexEntry.defaults.contains(KexEntry.DH_GROUP_EXCHANGE_SHA1))
         assertFalse(KexEntry.defaults.contains(KexEntry.DH_GROUP1_SHA1))
-        assertFalse(KexEntry.defaultString.contains("diffie-hellman-group1-sha1"))
+        assertTrue(KexEntry.defaults.none { it.hashAlgorithm == "SHA-1" })
     }
 
     @Test
@@ -324,18 +328,14 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `SignatureEntry defaults contain all entries`() {
-        for (entry in SignatureEntry.entries) {
-            assertTrue(
-                SignatureEntry.defaultString.contains(entry.sshName),
-                "${entry.sshName} not found in defaultString",
-            )
-        }
+    fun `SignatureEntry defaults exclude SHA1 ssh-rsa`() {
+        assertFalse(SignatureEntry.defaults.contains(SignatureEntry.SSH_RSA))
+        assertFalse(SignatureEntry.defaultString.split(",").contains("ssh-rsa"))
     }
 
     @Test
-    fun `negotiateRsaAlgorithm returns ssh-rsa when serverSigAlgs is null`() {
-        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(null))
+    fun `negotiateRsaAlgorithm skips RSA when serverSigAlgs is null`() {
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(null))
     }
 
     @Test
@@ -351,19 +351,19 @@ class AlgorithmsTest {
     }
 
     @Test
-    fun `negotiateRsaAlgorithm falls back to ssh-rsa as last resort`() {
+    fun `negotiateRsaAlgorithm skips ssh-rsa-only advertisement`() {
         val serverAlgs = setOf("ssh-rsa", "ssh-ed25519")
-        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
     }
 
     @Test
-    fun `negotiateRsaAlgorithm returns ssh-rsa when no RSA algorithm in server list`() {
+    fun `negotiateRsaAlgorithm skips when no RSA algorithm is advertised`() {
         val serverAlgs = setOf("ssh-ed25519", "ecdsa-sha2-nistp256")
-        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(serverAlgs))
     }
 
     @Test
-    fun `negotiateRsaAlgorithm returns ssh-rsa when serverSigAlgs is empty`() {
-        assertEquals("ssh-rsa", SignatureEntry.negotiateRsaAlgorithm(emptySet()))
+    fun `negotiateRsaAlgorithm skips when serverSigAlgs is empty`() {
+        assertNull(SignatureEntry.negotiateRsaAlgorithm(emptySet()))
     }
 }

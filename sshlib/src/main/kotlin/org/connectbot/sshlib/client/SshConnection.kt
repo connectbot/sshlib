@@ -674,6 +674,7 @@ class SshConnection(
 
             val sigAlgorithmName = if (privateKey.keyType == KEY_TYPE_SSH_RSA) {
                 negotiateRsaAlgorithm()
+                    ?: return PublicAuthResult.Failure(allowedAuthentications ?: setOf("publickey"))
             } else {
                 privateKey.signatureAlgorithm
             }
@@ -791,7 +792,7 @@ class SshConnection(
         return data.toByteArray()
     }
 
-    private fun negotiateRsaAlgorithm(): String = SignatureEntry.negotiateRsaAlgorithm(serverSigAlgs)
+    private fun negotiateRsaAlgorithm(): String? = SignatureEntry.negotiateRsaAlgorithm(serverSigAlgs)
 
     /**
      * Authenticate using the strategy-based [AuthHandler] flow.
@@ -890,6 +891,7 @@ class SshConnection(
     ): InternalAuthResult {
         val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == KEY_TYPE_SSH_RSA) {
             negotiateRsaAlgorithm()
+                ?: return InternalAuthResult.Failure(allowedAuthentications ?: setOf("publickey"), partialSuccess = false)
         } else {
             key.algorithmName
         }
@@ -915,7 +917,7 @@ class SshConnection(
         val hostBoundKeyBlob = serverHostKeyBlob.takeIf { serverAdvertisesHostBound }
 
         val effectiveAlgorithmName = if (keyBlobAlgorithmName(key.publicKeyBlob) == KEY_TYPE_SSH_RSA) {
-            negotiateRsaAlgorithm()
+            negotiateRsaAlgorithm() ?: return false
         } else {
             key.algorithmName
         }
