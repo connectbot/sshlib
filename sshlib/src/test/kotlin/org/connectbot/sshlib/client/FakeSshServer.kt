@@ -363,8 +363,8 @@ class FakeSshServer(
             setServerHostKeyAlgorithms(createNameList("ssh-ed25519"))
             setEncryptionAlgorithmsClientToServer(createNameList("aes128-ctr"))
             setEncryptionAlgorithmsServerToClient(createNameList("aes128-ctr"))
-            setMacAlgorithmsClientToServer(createNameList("hmac-sha2-256"))
-            setMacAlgorithmsServerToClient(createNameList("hmac-sha2-256"))
+            setMacAlgorithmsClientToServer(createNameList("hmac-sha2-256-etm@openssh.com"))
+            setMacAlgorithmsServerToClient(createNameList("hmac-sha2-256-etm@openssh.com"))
             setCompressionAlgorithmsClientToServer(createNameList("none"))
             setCompressionAlgorithmsServerToClient(createNameList("none"))
             setLanguagesClientToServer(createNameList(""))
@@ -430,7 +430,7 @@ class FakeSshServer(
 
         val keyDerivation = KeyDerivation(sharedSecret, exchangeHash, sid, "SHA-256")
         val cipherEntry = CipherEntry.fromSshName("aes128-ctr") ?: return
-        val macEntry = MacEntry.fromSshName("hmac-sha2-256") ?: return
+        val macEntry = MacEntry.fromSshName("hmac-sha2-256-etm@openssh.com") ?: return
 
         val keys = keyDerivation.deriveKeys(
             ivLength = cipherEntry.ivLength,
@@ -460,6 +460,8 @@ class FakeSshServer(
             clientToServerMac = sendMac,
             serverToClientCipher = receiveCipher,
             serverToClientMac = receiveMac,
+            clientToServerEtm = true,
+            serverToClientEtm = true,
         )
     }
 

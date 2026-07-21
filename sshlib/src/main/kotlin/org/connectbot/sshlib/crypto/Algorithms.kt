@@ -103,7 +103,13 @@ internal enum class CipherEntry(
     internal fun create(key: ByteArray, iv: ByteArray, forEncryption: Boolean): EncryptionInstance = factory(key, iv, forEncryption)
 
     companion object {
-        val defaults: List<CipherEntry> = entries.toList()
+        val defaults: List<CipherEntry> = listOf(
+            CHACHA20_POLY1305,
+            AES128_GCM,
+            AES256_GCM,
+            AES128_CTR,
+            AES256_CTR,
+        )
 
         val defaultString: String = defaults.joinToString(",") { it.sshName }
 
@@ -165,7 +171,7 @@ internal enum class MacEntry(
     internal fun create(key: ByteArray): PacketMac = factory(key)
 
     companion object {
-        val defaults: List<MacEntry> = entries.toList()
+        val defaults: List<MacEntry> = listOf(HMAC_SHA2_256_ETM, HMAC_SHA2_512_ETM)
 
         val defaultString: String = defaults.joinToString(",") { it.sshName }
 
@@ -271,7 +277,9 @@ internal enum class KexEntry(
     internal fun create(): KexAlgorithm = factory()
 
     companion object {
-        val defaults: List<KexEntry> = entries.filter { it != DH_GROUP1_SHA1 }
+        val defaults: List<KexEntry> = entries.filter {
+            it !in setOf(DH_GROUP14_SHA1, DH_GROUP_EXCHANGE_SHA1, DH_GROUP1_SHA1)
+        }
 
         val defaultString: String =
             defaults.joinToString(",") { it.sshName } + ",kex-strict-c-v00@openssh.com,ext-info-c"
@@ -295,23 +303,22 @@ internal enum class SignatureEntry(
     ;
 
     companion object {
-        val defaults: List<SignatureEntry> = entries.toList()
+        val defaults: List<SignatureEntry> = entries.filter { it != SSH_RSA }
 
         val defaultString: String = defaults.joinToString(",") { it.sshName }
 
         fun fromSshName(name: String): SignatureEntry? = entries.firstOrNull { it.sshName == name }
 
-        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256", KEY_TYPE_SSH_RSA)
+        private val rsaPreferenceOrder = listOf("rsa-sha2-512", "rsa-sha2-256")
 
         /**
          * Picks the best RSA signing algorithm given the server's advertised list.
-         * Returns "ssh-rsa" if [serverSigAlgs] is null (server didn't send the extension)
-         * or if no supported RSA algorithms were advertised.
+         * Returns null if the RFC 8308 server-sig-algs extension is absent or does
+         * not contain a modern RSA algorithm. The client must skip that RSA key
+         * rather than guess an unadvertised algorithm or fall back to SHA-1.
          */
-        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String {
-            if (serverSigAlgs == null) return KEY_TYPE_SSH_RSA
-            return rsaPreferenceOrder.firstOrNull { it in serverSigAlgs } ?: KEY_TYPE_SSH_RSA
-        }
+        fun negotiateRsaAlgorithm(serverSigAlgs: Set<String>?): String? =
+            serverSigAlgs?.let { advertised -> rsaPreferenceOrder.firstOrNull { it in advertised } }
     }
 }
 
