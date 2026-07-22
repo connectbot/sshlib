@@ -76,6 +76,18 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `duplicate kex init during rekey is a fatal protocol error`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            val disconnected = async(dispatcher) { connection.disconnectedFlow.first() }
+            server.sendDuplicateKexInitDuringRekey = true
+            server.initiateRekey()
+
+            val failure = assertNotNull(withTimeout(5_000) { disconnected.await() })
+            assertTrue(failure.message.orEmpty().contains("Unexpected SSH_MSG_KEXINIT"))
+        }
+    }
+
+    @Test
     fun `connect returns host key rejected when verifier rejects server key`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val (clientTransport, serverTransport) = PipedTransport.create()

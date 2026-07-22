@@ -104,6 +104,7 @@ class FakeSshServer(
     var advertiseExtInfo: Boolean = false
     var kexAlgorithms: String? = null
     var corruptKexSignature: Boolean = false
+    var sendDuplicateKexInitDuringRekey: Boolean = false
     private val receivedPongs = Channel<ByteArray>(Channel.UNLIMITED)
     private val receivedExtInfo = Channel<SshMsgExtInfo>(Channel.UNLIMITED)
     private val receivedUserauthRequests = Channel<SshMsgUserauthRequest>(Channel.UNLIMITED)
@@ -326,6 +327,11 @@ class FakeSshServer(
                 raw = r
             }
             raw
+        }
+        if (sendDuplicateKexInitDuringRekey) {
+            sendDuplicateKexInitDuringRekey = false
+            sendKexInit(io)
+            return
         }
         val (_, ecdhInitRaw) = packets.receive() // ECDH_INIT
         val clientPublic = parseEcdhInit(ecdhInitRaw)

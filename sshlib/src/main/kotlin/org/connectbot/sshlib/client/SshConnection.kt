@@ -282,7 +282,11 @@ class SshConnection(
 
     private class HostKeyRejectedException(val key: PublicKey) : Exception("Host key rejected")
 
-    private class ProtocolViolationException(message: String, cause: Throwable? = null) : SshException(message, cause)
+    private class ProtocolViolationException(
+        message: String,
+        cause: Throwable? = null,
+        val responseSent: Boolean = false,
+    ) : SshException(message, cause)
 
     private val packetIO = PacketIO(transport)
 
@@ -327,6 +331,7 @@ class SshConnection(
         override fun debug(msg: SshMsgDebug) = this@SshConnection.debug(msg)
         override fun ignore() = this@SshConnection.ignore()
         override suspend fun disconnect() = this@SshConnection.disconnect()
+        override suspend fun sendProtocolError(description: String) = this@SshConnection.sendProtocolError(description)
         override fun onStateEnter(stateName: String) = this@SshConnection.onStateEnter(stateName)
         override fun onStateExit(stateName: String) = this@SshConnection.onStateExit(stateName)
     }
@@ -2332,6 +2337,11 @@ class SshConnection(
 
                 when (msgType) {
                     SshEnums.MessageType.SSH_MSG_KEXINIT -> {
+                        if (stateMachine.isKexInProgress() && !stateMachine.isWaitingForKexInit()) {
+                            val description = "Unexpected SSH_MSG_KEXINIT while key exchange is already in progress"
+                            requireAccepted(stateMachine.unexpectedKexInit(description), msgType)
+                            throw ProtocolViolationException(description, responseSent = true)
+                        }
                         val kexInitMsgType = msgType.id().toByte()
                         serverKexInit = byteArrayOf(kexInitMsgType) + packet._raw_body()
                         val kexInit = packet.body() as SshMsgKexinit
@@ -2846,9 +2856,19 @@ class SshConnection(
             } catch (e: Exception) {
                 if (e is ProtocolViolationException) {
                     try {
-                        sendProtocolError(e.message ?: "Unexpected SSH packet")
+                        if (!e.responseSent) {
+                            sendProtocolError(e.message ?: "Unexpected SSH packet")
+                        }
                     } catch (sendFailure: Exception) {
                         logger.debug("Failed to send protocol-error disconnect", sendFailure)
+                    } finally {
+                        isRekeying = false
+                        authRequestPending = false
+                        try {
+                            transport.close()
+                        } finally {
+                            outboundPacketController.completeKex()
+                        }
                     }
                 }
                 val packetFailure = e.kaitaiParseFailureOrNull()

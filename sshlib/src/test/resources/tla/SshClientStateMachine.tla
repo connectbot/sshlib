@@ -45,6 +45,7 @@ TypeOK ==
     /\ effects \subseteq Effects
     /\ rekeying \in BOOLEAN
     /\ authenticationEstablished \in BOOLEAN
+    /\ initialNewKeysActive \in BOOLEAN
     /\ authRequestPending \in BOOLEAN
     /\ previousAuthRequestPending \in BOOLEAN
 
@@ -109,5 +110,37 @@ AuthenticationRequestIsGuarded ==
 AuthenticationRequestResponseClearsPending ==
     event \in {"AuthenticationSuccess", "AuthenticationFailure", "AuthorizeAuthenticationPacket"} =>
         ~authRequestPending
+
+KexEventsAreStrictlySequenced ==
+    /\ event = "ReceiveKexInit" =>
+        /\ previousState = "WaitKexInit"
+        /\ state = "WaitKex"
+        /\ "SendKexExchangeInit" \in effects
+    /\ event \in {"ReceiveKex.DhReply", "ReceiveKex.EcdhReply"} =>
+        /\ previousState = "WaitKex"
+        /\ state = "WaitNewKeys"
+        /\ "SendNewKeys" \in effects
+    /\ event = "ReceiveKex.DhGexGroup" =>
+        /\ previousState = "WaitKex"
+        /\ state = "WaitKexDhGexInit"
+        /\ "SendKexDhGexInit" \in effects
+    /\ event = "ReceiveKex.DhGexReply" =>
+        /\ previousState = "WaitKexDhGexInit"
+        /\ state = "WaitNewKeys"
+        /\ "SendNewKeys" \in effects
+    /\ event = "ReceiveNewKeys" =>
+        /\ previousState = "WaitNewKeys"
+        /\ "ActivateEncryption" \in effects
+
+UserAuthenticationRequiresInitialNewKeys ==
+    event = "BeginAuthentication" \/ "StartAuthentication" \in effects \/ "SendUserauthRequest" \in effects =>
+        initialNewKeysActive
+
+UnexpectedKexInitIsFatal ==
+    event = "UnexpectedKexInit" =>
+        /\ previousState \in {"WaitKex", "WaitKexDhGexInit", "WaitNewKeys"}
+        /\ state = "Disconnected"
+        /\ "SendProtocolError" \in effects
+        /\ "Disconnect" \in effects
 
 ====

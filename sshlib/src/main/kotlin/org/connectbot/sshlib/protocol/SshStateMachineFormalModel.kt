@@ -61,6 +61,9 @@ internal enum class SshTransitionId {
     AUTHORIZE_SERVICE_EXT_INFO,
     RECEIVE_DEBUG,
     RECEIVE_IGNORE,
+    UNEXPECTED_KEX_INIT_WAIT_KEX,
+    UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT,
+    UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS,
     DISCONNECT,
 }
 
@@ -102,6 +105,7 @@ internal enum class SshEffect {
     SEND_KEX_INIT,
     SEND_NEW_KEYS,
     SEND_SERVICE_REQUEST,
+    SEND_PROTOCOL_ERROR,
     SEND_USERAUTH_REQUEST,
     SEND_VERSION,
     START_AUTHENTICATION,
@@ -189,6 +193,12 @@ internal data class SshStateMachineFormalModel(
     val states: List<SshFormalState>,
     val transitions: List<SshFormalTransition>,
 ) {
+    private data class FormalVariable(
+        val name: String,
+        val initialValue: String,
+        val renderNext: (SshFormalTransitionMeta) -> String,
+    )
+
     private val stateByName = states.associateBy(SshFormalState::name)
     private val leafStateNames = states
         .filterNot { it.isHistory }
@@ -209,14 +219,13 @@ internal data class SshStateMachineFormalModel(
     }
 
     fun renderTla(moduleName: String = GENERATED_MODULE_NAME): String {
+        val variables = formalVariables()
         val body = buildString {
             appendLine("EXTENDS Naturals")
             appendLine()
-            appendLine("VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying,")
-            appendLine("          authenticationEstablished, authRequestPending, previousAuthRequestPending")
+            appendLine("VARIABLES ${variables.joinToString(", ", transform = FormalVariable::name)}")
             appendLine()
-            appendLine("vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying,")
-            appendLine("          authenticationEstablished, authRequestPending, previousAuthRequestPending>>")
+            appendLine("vars == <<${variables.joinToString(", ", transform = FormalVariable::name)}>>")
             appendLine()
             appendLine("States == ${renderSet(leafStateNames)}")
             appendLine("PostAuthenticatedStates == ${renderSet(descendantLeaves(POST_AUTHENTICATED_STATE))}")
@@ -226,20 +235,12 @@ internal data class SshStateMachineFormalModel(
             appendLine("Effects == ${renderSet(SshEffect.entries.mapTo(sortedSetOf()) { it.tlaName })}")
             appendLine()
             appendLine("Init ==")
-            appendLine("    /\\ state = ${quote(initialStateName)}")
-            appendLine("    /\\ previousState = ${quote(initialStateName)}")
-            appendLine("    /\\ history = ${quote(initialPostAuthenticatedState())}")
-            appendLine("    /\\ event = \"None\"")
-            appendLine("    /\\ origin = ${quote(SshEventOrigin.INTERNAL.tlaName)}")
-            appendLine("    /\\ packetWasParsed = FALSE")
-            appendLine("    /\\ effects = {}")
-            appendLine("    /\\ rekeying = FALSE")
-            appendLine("    /\\ authenticationEstablished = FALSE")
-            appendLine("    /\\ authRequestPending = FALSE")
-            appendLine("    /\\ previousAuthRequestPending = FALSE")
+            variables.forEach { variable ->
+                appendLine("    /\\ ${variable.name} = ${variable.initialValue}")
+            }
             appendLine()
             transitions.sortedBy { it.meta.id.name }.forEach { transition ->
-                appendTransition(transition)
+                appendTransition(transition, variables)
                 appendLine()
             }
             appendLine("Next ==")
@@ -264,29 +265,47 @@ internal data class SshStateMachineFormalModel(
         }
     }
 
-    private fun StringBuilder.appendTransition(transition: SshFormalTransition) {
+    private fun StringBuilder.appendTransition(
+        transition: SshFormalTransition,
+        variables: List<FormalVariable>,
+    ) {
         val meta = transition.meta
         appendLine("${meta.id.name} ==")
         appendLine("    /\\ state \\in ${renderSet(transition.sourceStateNames)}")
         if (meta.guard != SshFormalGuard.Always) {
             appendLine("    /\\ ${meta.guard.renderTla()}")
         }
-        appendLine("    /\\ event' = ${quote(meta.eventName)}")
-        if (meta.origins.size == 1) {
-            appendLine("    /\\ origin' = ${quote(meta.origins.single().tlaName)}")
-        } else {
-            appendLine("    /\\ origin' \\in ${renderSet(meta.origins.mapTo(sortedSetOf()) { it.tlaName })}")
+        variables.forEach { variable ->
+            appendLine("    /\\ ${variable.renderNext(meta)}")
         }
-        appendLine("    /\\ packetWasParsed' = (origin' = ${quote(SshEventOrigin.PARSED_PACKET.tlaName)})")
-        appendLine("    /\\ effects' = ${renderSet(meta.effects.mapTo(sortedSetOf()) { it.tlaName })}")
-        appendLine("    /\\ previousState' = state")
-        appendLine("    /\\ state' = ${renderTarget(meta)}")
-        appendLine("    /\\ history' = ${renderHistoryUpdate(meta)}")
-        appendLine("    /\\ rekeying' = ${renderRekeyingUpdate(meta)}")
-        appendLine("    /\\ authenticationEstablished' = ${renderAuthenticationEstablishedUpdate(meta)}")
-        appendLine("    /\\ previousAuthRequestPending' = authRequestPending")
-        appendLine("    /\\ authRequestPending' = ${renderAuthRequestPendingUpdate(meta)}")
     }
+
+    private fun formalVariables(): List<FormalVariable> = listOf(
+        variable("state", quote(initialStateName), ::renderTarget),
+        variable("previousState", quote(initialStateName)) { "state" },
+        variable("history", quote(initialPostAuthenticatedState()), ::renderHistoryUpdate),
+        variable("event", quote("None")) { quote(it.eventName) },
+        FormalVariable("origin", quote(SshEventOrigin.INTERNAL.tlaName)) { meta ->
+            if (meta.origins.size == 1) {
+                "origin' = ${quote(meta.origins.single().tlaName)}"
+            } else {
+                "origin' \\in ${renderSet(meta.origins.mapTo(sortedSetOf()) { it.tlaName })}"
+            }
+        },
+        variable("packetWasParsed", "FALSE") { "(origin' = ${quote(SshEventOrigin.PARSED_PACKET.tlaName)})" },
+        variable("effects", "{}") { renderSet(it.effects.mapTo(sortedSetOf()) { effect -> effect.tlaName }) },
+        variable("rekeying", "FALSE", ::renderRekeyingUpdate),
+        variable("authenticationEstablished", "FALSE", ::renderAuthenticationEstablishedUpdate),
+        variable("initialNewKeysActive", "FALSE", ::renderInitialNewKeysActiveUpdate),
+        variable("authRequestPending", "FALSE", ::renderAuthRequestPendingUpdate),
+        variable("previousAuthRequestPending", "FALSE") { "authRequestPending" },
+    )
+
+    private fun variable(
+        name: String,
+        initialValue: String,
+        nextValue: (SshFormalTransitionMeta) -> String,
+    ) = FormalVariable(name, initialValue) { meta -> "$name' = ${nextValue(meta)}" }
 
     private fun renderTarget(meta: SshFormalTransitionMeta): String {
         val targetName = meta.targetStateName ?: return "state"
@@ -304,6 +323,8 @@ internal data class SshStateMachineFormalModel(
     }
 
     private fun renderAuthenticationEstablishedUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.AUTHENTICATION_SUCCESS in meta.effects) "TRUE" else "authenticationEstablished"
+
+    private fun renderInitialNewKeysActiveUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.ACTIVATE_ENCRYPTION in meta.effects) "TRUE" else "initialNewKeysActive"
 
     private fun renderAuthRequestPendingUpdate(meta: SshFormalTransitionMeta): String = when {
         SshEffect.SEND_USERAUTH_REQUEST in meta.effects -> "TRUE"
