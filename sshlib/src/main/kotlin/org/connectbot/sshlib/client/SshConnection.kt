@@ -343,6 +343,7 @@ class SshConnection(
     internal val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
     private val writeMutex = Mutex()
     private val outboundPacketController = OutboundPacketController()
+    private var transportClosing = false
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
     val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
@@ -521,6 +522,7 @@ class SshConnection(
 
                 var written = false
                 writeMutex.withLock {
+                    checkTransportOpen()
                     if (isAllowedDuringKex(messageType) || kexCompletion.isCompleted) {
                         beforeWrite()
                         packetIO.writePacket(messageType, payload)
@@ -533,6 +535,27 @@ class SshConnection(
         }
 
         private fun isAllowedDuringKex(messageType: Int): Boolean = messageType in 1..4 || messageType in 7..49
+    }
+
+    private fun checkTransportOpen() {
+        if (transportClosing) {
+            throw TransportException("Transport is closed")
+        }
+    }
+
+    /** Prevent new writes before closing the underlying transport exactly once. */
+    private suspend fun closeTransport() {
+        withContext(NonCancellable) {
+            writeMutex.withLock {
+                if (transportClosing) return@withLock
+                transportClosing = true
+                try {
+                    transport.close()
+                } finally {
+                    outboundPacketController.completeKex()
+                }
+            }
+        }
     }
 
     /**
@@ -1858,11 +1881,7 @@ class SshConnection(
         isRekeying = false
         authRequestPending = false
         _disconnectedFlow.tryEmit(null)
-        try {
-            transport.close()
-        } finally {
-            outboundPacketController.completeKex()
-        }
+        closeTransport()
     }
 
     /**
@@ -2043,12 +2062,8 @@ class SshConnection(
     }
 
     suspend fun close() {
-        try {
-            transport.close()
-        } finally {
-            outboundPacketController.completeKex()
-        }
         connectionScope.cancel()
+        closeTransport()
         packetLoopJob?.join()
         packetLoopJob = null
 
@@ -2843,7 +2858,7 @@ class SshConnection(
             logger.debug("Failed to send disconnect", e)
         }
         _disconnectedFlow.tryEmit(null)
-        transport.close()
+        closeTransport()
     }
 
     private suspend fun sendProtocolError(description: String) {
@@ -2888,11 +2903,7 @@ class SshConnection(
                     } finally {
                         isRekeying = false
                         authRequestPending = false
-                        try {
-                            transport.close()
-                        } finally {
-                            outboundPacketController.completeKex()
-                        }
+                        closeTransport()
                     }
                 }
                 val packetFailure = e.kaitaiParseFailureOrNull()
