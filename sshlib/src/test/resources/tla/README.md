@@ -1,8 +1,23 @@
 # SSH lifecycle TLA+ model
 
-`SshClientStateMachineGenerated.tla` is generated from the real KStateMachine declaration.
-Do not edit it directly. `SshClientStateMachine.tla` contains the handwritten invariants, and
-`SshClientStateMachine.cfg` tells TLC which invariants to check.
+This model uses TLA+ to explore the SSH client's connection and channel state machines and check
+that their safety rules hold for every reachable state. It is intended to catch invalid behavior
+such as bypassing authentication, treating an unparsed packet as genuine, sending higher-layer
+packets during key exchange, or applying channel effects to the wrong channel. It does not
+currently check liveness properties.
+
+The connection model covers initial key exchange, authentication, rekeying, and disconnection.
+The channel model adds a small registry of channels so TLC can verify that an operation on one
+channel does not affect another. Global connection operations must leave channels unchanged except
+for disconnection, which closes every allocated channel. Rekeying must also preserve channel state
+and allow valid channel operations to resume with the same guards afterward.
+
+Most of the model is generated from the KStateMachine declarations and their typed TLA+ metadata:
+
+- `SshClientStateMachineGenerated.tla` contains the generated states, transitions, guards, and
+  side effects. Do not edit it directly.
+- `SshClientStateMachine.tla` defines the handwritten safety properties.
+- `SshClientStateMachine.cfg` configures the states and properties that TLC explores.
 
 Regenerate the structural model with:
 
@@ -10,22 +25,13 @@ Regenerate the structural model with:
 ./gradlew :sshlib:generateSshStateMachineTla
 ```
 
-The unit test suite fails when the generated model does not match the checked-in file. To run TLC
-after obtaining an official `tla2tools.jar`, use:
+The unit tests fail if the checked-in generated model is out of date. To run TLC with an official
+`tla2tools.jar`, use:
 
 ```bash
 ./gradlew :sshlib:checkSshStateMachineTla \
   -Ptla2toolsJar=/path/to/tla2tools.jar
 ```
 
-`TLA2TOOLS_JAR=/path/to/tla2tools.jar` can be used instead of the Gradle property.
-
-The generated model intentionally abstracts packet bodies and cryptographic data. Its boundary is
-the lifecycle state, transition event, event provenance, rekey status, and declared side effects.
-
-## State counts
-
-The generated model currently has 11 leaf lifecycle states and 33 named transitions. TLC's
-"distinct states" statistic is intentionally larger: it counts complete valuations of lifecycle
-state, previous state, rekey history, last event, provenance, and effects. That statistic is not
-directly comparable to the node count of a learned Mealy machine such as an inferred OpenSSH model.
+`TLA2TOOLS_JAR=/path/to/tla2tools.jar` may be used instead of the Gradle property. CI downloads the
+pinned official release, verifies its SHA-256 digest, and runs the same check.
