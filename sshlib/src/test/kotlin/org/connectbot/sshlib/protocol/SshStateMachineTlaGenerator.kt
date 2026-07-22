@@ -137,6 +137,17 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `TLC checks global operations for channel non-interference`() {
+        val handwritten = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.tla"))
+        val config = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.cfg"))
+
+        assertTrue("GlobalOperationsPreserveChannels ==" in handwritten)
+        assertTrue("GlobalChannelMutationIsDisconnectCascade ==" in handwritten)
+        assertTrue("INVARIANT GlobalOperationsPreserveChannels" in config)
+        assertTrue("INVARIANT GlobalChannelMutationIsDisconnectCascade" in config)
+    }
+
+    @Test
     fun `checked in TLA model matches KStateMachine declaration`() {
         val expected = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachineGenerated.tla"))
 
