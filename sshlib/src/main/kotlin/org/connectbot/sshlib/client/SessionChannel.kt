@@ -20,6 +20,7 @@ package org.connectbot.sshlib.client
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -27,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.SshSession
 import org.connectbot.sshlib.protocol.ByteString
 import org.connectbot.sshlib.protocol.ChannelRequestExec
@@ -83,6 +85,18 @@ class SessionChannel internal constructor(
     override val remoteChannelNumber: Int get() = _remoteChannelNumber
     override val stdout: ReceiveChannel<ByteArray> get() = _stdout
     override val stderr: ReceiveChannel<ByteArray> get() = _stderr
+
+    private val _exitInfo = CompletableDeferred<SessionExit?>()
+    override val exitInfo: Deferred<SessionExit?> get() = _exitInfo
+
+    /**
+     * Called from the connection's packet loop when the server reports how
+     * the remote process terminated (RFC 4254 section 6.10). First report
+     * wins; the RFC allows at most one of exit-status/exit-signal.
+     */
+    internal fun receiveExitInfo(info: SessionExit) {
+        _exitInfo.complete(info)
+    }
 
     private var ptyGranted = false
     private var obfuscator: KeystrokeObfuscator? = null
@@ -198,6 +212,9 @@ class SessionChannel internal constructor(
         _stderr.close()
         _extendedData.close()
         windowAvailable.close()
+        // Channel is gone; if the server never reported an exit, resolve
+        // waiters with "unknown" rather than leaving them suspended.
+        _exitInfo.complete(null)
     }
 
     internal suspend fun onDisconnected() {
@@ -445,6 +462,7 @@ class SessionChannel internal constructor(
                 _stdout.close()
                 _stderr.close()
                 _extendedData.close()
+                _exitInfo.complete(null)
                 try {
                     connection.sendChannelClose(_remoteChannelNumber)
                 } catch (e: Exception) {

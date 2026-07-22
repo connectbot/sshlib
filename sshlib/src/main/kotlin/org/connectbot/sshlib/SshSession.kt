@@ -17,7 +17,30 @@
 
 package org.connectbot.sshlib
 
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.channels.ReceiveChannel
+
+/**
+ * How the remote process on a session channel terminated
+ * (RFC 4254 section 6.10).
+ */
+sealed interface SessionExit {
+    /** The remote process exited normally with [code] (`exit-status`). */
+    data class Status(val code: Long) : SessionExit
+
+    /**
+     * The remote process was terminated by a signal (`exit-signal`).
+     *
+     * @param signalName Signal name without the "SIG" prefix (e.g. "KILL")
+     * @param coreDumped Whether a core dump was produced
+     * @param errorMessage Additional textual explanation from the server; may be empty
+     */
+    data class Signal(
+        val signalName: String,
+        val coreDumped: Boolean,
+        val errorMessage: String,
+    ) : SessionExit
+}
 
 /**
  * Represents an SSH session channel (RFC 4254 section 6).
@@ -85,6 +108,17 @@ interface SshSession : AutoCloseable {
     suspend fun readExtended(): Pair<Int, ByteArray>?
 
     suspend fun sendEof()
+
+    /**
+     * Completes with how the remote process terminated once the server
+     * reports it (RFC 4254 section 6.10), or with null when the channel
+     * closes without an `exit-status`/`exit-signal` notification. Servers
+     * are not required to send one, so null means unknown, not failure.
+     *
+     * Typically awaited after [stdout] reaches end-of-stream on an
+     * exec channel to collect the command's exit code.
+     */
+    val exitInfo: Deferred<SessionExit?>
 
     override fun close()
 }

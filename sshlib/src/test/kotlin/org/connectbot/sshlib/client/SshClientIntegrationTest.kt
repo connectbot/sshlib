@@ -31,6 +31,7 @@ import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.SshClient
 import org.connectbot.sshlib.SshClientConfig
 import org.connectbot.sshlib.SshException
@@ -856,6 +857,78 @@ class SshClientIntegrationTest {
             }
 
             assertTrue(stderr.contains("error-output"), "Should receive stderr output: $stderr")
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should surface exec exit status`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+        try {
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            assertTrue(session!!.requestExec("sh -c 'exit 42'"), "Should successfully request exec")
+
+            // Drain stdout to EOF first — the exit report follows the data.
+            withTimeout(5_000) {
+                while (session.read() != null) {
+                    // discard
+                }
+            }
+            val exit = withTimeout(5_000) { session.exitInfo.await() }
+            assertEquals(SessionExit.Status(42L), exit)
+
+            session.close()
+        } finally {
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `should surface exec exit signal`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val config = SshClientConfig {
+            this.host = host
+            this.port = port
+            hostKeyVerifier = acceptAllVerifier
+        }
+        val client = SshClient(config)
+        try {
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect")
+            assertTrue(client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success, "Should authenticate")
+
+            val session = client.openSession()
+            assertNotNull(session)
+
+            assertTrue(session!!.requestExec("sh -c 'kill -KILL \$\$'"), "Should successfully request exec")
+
+            withTimeout(5_000) {
+                while (session.read() != null) {
+                    // discard
+                }
+            }
+            val exit = withTimeout(5_000) { session.exitInfo.await() }
+            assertTrue(
+                exit is SessionExit.Signal && exit.signalName == "KILL",
+                "Expected KILL exit-signal, got: $exit",
+            )
 
             session.close()
         } finally {

@@ -35,6 +35,8 @@ import org.connectbot.sshlib.crypto.MacEntry
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.crypto.X25519ProviderFactory
 import org.connectbot.sshlib.crypto.encodeMpint
+import org.connectbot.sshlib.protocol.ChannelRequestExitSignal
+import org.connectbot.sshlib.protocol.ChannelRequestExitStatus
 import org.connectbot.sshlib.protocol.SshEnums
 import org.connectbot.sshlib.protocol.SshMsgChannelData
 import org.connectbot.sshlib.protocol.SshMsgChannelFailure
@@ -804,6 +806,50 @@ class FakeSshServer(
             .array()
         writeMutex.withLock {
             serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST.id().toInt(), payload)
+        }
+    }
+
+    /** SSH_MSG_CHANNEL_REQUEST `exit-status` (RFC 4254 section 6.10). */
+    suspend fun sendChannelExitStatus(recipientChannel: Int, exitStatus: Long) {
+        val statusReq = ChannelRequestExitStatus().apply {
+            setExitStatus(exitStatus)
+            _check()
+        }
+        val msg = SshMsgChannelRequest().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            setRequestType(createAsciiString("exit-status"))
+            setWantReply(0)
+            setRequestSpecificFields(statusReq)
+            _check()
+        }
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(), msg.toByteArray())
+        }
+    }
+
+    /** SSH_MSG_CHANNEL_REQUEST `exit-signal` (RFC 4254 section 6.10). */
+    suspend fun sendChannelExitSignal(
+        recipientChannel: Int,
+        signalName: String,
+        coreDumped: Boolean = false,
+        errorMessage: String = "",
+    ) {
+        val signalReq = ChannelRequestExitSignal().apply {
+            setSignalName(createByteString(signalName.toByteArray(Charsets.US_ASCII)))
+            setCoreDumped(if (coreDumped) 1 else 0)
+            setErrorMessage(createUtf8String(errorMessage))
+            setLanguageTag(createByteString(ByteArray(0)))
+            _check()
+        }
+        val msg = SshMsgChannelRequest().apply {
+            setRecipientChannel(recipientChannel.toLong())
+            setRequestType(createAsciiString("exit-signal"))
+            setWantReply(0)
+            setRequestSpecificFields(signalReq)
+            _check()
+        }
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST.id().toInt(), msg.toByteArray())
         }
     }
 
