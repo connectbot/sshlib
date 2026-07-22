@@ -20,6 +20,8 @@ package org.connectbot.sshlib.protocol
 import ru.nsk.kstatemachine.event.Event
 import ru.nsk.kstatemachine.state.HistoryState
 import ru.nsk.kstatemachine.state.HistoryType
+import ru.nsk.kstatemachine.state.IState
+import ru.nsk.kstatemachine.state.State
 import ru.nsk.kstatemachine.state.activeStates
 import ru.nsk.kstatemachine.state.finalState
 import ru.nsk.kstatemachine.state.historyState
@@ -32,6 +34,7 @@ import ru.nsk.kstatemachine.state.transition
 import ru.nsk.kstatemachine.statemachine.ProcessingResult
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStdLibStateMachine
+import ru.nsk.kstatemachine.transition.TransitionParams
 import ru.nsk.kstatemachine.transition.onTriggered
 
 /**
@@ -57,6 +60,10 @@ import ru.nsk.kstatemachine.transition.onTriggered
 internal class SshClientStateMachine(
     private val callbacks: SshClientCallbacks,
 ) {
+    private val parsedPacket = setOf(SshEventOrigin.PARSED_PACKET)
+    private val localCommand = setOf(SshEventOrigin.LOCAL_COMMAND)
+    private val rekeying = SshFormalGuard.Fact(SshBooleanFact.REKEYING)
+
     private sealed class SshEvent : Event {
         object Connect : SshEvent()
         data class ReceiveVersion(val banner: IdBanner) : SshEvent()
@@ -121,76 +128,111 @@ internal class SshClientStateMachine(
                 onEntry { callbacks.onStateEnter("AuthenticationReady") }
                 onExit { callbacks.onStateExit("AuthenticationReady") }
 
-                transition<SshEvent.BeginAuthentication> {
-                    targetState = authenticating
-                }
-                transition<SshEvent.ReceiveUserauthBanner> {
-                    onTriggered { callbacks.receiveUserauthBanner(it.event.msg) }
-                }
+                formalTransition<SshEvent.BeginAuthentication>(
+                    id = SshTransitionId.BEGIN_AUTHENTICATION,
+                    targetState = authenticating,
+                    origins = localCommand,
+                )
+                formalTransition<SshEvent.ReceiveUserauthBanner>(
+                    id = SshTransitionId.RECEIVE_USERAUTH_BANNER_READY,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_USERAUTH_BANNER),
+                ) { callbacks.receiveUserauthBanner(it.event.msg) }
             }
 
             authenticating {
                 onEntry { callbacks.onStateEnter("Authenticating") }
                 onExit { callbacks.onStateExit("Authenticating") }
 
-                transition<SshEvent.BeginAuthentication> {}
-                transition<SshEvent.AuthenticationSuccess> {
-                    targetState = authenticated
-                    onTriggered { callbacks.authenticationSuccess() }
-                }
-                transition<SshEvent.AuthenticationFailure> {
-                    targetState = authenticationReady
-                    onTriggered { callbacks.authenticationFailure() }
-                }
-                transition<SshEvent.ReceiveUserauthInfoRequest> {
-                    onTriggered { callbacks.receiveUserauthInfoRequest(it.event.msg) }
-                }
-                transition<SshEvent.ReceiveUserauthBanner> {
-                    onTriggered { callbacks.receiveUserauthBanner(it.event.msg) }
-                }
-                transition<SshEvent.AuthorizeAuthenticationPacket> {}
+                formalTransition<SshEvent.BeginAuthentication>(
+                    id = SshTransitionId.REPEAT_BEGIN_AUTHENTICATION,
+                    origins = localCommand,
+                )
+                formalTransition<SshEvent.AuthenticationSuccess>(
+                    id = SshTransitionId.AUTHENTICATION_SUCCESS,
+                    targetState = authenticated,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.AUTHENTICATION_SUCCESS),
+                ) { callbacks.authenticationSuccess() }
+                formalTransition<SshEvent.AuthenticationFailure>(
+                    id = SshTransitionId.AUTHENTICATION_FAILURE,
+                    targetState = authenticationReady,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.AUTHENTICATION_FAILURE),
+                ) { callbacks.authenticationFailure() }
+                formalTransition<SshEvent.ReceiveUserauthInfoRequest>(
+                    id = SshTransitionId.RECEIVE_USERAUTH_INFO_REQUEST,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_USERAUTH_INFO_REQUEST),
+                ) { callbacks.receiveUserauthInfoRequest(it.event.msg) }
+                formalTransition<SshEvent.ReceiveUserauthBanner>(
+                    id = SshTransitionId.RECEIVE_USERAUTH_BANNER_AUTHENTICATING,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_USERAUTH_BANNER),
+                ) { callbacks.receiveUserauthBanner(it.event.msg) }
+                formalTransition<SshEvent.AuthorizeAuthenticationPacket>(
+                    id = SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
+                    origins = parsedPacket,
+                )
             }
 
             authenticated {
                 onEntry { callbacks.onStateEnter("Authenticated") }
                 onExit { callbacks.onStateExit("Authenticated") }
 
-                transition<SshEvent.AuthorizeAuthenticatedPacket> {}
-                transition<SshEvent.ReceiveGlobalRequest> {
-                    onTriggered { callbacks.receiveGlobalRequest(it.event.msg) }
+                formalTransition<SshEvent.AuthorizeAuthenticatedPacket>(
+                    id = SshTransitionId.AUTHORIZE_AUTHENTICATED_PACKET,
+                    origins = parsedPacket,
+                )
+                formalTransition<SshEvent.ReceiveGlobalRequest>(
+                    id = SshTransitionId.RECEIVE_GLOBAL_REQUEST,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_GLOBAL_REQUEST),
+                ) { callbacks.receiveGlobalRequest(it.event.msg) }
+                formalTransition<SshEvent.OpenChannel>(
+                    id = SshTransitionId.OPEN_CHANNEL,
+                    origins = localCommand,
+                    effects = setOf(SshEffect.SEND_CHANNEL_OPEN),
+                ) {
+                    callbacks.sendChannelOpen(
+                        it.event.channelType,
+                        it.event.localChannelNumber,
+                        it.event.initialWindowSize,
+                        it.event.maxPacketSize,
+                    )
                 }
-                transition<SshEvent.OpenChannel> {
-                    onTriggered {
-                        callbacks.sendChannelOpen(
-                            it.event.channelType,
-                            it.event.localChannelNumber,
-                            it.event.initialWindowSize,
-                            it.event.maxPacketSize,
-                        )
-                    }
+                formalTransition<SshEvent.ReceiveChannelOpenConfirmation>(
+                    id = SshTransitionId.RECEIVE_CHANNEL_OPEN_CONFIRMATION,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_CHANNEL_OPEN_CONFIRMATION),
+                ) { callbacks.receiveChannelOpenConfirmation(it.event.msg) }
+                formalTransition<SshEvent.ReceiveChannelOpenFailure>(
+                    id = SshTransitionId.RECEIVE_CHANNEL_OPEN_FAILURE,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_CHANNEL_OPEN_FAILURE),
+                ) { callbacks.receiveChannelOpenFailure(it.event.msg) }
+                formalTransition<SshEvent.SendChannelRequest>(
+                    id = SshTransitionId.SEND_CHANNEL_REQUEST,
+                    origins = localCommand,
+                    effects = setOf(SshEffect.SEND_CHANNEL_REQUEST),
+                ) {
+                    callbacks.sendChannelRequest(
+                        it.event.recipientChannel,
+                        it.event.requestType,
+                        it.event.wantReply,
+                        it.event.message,
+                    )
                 }
-                transition<SshEvent.ReceiveChannelOpenConfirmation> {
-                    onTriggered { callbacks.receiveChannelOpenConfirmation(it.event.msg) }
-                }
-                transition<SshEvent.ReceiveChannelOpenFailure> {
-                    onTriggered { callbacks.receiveChannelOpenFailure(it.event.msg) }
-                }
-                transition<SshEvent.SendChannelRequest> {
-                    onTriggered {
-                        callbacks.sendChannelRequest(
-                            it.event.recipientChannel,
-                            it.event.requestType,
-                            it.event.wantReply,
-                            it.event.message,
-                        )
-                    }
-                }
-                transition<SshEvent.ReceiveChannelSuccess> {
-                    onTriggered { callbacks.receiveChannelSuccess(it.event.recipientChannel) }
-                }
-                transition<SshEvent.ReceiveChannelFailure> {
-                    onTriggered { callbacks.receiveChannelFailure(it.event.recipientChannel) }
-                }
+                formalTransition<SshEvent.ReceiveChannelSuccess>(
+                    id = SshTransitionId.RECEIVE_CHANNEL_SUCCESS,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_CHANNEL_SUCCESS),
+                ) { callbacks.receiveChannelSuccess(it.event.recipientChannel) }
+                formalTransition<SshEvent.ReceiveChannelFailure>(
+                    id = SshTransitionId.RECEIVE_CHANNEL_FAILURE,
+                    origins = parsedPacket,
+                    effects = setOf(SshEffect.RECEIVE_CHANNEL_FAILURE),
+                ) { callbacks.receiveChannelFailure(it.event.recipientChannel) }
             }
 
             postAuthHistory = historyState(
@@ -199,37 +241,49 @@ internal class SshClientStateMachine(
                 historyType = HistoryType.DEEP,
             )
 
-            transition<SshEvent.RekeyStarted> {
-                targetState = waitKexInit
-                onTriggered {
-                    callbacks.rekeyStarted()
-                    callbacks.sendKexInit()
-                }
+            formalTransition<SshEvent.RekeyStarted>(
+                id = SshTransitionId.REKEY_STARTED,
+                targetState = waitKexInit,
+                origins = setOf(SshEventOrigin.LOCAL_COMMAND, SshEventOrigin.PARSED_PACKET, SshEventOrigin.TIMER),
+                effects = setOf(SshEffect.REKEY_STARTED, SshEffect.SEND_KEX_INIT),
+            ) {
+                callbacks.rekeyStarted()
+                callbacks.sendKexInit()
             }
-            transition<SshEvent.AuthorizeExtInfo> {}
-            transition<SshEvent.AuthorizeConnectionPacket> {}
+            formalTransition<SshEvent.AuthorizeExtInfo>(
+                id = SshTransitionId.AUTHORIZE_POST_AUTH_EXT_INFO,
+                origins = parsedPacket,
+            )
+            formalTransition<SshEvent.AuthorizeConnectionPacket>(
+                id = SshTransitionId.AUTHORIZE_CONNECTION_PACKET,
+                origins = parsedPacket,
+            )
         }
 
         initialState("Unconnected") {
             onEntry { callbacks.onStateEnter("Unconnected") }
             onExit { callbacks.onStateExit("Unconnected") }
 
-            transition<SshEvent.Connect> {
-                targetState = waitVersion
-                onTriggered { callbacks.sendVersion() }
-            }
+            formalTransition<SshEvent.Connect>(
+                id = SshTransitionId.CONNECT,
+                targetState = waitVersion,
+                origins = localCommand,
+                effects = setOf(SshEffect.SEND_VERSION),
+            ) { callbacks.sendVersion() }
         }
 
         waitVersion {
             onEntry { callbacks.onStateEnter("WaitVersion") }
             onExit { callbacks.onStateExit("WaitVersion") }
 
-            transition<SshEvent.ReceiveVersion> {
-                targetState = waitKexInit
-                onTriggered {
-                    callbacks.receiveVersion(it.event.banner)
-                    callbacks.sendKexInit()
-                }
+            formalTransition<SshEvent.ReceiveVersion>(
+                id = SshTransitionId.RECEIVE_VERSION,
+                targetState = waitKexInit,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_VERSION, SshEffect.SEND_KEX_INIT),
+            ) {
+                callbacks.receiveVersion(it.event.banner)
+                callbacks.sendKexInit()
             }
         }
 
@@ -237,12 +291,14 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitKexInit") }
             onExit { callbacks.onStateExit("WaitKexInit") }
 
-            transition<SshEvent.ReceiveKexInit> {
-                targetState = waitKex
-                onTriggered {
-                    callbacks.receiveKexInit(it.event.msg)
-                    callbacks.sendKexExchangeInit()
-                }
+            formalTransition<SshEvent.ReceiveKexInit>(
+                id = SshTransitionId.RECEIVE_KEX_INIT,
+                targetState = waitKex,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_KEX_INIT, SshEffect.SEND_KEX_EXCHANGE_INIT),
+            ) {
+                callbacks.receiveKexInit(it.event.msg)
+                callbacks.sendKexExchangeInit()
             }
         }
 
@@ -250,36 +306,44 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitKex") }
             onExit { callbacks.onStateExit("WaitKex") }
 
-            transition<SshEvent.ReceiveKex.DhReply> {
-                targetState = waitNewKeys
-                onTriggered {
-                    callbacks.receiveKexDhReply(it.event.msg)
-                    callbacks.sendNewKeys()
-                }
+            formalTransition<SshEvent.ReceiveKex.DhReply>(
+                id = SshTransitionId.RECEIVE_KEX_DH_REPLY,
+                targetState = waitNewKeys,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_KEX_DH_REPLY, SshEffect.SEND_NEW_KEYS),
+            ) {
+                callbacks.receiveKexDhReply(it.event.msg)
+                callbacks.sendNewKeys()
             }
-            transition<SshEvent.ReceiveKex.EcdhReply> {
-                targetState = waitNewKeys
-                onTriggered {
-                    callbacks.receiveKexEcdhReply(it.event.msg)
-                    callbacks.sendNewKeys()
-                }
+            formalTransition<SshEvent.ReceiveKex.EcdhReply>(
+                id = SshTransitionId.RECEIVE_KEX_ECDH_REPLY,
+                targetState = waitNewKeys,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_KEX_ECDH_REPLY, SshEffect.SEND_NEW_KEYS),
+            ) {
+                callbacks.receiveKexEcdhReply(it.event.msg)
+                callbacks.sendNewKeys()
             }
-            transition<SshEvent.ReceiveKex.DhGexGroup> {
-                targetState = waitKexDhGexInit
-                onTriggered { callbacks.sendKexDhGexInit() }
-            }
+            formalTransition<SshEvent.ReceiveKex.DhGexGroup>(
+                id = SshTransitionId.RECEIVE_KEX_DH_GEX_GROUP,
+                targetState = waitKexDhGexInit,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_KEX_DH_GEX_INIT),
+            ) { callbacks.sendKexDhGexInit() }
         }
 
         waitKexDhGexInit {
             onEntry { callbacks.onStateEnter("WaitKexDhGexInit") }
             onExit { callbacks.onStateExit("WaitKexDhGexInit") }
 
-            transition<SshEvent.ReceiveKex.DhGexReply> {
-                targetState = waitNewKeys
-                onTriggered {
-                    callbacks.receiveKexDhGexReply(it.event.msg)
-                    callbacks.sendNewKeys()
-                }
+            formalTransition<SshEvent.ReceiveKex.DhGexReply>(
+                id = SshTransitionId.RECEIVE_KEX_DH_GEX_REPLY,
+                targetState = waitNewKeys,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_KEX_DH_GEX_REPLY, SshEffect.SEND_NEW_KEYS),
+            ) {
+                callbacks.receiveKexDhGexReply(it.event.msg)
+                callbacks.sendNewKeys()
             }
         }
 
@@ -287,24 +351,33 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitNewKeys") }
             onExit { callbacks.onStateExit("WaitNewKeys") }
 
-            transition<SshEvent.ReceiveNewKeys> {
-                guard = { !callbacks.isRekeying() }
-                targetState = waitService
-                onTriggered {
-                    callbacks.receiveNewKeys()
-                    callbacks.activateEncryption()
-                    callbacks.sendClientExtInfo()
-                    callbacks.sendServiceRequest("ssh-userauth")
-                }
+            formalTransition<SshEvent.ReceiveNewKeys>(
+                id = SshTransitionId.RECEIVE_INITIAL_NEW_KEYS,
+                targetState = waitService,
+                guard = !rekeying,
+                origins = parsedPacket,
+                effects = setOf(
+                    SshEffect.RECEIVE_NEW_KEYS,
+                    SshEffect.ACTIVATE_ENCRYPTION,
+                    SshEffect.SEND_CLIENT_EXT_INFO,
+                    SshEffect.SEND_SERVICE_REQUEST,
+                ),
+            ) {
+                callbacks.receiveNewKeys()
+                callbacks.activateEncryption()
+                callbacks.sendClientExtInfo()
+                callbacks.sendServiceRequest("ssh-userauth")
             }
-            transition<SshEvent.ReceiveNewKeys> {
-                guard = { callbacks.isRekeying() }
-                targetState = postAuthHistory
-                onTriggered {
-                    callbacks.receiveNewKeys()
-                    callbacks.activateEncryption()
-                    callbacks.rekeyComplete()
-                }
+            formalTransition<SshEvent.ReceiveNewKeys>(
+                id = SshTransitionId.RECEIVE_REKEY_NEW_KEYS,
+                targetState = postAuthHistory,
+                guard = rekeying,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_NEW_KEYS, SshEffect.ACTIVATE_ENCRYPTION, SshEffect.REKEY_COMPLETE),
+            ) {
+                callbacks.receiveNewKeys()
+                callbacks.activateEncryption()
+                callbacks.rekeyComplete()
             }
         }
 
@@ -312,25 +385,65 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitService") }
             onExit { callbacks.onStateExit("WaitService") }
 
-            transition<SshEvent.ReceiveServiceAccept> {
-                targetState = postAuthenticated
-                onTriggered {
-                    callbacks.receiveServiceAccept(it.event.service)
-                    callbacks.startAuthentication()
-                }
+            formalTransition<SshEvent.ReceiveServiceAccept>(
+                id = SshTransitionId.RECEIVE_SERVICE_ACCEPT,
+                targetState = postAuthenticated,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECEIVE_SERVICE_ACCEPT, SshEffect.START_AUTHENTICATION),
+            ) {
+                callbacks.receiveServiceAccept(it.event.service)
+                callbacks.startAuthentication()
             }
-            transition<SshEvent.AuthorizeExtInfo> {}
+            formalTransition<SshEvent.AuthorizeExtInfo>(
+                id = SshTransitionId.AUTHORIZE_SERVICE_EXT_INFO,
+                origins = parsedPacket,
+            )
         }
 
-        transition<SshEvent.ReceiveDebug> {
-            onTriggered { callbacks.debug(it.event.msg) }
+        formalTransition<SshEvent.ReceiveDebug>(
+            id = SshTransitionId.RECEIVE_DEBUG,
+            origins = parsedPacket,
+            effects = setOf(SshEffect.DEBUG),
+        ) { callbacks.debug(it.event.msg) }
+        formalTransition<SshEvent.ReceiveIgnore>(
+            id = SshTransitionId.RECEIVE_IGNORE,
+            origins = parsedPacket,
+            effects = setOf(SshEffect.IGNORE),
+        ) { callbacks.ignore() }
+        formalTransition<SshEvent.Disconnect>(
+            id = SshTransitionId.DISCONNECT,
+            targetState = disconnected,
+            origins = parsedPacket,
+            effects = setOf(SshEffect.DISCONNECT),
+        ) { callbacks.disconnect() }
+    }
+
+    private inline fun <reified E : SshEvent> IState.formalTransition(
+        id: SshTransitionId,
+        targetState: State? = null,
+        guard: SshFormalGuard = SshFormalGuard.Always,
+        origins: Set<SshEventOrigin>,
+        effects: Set<SshEffect> = emptySet(),
+        noinline action: (suspend (TransitionParams<E>) -> Unit)? = null,
+    ) {
+        val meta = SshFormalTransitionMeta(
+            id = id,
+            eventClass = E::class,
+            targetStateName = targetState?.name,
+            targetIsHistory = targetState is HistoryState,
+            guard = guard,
+            origins = origins,
+            effects = effects,
+        )
+        val transition = transition<E>(id.name) {
+            this.targetState = targetState
+            metaInfo = meta
+            if (guard != SshFormalGuard.Always) {
+                this.guard = { guard.evaluate(callbacks) }
+            }
         }
-        transition<SshEvent.ReceiveIgnore> {
-            onTriggered { callbacks.ignore() }
-        }
-        transition<SshEvent.Disconnect> {
-            targetState = disconnected
-            onTriggered { callbacks.disconnect() }
+        if (action != null) {
+            transition.onTriggered(action)
         }
     }
 
@@ -402,6 +515,8 @@ internal class SshClientStateMachine(
     fun isKexInProgress(): Boolean = stateMachine.activeStates().any {
         it.name == "WaitKexInit" || it.name == "WaitKex" || it.name == "WaitKexDhGexInit" || it.name == "WaitNewKeys"
     }
+
+    internal fun formalModel(): SshStateMachineFormalModel = stateMachine.toSshFormalModel()
 
     private suspend fun process(event: SshEvent): Boolean = stateMachine.processEvent(event) == ProcessingResult.PROCESSED
 }

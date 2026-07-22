@@ -63,6 +63,30 @@ class SshClientStateMachineTest {
     }
 
     @Test
+    fun `typed rekey guard restores the authenticated state`() = runTest {
+        val callbacks = RecordingCallbacks()
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexEcdhReply(SshMsgKexEcdhReply()))
+        assertTrue(machine.receiveNewKeys())
+        assertTrue(machine.receiveServiceAccept("ssh-userauth"))
+        assertTrue(machine.beginAuthentication())
+        assertTrue(machine.authenticationSuccess())
+
+        assertTrue(machine.requestRekey())
+        assertTrue(callbacks.rekeying)
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexEcdhReply(SshMsgKexEcdhReply()))
+        assertTrue(machine.receiveNewKeys())
+
+        assertFalse(callbacks.rekeying)
+        assertTrue(machine.authorizeAuthenticatedPacket())
+    }
+
+    @Test
     fun `raw KStateMachine and event hierarchy are private`() {
         val machineField = SshClientStateMachine::class.java.getDeclaredField("stateMachine")
         assertTrue(Modifier.isPrivate(machineField.modifiers))
@@ -75,6 +99,7 @@ class SshClientStateMachineTest {
 
     private class RecordingCallbacks : SshClientCallbacks {
         val actions = mutableListOf<String>()
+        var rekeying = false
 
         override fun sendVersion() {
             actions += "sendVersion"
@@ -100,12 +125,14 @@ class SshClientStateMachineTest {
         override suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) {
             actions += "receiveKexDhGexReply"
         }
-        override fun isRekeying(): Boolean = false
+        override fun isRekeying(): Boolean = rekeying
         override fun rekeyStarted() {
             actions += "rekeyStarted"
+            rekeying = true
         }
         override fun rekeyComplete() {
             actions += "rekeyComplete"
+            rekeying = false
         }
         override suspend fun sendKexDhGexInit() {
             actions += "sendKexDhGexInit"
