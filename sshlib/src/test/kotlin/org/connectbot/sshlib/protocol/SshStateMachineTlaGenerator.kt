@@ -36,6 +36,33 @@ internal object SshStateMachineTlaGenerator {
 
 class SshStateMachineFormalModelTest {
     @Test
+    fun `channel TLA is serialized from typed runtime operations`() {
+        val model = createFormalModel()
+        val rendered = model.renderTla()
+
+        assertTrue("ChannelTransitions == {" in rendered)
+        model.channelModel.operations
+            .filter { it.scope != SshChannelOperationScope.CONNECTION_TEARDOWN }
+            .forEach { operation ->
+                assertTrue(
+                    "<<\"${operation.sourceStateName}\", \"${operation.eventName}\", \"${operation.targetStateName}\">>" in rendered,
+                )
+            }
+    }
+
+    @Test
+    fun `rejected operation policy is not hard coded by TLA renderer`() {
+        val model = createFormalModel()
+        val deliberatelyUnsafe = model.copy(
+            channelModel = model.channelModel.copy(
+                rejectedOperationEffects = setOf(SshChannelEffect.SEND_DATA),
+            ),
+        )
+
+        assertTrue("channelEffects' = {\"SEND_DATA\"}" in deliberatelyUnsafe.renderTla())
+    }
+
+    @Test
     fun `every KStateMachine transition has unique formal metadata`() {
         val model = createFormalModel()
 

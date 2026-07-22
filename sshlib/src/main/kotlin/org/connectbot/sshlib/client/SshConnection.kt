@@ -84,6 +84,8 @@ import org.connectbot.sshlib.protocol.IdBanner
 import org.connectbot.sshlib.protocol.KexDhGexPayload
 import org.connectbot.sshlib.protocol.KexEcdhPayload
 import org.connectbot.sshlib.protocol.KexdhPayload
+import org.connectbot.sshlib.protocol.SshChannelState
+import org.connectbot.sshlib.protocol.SshChannelStateMachine
 import org.connectbot.sshlib.protocol.SshClientCallbacks
 import org.connectbot.sshlib.protocol.SshClientStateMachine
 import org.connectbot.sshlib.protocol.SshEnums
@@ -98,8 +100,6 @@ import org.connectbot.sshlib.protocol.SshMsgChannelOpenFailure
 import org.connectbot.sshlib.protocol.SshMsgChannelRequest
 import org.connectbot.sshlib.protocol.SshMsgChannelSuccess
 import org.connectbot.sshlib.protocol.SshMsgChannelWindowAdjust
-import org.connectbot.sshlib.protocol.SshChannelState
-import org.connectbot.sshlib.protocol.SshChannelStateMachine
 import org.connectbot.sshlib.protocol.SshMsgDebug
 import org.connectbot.sshlib.protocol.SshMsgDisconnect
 import org.connectbot.sshlib.protocol.SshMsgExtInfo
@@ -2476,9 +2476,11 @@ class SshConnection(
                         when (val entry = channelRegistry.findByLocalRecipient(recipientChannel)) {
                             is SshChannelRegistry.Entry.Session ->
                                 entry.channel.onExtendedData(msg.dataTypeCode().toInt(), msg.data().data())
+
                             is SshChannelRegistry.Entry.Agent,
                             is SshChannelRegistry.Entry.Forwarding,
                             -> throw ProtocolViolationException("Extended data is invalid for channel $recipientChannel")
+
                             null -> throw ProtocolViolationException("Extended data for unknown channel $recipientChannel")
                         }
                     }
@@ -2514,11 +2516,14 @@ class SshConnection(
                         logger.debug("Received CHANNEL_CLOSE for local channel $recipientChannel (channels: ${channels.size}, forwardingChannels: ${forwardingChannels.size})")
                         when (val entry = channelRegistry.findByLocalRecipient(recipientChannel)) {
                             is SshChannelRegistry.Entry.Session -> entry.channel.onClose()
+
                             is SshChannelRegistry.Entry.Agent -> entry.channel.onClose()
+
                             is SshChannelRegistry.Entry.Forwarding -> {
                                 entry.channel.onClose()
                                 unregisterForwardingChannel(entry.channel)
                             }
+
                             null -> throw ProtocolViolationException("Close for unknown channel $recipientChannel")
                         }
                         checkAllChannelsClosed()

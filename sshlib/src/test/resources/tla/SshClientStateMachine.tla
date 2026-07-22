@@ -48,6 +48,52 @@ TypeOK ==
     /\ initialNewKeysActive \in BOOLEAN
     /\ authRequestPending \in BOOLEAN
     /\ previousAuthRequestPending \in BOOLEAN
+    /\ MaxChannels \in Nat \ {0}
+    /\ channels \in [ChannelIDs -> ChannelStates]
+    /\ previousChannels \in [ChannelIDs -> ChannelStates]
+    /\ activeChannel \in ChannelAttemptIDs
+    /\ channelEvent \in ChannelEvents \cup {"None"}
+    /\ channelEffects \subseteq ChannelEffectSet
+
+NoInvalidChannelSideEffects ==
+    channelEffects # {} =>
+        /\ activeChannel \in ChannelIDs
+        /\ ChannelOperationAllowed(
+               state,
+               previousChannels[activeChannel],
+               channelEvent
+           )
+        /\ channelEffects = ChannelEffectsFor(
+               previousChannels[activeChannel],
+               channelEvent
+           )
+
+ChannelIsolation ==
+    activeChannel \in ChannelIDs =>
+        \A other \in ChannelIDs \ {activeChannel} :
+            channels[other] = previousChannels[other]
+
+DisconnectedClosesChannels ==
+    state = "Disconnected" =>
+        \A channel \in ChannelIDs :
+            channels[channel] \in {"Unallocated", "CLOSED"}
+
+ModelView ==
+    <<state,
+      previousState,
+      history,
+      event,
+      origin,
+      packetWasParsed,
+      effects,
+      rekeying,
+      authenticationEstablished,
+      initialNewKeysActive,
+      authRequestPending,
+      previousAuthRequestPending,
+      channels,
+      NoInvalidChannelSideEffects,
+      ChannelIsolation>>
 
 AuthenticationStateIsMonotonic ==
     authenticationEstablished => state \in AuthenticationEstablishedStates
