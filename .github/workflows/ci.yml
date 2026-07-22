@@ -77,9 +77,9 @@ jobs:
           echo "${TLA2TOOLS_SHA256}  ${tla2tools_jar}" | sha256sum --check
           echo "TLA2TOOLS_JAR=${tla2tools_jar}" >> "${GITHUB_ENV}"
 
-      - name: Check SSH lifecycle TLA+ model
+      - name: Check TLA+ models
         if: matrix.java == '17'
-        run: ./gradlew :sshlib:checkSshStateMachineTla
+        run: ./gradlew :sshlib:checkTla
 
       - name: Configure Docker mirror
         run: |
