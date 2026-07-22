@@ -106,6 +106,7 @@ internal class SshClientStateMachine(
         object AuthorizeExtInfo : SshEvent()
         object Disconnect : SshEvent()
         object RekeyStarted : SshEvent()
+        data class UnexpectedKexInit(val description: String) : SshEvent()
     }
 
     private val stateMachine: StateMachine = createStdLibStateMachine {
@@ -334,6 +335,12 @@ internal class SshClientStateMachine(
                 origins = parsedPacket,
                 effects = setOf(SshEffect.SEND_KEX_DH_GEX_INIT),
             ) { callbacks.sendKexDhGexInit() }
+            formalTransition<SshEvent.UnexpectedKexInit>(
+                id = SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_KEX,
+                targetState = disconnected,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
         }
 
         waitKexDhGexInit {
@@ -349,6 +356,12 @@ internal class SshClientStateMachine(
                 callbacks.receiveKexDhGexReply(it.event.msg)
                 callbacks.sendNewKeys()
             }
+            formalTransition<SshEvent.UnexpectedKexInit>(
+                id = SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT,
+                targetState = disconnected,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
         }
 
         waitNewKeys {
@@ -383,6 +396,12 @@ internal class SshClientStateMachine(
                 callbacks.activateEncryption()
                 callbacks.rekeyComplete()
             }
+            formalTransition<SshEvent.UnexpectedKexInit>(
+                id = SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS,
+                targetState = disconnected,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
         }
 
         waitService {
@@ -514,11 +533,15 @@ internal class SshClientStateMachine(
 
     suspend fun requestRekey(): Boolean = process(SshEvent.RekeyStarted)
 
+    suspend fun unexpectedKexInit(description: String): Boolean = process(SshEvent.UnexpectedKexInit(description))
+
     fun isPostAuthenticated(): Boolean = stateMachine.activeStates().any { it.name == "PostAuthenticated" }
 
     fun isKexInProgress(): Boolean = stateMachine.activeStates().any {
         it.name == "WaitKexInit" || it.name == "WaitKex" || it.name == "WaitKexDhGexInit" || it.name == "WaitNewKeys"
     }
+
+    fun isWaitingForKexInit(): Boolean = stateMachine.activeStates().any { it.name == "WaitKexInit" }
 
     internal fun formalModel(): SshStateMachineFormalModel = stateMachine.toSshFormalModel()
 
@@ -562,6 +585,7 @@ internal interface SshClientCallbacks {
     fun debug(msg: SshMsgDebug)
     fun ignore()
     suspend fun disconnect()
+    suspend fun sendProtocolError(description: String)
     fun onStateEnter(stateName: String)
     fun onStateExit(stateName: String)
 }

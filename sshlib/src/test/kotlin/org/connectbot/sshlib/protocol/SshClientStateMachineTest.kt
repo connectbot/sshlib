@@ -105,6 +105,21 @@ class SshClientStateMachineTest {
     }
 
     @Test
+    fun `a second kex init during key exchange is fatal`() = runTest {
+        val callbacks = RecordingCallbacks()
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.unexpectedKexInit("duplicate KEXINIT"))
+
+        assertTrue("sendProtocolError:duplicate KEXINIT" in callbacks.actions)
+        assertFalse(machine.receiveKexDhReply(SshMsgKexdhReply()))
+        assertFalse(machine.receiveKexInit(SshMsgKexinit()))
+    }
+
+    @Test
     fun `raw KStateMachine and event hierarchy are private`() {
         val machineField = SshClientStateMachine::class.java.getDeclaredField("stateMachine")
         assertTrue(Modifier.isPrivate(machineField.modifiers))
@@ -237,6 +252,9 @@ class SshClientStateMachineTest {
         }
         override suspend fun disconnect() {
             actions += "disconnect"
+        }
+        override suspend fun sendProtocolError(description: String) {
+            actions += "sendProtocolError:$description"
         }
         override fun onStateEnter(stateName: String) = Unit
         override fun onStateExit(stateName: String) = Unit

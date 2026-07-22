@@ -82,6 +82,23 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `unexpected kex init is modeled as fatal from every mid kex state`() {
+        val transitions = createFormalModel().transitions
+            .filter { it.meta.eventName == "UnexpectedKexInit" }
+
+        assertEquals(
+            setOf("WaitKex", "WaitKexDhGexInit", "WaitNewKeys"),
+            transitions.flatMapTo(mutableSetOf()) { it.sourceStateNames },
+        )
+        assertTrue(transitions.all { it.meta.targetStateName == "Disconnected" })
+        assertTrue(
+            transitions.all {
+                it.meta.effects == setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT)
+            },
+        )
+    }
+
+    @Test
     fun `checked in TLA model matches KStateMachine declaration`() {
         val expected = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachineGenerated.tla"))
 
