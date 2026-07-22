@@ -76,6 +76,18 @@ ChannelIsolation ==
         \A other \in ChannelIDs \ {activeChannel} :
             channels[other] = previousChannels[other]
 
+GlobalOperationsPreserveChannels ==
+    activeChannel = 0 /\ "Disconnect" \notin effects =>
+        channels = previousChannels
+
+GlobalChannelMutationIsDisconnectCascade ==
+    activeChannel = 0 /\ channels # previousChannels =>
+        /\ "Disconnect" \in effects
+        /\ state = "Disconnected"
+        /\ \A channel \in ChannelIDs :
+            channels[channel] =
+                IF previousChannels[channel] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"
+
 DisconnectedClosesChannels ==
     state = "Disconnected" =>
         \A channel \in ChannelIDs :
