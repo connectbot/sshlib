@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import org.connectbot.sshlib.SftpAttributes
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpDirectoryEntry
@@ -29,9 +30,15 @@ import org.connectbot.sshlib.SftpOpenFlag
 import org.connectbot.sshlib.SftpResult
 import org.connectbot.sshlib.SftpStatusCode
 import org.connectbot.sshlib.SshSession
+import org.connectbot.sshlib.protocol.SftpAcceptedTransition
+import org.connectbot.sshlib.protocol.SftpState
+import org.connectbot.sshlib.protocol.SftpStateMachine
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicBoolean
+
+private typealias SftpTransition = suspend (suspend (SftpAcceptedTransition) -> Unit) -> Boolean
 
 /**
  * Internal implementation of [SftpClient].
@@ -43,12 +50,13 @@ internal class SftpClientImpl private constructor(
     private val dispatcher: SftpDispatcher,
     private val readJob: Job,
     override val protocolVersion: Int,
+    private val stateMachine: SftpStateMachine,
 ) : SftpClient {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var closed = false
+    private val closed = AtomicBoolean()
 
-    override val isOpen: Boolean get() = !closed && session.isOpen
+    override val isOpen: Boolean get() = !closed.get() && session.isOpen && stateMachine.state == SftpState.READY
 
     // --- File I/O ---
 
@@ -62,7 +70,7 @@ internal class SftpClientImpl private constructor(
         payload.putInt(pflags)
         payload.put(attrsBytes)
 
-        return dispatchRequest(SSH_FXP_OPEN, payload.array()) { response ->
+        return dispatchRequest(SSH_FXP_OPEN, payload.array(), stateMachine::openFile) { response ->
             when (response.type) {
                 SSH_FXP_HANDLE -> SftpResult.Success(SftpFileHandle(extractString(ByteBuffer.wrap(response.payload))))
                 SSH_FXP_STATUS -> decodeStatusError(response.payload)
@@ -75,7 +83,7 @@ internal class SftpClientImpl private constructor(
         val payload = ByteBuffer.allocate(4 + handle.handle.size)
         putString(payload, handle.handle)
 
-        return dispatchRequest(SSH_FXP_CLOSE, payload.array()) { response ->
+        return dispatchRequest(SSH_FXP_CLOSE, payload.array(), stateMachine::closeHandle) { response ->
             if (response.type == SSH_FXP_STATUS) {
                 val status = decodeStatus(response.payload)
                 if (status == SftpStatusCode.OK) {
@@ -95,7 +103,7 @@ internal class SftpClientImpl private constructor(
         payload.putLong(offset)
         payload.putInt(length)
 
-        return dispatchRequest(SSH_FXP_READ, payload.array()) { response ->
+        return dispatchRequest(SSH_FXP_READ, payload.array(), stateMachine::readFile) { response ->
             when (response.type) {
                 SSH_FXP_DATA -> SftpResult.Success(extractString(ByteBuffer.wrap(response.payload)))
 
@@ -119,7 +127,7 @@ internal class SftpClientImpl private constructor(
         payload.putLong(offset)
         putString(payload, data)
 
-        return dispatchStatusRequest(SSH_FXP_WRITE, payload.array())
+        return dispatchStatusRequest(SSH_FXP_WRITE, payload.array(), stateMachine::writeFile)
     }
 
     // --- Stat operations ---
@@ -181,7 +189,7 @@ internal class SftpClientImpl private constructor(
         val payload = ByteBuffer.allocate(4 + pathBytes.size)
         putString(payload, pathBytes)
 
-        return dispatchRequest(SSH_FXP_OPENDIR, payload.array()) { response ->
+        return dispatchRequest(SSH_FXP_OPENDIR, payload.array(), stateMachine::openDir) { response ->
             when (response.type) {
                 SSH_FXP_HANDLE -> SftpResult.Success(SftpFileHandle(extractString(ByteBuffer.wrap(response.payload))))
                 SSH_FXP_STATUS -> decodeStatusError(response.payload)
@@ -194,7 +202,7 @@ internal class SftpClientImpl private constructor(
         val payload = ByteBuffer.allocate(4 + handle.handle.size)
         putString(payload, handle.handle)
 
-        return dispatchRequest(SSH_FXP_READDIR, payload.array()) { response ->
+        return dispatchRequest(SSH_FXP_READDIR, payload.array(), stateMachine::readDir) { response ->
             when (response.type) {
                 SSH_FXP_NAME -> SftpResult.Success(decodeName(response.payload))
 
@@ -289,10 +297,6 @@ internal class SftpClientImpl private constructor(
     }
 
     override suspend fun symlink(targetPath: String, linkPath: String): SftpResult<Unit> {
-        // Note: OpenSSH has a known bug where symlink arguments are reversed
-        // from the spec. The spec says (targetpath, linkpath) but OpenSSH
-        // expects (linkpath, targetpath). We follow the OpenSSH convention
-        // since it's the most common server implementation.
         val linkBytes = linkPath.toByteArray(StandardCharsets.UTF_8)
         val targetBytes = targetPath.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteBuffer.allocate(4 + linkBytes.size + 4 + targetBytes.size)
@@ -303,8 +307,10 @@ internal class SftpClientImpl private constructor(
     }
 
     override fun close() {
-        if (closed) return
-        closed = true
+        if (!closed.compareAndSet(false, true)) return
+        runBlocking {
+            stateMachine.disconnect { }
+        }
         dispatcher.stop()
         session.close()
     }
@@ -317,8 +323,9 @@ internal class SftpClientImpl private constructor(
     private suspend fun <T> dispatchRequest(
         type: Int,
         payload: ByteArray,
+        transition: SftpTransition = stateMachine::request,
         map: (SftpRawPacket) -> SftpResult<T>,
-    ): SftpResult<T> = when (val result = dispatcher.request(type, payload)) {
+    ): SftpResult<T> = when (val result = dispatcher.request(type, payload) { action -> transition { action() } }) {
         is SftpResult.Success -> try {
             map(result.value)
         } catch (e: SftpDecodeException) {
@@ -335,7 +342,11 @@ internal class SftpClientImpl private constructor(
     /**
      * Send a request that expects SSH_FXP_STATUS with OK.
      */
-    private suspend fun dispatchStatusRequest(type: Int, payload: ByteArray): SftpResult<Unit> = dispatchRequest(type, payload) { response ->
+    private suspend fun dispatchStatusRequest(
+        type: Int,
+        payload: ByteArray,
+        transition: SftpTransition = stateMachine::request,
+    ): SftpResult<Unit> = dispatchRequest(type, payload, transition) { response ->
         if (response.type == SSH_FXP_STATUS) {
             val status = decodeStatus(response.payload)
             if (status == SftpStatusCode.OK) {
@@ -395,16 +406,22 @@ internal class SftpClientImpl private constructor(
         suspend fun create(session: SshSession): SftpResult<SftpClient> = create(session, SftpPacketIO(session))
 
         internal suspend fun create(session: SshSession, packetIO: SftpPacketTransport): SftpResult<SftpClient> {
-            val dispatcher = SftpDispatcher(packetIO)
+            val stateMachine = SftpStateMachine()
+            val dispatcher = SftpDispatcher(packetIO, stateMachine)
 
             // Send SSH_FXP_INIT
             val initPayload = ByteBuffer.allocate(4)
             initPayload.putInt(SFTP_VERSION)
-            when (val w = dispatcher.writeRaw(SSH_FXP_INIT, initPayload.array())) {
+            var initResult: SftpResult<Unit>? = null
+            stateMachine.sendInit {
+                initResult = dispatcher.writeRaw(SSH_FXP_INIT, initPayload.array())
+            }
+            when (val w = initResult) {
                 is SftpResult.Success -> {}
                 is SftpResult.ServerError -> return w
                 is SftpResult.ProtocolError -> return w
                 is SftpResult.IoError -> return w
+                null -> return SftpResult.ProtocolError("Failed to send SFTP INIT")
             }
 
             // Read SSH_FXP_VERSION
@@ -430,7 +447,7 @@ internal class SftpClientImpl private constructor(
             val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
             val readJob = dispatcher.startReadLoop(scope)
 
-            return SftpResult.Success(SftpClientImpl(session, dispatcher, readJob, negotiatedVersion))
+            return SftpResult.Success(SftpClientImpl(session, dispatcher, readJob, negotiatedVersion, stateMachine))
         }
 
         // --- Wire format helpers ---

@@ -79,6 +79,15 @@ tasks.register<JavaExec>("generateSshStateMachineTla") {
     args(tlaModelDirectory.file("SshClientStateMachineGenerated.tla").asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("generateSftpStateMachineTla") {
+    group = "verification"
+    description = "Regenerates the TLA+ lifecycle model from SftpStateMachine"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.connectbot.sshlib.protocol.SftpStateMachineTlaGenerator")
+    args(tlaModelDirectory.file("SftpClientStateMachineGenerated.tla").asFile.absolutePath)
+}
+
 val tla2toolsJar = providers.gradleProperty("tla2toolsJar")
     .orElse(providers.environmentVariable("TLA2TOOLS_JAR"))
 
@@ -104,6 +113,42 @@ tasks.register<JavaExec>("checkSshStateMachineTla") {
             )
         classpath = files(jarPath)
     }
+}
+
+tasks.register<JavaExec>("checkSftpStateMachineTla") {
+    group = "verification"
+    description = "Checks the generated SFTP lifecycle model with TLC"
+    mainClass.set("tlc2.TLC")
+    workingDir(tlaModelDirectory)
+    args(
+        "-workers",
+        "1",
+        "-metadir",
+        tlaStateDirectory.get().asFile.absolutePath,
+        "-config",
+        "SftpClientStateMachine.cfg",
+        "SftpClientStateMachine.tla",
+    )
+    jvmArgs("-XX:+UseParallelGC")
+    doFirst {
+        val jarPath = tla2toolsJar.orNull
+            ?: throw GradleException(
+                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+            )
+        classpath = files(jarPath)
+    }
+}
+
+tasks.register("generateTla") {
+    group = "verification"
+    description = "Regenerates all TLA+ formal models (SSH and SFTP)"
+    dependsOn("generateSshStateMachineTla", "generateSftpStateMachineTla")
+}
+
+tasks.register("checkTla") {
+    group = "verification"
+    description = "Checks all TLA+ formal models (SSH and SFTP) with TLC"
+    dependsOn("checkSshStateMachineTla", "checkSftpStateMachineTla")
 }
 
 java {

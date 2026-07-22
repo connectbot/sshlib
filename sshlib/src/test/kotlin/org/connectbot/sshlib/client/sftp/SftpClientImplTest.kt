@@ -19,7 +19,9 @@ package org.connectbot.sshlib.client.sftp
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.SftpAttributes
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpDirectoryEntry
@@ -50,6 +52,23 @@ class SftpClientImplTest {
         client.close()
         client.close()
         assertFalse(client.isOpen)
+        assertEquals(1, session.closeCalls)
+    }
+
+    @Test
+    fun `close cleans up session after read loop already disconnected state machine`() = runBlocking {
+        val session = FakeSshSession()
+        val client = createClient(session)
+
+        session.closeReads()
+        withTimeout(1_000) {
+            while (client.isOpen) {
+                delay(1)
+            }
+        }
+
+        client.close()
+
         assertEquals(1, session.closeCalls)
     }
 

@@ -25,6 +25,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.SftpResult
+import org.connectbot.sshlib.protocol.SftpStateMachine
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -36,7 +37,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * Each outbound request gets a unique request ID. A background read loop
  * parses incoming SFTP packets and completes the matching deferred.
  */
-internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
+internal class SftpDispatcher(
+    private val packetIO: SftpPacketTransport,
+    private val stateMachine: SftpStateMachine = SftpStateMachine(),
+) {
     private val nextRequestId = AtomicInteger(1)
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<SftpRawPacket>>()
     private val writeMutex = Mutex()
@@ -50,39 +54,61 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
      * @param timeoutMs Maximum time to wait for a response
      * @return The raw response packet
      */
-    suspend fun request(type: Int, payload: ByteArray, timeoutMs: Long = 30_000L): SftpResult<SftpRawPacket> {
-        val requestId = nextRequestId.getAndIncrement()
-        val deferred = CompletableDeferred<SftpRawPacket>()
-        pending[requestId] = deferred
+    suspend fun request(type: Int, payload: ByteArray, timeoutMs: Long = 30_000L): SftpResult<SftpRawPacket> = request(type, payload, timeoutMs) { action ->
+        action()
+        true
+    }
 
-        // Prepend request ID to payload
-        val fullPayload = ByteBuffer.allocate(4 + payload.size)
-        fullPayload.putInt(requestId)
-        fullPayload.put(payload)
+    /**
+     * Admit and write a request as one state-machine action, then await its response
+     * after the state-machine serialization point has been released.
+     */
+    suspend fun request(
+        type: Int,
+        payload: ByteArray,
+        timeoutMs: Long = 30_000L,
+        authorize: suspend (suspend () -> Unit) -> Boolean,
+    ): SftpResult<SftpRawPacket> {
+        var requestId = 0
+        var deferred: CompletableDeferred<SftpRawPacket>? = null
+        var writeResult: SftpResult<Unit>? = null
 
-        // The framing layer ([packetIO]) now returns sealed SftpResult
-        // rather than throwing — propagate any error from the write
-        // straight back to the caller. Timeout / await are still
-        // exception-paths so they keep the catch.
-        val writeResult = writeMutex.withLock {
-            packetIO.writePacket(type, fullPayload.array())
+        val authorized = authorize {
+            requestId = nextRequestId.getAndIncrement()
+            deferred = CompletableDeferred<SftpRawPacket>().also { pending[requestId] = it }
+
+            val fullPayload = ByteBuffer.allocate(4 + payload.size)
+            fullPayload.putInt(requestId)
+            fullPayload.put(payload)
+
+            writeResult = writeMutex.withLock {
+                packetIO.writePacket(type, fullPayload.array())
+            }
         }
-        if (writeResult is SftpResult.IoError) {
-            pending.remove(requestId)
-            return writeResult
+        if (!authorized) {
+            return SftpResult.ProtocolError("SFTP session is not ready")
         }
-        if (writeResult is SftpResult.ProtocolError) {
+
+        val response = deferred
+            ?: return SftpResult.ProtocolError("Authorized SFTP request did not run its action")
+        val result = writeResult
+            ?: return SftpResult.ProtocolError("Authorized SFTP request did not produce a write result")
+        if (result is SftpResult.IoError) {
             pending.remove(requestId)
-            return writeResult
+            return result
         }
-        if (writeResult is SftpResult.ServerError) {
+        if (result is SftpResult.ProtocolError) {
             pending.remove(requestId)
-            return writeResult
+            return result
+        }
+        if (result is SftpResult.ServerError) {
+            pending.remove(requestId)
+            return result
         }
 
         return try {
             val packet = withTimeout(timeoutMs) {
-                deferred.await()
+                response.await()
             }
             SftpResult.Success(packet)
         } catch (e: Exception) {
@@ -101,9 +127,14 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
 
     /**
      * Read a single raw packet (used for VERSION response during init).
-     * Just forwards the framing-layer result.
      */
-    suspend fun readRaw(): SftpResult<SftpRawPacket> = packetIO.readPacket()
+    suspend fun readRaw(): SftpResult<SftpRawPacket> {
+        val result = packetIO.readPacket()
+        if (result is SftpResult.Success && result.value.type == SSH_FXP_VERSION) {
+            stateMachine.receiveVersion { }
+        }
+        return result
+    }
 
     /**
      * Start the background read loop that routes responses to waiting callers.
@@ -117,23 +148,22 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
 
                         is SftpResult.IoError -> {
                             logger.debug("SFTP read loop ended: {}", result.cause.message)
-                            pending.values.forEach { it.completeExceptionally(result.cause) }
-                            pending.clear()
+                            stateMachine.disconnect { failPending(result.cause) }
                             break@loop
                         }
 
                         is SftpResult.ProtocolError -> {
                             logger.debug("SFTP channel closed: {}", result.message)
                             val err = SftpProtocolException(result.message)
-                            pending.values.forEach { it.completeExceptionally(err) }
-                            pending.clear()
+                            stateMachine.disconnect { failPending(err) }
                             break@loop
                         }
 
                         is SftpResult.ServerError -> {
-                            // Framing layer never produces ServerError, but the
-                            // sealed exhaustiveness check requires this branch.
                             logger.warn("Unexpected ServerError from packet framing: code={}", result.statusCode)
+                            stateMachine.disconnect {
+                                failPending(SftpProtocolException("Unexpected SFTP framing server error"))
+                            }
                             break@loop
                         }
                     }
@@ -142,6 +172,15 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
                     if (packet.payload.size < 4) {
                         logger.warn("SFTP packet type {} with payload too short for request ID", packet.type)
                         continue
+                    }
+
+                    // Notify state machine directly of incoming packet
+                    when (packet.type) {
+                        SSH_FXP_STATUS -> stateMachine.receiveStatus { }
+                        SSH_FXP_HANDLE -> stateMachine.receiveHandle { }
+                        SSH_FXP_DATA -> stateMachine.receiveData { }
+                        SSH_FXP_NAME -> stateMachine.receiveName { }
+                        SSH_FXP_ATTRS -> stateMachine.receiveAttrs { }
                     }
 
                     val requestId = ByteBuffer.wrap(packet.payload, 0, 4).int
@@ -156,10 +195,8 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
                     }
                 }
             } catch (e: Exception) {
-                // Coroutine cancellation or other unexpected error.
                 logger.debug("SFTP read loop ended unexpectedly: {}", e.message)
-                pending.values.forEach { it.completeExceptionally(e) }
-                pending.clear()
+                stateMachine.disconnect { failPending(e) }
             }
         }
         readJob = job
@@ -168,13 +205,22 @@ internal class SftpDispatcher(private val packetIO: SftpPacketTransport) {
 
     fun stop() {
         readJob?.cancel()
-        pending.values.forEach {
-            it.completeExceptionally(SftpProtocolException("SFTP session closed"))
-        }
+        failPending(SftpProtocolException("SFTP session closed"))
+    }
+
+    private fun failPending(cause: Throwable) {
+        pending.values.forEach { it.completeExceptionally(cause) }
         pending.clear()
     }
 
     companion object {
         private val logger = LoggerFactory.getLogger(SftpDispatcher::class.java)
+
+        private const val SSH_FXP_VERSION = 2
+        private const val SSH_FXP_STATUS = 101
+        private const val SSH_FXP_HANDLE = 102
+        private const val SSH_FXP_DATA = 103
+        private const val SSH_FXP_NAME = 104
+        private const val SSH_FXP_ATTRS = 105
     }
 }
