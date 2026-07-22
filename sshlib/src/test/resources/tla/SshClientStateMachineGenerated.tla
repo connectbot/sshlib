@@ -1,6 +1,6 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: 3b1afd871c87d45f44e401ca6a87b4840d9296b9c9a7f7d35573897404b6a45a
+\* Model SHA-256: c29f846affc9a10f29a83a0285652bfc51f6ab3c69ab9a0c9109ea32feef75c7
 \* Lifecycle states: 11; transitions: 36.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
@@ -10,9 +10,9 @@ CONSTANT MaxChannels
 ChannelIDs == 1..MaxChannels
 ChannelAttemptIDs == 0..(MaxChannels + 1)
 
-VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channels, channelEffects
+VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects
 
-vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channels, channelEffects>>
+vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
 
 States == {"Authenticated", "Authenticating", "AuthenticationReady", "Disconnected", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
 PostAuthenticatedStates == {"Authenticated", "Authenticating", "AuthenticationReady"}
@@ -25,6 +25,7 @@ ChannelStates == {"BOTH_EOF", "CLOSED", "CLOSE_SENT", "LOCAL_EOF", "OPEN", "OPEN
 ChannelEvents == {"AcceptRemoteOpen", "AllocateLocalOpen", "OpenConfirmed", "OpenFailed", "ReceiveClose", "ReceiveData", "ReceiveEof", "ReceiveRequest", "ReceiveWindowAdjust", "SendClose", "SendData", "SendEof", "SendRequest"}
 ChannelAttemptEvents == {"AcceptRemoteOpen", "ReceiveClose", "ReceiveData", "ReceiveEof", "ReceiveRequest", "ReceiveWindowAdjust", "SendClose", "SendData", "SendEof"}
 ChannelEffectSet == {"ADJUST_WINDOW", "CLOSE_CHANNEL", "CLOSE_INBOUND_STREAMS", "COMPLETE_OPEN", "DELIVER_DATA", "DELIVER_REQUEST", "FAIL_OPEN", "SEND_CLOSE", "SEND_DATA", "SEND_EOF", "SEND_OPEN", "SEND_OPEN_CONFIRMATION", "SEND_REQUEST"}
+ChannelOrigins == {"ConnectionControl", "LocalCommand", "ParsedPacket"}
 ChannelTransitions == {
     <<"BOTH_EOF", "ReceiveClose", "CLOSED">>,
     <<"BOTH_EOF", "ReceiveRequest", "BOTH_EOF">>,
@@ -138,6 +139,22 @@ ChannelEffectsFor(channelState, operation) ==
       [] /\ channelState = "Unallocated" /\ operation = "AllocateLocalOpen" -> {"SEND_OPEN"}
       [] OTHER -> {}
 
+ChannelOriginFor(operation) ==
+    CASE  operation = "ReceiveClose" -> "ParsedPacket"
+      []  operation = "ReceiveRequest" -> "ParsedPacket"
+      []  operation = "ReceiveWindowAdjust" -> "ParsedPacket"
+      []  operation = "SendClose" -> "LocalCommand"
+      []  operation = "SendRequest" -> "LocalCommand"
+      []  operation = "ReceiveData" -> "ParsedPacket"
+      []  operation = "ReceiveEof" -> "ParsedPacket"
+      []  operation = "SendData" -> "LocalCommand"
+      []  operation = "SendEof" -> "LocalCommand"
+      []  operation = "OpenConfirmed" -> "ParsedPacket"
+      []  operation = "OpenFailed" -> "ParsedPacket"
+      []  operation = "AcceptRemoteOpen" -> "ParsedPacket"
+      []  operation = "AllocateLocalOpen" -> "LocalCommand"
+      [] OTHER -> "None"
+
 ChannelOperationAllowed(connectionState, channelState, operation) ==
     /\ ChannelTransitionDefined(channelState, operation)
     /\ (<<channelState, operation>> \notin ChannelAuthenticationRequired
@@ -146,6 +163,7 @@ ChannelOperationAllowed(connectionState, channelState, operation) ==
 AttemptChannelOperation ==
     /\ activeChannel' \in ChannelAttemptIDs
     /\ channelEvent' \in ChannelAttemptEvents
+    /\ channelOrigin' = ChannelOriginFor(channelEvent')
     /\ previousChannels' = channels
     /\ IF activeChannel' \in ChannelIDs
           /\ ChannelOperationAllowed(state, channels[activeChannel'], channelEvent')
@@ -173,6 +191,7 @@ Init ==
     /\ previousChannels = [c \in ChannelIDs |-> "Unallocated"]
     /\ activeChannel = 0
     /\ channelEvent = "None"
+    /\ channelOrigin = "None"
     /\ channels = [c \in ChannelIDs |-> "Unallocated"]
     /\ channelEffects = {}
 
@@ -193,6 +212,7 @@ AUTHENTICATION_FAILURE ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -213,6 +233,7 @@ AUTHENTICATION_SUCCESS ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -233,6 +254,7 @@ AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -253,6 +275,7 @@ AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -273,6 +296,7 @@ AUTHORIZE_CONNECTION_PACKET ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -293,6 +317,7 @@ AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -313,6 +338,7 @@ AUTHORIZE_SERVICE_EXT_INFO ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -334,6 +360,7 @@ BEGIN_AUTHENTICATION ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -354,6 +381,7 @@ CONNECT ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -374,6 +402,7 @@ DISCONNECT ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 
@@ -394,6 +423,7 @@ OPEN_CHANNEL ==
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "AllocateLocalOpen")
     /\ channelEvent' = "AllocateLocalOpen"
+    /\ channelOrigin' = ChannelOriginFor("AllocateLocalOpen")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "AllocateLocalOpen")]
     /\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], "AllocateLocalOpen")
 
@@ -414,6 +444,7 @@ RECEIVE_CHANNEL_FAILURE ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -434,6 +465,7 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "OpenConfirmed")
     /\ channelEvent' = "OpenConfirmed"
+    /\ channelOrigin' = ChannelOriginFor("OpenConfirmed")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "OpenConfirmed")]
     /\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], "OpenConfirmed")
 
@@ -454,6 +486,7 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "OpenFailed")
     /\ channelEvent' = "OpenFailed"
+    /\ channelOrigin' = ChannelOriginFor("OpenFailed")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "OpenFailed")]
     /\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], "OpenFailed")
 
@@ -474,6 +507,7 @@ RECEIVE_CHANNEL_SUCCESS ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -494,6 +528,7 @@ RECEIVE_DEBUG ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -514,6 +549,7 @@ RECEIVE_GLOBAL_REQUEST ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -534,6 +570,7 @@ RECEIVE_IGNORE ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -555,6 +592,7 @@ RECEIVE_INITIAL_NEW_KEYS ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -575,6 +613,7 @@ RECEIVE_KEX_DH_GEX_GROUP ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -595,6 +634,7 @@ RECEIVE_KEX_DH_GEX_REPLY ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -615,6 +655,7 @@ RECEIVE_KEX_DH_REPLY ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -635,6 +676,7 @@ RECEIVE_KEX_ECDH_REPLY ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -655,6 +697,7 @@ RECEIVE_KEX_INIT ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -676,6 +719,7 @@ RECEIVE_REKEY_NEW_KEYS ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -696,6 +740,7 @@ RECEIVE_SERVICE_ACCEPT ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -716,6 +761,7 @@ RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -736,6 +782,7 @@ RECEIVE_USERAUTH_BANNER_READY ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -756,6 +803,7 @@ RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -776,6 +824,7 @@ RECEIVE_VERSION ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -796,6 +845,7 @@ REKEY_STARTED ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -817,6 +867,7 @@ REPEAT_BEGIN_AUTHENTICATION ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = channels
     /\ channelEffects' = {}
 
@@ -837,6 +888,7 @@ SEND_CHANNEL_REQUEST ==
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "SendRequest")
     /\ channelEvent' = "SendRequest"
+    /\ channelOrigin' = ChannelOriginFor("SendRequest")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "SendRequest")]
     /\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], "SendRequest")
 
@@ -857,6 +909,7 @@ UNEXPECTED_KEX_INIT_WAIT_KEX ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 
@@ -877,6 +930,7 @@ UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 
@@ -897,6 +951,7 @@ UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS ==
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
     /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 

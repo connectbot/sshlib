@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package org.connectbot.sshlib.client
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -96,7 +97,7 @@ class KeystrokeObfuscationTest {
     fun `write without PTY does not send chaff`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(true)
 
         val channel = createObfuscatingChannel(
             conn,
@@ -117,7 +118,7 @@ class KeystrokeObfuscationTest {
     fun `write with PTY but canSendChaff false does not send chaff`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(true)
 
         val channel = createObfuscatingChannel(
             conn,
@@ -138,7 +139,7 @@ class KeystrokeObfuscationTest {
     fun `write with PTY and intervalMs zero does not send chaff`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(true)
 
         val channel = createObfuscatingChannel(
             conn,
@@ -182,7 +183,7 @@ class KeystrokeObfuscationTest {
     fun `write with PTY canSendChaff and interval sends chaff during chaff window`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(true)
 
         val channel = createObfuscatingChannel(
             conn,
@@ -286,7 +287,7 @@ class KeystrokeObfuscationTest {
     fun `chaff stops after chaff window expires`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(true)
         var chaffCount = 0
         coEvery { conn.sendChaff() } coAnswers {
             chaffCount++
@@ -320,7 +321,7 @@ class KeystrokeObfuscationTest {
     fun `requestPty sets ptyGranted on success`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), eq("pty-req"), any(), any()) } returns true
+        coEvery { conn.beginChannelRequest(any(), eq("pty-req"), any(), any()) } returns CompletableDeferred(true)
 
         val channel = createObfuscatingChannel(
             conn,
@@ -344,7 +345,7 @@ class KeystrokeObfuscationTest {
     fun `requestPty does not set ptyGranted on failure`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), eq("pty-req"), any(), any()) } returns false
+        coEvery { conn.beginChannelRequest(any(), eq("pty-req"), any(), any()) } returns CompletableDeferred(false)
 
         val channel = createObfuscatingChannel(
             conn,
