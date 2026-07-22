@@ -1,19 +1,22 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: 091cf5eb3bf082c601ebd326ed89f36cd2f4ff2973c3f29de16fba05f376dde8
+\* Model SHA-256: ab592830fd6d80e761d6541f23a23fa020dd3ce077e96ed0b39aa5c276a3c3a1
 \* Lifecycle states: 11; transitions: 33.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
 
-VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying
+VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying,
+          authenticationEstablished, authRequestPending, previousAuthRequestPending
 
-vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying>>
+vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying,
+          authenticationEstablished, authRequestPending, previousAuthRequestPending>>
 
 States == {"Authenticated", "Authenticating", "AuthenticationReady", "Disconnected", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
 PostAuthenticatedStates == {"Authenticated", "Authenticating", "AuthenticationReady"}
+KexStates == {"WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys"}
 Events == {"AuthenticationFailure", "AuthenticationSuccess", "AuthorizeAuthenticatedPacket", "AuthorizeAuthenticationPacket", "AuthorizeConnectionPacket", "AuthorizeExtInfo", "BeginAuthentication", "Connect", "Disconnect", "OpenChannel", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveDebug", "ReceiveGlobalRequest", "ReceiveIgnore", "ReceiveKex.DhGexGroup", "ReceiveKex.DhGexReply", "ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyStarted", "SendChannelRequest"}
 Origins == {"Internal", "LocalCommand", "ParsedPacket", "Timer"}
-Effects == {"ActivateEncryption", "AuthenticationFailure", "AuthenticationSuccess", "Debug", "Disconnect", "Ignore", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyComplete", "RekeyStarted", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendServiceRequest", "SendVersion", "StartAuthentication"}
+Effects == {"ActivateEncryption", "AuthenticationFailure", "AuthenticationSuccess", "Debug", "Disconnect", "Ignore", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyComplete", "RekeyStarted", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendServiceRequest", "SendUserauthRequest", "SendVersion", "StartAuthentication"}
 
 Init ==
     /\ state = "Unconnected"
@@ -24,6 +27,9 @@ Init ==
     /\ packetWasParsed = FALSE
     /\ effects = {}
     /\ rekeying = FALSE
+    /\ authenticationEstablished = FALSE
+    /\ authRequestPending = FALSE
+    /\ previousAuthRequestPending = FALSE
 
 AUTHENTICATION_FAILURE ==
     /\ state \in {"Authenticating"}
@@ -35,6 +41,9 @@ AUTHENTICATION_FAILURE ==
     /\ state' = "AuthenticationReady"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = FALSE
 
 AUTHENTICATION_SUCCESS ==
     /\ state \in {"Authenticating"}
@@ -46,6 +55,9 @@ AUTHENTICATION_SUCCESS ==
     /\ state' = "Authenticated"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = TRUE
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = FALSE
 
 AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ state \in {"Authenticated"}
@@ -57,6 +69,9 @@ AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ state \in {"Authenticating"}
@@ -68,6 +83,9 @@ AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = FALSE
 
 AUTHORIZE_CONNECTION_PACKET ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
@@ -79,6 +97,9 @@ AUTHORIZE_CONNECTION_PACKET ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
@@ -90,6 +111,9 @@ AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 AUTHORIZE_SERVICE_EXT_INFO ==
     /\ state \in {"WaitService"}
@@ -101,17 +125,24 @@ AUTHORIZE_SERVICE_EXT_INFO ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 BEGIN_AUTHENTICATION ==
     /\ state \in {"AuthenticationReady"}
+    /\ ~(authRequestPending)
     /\ event' = "BeginAuthentication"
     /\ origin' = "LocalCommand"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {}
+    /\ effects' = {"SendUserauthRequest"}
     /\ previousState' = state
     /\ state' = "Authenticating"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = TRUE
 
 CONNECT ==
     /\ state \in {"Unconnected"}
@@ -123,6 +154,9 @@ CONNECT ==
     /\ state' = "WaitVersion"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 DISCONNECT ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
@@ -133,7 +167,10 @@ DISCONNECT ==
     /\ previousState' = state
     /\ state' = "Disconnected"
     /\ history' = history
-    /\ rekeying' = rekeying
+    /\ rekeying' = FALSE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = FALSE
 
 OPEN_CHANNEL ==
     /\ state \in {"Authenticated"}
@@ -145,6 +182,9 @@ OPEN_CHANNEL ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_CHANNEL_FAILURE ==
     /\ state \in {"Authenticated"}
@@ -156,6 +196,9 @@ RECEIVE_CHANNEL_FAILURE ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ state \in {"Authenticated"}
@@ -167,6 +210,9 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ state \in {"Authenticated"}
@@ -178,6 +224,9 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_CHANNEL_SUCCESS ==
     /\ state \in {"Authenticated"}
@@ -189,6 +238,9 @@ RECEIVE_CHANNEL_SUCCESS ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_DEBUG ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
@@ -200,6 +252,9 @@ RECEIVE_DEBUG ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_GLOBAL_REQUEST ==
     /\ state \in {"Authenticated"}
@@ -211,6 +266,9 @@ RECEIVE_GLOBAL_REQUEST ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_IGNORE ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
@@ -222,6 +280,9 @@ RECEIVE_IGNORE ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_INITIAL_NEW_KEYS ==
     /\ state \in {"WaitNewKeys"}
@@ -234,6 +295,9 @@ RECEIVE_INITIAL_NEW_KEYS ==
     /\ state' = "WaitService"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_KEX_DH_GEX_GROUP ==
     /\ state \in {"WaitKex"}
@@ -245,6 +309,9 @@ RECEIVE_KEX_DH_GEX_GROUP ==
     /\ state' = "WaitKexDhGexInit"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_KEX_DH_GEX_REPLY ==
     /\ state \in {"WaitKexDhGexInit"}
@@ -256,6 +323,9 @@ RECEIVE_KEX_DH_GEX_REPLY ==
     /\ state' = "WaitNewKeys"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_KEX_DH_REPLY ==
     /\ state \in {"WaitKex"}
@@ -267,6 +337,9 @@ RECEIVE_KEX_DH_REPLY ==
     /\ state' = "WaitNewKeys"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_KEX_ECDH_REPLY ==
     /\ state \in {"WaitKex"}
@@ -278,6 +351,9 @@ RECEIVE_KEX_ECDH_REPLY ==
     /\ state' = "WaitNewKeys"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_KEX_INIT ==
     /\ state \in {"WaitKexInit"}
@@ -289,6 +365,9 @@ RECEIVE_KEX_INIT ==
     /\ state' = "WaitKex"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_REKEY_NEW_KEYS ==
     /\ state \in {"WaitNewKeys"}
@@ -301,6 +380,9 @@ RECEIVE_REKEY_NEW_KEYS ==
     /\ state' = history
     /\ history' = history
     /\ rekeying' = FALSE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_SERVICE_ACCEPT ==
     /\ state \in {"WaitService"}
@@ -312,6 +394,9 @@ RECEIVE_SERVICE_ACCEPT ==
     /\ state' = "AuthenticationReady"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ state \in {"Authenticating"}
@@ -323,6 +408,9 @@ RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_USERAUTH_BANNER_READY ==
     /\ state \in {"AuthenticationReady"}
@@ -334,6 +422,9 @@ RECEIVE_USERAUTH_BANNER_READY ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ state \in {"Authenticating"}
@@ -345,6 +436,9 @@ RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 RECEIVE_VERSION ==
     /\ state \in {"WaitVersion"}
@@ -356,6 +450,9 @@ RECEIVE_VERSION ==
     /\ state' = "WaitKexInit"
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 REKEY_STARTED ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
@@ -367,17 +464,24 @@ REKEY_STARTED ==
     /\ state' = "WaitKexInit"
     /\ history' = state
     /\ rekeying' = TRUE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 REPEAT_BEGIN_AUTHENTICATION ==
     /\ state \in {"Authenticating"}
+    /\ ~(authRequestPending)
     /\ event' = "BeginAuthentication"
     /\ origin' = "LocalCommand"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {}
+    /\ effects' = {"SendUserauthRequest"}
     /\ previousState' = state
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = TRUE
 
 SEND_CHANNEL_REQUEST ==
     /\ state \in {"Authenticated"}
@@ -389,6 +493,9 @@ SEND_CHANNEL_REQUEST ==
     /\ state' = state
     /\ history' = history
     /\ rekeying' = rekeying
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ authRequestPending' = authRequestPending
 
 Next ==
     \/ AUTHENTICATION_FAILURE

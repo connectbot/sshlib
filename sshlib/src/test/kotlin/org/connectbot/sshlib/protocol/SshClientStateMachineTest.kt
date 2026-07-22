@@ -63,6 +63,24 @@ class SshClientStateMachineTest {
     }
 
     @Test
+    fun `authentication requests cannot overlap without a server response`() = runTest {
+        val callbacks = RecordingCallbacks()
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexDhReply(SshMsgKexdhReply()))
+        assertTrue(machine.receiveNewKeys())
+        assertTrue(machine.receiveServiceAccept("ssh-userauth"))
+
+        assertTrue(machine.beginAuthentication())
+        assertFalse(machine.beginAuthentication())
+        assertTrue(machine.authorizeAuthenticationPacket())
+        assertTrue(machine.beginAuthentication())
+    }
+
+    @Test
     fun `typed rekey guard restores the authenticated state`() = runTest {
         val callbacks = RecordingCallbacks()
         val machine = SshClientStateMachine(callbacks)
@@ -100,6 +118,7 @@ class SshClientStateMachineTest {
     private class RecordingCallbacks : SshClientCallbacks {
         val actions = mutableListOf<String>()
         var rekeying = false
+        var authenticationRequestPending = false
 
         override fun sendVersion() {
             actions += "sendVersion"
@@ -126,6 +145,13 @@ class SshClientStateMachineTest {
             actions += "receiveKexDhGexReply"
         }
         override fun isRekeying(): Boolean = rekeying
+        override fun isAuthenticationRequestPending(): Boolean = authenticationRequestPending
+        override fun authenticationRequestStarted() {
+            authenticationRequestPending = true
+        }
+        override fun authenticationRequestResponseReceived() {
+            authenticationRequestPending = false
+        }
         override fun rekeyStarted() {
             actions += "rekeyStarted"
             rekeying = true
@@ -160,9 +186,11 @@ class SshClientStateMachineTest {
         }
         override fun authenticationSuccess() {
             actions += "authenticationSuccess"
+            authenticationRequestPending = false
         }
         override fun authenticationFailure() {
             actions += "authenticationFailure"
+            authenticationRequestPending = false
         }
         override fun receiveUserauthInfoRequest(msg: SshMsgUserauthInfoRequest) {
             actions += "receiveUserauthInfoRequest"
