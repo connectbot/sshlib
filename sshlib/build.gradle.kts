@@ -67,6 +67,45 @@ tasks.test {
     )
 }
 
+val tlaModelDirectory = layout.projectDirectory.dir("src/test/resources/tla")
+val tlaStateDirectory = layout.buildDirectory.dir("tla/states")
+
+tasks.register<JavaExec>("generateSshStateMachineTla") {
+    group = "verification"
+    description = "Regenerates the TLA+ lifecycle model from SshClientStateMachine"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.connectbot.sshlib.protocol.SshStateMachineTlaGenerator")
+    args(tlaModelDirectory.file("SshClientStateMachineGenerated.tla").asFile.absolutePath)
+}
+
+val tla2toolsJar = providers.gradleProperty("tla2toolsJar")
+    .orElse(providers.environmentVariable("TLA2TOOLS_JAR"))
+
+tasks.register<JavaExec>("checkSshStateMachineTla") {
+    group = "verification"
+    description = "Checks the generated SSH lifecycle model with TLC"
+    mainClass.set("tlc2.TLC")
+    workingDir(tlaModelDirectory)
+    args(
+        "-workers",
+        "1",
+        "-metadir",
+        tlaStateDirectory.get().asFile.absolutePath,
+        "-config",
+        "SshClientStateMachine.cfg",
+        "SshClientStateMachine.tla",
+    )
+    jvmArgs("-XX:+UseParallelGC")
+    doFirst {
+        val jarPath = tla2toolsJar.orNull
+            ?: throw GradleException(
+                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+            )
+        classpath = files(jarPath)
+    }
+}
+
 java {
     withSourcesJar()
     toolchain {
