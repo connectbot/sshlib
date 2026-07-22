@@ -23,6 +23,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.protocol.SshChannelEffect
 import org.connectbot.sshlib.protocol.SshChannelState
 import org.connectbot.sshlib.protocol.SshChannelStateMachine
 import org.slf4j.LoggerFactory
@@ -59,66 +60,64 @@ internal class AgentChannel(
     val isOpen: Boolean get() = lifecycle.isOpen
 
     suspend fun handleData(data: ByteArray) {
-        if (!lifecycle.receiveData()) {
+        if (!lifecycle.receiveData {
+                window.consumeLocal(data.size)
+                logger.debug("Queueing ${data.size} bytes received on agent channel")
+                if (requests.trySend(data).isFailure) {
+                    window.releaseLocal(data.size)
+                    logger.warn("Discarding data received while agent channel is closing")
+                }
+            }
+        ) {
             logger.warn("Received data on closed agent channel")
             return
-        }
-        window.consumeLocal(data.size)
-
-        logger.debug("Queueing ${data.size} bytes received on agent channel")
-        if (requests.trySend(data).isFailure) {
-            window.releaseLocal(data.size)
-            logger.warn("Discarding data received while agent channel is closing")
         }
     }
 
     suspend fun onWindowAdjust(bytesToAdd: Long) {
-        if (!lifecycle.receiveWindowAdjust()) {
+        if (!lifecycle.receiveWindowAdjust {
+                window.adjustRemote(bytesToAdd)
+                logger.debug("Agent channel window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
+                if (window.remoteRemaining > 0) windowAvailable.trySend(Unit)
+            }
+        ) {
             throw SshException("Received window adjustment after CLOSE on agent channel $localChannelNumber")
-        }
-        window.adjustRemote(bytesToAdd)
-        logger.debug("Agent channel window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
-        if (window.remoteRemaining > 0) {
-            windowAvailable.trySend(Unit)
         }
     }
 
     suspend fun onEof() {
-        if (!lifecycle.receiveEof()) {
+        if (!lifecycle.receiveEof { logger.debug("Agent channel received EOF") }) {
             throw SshException("Received duplicate EOF or EOF after CLOSE on agent channel $localChannelNumber")
         }
-        logger.debug("Agent channel received EOF")
     }
 
     suspend fun onClose() {
-        val replyRequired = lifecycle.state != SshChannelState.CLOSE_SENT
-        if (!lifecycle.receiveClose()) return
-        logger.debug("Agent channel closed")
-        if (replyRequired) {
-            try {
-                connection.sendChannelClose(remoteChannelNumber)
-            } catch (e: Exception) {
-                logger.debug("Failed to send CHANNEL_CLOSE reply", e)
+        lifecycle.receiveClose { transition ->
+            logger.debug("Agent channel closed")
+            if (SshChannelEffect.SEND_CLOSE in transition.effects) {
+                try {
+                    connection.sendChannelClose(remoteChannelNumber)
+                } catch (e: Exception) {
+                    logger.debug("Failed to send CHANNEL_CLOSE reply", e)
+                }
             }
+            requests.close()
+            requestWorker.cancelAndJoin()
+            windowAvailable.close()
         }
-        requests.close()
-        requestWorker.cancelAndJoin()
-        windowAvailable.close()
     }
 
     suspend fun onDisconnected() {
-        lifecycle.disconnect()
-        requests.close()
-        requestWorker.cancelAndJoin()
-        windowAvailable.close()
+        lifecycle.disconnect {
+            requests.close()
+            requestWorker.cancelAndJoin()
+            windowAvailable.close()
+        }
     }
 
-    suspend fun authorizeReceiveRequest(): Boolean = lifecycle.receiveRequest()
+    suspend fun receiveRequest(action: suspend () -> Unit): Boolean = lifecycle.receiveRequest { action() }
 
     private suspend fun sendData(data: ByteArray) {
-        if (!lifecycle.sendData()) {
-            throw SshException("Cannot send data after EOF or CLOSE on agent channel $localChannelNumber")
-        }
         var offset = 0
         while (offset < data.size) {
             while (window.remoteRemaining <= 0) {
@@ -126,8 +125,13 @@ internal class AgentChannel(
             }
             val chunkSize = window.sendChunkSize(data.size - offset, maxPacketSize)
             val chunk = data.copyOfRange(offset, offset + chunkSize)
-            connection.sendChannelData(remoteChannelNumber, chunk)
-            window.consumeRemote(chunkSize)
+            if (!lifecycle.sendData {
+                    connection.sendChannelData(remoteChannelNumber, chunk)
+                    window.consumeRemote(chunkSize)
+                }
+            ) {
+                throw SshException("Cannot send data after EOF or CLOSE on agent channel $localChannelNumber")
+            }
             offset += chunkSize
         }
     }

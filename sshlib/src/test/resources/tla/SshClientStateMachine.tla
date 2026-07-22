@@ -53,6 +53,7 @@ TypeOK ==
     /\ previousChannels \in [ChannelIDs -> ChannelStates]
     /\ activeChannel \in ChannelAttemptIDs
     /\ channelEvent \in ChannelEvents \cup {"None"}
+    /\ channelOrigin \in ChannelOrigins \cup {"None"}
     /\ channelEffects \subseteq ChannelEffectSet
 
 NoInvalidChannelSideEffects ==
@@ -67,6 +68,7 @@ NoInvalidChannelSideEffects ==
                previousChannels[activeChannel],
                channelEvent
            )
+        /\ channelOrigin = ChannelOriginFor(channelEvent)
 
 ChannelIsolation ==
     activeChannel \in ChannelIDs =>

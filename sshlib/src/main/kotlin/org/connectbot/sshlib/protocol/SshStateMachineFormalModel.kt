@@ -225,6 +225,15 @@ internal data class SshStateMachineFormalModel(
         require(generatedConnectionOperations == declaredConnectionOperations) {
             "Connection transitions $generatedConnectionOperations do not match channel operations $declaredConnectionOperations"
         }
+        transitions.filter { it.meta.channelOperationEvent != null }.forEach { transition ->
+            val channelEvent = requireNotNull(transition.meta.channelOperationEvent)
+            val channelOrigin = channelModel.operations.first { it.eventId == channelEvent }.origin
+            val expectedOrigin = channelOrigin.connectionOrigin
+            require(transition.meta.origins == setOf(expectedOrigin)) {
+                "Connection transition ${transition.meta.id} has origins ${transition.meta.origins}, " +
+                    "but channel event $channelEvent requires $expectedOrigin"
+            }
+        }
     }
 
     fun renderTla(moduleName: String = GENERATED_MODULE_NAME): String {
@@ -326,6 +335,10 @@ internal data class SshStateMachineFormalModel(
             }
         },
         variable("channelEvent", quote("None")) { quote(it.channelOperationEvent?.tlaName ?: "None") },
+        FormalVariable("channelOrigin", quote("None")) { meta ->
+            val operation = meta.channelOperationEvent
+            if (operation == null) "channelOrigin' = \"None\"" else "channelOrigin' = ChannelOriginFor(${quote(operation.tlaName)})"
+        },
         FormalVariable("channels", "[c \\in ChannelIDs |-> \"Unallocated\"]") { meta ->
             when {
                 SshEffect.DISCONNECT in meta.effects ->
@@ -366,6 +379,7 @@ internal data class SshStateMachineFormalModel(
         appendLine("ChannelEvents == ${renderSet(channelEvents)}")
         appendLine("ChannelAttemptEvents == ${renderSet(channelAttemptEvents)}")
         appendLine("ChannelEffectSet == ${renderSet(channelEffects)}")
+        appendLine("ChannelOrigins == ${renderSet(SshChannelEventOrigin.entries.mapTo(sortedSetOf()) { it.tlaName })}")
         appendLine("ChannelTransitions == {")
         operations.forEachIndexed { index, operation ->
             val suffix = if (index == operations.lastIndex) "" else ","
@@ -395,6 +409,13 @@ internal data class SshStateMachineFormalModel(
         }
         appendLine("      [] OTHER -> ${renderSet(channelModel.rejectedOperationEffects.map { it.name })}")
         appendLine()
+        appendLine("ChannelOriginFor(operation) ==")
+        operations.distinctBy(SshChannelFormalOperation::eventId).forEachIndexed { index, operation ->
+            val prefix = if (index == 0) "    CASE " else "      [] "
+            appendLine("$prefix operation = ${quote(operation.eventName)} -> ${quote(operation.origin.tlaName)}")
+        }
+        appendLine("      [] OTHER -> \"None\"")
+        appendLine()
         appendLine("ChannelOperationAllowed(connectionState, channelState, operation) ==")
         appendLine("    /\\ ChannelTransitionDefined(channelState, operation)")
         appendLine("    /\\ (<<channelState, operation>> \\notin ChannelAuthenticationRequired")
@@ -403,6 +424,7 @@ internal data class SshStateMachineFormalModel(
         appendLine("AttemptChannelOperation ==")
         appendLine("    /\\ activeChannel' \\in ChannelAttemptIDs")
         appendLine("    /\\ channelEvent' \\in ChannelAttemptEvents")
+        appendLine("    /\\ channelOrigin' = ChannelOriginFor(channelEvent')")
         appendLine("    /\\ previousChannels' = channels")
         appendLine("    /\\ IF activeChannel' \\in ChannelIDs")
         appendLine("          /\\ ChannelOperationAllowed(state, channels[activeChannel'], channelEvent')")
@@ -495,10 +517,25 @@ internal data class SshStateMachineFormalModel(
             "previousChannels",
             "activeChannel",
             "channelEvent",
+            "channelOrigin",
             "channelEffects",
         )
     }
 }
+
+private val SshChannelEventOrigin.tlaName: String
+    get() = when (this) {
+        SshChannelEventOrigin.CONNECTION_CONTROL -> "ConnectionControl"
+        SshChannelEventOrigin.LOCAL_COMMAND -> "LocalCommand"
+        SshChannelEventOrigin.PARSED_PACKET -> "ParsedPacket"
+    }
+
+private val SshChannelEventOrigin.connectionOrigin: SshEventOrigin
+    get() = when (this) {
+        SshChannelEventOrigin.CONNECTION_CONTROL -> SshEventOrigin.INTERNAL
+        SshChannelEventOrigin.LOCAL_COMMAND -> SshEventOrigin.LOCAL_COMMAND
+        SshChannelEventOrigin.PARSED_PACKET -> SshEventOrigin.PARSED_PACKET
+    }
 
 internal fun StateMachine.toSshFormalModel(): SshStateMachineFormalModel {
     val allStates = collectStates(this)

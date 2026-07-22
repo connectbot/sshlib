@@ -39,6 +39,7 @@ class SshChannelStateMachineTest {
             assertEquals(transition.source.name, operation.sourceStateName)
             assertEquals(transition.target.name, operation.targetStateName)
             assertEquals(transition.effects, operation.effects)
+            assertEquals(transition.origin, operation.origin)
             assertEquals(transition.scope, operation.scope)
             assertEquals(transition.requiresAuthenticatedConnection, operation.requiresAuthenticatedConnection)
         }
@@ -72,57 +73,107 @@ class SshChannelStateMachineTest {
         assertTrue(disconnects.isNotEmpty())
         assertTrue(disconnects.all { it.scope == SshChannelOperationScope.CONNECTION_TEARDOWN })
         assertTrue(disconnects.none { it.requiresAuthenticatedConnection })
+        assertTrue(disconnects.all { it.origin == SshChannelEventOrigin.CONNECTION_CONTROL })
+    }
+
+    @Test
+    fun `packet and local operations have distinct typed origins`() {
+        val operations = SshChannelStateMachine(SshChannelState.OPEN).formalModel().operations
+        val localEvents = setOf(
+            SshChannelEventId.ALLOCATE_LOCAL_OPEN,
+            SshChannelEventId.SEND_CLOSE,
+            SshChannelEventId.SEND_DATA,
+            SshChannelEventId.SEND_EOF,
+            SshChannelEventId.SEND_REQUEST,
+        )
+        val packetEvents = SshChannelEventId.entries.toSet() - localEvents - SshChannelEventId.DISCONNECT
+
+        assertTrue(operations.filter { it.eventId in packetEvents }.all { it.origin == SshChannelEventOrigin.PARSED_PACKET })
+        assertTrue(operations.filter { it.eventId in localEvents }.all { it.origin == SshChannelEventOrigin.LOCAL_COMMAND })
+    }
+
+    @Test
+    fun `only an accepted transition executes its effect callback`() = runTest {
+        val machine = SshChannelStateMachine(SshChannelState.OPEN)
+        var effects = 0
+
+        assertTrue(machine.sendEof { effects++ })
+        assertFalse(machine.sendEof { effects++ })
+        assertFalse(machine.sendData { effects++ })
+
+        assertEquals(1, effects)
+    }
+
+    @Test
+    fun `accepted callback receives source-specific transition metadata`() = runTest {
+        val remotelyClosed = SshChannelStateMachine(SshChannelState.OPEN)
+        val closeSent = SshChannelStateMachine(SshChannelState.OPEN)
+        var remoteCloseEffects = emptySet<SshChannelEffect>()
+        var closeReplyEffects = emptySet<SshChannelEffect>()
+
+        remotelyClosed.receiveClose { remoteCloseEffects = it.effects }
+        closeSent.sendClose {}
+        closeSent.receiveClose { closeReplyEffects = it.effects }
+
+        assertTrue(SshChannelEffect.SEND_CLOSE in remoteCloseEffects)
+        assertFalse(SshChannelEffect.SEND_CLOSE in closeReplyEffects)
+        assertEquals(
+            SshChannelEventOrigin.PARSED_PACKET,
+            closeSent.formalModel().transitions.first {
+                it.id == SshChannelTransitionId.RECEIVE_CLOSE_CLOSE_SENT
+            }.origin,
+        )
     }
 
     @Test
     fun `opening accepts exactly one terminal response`() = runTest {
         val confirmed = SshChannelStateMachine(SshChannelState.OPENING)
-        assertTrue(confirmed.openConfirmed())
+        assertTrue(confirmed.openConfirmed {})
         assertEquals(SshChannelState.OPEN, confirmed.state)
-        assertFalse(confirmed.openFailed())
+        assertFalse(confirmed.openFailed {})
 
         val failed = SshChannelStateMachine(SshChannelState.OPENING)
-        assertTrue(failed.openFailed())
+        assertTrue(failed.openFailed {})
         assertEquals(SshChannelState.CLOSED, failed.state)
-        assertFalse(failed.openConfirmed())
+        assertFalse(failed.openConfirmed {})
     }
 
     @Test
     fun `EOF independently closes each data direction`() = runTest {
         val machine = SshChannelStateMachine(SshChannelState.OPEN)
 
-        assertTrue(machine.sendEof())
+        assertTrue(machine.sendEof {})
         assertEquals(SshChannelState.LOCAL_EOF, machine.state)
-        assertFalse(machine.sendData())
-        assertTrue(machine.receiveData())
+        assertFalse(machine.sendData {})
+        assertTrue(machine.receiveData {})
 
-        assertTrue(machine.receiveEof())
+        assertTrue(machine.receiveEof {})
         assertEquals(SshChannelState.BOTH_EOF, machine.state)
-        assertFalse(machine.sendData())
-        assertFalse(machine.receiveData())
+        assertFalse(machine.sendData {})
+        assertFalse(machine.receiveData {})
     }
 
     @Test
     fun `remote EOF still permits outbound data`() = runTest {
         val machine = SshChannelStateMachine(SshChannelState.OPEN)
 
-        assertTrue(machine.receiveEof())
+        assertTrue(machine.receiveEof {})
         assertEquals(SshChannelState.REMOTE_EOF, machine.state)
-        assertTrue(machine.sendData())
-        assertFalse(machine.receiveData())
+        assertTrue(machine.sendData {})
+        assertFalse(machine.receiveData {})
     }
 
     @Test
     fun `local close waits for remote close and blocks channel operations`() = runTest {
         val machine = SshChannelStateMachine(SshChannelState.OPEN)
 
-        assertTrue(machine.sendClose())
+        assertTrue(machine.sendClose {})
         assertEquals(SshChannelState.CLOSE_SENT, machine.state)
         assertFalse(machine.isOpen)
-        assertFalse(machine.sendData())
-        assertFalse(machine.receiveData())
-        assertFalse(machine.sendEof())
-        assertTrue(machine.receiveClose())
+        assertFalse(machine.sendData {})
+        assertFalse(machine.receiveData {})
+        assertFalse(machine.sendEof {})
+        assertTrue(machine.receiveClose {})
         assertEquals(SshChannelState.CLOSED, machine.state)
     }
 
@@ -130,10 +181,10 @@ class SshChannelStateMachineTest {
     fun `remote close is terminal and duplicate close is rejected`() = runTest {
         val machine = SshChannelStateMachine(SshChannelState.OPEN)
 
-        assertTrue(machine.receiveClose())
+        assertTrue(machine.receiveClose {})
         assertEquals(SshChannelState.CLOSED, machine.state)
-        assertFalse(machine.receiveClose())
-        assertFalse(machine.sendClose())
+        assertFalse(machine.receiveClose {})
+        assertFalse(machine.sendClose {})
     }
 
     @Test
@@ -141,8 +192,8 @@ class SshChannelStateMachineTest {
         val opening = SshChannelStateMachine(SshChannelState.OPENING)
         val established = SshChannelStateMachine(SshChannelState.OPEN)
 
-        assertTrue(opening.disconnect())
-        assertTrue(established.disconnect())
+        assertTrue(opening.disconnect {})
+        assertTrue(established.disconnect {})
         assertEquals(SshChannelState.CLOSED, opening.state)
         assertEquals(SshChannelState.CLOSED, established.state)
     }

@@ -17,6 +17,7 @@
 
 package org.connectbot.sshlib.client
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -33,6 +34,7 @@ import org.connectbot.sshlib.protocol.ChannelRequestPtyReq
 import org.connectbot.sshlib.protocol.ChannelRequestShell
 import org.connectbot.sshlib.protocol.ChannelRequestSubsystem
 import org.connectbot.sshlib.protocol.ChannelRequestWindowChange
+import org.connectbot.sshlib.protocol.SshChannelEffect
 import org.connectbot.sshlib.protocol.SshChannelState
 import org.connectbot.sshlib.protocol.SshChannelStateMachine
 import org.slf4j.LoggerFactory
@@ -98,26 +100,30 @@ class SessionChannel internal constructor(
         get() = ptyGranted && canSendChaff && obscureKeystrokeTimingIntervalMs > 0
 
     internal suspend fun onData(data: ByteArray) {
-        if (!lifecycle.receiveData()) {
+        if (!lifecycle.receiveData {
+                window.consumeLocal(data.size)
+                if (stdoutIngress.trySend(data).isFailure) {
+                    throw org.connectbot.sshlib.SshException("Received data for a closed stdout stream")
+                }
+            }
+        ) {
             throw org.connectbot.sshlib.SshException("Received data after EOF or CLOSE on channel $localChannelNumber")
-        }
-        window.consumeLocal(data.size)
-        if (stdoutIngress.trySend(data).isFailure) {
-            throw org.connectbot.sshlib.SshException("Received data for a closed stdout stream")
         }
     }
 
     internal suspend fun onExtendedData(dataType: Int, data: ByteArray) {
-        if (!lifecycle.receiveData()) {
-            throw org.connectbot.sshlib.SshException("Received extended data after EOF or CLOSE on channel $localChannelNumber")
-        }
-        window.consumeLocal(data.size)
-        if (dataType == 1) {
-            if (stderrIngress.trySend(data).isFailure) {
-                throw org.connectbot.sshlib.SshException("Received data for a closed stderr stream")
+        if (!lifecycle.receiveData {
+                window.consumeLocal(data.size)
+                if (dataType == 1) {
+                    if (stderrIngress.trySend(data).isFailure) {
+                        throw org.connectbot.sshlib.SshException("Received data for a closed stderr stream")
+                    }
+                } else if (extendedDataIngress.trySend(dataType to data).isFailure) {
+                    throw org.connectbot.sshlib.SshException("Received data for a closed extended-data stream")
+                }
             }
-        } else if (extendedDataIngress.trySend(dataType to data).isFailure) {
-            throw org.connectbot.sshlib.SshException("Received data for a closed extended-data stream")
+        ) {
+            throw org.connectbot.sshlib.SshException("Received extended data after EOF or CLOSE on channel $localChannelNumber")
         }
     }
 
@@ -138,32 +144,39 @@ class SessionChannel internal constructor(
     }
 
     internal suspend fun onWindowAdjust(bytesToAdd: Long) {
-        if (!lifecycle.receiveWindowAdjust()) {
+        if (!lifecycle.receiveWindowAdjust {
+                window.adjustRemote(bytesToAdd)
+                logger.debug("Window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
+                if (window.remoteRemaining > 0) windowAvailable.trySend(Unit)
+            }
+        ) {
             throw org.connectbot.sshlib.SshException("Received window adjustment after CLOSE on channel $localChannelNumber")
-        }
-        window.adjustRemote(bytesToAdd)
-        logger.debug("Window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
-        if (window.remoteRemaining > 0) {
-            windowAvailable.trySend(Unit)
         }
     }
 
     internal suspend fun onEof() {
-        if (!lifecycle.receiveEof()) {
+        if (!lifecycle.receiveEof {
+                logger.debug("Received EOF on channel $localChannelNumber")
+                stdoutIngress.close()
+                stderrIngress.close()
+                extendedDataIngress.close()
+            }
+        ) {
             throw org.connectbot.sshlib.SshException("Received duplicate EOF or EOF after CLOSE on channel $localChannelNumber")
         }
-        logger.debug("Received EOF on channel $localChannelNumber")
-        stdoutIngress.close()
-        stderrIngress.close()
-        extendedDataIngress.close()
     }
 
     internal suspend fun onClose() {
-        val replyRequired = lifecycle.state != SshChannelState.CLOSE_SENT
-        if (!lifecycle.receiveClose()) {
+        if (!lifecycle.receiveClose { transition ->
+                closeResources(SshChannelEffect.SEND_CLOSE in transition.effects, "Received CLOSE")
+            }
+        ) {
             throw org.connectbot.sshlib.SshException("Received duplicate CLOSE on channel $localChannelNumber")
         }
-        logger.debug("Received CLOSE on channel $localChannelNumber")
+    }
+
+    private suspend fun closeResources(replyRequired: Boolean, reason: String) {
+        logger.debug("$reason on channel $localChannelNumber")
         obfuscatorMutex.withLock {
             obfuscator?.stop()
         }
@@ -188,24 +201,10 @@ class SessionChannel internal constructor(
     }
 
     internal suspend fun onDisconnected() {
-        lifecycle.disconnect()
-        obfuscatorMutex.withLock {
-            obfuscator?.stop()
-        }
-        chaffJob?.cancel()
-        stdoutIngress.close()
-        stderrIngress.close()
-        extendedDataIngress.close()
-        stdoutDeliveryJob.cancel()
-        stderrDeliveryJob.cancel()
-        extendedDeliveryJob.cancel()
-        _stdout.close()
-        _stderr.close()
-        _extendedData.close()
-        windowAvailable.close()
+        lifecycle.disconnect { closeResources(replyRequired = false, reason = "Disconnected") }
     }
 
-    internal suspend fun authorizeReceiveRequest(): Boolean = lifecycle.receiveRequest()
+    internal suspend fun receiveRequest(action: suspend () -> Unit): Boolean = lifecycle.receiveRequest { action() }
 
     override suspend fun write(data: ByteArray) {
         if (obfuscationActive) {
@@ -216,9 +215,6 @@ class SessionChannel internal constructor(
     }
 
     private suspend fun writeDirect(data: ByteArray) {
-        if (!lifecycle.sendData()) {
-            throw org.connectbot.sshlib.SshException("Cannot send data after EOF or CLOSE on channel $localChannelNumber")
-        }
         var offset = 0
         while (offset < data.size) {
             while (window.remoteRemaining <= 0) {
@@ -226,8 +222,13 @@ class SessionChannel internal constructor(
             }
             val chunkSize = window.sendChunkSize(data.size - offset, maxPacketSize)
             val chunk = data.copyOfRange(offset, offset + chunkSize)
-            connection.sendChannelData(_remoteChannelNumber, chunk)
-            window.consumeRemote(chunkSize)
+            if (!lifecycle.sendData {
+                    connection.sendChannelData(_remoteChannelNumber, chunk)
+                    window.consumeRemote(chunkSize)
+                }
+            ) {
+                throw org.connectbot.sshlib.SshException("Cannot send data after EOF or CLOSE on channel $localChannelNumber")
+            }
             offset += chunkSize
         }
     }
@@ -301,8 +302,18 @@ class SessionChannel internal constructor(
     override suspend fun readExtended(): Pair<Int, ByteArray>? = _extendedData.receiveCatching().getOrNull()
 
     override suspend fun sendEof() {
-        if (!lifecycle.sendEof()) return
-        connection.sendChannelEof(_remoteChannelNumber)
+        lifecycle.sendEof { connection.sendChannelEof(_remoteChannelNumber) }
+    }
+
+    private suspend fun performSendRequest(action: suspend () -> CompletableDeferred<Boolean>?): Boolean {
+        var pendingReply: CompletableDeferred<Boolean>? = null
+        if (!lifecycle.sendRequest { pendingReply = action() }) return false
+        val deferred = pendingReply ?: return true
+        return try {
+            deferred.await()
+        } finally {
+            connection.finishChannelRequest(deferred)
+        }
     }
 
     override suspend fun resizeTerminal(
@@ -310,10 +321,9 @@ class SessionChannel internal constructor(
         heightRows: Int,
         widthPixels: Int,
         heightPixels: Int,
-    ): Boolean {
-        if (!lifecycle.sendRequest()) return false
+    ): Boolean = performSendRequest {
         logger.debug("Resizing terminal: ${widthChars}x$heightRows")
-        return connection.sendChannelRequest(
+        connection.beginChannelRequest(
             _remoteChannelNumber,
             "window-change",
             wantReply = false,
@@ -336,43 +346,44 @@ class SessionChannel internal constructor(
         heightPixels: Int,
         terminalModes: ByteArray,
     ): Boolean {
-        if (!lifecycle.sendRequest()) return false
-        logger.debug("Requesting PTY: $terminalType ${widthChars}x$heightRows")
-        val granted = connection.sendChannelRequest(
-            _remoteChannelNumber,
-            "pty-req",
-            wantReply = true,
-        ) { msg ->
-            val ptyReq = ChannelRequestPtyReq()
+        val granted = performSendRequest {
+            logger.debug("Requesting PTY: $terminalType ${widthChars}x$heightRows")
+            val pendingReply = connection.beginChannelRequest(
+                _remoteChannelNumber,
+                "pty-req",
+                wantReply = true,
+            ) { msg ->
+                val ptyReq = ChannelRequestPtyReq()
 
-            val termBytes = ByteString()
-            termBytes.setLenData(terminalType.length.toLong())
-            termBytes.setData(terminalType.toByteArray(Charsets.US_ASCII))
-            termBytes._check()
-            ptyReq.setTerm(termBytes)
+                val termBytes = ByteString()
+                termBytes.setLenData(terminalType.length.toLong())
+                termBytes.setData(terminalType.toByteArray(Charsets.US_ASCII))
+                termBytes._check()
+                ptyReq.setTerm(termBytes)
 
-            ptyReq.setTerminalWidth(widthChars.toLong())
-            ptyReq.setTerminalHeight(heightRows.toLong())
-            ptyReq.setTerminalWidthPixels(widthPixels.toLong())
-            ptyReq.setTerminalHeightPixels(heightPixels.toLong())
+                ptyReq.setTerminalWidth(widthChars.toLong())
+                ptyReq.setTerminalHeight(heightRows.toLong())
+                ptyReq.setTerminalWidthPixels(widthPixels.toLong())
+                ptyReq.setTerminalHeightPixels(heightPixels.toLong())
 
-            val modeString = ByteString()
-            modeString.setLenData(terminalModes.size.toLong())
-            modeString.setData(terminalModes)
-            modeString._check()
-            ptyReq.setTerminalModes(modeString)
+                val modeString = ByteString()
+                modeString.setLenData(terminalModes.size.toLong())
+                modeString.setData(terminalModes)
+                modeString._check()
+                ptyReq.setTerminalModes(modeString)
 
-            ptyReq._check()
-            msg.setRequestSpecificFields(ptyReq)
+                ptyReq._check()
+                msg.setRequestSpecificFields(ptyReq)
+            }
+            pendingReply
         }
         if (granted) ptyGranted = true
         return granted
     }
 
-    override suspend fun requestShell(): Boolean {
-        if (!lifecycle.sendRequest()) return false
+    override suspend fun requestShell(): Boolean = performSendRequest {
         logger.debug("Requesting shell on channel $localChannelNumber")
-        return connection.sendChannelRequest(
+        connection.beginChannelRequest(
             _remoteChannelNumber,
             "shell",
             wantReply = true,
@@ -383,10 +394,9 @@ class SessionChannel internal constructor(
         }
     }
 
-    override suspend fun requestExec(command: String): Boolean {
-        if (!lifecycle.sendRequest()) return false
+    override suspend fun requestExec(command: String): Boolean = performSendRequest {
         logger.debug("Requesting exec on channel $localChannelNumber: $command")
-        return connection.sendChannelRequest(
+        connection.beginChannelRequest(
             _remoteChannelNumber,
             "exec",
             wantReply = true,
@@ -402,10 +412,9 @@ class SessionChannel internal constructor(
         }
     }
 
-    override suspend fun requestSubsystem(name: String): Boolean {
-        if (!lifecycle.sendRequest()) return false
+    override suspend fun requestSubsystem(name: String): Boolean = performSendRequest {
         logger.debug("Requesting subsystem on channel $localChannelNumber: $name")
-        return connection.sendChannelRequest(
+        connection.beginChannelRequest(
             _remoteChannelNumber,
             "subsystem",
             wantReply = true,
@@ -423,26 +432,24 @@ class SessionChannel internal constructor(
 
     override fun close() {
         connectionScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            if (!lifecycle.sendClose()) return@launch
-
-            logger.debug("Closing channel $localChannelNumber")
-            obfuscatorMutex.withLock {
-                obfuscator?.stop()
-            }
-            chaffJob?.cancel()
-            stdoutIngress.close()
-            stderrIngress.close()
-            extendedDataIngress.close()
-            stdoutDeliveryJob.cancel()
-            stderrDeliveryJob.cancel()
-            extendedDeliveryJob.cancel()
-            _stdout.close()
-            _stderr.close()
-            _extendedData.close()
-            try {
-                connection.sendChannelClose(_remoteChannelNumber)
-            } catch (e: Exception) {
-                logger.debug("Failed to send CHANNEL_CLOSE", e)
+            lifecycle.sendClose {
+                logger.debug("Closing channel $localChannelNumber")
+                obfuscatorMutex.withLock { obfuscator?.stop() }
+                chaffJob?.cancel()
+                stdoutIngress.close()
+                stderrIngress.close()
+                extendedDataIngress.close()
+                stdoutDeliveryJob.cancel()
+                stderrDeliveryJob.cancel()
+                extendedDeliveryJob.cancel()
+                _stdout.close()
+                _stderr.close()
+                _extendedData.close()
+                try {
+                    connection.sendChannelClose(_remoteChannelNumber)
+                } catch (e: Exception) {
+                    logger.debug("Failed to send CHANNEL_CLOSE", e)
+                }
             }
         }
     }

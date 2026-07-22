@@ -31,6 +31,7 @@ import ru.nsk.kstatemachine.state.transition
 import ru.nsk.kstatemachine.statemachine.ProcessingResult
 import ru.nsk.kstatemachine.statemachine.StateMachine
 import ru.nsk.kstatemachine.statemachine.createStdLibStateMachine
+import ru.nsk.kstatemachine.transition.onTriggered
 
 /**
  * The protocol-visible lifecycle of one SSH connection-layer channel.
@@ -90,6 +91,12 @@ internal enum class SshChannelEventId(
     SEND_REQUEST("SendRequest"),
 }
 
+internal enum class SshChannelEventOrigin {
+    CONNECTION_CONTROL,
+    LOCAL_COMMAND,
+    PARSED_PACKET,
+}
+
 internal enum class SshChannelOperationScope {
     CHANNEL_ATTEMPT,
     CONNECTION_TRANSITION,
@@ -143,9 +150,16 @@ internal data class SshChannelTransitionMeta(
     val source: SshChannelState,
     val target: SshChannelState,
     val effects: Set<SshChannelEffect>,
+    val origin: SshChannelEventOrigin,
     val scope: SshChannelOperationScope,
     val requiresAuthenticatedConnection: Boolean,
 ) : MetaInfo
+
+internal data class SshChannelAcceptedTransition(
+    val id: SshChannelTransitionId,
+    val effects: Set<SshChannelEffect>,
+    val origin: SshChannelEventOrigin,
+)
 
 internal data class SshChannelFormalTransition(
     val id: SshChannelTransitionId,
@@ -153,6 +167,7 @@ internal data class SshChannelFormalTransition(
     val source: SshChannelState,
     val target: SshChannelState,
     val effects: Set<SshChannelEffect>,
+    val origin: SshChannelEventOrigin,
     val scope: SshChannelOperationScope,
     val requiresAuthenticatedConnection: Boolean,
 ) {
@@ -166,6 +181,7 @@ internal data class SshChannelFormalOperation(
     val sourceStateName: String,
     val targetStateName: String,
     val effects: Set<SshChannelEffect>,
+    val origin: SshChannelEventOrigin,
     val scope: SshChannelOperationScope,
     val requiresAuthenticatedConnection: Boolean,
 ) {
@@ -186,6 +202,11 @@ internal data class SshChannelFormalModel(
         require(transitions.map(SshChannelFormalTransition::id).distinct().size == transitions.size)
         require(operations.map(SshChannelFormalOperation::id).distinct().size == operations.size)
         require(operations.mapTo(mutableSetOf(), SshChannelFormalOperation::eventId) == SshChannelEventId.entries.toSet())
+        require(
+            operations.groupBy(SshChannelFormalOperation::eventId).values.all { variants ->
+                variants.map(SshChannelFormalOperation::origin).distinct().size == 1
+            },
+        ) { "Every channel event must have exactly one typed origin" }
         require(operations.count { it.scope == SshChannelOperationScope.CHANNEL_ATTEMPT } > 0)
     }
 }
@@ -194,8 +215,8 @@ internal data class SshChannelFormalModel(
  * Per-channel KStateMachine source of truth.
  *
  * [process] serializes event delivery because inbound packets and application calls may arrive on
- * different coroutines. A rejected event performs no transition; callers must not perform the
- * corresponding packet, window, or stream side effect when this returns `false`.
+ * different coroutines. Effects are executed by the accepted transition's callback while that
+ * serialization lock is held. Rejected events therefore cannot execute their supplied effect.
  */
 internal class SshChannelStateMachine(
     initialState: SshChannelState,
@@ -209,38 +230,100 @@ internal class SshChannelStateMachine(
     private sealed class ChannelEvent(
         val id: SshChannelEventId,
         val effects: Set<SshChannelEffect>,
+        val origin: SshChannelEventOrigin,
+        val action: suspend (SshChannelAcceptedTransition) -> Unit,
         val scope: SshChannelOperationScope = SshChannelOperationScope.CHANNEL_ATTEMPT,
         val requiresAuthenticatedConnection: Boolean = true,
     ) : Event {
-        data object OpenConfirmed : ChannelEvent(
-            SshChannelEventId.OPEN_CONFIRMED,
-            setOf(SshChannelEffect.COMPLETE_OPEN),
-            scope = SshChannelOperationScope.CONNECTION_TRANSITION,
-        )
-        data object OpenFailed : ChannelEvent(
-            SshChannelEventId.OPEN_FAILED,
-            setOf(SshChannelEffect.FAIL_OPEN),
-            scope = SshChannelOperationScope.CONNECTION_TRANSITION,
-        )
-        data object SendData : ChannelEvent(SshChannelEventId.SEND_DATA, setOf(SshChannelEffect.SEND_DATA))
-        data object ReceiveData : ChannelEvent(SshChannelEventId.RECEIVE_DATA, setOf(SshChannelEffect.DELIVER_DATA))
-        data object SendRequest : ChannelEvent(
-            SshChannelEventId.SEND_REQUEST,
-            setOf(SshChannelEffect.SEND_REQUEST),
-            scope = SshChannelOperationScope.CONNECTION_TRANSITION,
-        )
-        data object ReceiveRequest : ChannelEvent(SshChannelEventId.RECEIVE_REQUEST, setOf(SshChannelEffect.DELIVER_REQUEST))
-        data object ReceiveWindowAdjust : ChannelEvent(SshChannelEventId.RECEIVE_WINDOW_ADJUST, setOf(SshChannelEffect.ADJUST_WINDOW))
-        data object SendEof : ChannelEvent(SshChannelEventId.SEND_EOF, setOf(SshChannelEffect.SEND_EOF))
-        data object ReceiveEof : ChannelEvent(SshChannelEventId.RECEIVE_EOF, setOf(SshChannelEffect.CLOSE_INBOUND_STREAMS))
-        data object SendClose : ChannelEvent(SshChannelEventId.SEND_CLOSE, setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL))
-        data object ReceiveClose : ChannelEvent(SshChannelEventId.RECEIVE_CLOSE, setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL))
-        data object Disconnect : ChannelEvent(
-            SshChannelEventId.DISCONNECT,
-            setOf(SshChannelEffect.CLOSE_CHANNEL),
-            scope = SshChannelOperationScope.CONNECTION_TEARDOWN,
-            requiresAuthenticatedConnection = false,
-        )
+        class OpenConfirmed(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.OPEN_CONFIRMED,
+                setOf(SshChannelEffect.COMPLETE_OPEN),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+                scope = SshChannelOperationScope.CONNECTION_TRANSITION,
+            )
+        class OpenFailed(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.OPEN_FAILED,
+                setOf(SshChannelEffect.FAIL_OPEN),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+                scope = SshChannelOperationScope.CONNECTION_TRANSITION,
+            )
+        class SendData(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.SEND_DATA,
+                setOf(SshChannelEffect.SEND_DATA),
+                SshChannelEventOrigin.LOCAL_COMMAND,
+                action,
+            )
+        class ReceiveData(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.RECEIVE_DATA,
+                setOf(SshChannelEffect.DELIVER_DATA),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+            )
+        class SendRequest(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.SEND_REQUEST,
+                setOf(SshChannelEffect.SEND_REQUEST),
+                SshChannelEventOrigin.LOCAL_COMMAND,
+                action,
+                scope = SshChannelOperationScope.CONNECTION_TRANSITION,
+            )
+        class ReceiveRequest(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.RECEIVE_REQUEST,
+                setOf(SshChannelEffect.DELIVER_REQUEST),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+            )
+        class ReceiveWindowAdjust(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.RECEIVE_WINDOW_ADJUST,
+                setOf(SshChannelEffect.ADJUST_WINDOW),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+            )
+        class SendEof(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.SEND_EOF,
+                setOf(SshChannelEffect.SEND_EOF),
+                SshChannelEventOrigin.LOCAL_COMMAND,
+                action,
+            )
+        class ReceiveEof(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.RECEIVE_EOF,
+                setOf(SshChannelEffect.CLOSE_INBOUND_STREAMS),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+            )
+        class SendClose(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.SEND_CLOSE,
+                setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL),
+                SshChannelEventOrigin.LOCAL_COMMAND,
+                action,
+            )
+        class ReceiveClose(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.RECEIVE_CLOSE,
+                setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL),
+                SshChannelEventOrigin.PARSED_PACKET,
+                action,
+            )
+        class Disconnect(action: suspend (SshChannelAcceptedTransition) -> Unit) :
+            ChannelEvent(
+                SshChannelEventId.DISCONNECT,
+                setOf(SshChannelEffect.CLOSE_CHANNEL),
+                SshChannelEventOrigin.CONNECTION_CONTROL,
+                action,
+                scope = SshChannelOperationScope.CONNECTION_TEARDOWN,
+                requiresAuthenticatedConnection = false,
+            )
     }
 
     private val eventMutex = Mutex()
@@ -274,55 +357,55 @@ internal class SshChannelStateMachine(
         bindState(closeSent, SshChannelState.CLOSE_SENT)
         bindState(closed, SshChannelState.CLOSED)
 
-        opening.channelTransition(ChannelEvent.OpenConfirmed, SshChannelTransitionId.OPEN_CONFIRMED, open)
-        opening.channelTransition(ChannelEvent.OpenFailed, SshChannelTransitionId.OPEN_FAILED, closed)
+        opening.channelTransition(ChannelEvent.OpenConfirmed {}, SshChannelTransitionId.OPEN_CONFIRMED, open)
+        opening.channelTransition(ChannelEvent.OpenFailed {}, SshChannelTransitionId.OPEN_FAILED, closed)
 
-        open.channelTransition(ChannelEvent.SendData, SshChannelTransitionId.SEND_DATA_OPEN)
-        remoteEof.channelTransition(ChannelEvent.SendData, SshChannelTransitionId.SEND_DATA_REMOTE_EOF)
-        open.channelTransition(ChannelEvent.ReceiveData, SshChannelTransitionId.RECEIVE_DATA_OPEN)
-        localEof.channelTransition(ChannelEvent.ReceiveData, SshChannelTransitionId.RECEIVE_DATA_LOCAL_EOF)
+        open.channelTransition(ChannelEvent.SendData {}, SshChannelTransitionId.SEND_DATA_OPEN)
+        remoteEof.channelTransition(ChannelEvent.SendData {}, SshChannelTransitionId.SEND_DATA_REMOTE_EOF)
+        open.channelTransition(ChannelEvent.ReceiveData {}, SshChannelTransitionId.RECEIVE_DATA_OPEN)
+        localEof.channelTransition(ChannelEvent.ReceiveData {}, SshChannelTransitionId.RECEIVE_DATA_LOCAL_EOF)
 
-        open.channelTransition(ChannelEvent.SendRequest, SshChannelTransitionId.SEND_REQUEST_OPEN)
-        localEof.channelTransition(ChannelEvent.SendRequest, SshChannelTransitionId.SEND_REQUEST_LOCAL_EOF)
-        remoteEof.channelTransition(ChannelEvent.SendRequest, SshChannelTransitionId.SEND_REQUEST_REMOTE_EOF)
-        bothEof.channelTransition(ChannelEvent.SendRequest, SshChannelTransitionId.SEND_REQUEST_BOTH_EOF)
-        open.channelTransition(ChannelEvent.ReceiveRequest, SshChannelTransitionId.RECEIVE_REQUEST_OPEN)
-        localEof.channelTransition(ChannelEvent.ReceiveRequest, SshChannelTransitionId.RECEIVE_REQUEST_LOCAL_EOF)
-        remoteEof.channelTransition(ChannelEvent.ReceiveRequest, SshChannelTransitionId.RECEIVE_REQUEST_REMOTE_EOF)
-        bothEof.channelTransition(ChannelEvent.ReceiveRequest, SshChannelTransitionId.RECEIVE_REQUEST_BOTH_EOF)
+        open.channelTransition(ChannelEvent.SendRequest {}, SshChannelTransitionId.SEND_REQUEST_OPEN)
+        localEof.channelTransition(ChannelEvent.SendRequest {}, SshChannelTransitionId.SEND_REQUEST_LOCAL_EOF)
+        remoteEof.channelTransition(ChannelEvent.SendRequest {}, SshChannelTransitionId.SEND_REQUEST_REMOTE_EOF)
+        bothEof.channelTransition(ChannelEvent.SendRequest {}, SshChannelTransitionId.SEND_REQUEST_BOTH_EOF)
+        open.channelTransition(ChannelEvent.ReceiveRequest {}, SshChannelTransitionId.RECEIVE_REQUEST_OPEN)
+        localEof.channelTransition(ChannelEvent.ReceiveRequest {}, SshChannelTransitionId.RECEIVE_REQUEST_LOCAL_EOF)
+        remoteEof.channelTransition(ChannelEvent.ReceiveRequest {}, SshChannelTransitionId.RECEIVE_REQUEST_REMOTE_EOF)
+        bothEof.channelTransition(ChannelEvent.ReceiveRequest {}, SshChannelTransitionId.RECEIVE_REQUEST_BOTH_EOF)
 
-        open.channelTransition(ChannelEvent.ReceiveWindowAdjust, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_OPEN)
-        localEof.channelTransition(ChannelEvent.ReceiveWindowAdjust, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_LOCAL_EOF)
-        remoteEof.channelTransition(ChannelEvent.ReceiveWindowAdjust, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_REMOTE_EOF)
-        bothEof.channelTransition(ChannelEvent.ReceiveWindowAdjust, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_BOTH_EOF)
+        open.channelTransition(ChannelEvent.ReceiveWindowAdjust {}, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_OPEN)
+        localEof.channelTransition(ChannelEvent.ReceiveWindowAdjust {}, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_LOCAL_EOF)
+        remoteEof.channelTransition(ChannelEvent.ReceiveWindowAdjust {}, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_REMOTE_EOF)
+        bothEof.channelTransition(ChannelEvent.ReceiveWindowAdjust {}, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_BOTH_EOF)
 
-        open.channelTransition(ChannelEvent.SendEof, SshChannelTransitionId.SEND_EOF_OPEN, localEof)
-        remoteEof.channelTransition(ChannelEvent.SendEof, SshChannelTransitionId.SEND_EOF_REMOTE_EOF, bothEof)
-        open.channelTransition(ChannelEvent.ReceiveEof, SshChannelTransitionId.RECEIVE_EOF_OPEN, remoteEof)
-        localEof.channelTransition(ChannelEvent.ReceiveEof, SshChannelTransitionId.RECEIVE_EOF_LOCAL_EOF, bothEof)
+        open.channelTransition(ChannelEvent.SendEof {}, SshChannelTransitionId.SEND_EOF_OPEN, localEof)
+        remoteEof.channelTransition(ChannelEvent.SendEof {}, SshChannelTransitionId.SEND_EOF_REMOTE_EOF, bothEof)
+        open.channelTransition(ChannelEvent.ReceiveEof {}, SshChannelTransitionId.RECEIVE_EOF_OPEN, remoteEof)
+        localEof.channelTransition(ChannelEvent.ReceiveEof {}, SshChannelTransitionId.RECEIVE_EOF_LOCAL_EOF, bothEof)
 
-        open.channelTransition(ChannelEvent.SendClose, SshChannelTransitionId.SEND_CLOSE_OPEN, closeSent)
-        localEof.channelTransition(ChannelEvent.SendClose, SshChannelTransitionId.SEND_CLOSE_LOCAL_EOF, closeSent)
-        remoteEof.channelTransition(ChannelEvent.SendClose, SshChannelTransitionId.SEND_CLOSE_REMOTE_EOF, closeSent)
-        bothEof.channelTransition(ChannelEvent.SendClose, SshChannelTransitionId.SEND_CLOSE_BOTH_EOF, closeSent)
+        open.channelTransition(ChannelEvent.SendClose {}, SshChannelTransitionId.SEND_CLOSE_OPEN, closeSent)
+        localEof.channelTransition(ChannelEvent.SendClose {}, SshChannelTransitionId.SEND_CLOSE_LOCAL_EOF, closeSent)
+        remoteEof.channelTransition(ChannelEvent.SendClose {}, SshChannelTransitionId.SEND_CLOSE_REMOTE_EOF, closeSent)
+        bothEof.channelTransition(ChannelEvent.SendClose {}, SshChannelTransitionId.SEND_CLOSE_BOTH_EOF, closeSent)
 
-        open.channelTransition(ChannelEvent.ReceiveClose, SshChannelTransitionId.RECEIVE_CLOSE_OPEN, closed)
-        localEof.channelTransition(ChannelEvent.ReceiveClose, SshChannelTransitionId.RECEIVE_CLOSE_LOCAL_EOF, closed)
-        remoteEof.channelTransition(ChannelEvent.ReceiveClose, SshChannelTransitionId.RECEIVE_CLOSE_REMOTE_EOF, closed)
-        bothEof.channelTransition(ChannelEvent.ReceiveClose, SshChannelTransitionId.RECEIVE_CLOSE_BOTH_EOF, closed)
+        open.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_OPEN, closed)
+        localEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_LOCAL_EOF, closed)
+        remoteEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_REMOTE_EOF, closed)
+        bothEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_BOTH_EOF, closed)
         closeSent.channelTransition(
-            ChannelEvent.ReceiveClose,
+            ChannelEvent.ReceiveClose {},
             SshChannelTransitionId.RECEIVE_CLOSE_CLOSE_SENT,
             closed,
             effects = setOf(SshChannelEffect.CLOSE_CHANNEL),
         )
 
-        opening.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_OPENING, closed)
-        open.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_OPEN, closed)
-        localEof.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_LOCAL_EOF, closed)
-        remoteEof.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_REMOTE_EOF, closed)
-        bothEof.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_BOTH_EOF, closed)
-        closeSent.channelTransition(ChannelEvent.Disconnect, SshChannelTransitionId.DISCONNECT_CLOSE_SENT, closed)
+        opening.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_OPENING, closed)
+        open.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_OPEN, closed)
+        localEof.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_LOCAL_EOF, closed)
+        remoteEof.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_REMOTE_EOF, closed)
+        bothEof.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_BOTH_EOF, closed)
+        closeSent.channelTransition(ChannelEvent.Disconnect {}, SshChannelTransitionId.DISCONNECT_CLOSE_SENT, closed)
     }
 
     val state: SshChannelState
@@ -331,18 +414,18 @@ internal class SshChannelStateMachine(
     val isOpen: Boolean
         get() = activeState !in setOf(SshChannelState.CLOSE_SENT, SshChannelState.CLOSED)
 
-    suspend fun openConfirmed() = process(ChannelEvent.OpenConfirmed)
-    suspend fun openFailed() = process(ChannelEvent.OpenFailed)
-    suspend fun sendData() = process(ChannelEvent.SendData)
-    suspend fun receiveData() = process(ChannelEvent.ReceiveData)
-    suspend fun sendRequest() = process(ChannelEvent.SendRequest)
-    suspend fun receiveRequest() = process(ChannelEvent.ReceiveRequest)
-    suspend fun receiveWindowAdjust() = process(ChannelEvent.ReceiveWindowAdjust)
-    suspend fun sendEof() = process(ChannelEvent.SendEof)
-    suspend fun receiveEof() = process(ChannelEvent.ReceiveEof)
-    suspend fun sendClose() = process(ChannelEvent.SendClose)
-    suspend fun receiveClose() = process(ChannelEvent.ReceiveClose)
-    suspend fun disconnect() = process(ChannelEvent.Disconnect)
+    suspend fun openConfirmed(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.OpenConfirmed(action))
+    suspend fun openFailed(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.OpenFailed(action))
+    suspend fun sendData(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.SendData(action))
+    suspend fun receiveData(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.ReceiveData(action))
+    suspend fun sendRequest(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.SendRequest(action))
+    suspend fun receiveRequest(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.ReceiveRequest(action))
+    suspend fun receiveWindowAdjust(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.ReceiveWindowAdjust(action))
+    suspend fun sendEof(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.SendEof(action))
+    suspend fun receiveEof(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.ReceiveEof(action))
+    suspend fun sendClose(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.SendClose(action))
+    suspend fun receiveClose(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.ReceiveClose(action))
+    suspend fun disconnect(action: suspend (SshChannelAcceptedTransition) -> Unit) = process(ChannelEvent.Disconnect(action))
 
     internal fun formalModel(): SshChannelFormalModel {
         val states = collectChannelStates(stateMachine)
@@ -355,6 +438,7 @@ internal class SshChannelStateMachine(
                     meta.source,
                     meta.target,
                     meta.effects,
+                    meta.origin,
                     meta.scope,
                     meta.requiresAuthenticatedConnection,
                 )
@@ -367,6 +451,7 @@ internal class SshChannelStateMachine(
                 sourceStateName = transition.source.name,
                 targetStateName = transition.target.name,
                 effects = transition.effects,
+                origin = transition.origin,
                 scope = transition.scope,
                 requiresAuthenticatedConnection = transition.requiresAuthenticatedConnection,
             )
@@ -378,6 +463,7 @@ internal class SshChannelStateMachine(
                 sourceStateName = UNALLOCATED_STATE,
                 targetStateName = SshChannelState.OPENING.name,
                 effects = setOf(SshChannelEffect.SEND_OPEN),
+                origin = SshChannelEventOrigin.LOCAL_COMMAND,
                 scope = SshChannelOperationScope.CONNECTION_TRANSITION,
                 requiresAuthenticatedConnection = true,
             ),
@@ -387,6 +473,7 @@ internal class SshChannelStateMachine(
                 sourceStateName = UNALLOCATED_STATE,
                 targetStateName = SshChannelState.OPEN.name,
                 effects = setOf(SshChannelEffect.SEND_OPEN_CONFIRMATION),
+                origin = SshChannelEventOrigin.PARSED_PACKET,
                 scope = SshChannelOperationScope.CHANNEL_ATTEMPT,
                 requiresAuthenticatedConnection = true,
             ),
@@ -423,9 +510,12 @@ internal class SshChannelStateMachine(
                 target = target?.name?.let(SshChannelState::valueOf)
                     ?: SshChannelState.valueOf(requireNotNull(this@channelTransition.name)),
                 effects = effects,
+                origin = event.origin,
                 scope = event.scope,
                 requiresAuthenticatedConnection = event.requiresAuthenticatedConnection,
             )
+        }.onTriggered {
+            it.event.action(SshChannelAcceptedTransition(id, effects, event.origin))
         }
     }
 

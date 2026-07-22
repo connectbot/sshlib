@@ -21,6 +21,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -59,8 +60,8 @@ class SessionChannelTest {
         val wantReplySlot = slot<Boolean>()
         val conn = mockk<SshConnection>(relaxed = true)
         coEvery {
-            conn.sendChannelRequest(any(), capture(requestTypeSlot), capture(wantReplySlot), any())
-        } returns true
+            conn.beginChannelRequest(any(), capture(requestTypeSlot), capture(wantReplySlot), any())
+        } returns null
 
         val (channel, _) = createChannel(conn)
 
@@ -79,7 +80,7 @@ class SessionChannelTest {
     @Test
     fun `resizeTerminal returns false when request fails`() = runTest {
         val conn = mockk<SshConnection>(relaxed = true)
-        coEvery { conn.sendChannelRequest(any(), any(), any(), any()) } returns false
+        coEvery { conn.beginChannelRequest(any(), any(), any(), any()) } returns CompletableDeferred(false)
 
         val (channel, _) = createChannel(conn)
 
@@ -98,8 +99,8 @@ class SessionChannelTest {
         val channelSlot = slot<Int>()
         val conn = mockk<SshConnection>(relaxed = true)
         coEvery {
-            conn.sendChannelRequest(capture(channelSlot), any(), any(), any())
-        } returns true
+            conn.beginChannelRequest(capture(channelSlot), any(), any(), any())
+        } returns null
 
         val (channel, _) = createChannel(conn)
 
