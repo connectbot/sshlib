@@ -221,10 +221,10 @@ class SshClientStateMachineTest {
         ) {
             actions += "sendChannelOpen"
         }
-        override fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
+        override suspend fun receiveChannelOpenConfirmation(msg: SshMsgChannelOpenConfirmation) {
             actions += "receiveChannelOpenConfirmation"
         }
-        override fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
+        override suspend fun receiveChannelOpenFailure(msg: SshMsgChannelOpenFailure) {
             actions += "receiveChannelOpenFailure"
         }
         override suspend fun sendChannelRequest(
