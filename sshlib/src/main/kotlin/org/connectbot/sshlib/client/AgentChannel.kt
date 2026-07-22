@@ -33,7 +33,7 @@ internal class AgentChannel(
     private val connection: SshConnection,
     scope: CoroutineScope,
     internal val localChannelNumber: Int,
-    private var remoteChannelNumber: Int,
+    internal val remoteChannelNumber: Int,
     private val maxPacketSize: Int,
     remoteWindowSizeInitial: Long,
     initialWindowSize: Int = 64 * 1024,

@@ -86,6 +86,8 @@ internal class RemotePortForwarder(
     ) {
         logger.debug("Incoming forwarded-tcpip from $originAddr:$originPort, connecting to $localHost:$localPort")
 
+        var registeredChannel: ForwardingChannel? = null
+        var confirmationSent = false
         try {
             val localChannelNumber = connection.allocateChannelNumber()
 
@@ -102,6 +104,7 @@ internal class RemotePortForwarder(
                 initialWindowSize = 256 * 1024,
             )
             connection.registerForwardingChannel(fwdChannel)
+            registeredChannel = fwdChannel
 
             connection.sendChannelOpenConfirmationPublic(
                 recipientChannel = senderChannel,
@@ -109,6 +112,7 @@ internal class RemotePortForwarder(
                 initialWindowSize = 256 * 1024,
                 maximumPacketSize = 32 * 1024,
             )
+            confirmationSent = true
 
             val readChannel = socket.openReadChannel()
             val writeChannel = socket.openWriteChannel(autoFlush = false)
@@ -117,13 +121,19 @@ internal class RemotePortForwarder(
             synchronized(dataForwarders) { dataForwarders.add(forwarder) }
             forwarder.start()
         } catch (e: Exception) {
+            registeredChannel?.let { channel ->
+                connection.unregisterForwardingChannel(channel)
+                if (confirmationSent) channel.close() else channel.onDisconnected()
+            }
             logger.warn("Failed to handle incoming forwarded-tcpip: ${e.message}")
-            connection.sendChannelOpenFailurePublic(
-                recipientChannel = senderChannel,
-                reasonCode = 2, // SSH_OPEN_CONNECT_FAILED
-                description = "Failed to connect to local target: ${e.message}",
-                languageTag = "",
-            )
+            if (!confirmationSent) {
+                connection.sendChannelOpenFailurePublic(
+                    recipientChannel = senderChannel,
+                    reasonCode = 2, // SSH_OPEN_CONNECT_FAILED
+                    description = "Failed to connect to local target: ${e.message}",
+                    languageTag = "",
+                )
+            }
         }
     }
 
