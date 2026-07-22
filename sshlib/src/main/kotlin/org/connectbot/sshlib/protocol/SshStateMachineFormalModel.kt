@@ -162,6 +162,7 @@ internal data class SshFormalTransitionMeta(
     val guard: SshFormalGuard,
     val origins: Set<SshEventOrigin>,
     val effects: Set<SshEffect>,
+    val channelOperationEvent: SshChannelEventId?,
 ) : MetaInfo {
     init {
         require(origins.isNotEmpty()) { "Formal transition ${id.name} must have an origin" }
@@ -192,6 +193,7 @@ internal data class SshStateMachineFormalModel(
     val initialStateName: String,
     val states: List<SshFormalState>,
     val transitions: List<SshFormalTransition>,
+    val channelModel: SshChannelFormalModel,
 ) {
     private data class FormalVariable(
         val name: String,
@@ -216,12 +218,24 @@ internal data class SshStateMachineFormalModel(
         require(transitions.size == SshTransitionId.entries.size) {
             "Expected ${SshTransitionId.entries.size} formal transitions, found ${transitions.size}"
         }
+        val generatedConnectionOperations = transitions.mapNotNull { it.meta.channelOperationEvent }.toSet()
+        val declaredConnectionOperations = channelModel.operations
+            .filter { it.scope == SshChannelOperationScope.CONNECTION_TRANSITION }
+            .mapTo(mutableSetOf(), SshChannelFormalOperation::eventId)
+        require(generatedConnectionOperations == declaredConnectionOperations) {
+            "Connection transitions $generatedConnectionOperations do not match channel operations $declaredConnectionOperations"
+        }
     }
 
     fun renderTla(moduleName: String = GENERATED_MODULE_NAME): String {
         val variables = formalVariables()
         val body = buildString {
             appendLine("EXTENDS Naturals")
+            appendLine()
+            appendLine("CONSTANT MaxChannels")
+            appendLine()
+            appendLine("ChannelIDs == 1..MaxChannels")
+            appendLine("ChannelAttemptIDs == 0..(MaxChannels + 1)")
             appendLine()
             appendLine("VARIABLES ${variables.joinToString(", ", transform = FormalVariable::name)}")
             appendLine()
@@ -233,6 +247,7 @@ internal data class SshStateMachineFormalModel(
             appendLine("Events == ${renderSet(transitions.mapTo(sortedSetOf()) { it.meta.eventName })}")
             appendLine("Origins == ${renderSet(SshEventOrigin.entries.mapTo(sortedSetOf()) { it.tlaName })}")
             appendLine("Effects == ${renderSet(SshEffect.entries.mapTo(sortedSetOf()) { it.tlaName })}")
+            appendChannelDefinitions()
             appendLine()
             appendLine("Init ==")
             variables.forEach { variable ->
@@ -247,6 +262,7 @@ internal data class SshStateMachineFormalModel(
             transitions.sortedBy { it.meta.id.name }.forEach { transition ->
                 appendLine("    \\/ ${transition.meta.id.name}")
             }
+            appendLine("    \\/ AttemptChannelOperation")
             appendLine()
             appendLine("Spec == Init /\\ [][Next]_vars")
         }
@@ -299,7 +315,110 @@ internal data class SshStateMachineFormalModel(
         variable("initialNewKeysActive", "FALSE", ::renderInitialNewKeysActiveUpdate),
         variable("authRequestPending", "FALSE", ::renderAuthRequestPendingUpdate),
         variable("previousAuthRequestPending", "FALSE") { "authRequestPending" },
+        variable("previousChannels", "[c \\in ChannelIDs |-> \"Unallocated\"]") { "channels" },
+        FormalVariable("activeChannel", "0") { meta ->
+            val operation = meta.channelOperationEvent
+            if (operation == null) {
+                "activeChannel' = 0"
+            } else {
+                "activeChannel' \\in ChannelIDs /\\ " +
+                    "ChannelOperationAllowed(state, channels[activeChannel'], ${quote(operation.tlaName)})"
+            }
+        },
+        variable("channelEvent", quote("None")) { quote(it.channelOperationEvent?.tlaName ?: "None") },
+        FormalVariable("channels", "[c \\in ChannelIDs |-> \"Unallocated\"]") { meta ->
+            when {
+                SshEffect.DISCONNECT in meta.effects ->
+                    "channels' = [c \\in ChannelIDs |-> IF channels[c] = \"Unallocated\" THEN \"Unallocated\" ELSE \"CLOSED\"]"
+
+                meta.channelOperationEvent != null ->
+                    "channels' = [channels EXCEPT ![activeChannel'] = " +
+                        "ChannelTransitionTarget(channels[activeChannel'], ${quote(meta.channelOperationEvent.tlaName)})]"
+
+                else -> "channels' = channels"
+            }
+        },
+        FormalVariable("channelEffects", "{}") { meta ->
+            val operation = meta.channelOperationEvent
+            if (operation == null) {
+                "channelEffects' = {}"
+            } else {
+                "channelEffects' = ChannelEffectsFor(channels[activeChannel'], ${quote(operation.tlaName)})"
+            }
+        },
     )
+
+    private fun StringBuilder.appendChannelDefinitions() {
+        val operations = channelModel.operations
+            .filter { it.scope != SshChannelOperationScope.CONNECTION_TEARDOWN }
+            .sortedWith(compareBy(SshChannelFormalOperation::sourceStateName, SshChannelFormalOperation::eventName))
+        val attemptedOperations = operations.filter { it.scope == SshChannelOperationScope.CHANNEL_ATTEMPT }
+        val channelStates = channelModel.states.mapTo(sortedSetOf()) { it.name }.apply {
+            add(channelModel.unallocatedStateName)
+        }
+        val channelEvents = operations.mapTo(sortedSetOf(), SshChannelFormalOperation::eventName)
+        val channelAttemptEvents = attemptedOperations.mapTo(sortedSetOf(), SshChannelFormalOperation::eventName)
+        val channelEffects = SshChannelEffect.entries.mapTo(sortedSetOf()) { it.name }
+        val authenticationRequired = operations.filter(SshChannelFormalOperation::requiresAuthenticatedConnection)
+
+        appendLine()
+        appendLine("ChannelStates == ${renderSet(channelStates)}")
+        appendLine("ChannelEvents == ${renderSet(channelEvents)}")
+        appendLine("ChannelAttemptEvents == ${renderSet(channelAttemptEvents)}")
+        appendLine("ChannelEffectSet == ${renderSet(channelEffects)}")
+        appendLine("ChannelTransitions == {")
+        operations.forEachIndexed { index, operation ->
+            val suffix = if (index == operations.lastIndex) "" else ","
+            appendLine("    <<${quote(operation.sourceStateName)}, ${quote(operation.eventName)}, ${quote(operation.targetStateName)}>>$suffix")
+        }
+        appendLine("}")
+        appendLine("ChannelAuthenticationRequired == {")
+        authenticationRequired.forEachIndexed { index, operation ->
+            val suffix = if (index == authenticationRequired.lastIndex) "" else ","
+            appendLine("    <<${quote(operation.sourceStateName)}, ${quote(operation.eventName)}>>$suffix")
+        }
+        appendLine("}")
+        appendLine()
+        appendLine("ChannelTransitionDefined(channelState, operation) ==")
+        appendLine("    \\E target \\in ChannelStates : <<channelState, operation, target>> \\in ChannelTransitions")
+        appendLine()
+        appendLine("ChannelTransitionTarget(channelState, operation) ==")
+        appendLine("    CHOOSE target \\in ChannelStates : <<channelState, operation, target>> \\in ChannelTransitions")
+        appendLine()
+        appendLine("ChannelEffectsFor(channelState, operation) ==")
+        operations.forEachIndexed { index, operation ->
+            val prefix = if (index == 0) "    CASE " else "      [] "
+            appendLine(
+                "$prefix/\\ channelState = ${quote(operation.sourceStateName)} /\\ operation = ${quote(operation.eventName)} -> " +
+                    renderSet(operation.effects.map { it.name }),
+            )
+        }
+        appendLine("      [] OTHER -> ${renderSet(channelModel.rejectedOperationEffects.map { it.name })}")
+        appendLine()
+        appendLine("ChannelOperationAllowed(connectionState, channelState, operation) ==")
+        appendLine("    /\\ ChannelTransitionDefined(channelState, operation)")
+        appendLine("    /\\ (<<channelState, operation>> \\notin ChannelAuthenticationRequired")
+        appendLine("        \\/ connectionState = \"Authenticated\")")
+        appendLine()
+        appendLine("AttemptChannelOperation ==")
+        appendLine("    /\\ activeChannel' \\in ChannelAttemptIDs")
+        appendLine("    /\\ channelEvent' \\in ChannelAttemptEvents")
+        appendLine("    /\\ previousChannels' = channels")
+        appendLine("    /\\ IF activeChannel' \\in ChannelIDs")
+        appendLine("          /\\ ChannelOperationAllowed(state, channels[activeChannel'], channelEvent')")
+        appendLine("       THEN")
+        appendLine("          /\\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], channelEvent')]")
+        appendLine("          /\\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], channelEvent')")
+        appendLine("       ELSE")
+        appendLine("          /\\ channels' = channels")
+        appendLine(
+            "          /\\ channelEffects' = ${renderSet(channelModel.rejectedOperationEffects.map { it.name })}",
+        )
+        val globalVariableNames = formalVariables()
+            .map(FormalVariable::name)
+            .filterNot { it in CHANNEL_VARIABLE_NAMES }
+        appendLine("    /\\ UNCHANGED <<${globalVariableNames.joinToString()}>>")
+    }
 
     private fun variable(
         name: String,
@@ -371,6 +490,13 @@ internal data class SshStateMachineFormalModel(
             SshTransitionId.AUTHENTICATION_FAILURE,
             SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
         )
+        private val CHANNEL_VARIABLE_NAMES = setOf(
+            "channels",
+            "previousChannels",
+            "activeChannel",
+            "channelEvent",
+            "channelEffects",
+        )
     }
 }
 
@@ -433,6 +559,7 @@ internal fun StateMachine.toSshFormalModel(): SshStateMachineFormalModel {
         initialStateName = resolveInitialLeaf(requireNotNull(initialState)),
         states = formalStates,
         transitions = transitions,
+        channelModel = SshChannelStateMachine(SshChannelState.OPEN).formalModel(),
     )
 }
 

@@ -198,6 +198,7 @@ internal class SshClientStateMachine(
                     id = SshTransitionId.OPEN_CHANNEL,
                     origins = localCommand,
                     effects = setOf(SshEffect.SEND_CHANNEL_OPEN),
+                    channelOperationEvent = SshChannelEventId.ALLOCATE_LOCAL_OPEN,
                 ) {
                     callbacks.sendChannelOpen(
                         it.event.channelType,
@@ -210,16 +211,19 @@ internal class SshClientStateMachine(
                     id = SshTransitionId.RECEIVE_CHANNEL_OPEN_CONFIRMATION,
                     origins = parsedPacket,
                     effects = setOf(SshEffect.RECEIVE_CHANNEL_OPEN_CONFIRMATION),
+                    channelOperationEvent = SshChannelEventId.OPEN_CONFIRMED,
                 ) { callbacks.receiveChannelOpenConfirmation(it.event.msg) }
                 formalTransition<SshEvent.ReceiveChannelOpenFailure>(
                     id = SshTransitionId.RECEIVE_CHANNEL_OPEN_FAILURE,
                     origins = parsedPacket,
                     effects = setOf(SshEffect.RECEIVE_CHANNEL_OPEN_FAILURE),
+                    channelOperationEvent = SshChannelEventId.OPEN_FAILED,
                 ) { callbacks.receiveChannelOpenFailure(it.event.msg) }
                 formalTransition<SshEvent.SendChannelRequest>(
                     id = SshTransitionId.SEND_CHANNEL_REQUEST,
                     origins = localCommand,
                     effects = setOf(SshEffect.SEND_CHANNEL_REQUEST),
+                    channelOperationEvent = SshChannelEventId.SEND_REQUEST,
                 ) {
                     callbacks.sendChannelRequest(
                         it.event.recipientChannel,
@@ -447,6 +451,7 @@ internal class SshClientStateMachine(
         guard: SshFormalGuard = SshFormalGuard.Always,
         origins: Set<SshEventOrigin>,
         effects: Set<SshEffect> = emptySet(),
+        channelOperationEvent: SshChannelEventId? = null,
         noinline action: (suspend (TransitionParams<E>) -> Unit)? = null,
     ) {
         val meta = SshFormalTransitionMeta(
@@ -457,6 +462,7 @@ internal class SshClientStateMachine(
             guard = guard,
             origins = origins,
             effects = effects,
+            channelOperationEvent = channelOperationEvent,
         )
         val transition = transition<E>(id.name) {
             this.targetState = targetState

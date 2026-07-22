@@ -30,6 +30,48 @@ class SshChannelStateMachineTest {
 
         assertEquals(SshChannelState.entries.toSet(), model.states)
         assertEquals(SshChannelTransitionId.entries.toSet(), model.transitions.map { it.id }.toSet())
+        val runtimeOperations = model.operations
+            .filter { it.id in SshChannelTransitionId.entries.map(SshChannelTransitionId::name) }
+            .associateBy { it.id }
+        model.transitions.forEach { transition ->
+            val operation = runtimeOperations.getValue(transition.id.name)
+            assertEquals(transition.eventName, operation.eventName)
+            assertEquals(transition.source.name, operation.sourceStateName)
+            assertEquals(transition.target.name, operation.targetStateName)
+            assertEquals(transition.effects, operation.effects)
+            assertEquals(transition.scope, operation.scope)
+            assertEquals(transition.requiresAuthenticatedConnection, operation.requiresAuthenticatedConnection)
+        }
+    }
+
+    @Test
+    fun `construction and rejection semantics are explicit formal operations`() {
+        val model = SshChannelStateMachine(SshChannelState.OPEN).formalModel()
+        val constructionIds = SshChannelConstructionId.entries.mapTo(mutableSetOf(), SshChannelConstructionId::name)
+        val constructions = model.operations.filter { it.id in constructionIds }
+
+        assertEquals(constructionIds, constructions.mapTo(mutableSetOf()) { it.id })
+        assertTrue(constructions.all { it.sourceStateName == model.unallocatedStateName })
+        assertEquals(
+            SshChannelOperationScope.CONNECTION_TRANSITION,
+            constructions.single { it.id == SshChannelConstructionId.ALLOCATE_LOCAL_OPEN.name }.scope,
+        )
+        assertEquals(
+            SshChannelOperationScope.CHANNEL_ATTEMPT,
+            constructions.single { it.id == SshChannelConstructionId.ACCEPT_REMOTE_OPEN.name }.scope,
+        )
+        assertTrue(constructions.all { it.requiresAuthenticatedConnection })
+        assertTrue(model.rejectedOperationEffects.isEmpty())
+    }
+
+    @Test
+    fun `disconnect is teardown rather than a malicious channel attempt`() {
+        val model = SshChannelStateMachine(SshChannelState.OPEN).formalModel()
+        val disconnects = model.operations.filter { it.eventId == SshChannelEventId.DISCONNECT }
+
+        assertTrue(disconnects.isNotEmpty())
+        assertTrue(disconnects.all { it.scope == SshChannelOperationScope.CONNECTION_TEARDOWN })
+        assertTrue(disconnects.none { it.requiresAuthenticatedConnection })
     }
 
     @Test
