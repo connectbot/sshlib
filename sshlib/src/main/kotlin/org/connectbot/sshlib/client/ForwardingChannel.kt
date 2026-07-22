@@ -21,6 +21,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.protocol.SshChannelState
+import org.connectbot.sshlib.protocol.SshChannelStateMachine
 import org.slf4j.LoggerFactory
 
 internal class ForwardingChannel(
@@ -31,13 +34,12 @@ internal class ForwardingChannel(
     private val maxPacketSize: Int,
     remoteWindowSizeInitial: Long,
     private val initialWindowSize: Int = 256 * 1024,
+    private val lifecycle: SshChannelStateMachine = SshChannelStateMachine(SshChannelState.OPEN),
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(ForwardingChannel::class.java)
     }
 
-    private var _isOpen = true
-    private var closeSent = false
     private val window = LocalChannelWindow(
         initialWindowSize,
         remoteInitial = remoteWindowSizeInitial,
@@ -59,16 +61,22 @@ internal class ForwardingChannel(
         }
     }
 
-    val isOpen: Boolean get() = _isOpen
+    val isOpen: Boolean get() = lifecycle.isOpen
 
     internal suspend fun onData(data: ByteArray) {
+        if (!lifecycle.receiveData()) {
+            throw SshException("Received data after EOF or CLOSE on forwarding channel $localChannelNumber")
+        }
         window.consumeLocal(data.size)
         if (incomingIngress.trySend(data).isFailure) {
             throw org.connectbot.sshlib.SshException("Received data for a closed forwarding stream")
         }
     }
 
-    internal fun onWindowAdjust(bytesToAdd: Long) {
+    internal suspend fun onWindowAdjust(bytesToAdd: Long) {
+        if (!lifecycle.receiveWindowAdjust()) {
+            throw SshException("Received window adjustment after CLOSE on forwarding channel $localChannelNumber")
+        }
         window.adjustRemote(bytesToAdd)
         logger.debug("Forwarding channel window adjust +$bytesToAdd, remote window now ${window.remoteRemaining}")
         if (window.remoteRemaining > 0) {
@@ -76,29 +84,47 @@ internal class ForwardingChannel(
         }
     }
 
-    internal fun onEof() {
+    internal suspend fun onEof() {
+        if (!lifecycle.receiveEof()) {
+            throw SshException("Received duplicate EOF or EOF after CLOSE on forwarding channel $localChannelNumber")
+        }
         logger.debug("Forwarding channel $localChannelNumber received EOF")
         incomingIngress.close()
     }
 
     internal suspend fun onClose() {
+        val replyRequired = lifecycle.state != SshChannelState.CLOSE_SENT
+        if (!lifecycle.receiveClose()) {
+            throw SshException("Received duplicate CLOSE on forwarding channel $localChannelNumber")
+        }
         logger.debug("Forwarding channel $localChannelNumber closed")
-        if (!closeSent) {
-            closeSent = true
+        if (replyRequired) {
             try {
                 connection.sendChannelClose(remoteChannelNumber)
             } catch (e: Exception) {
                 logger.debug("Failed to send CHANNEL_CLOSE reply", e)
             }
         }
-        _isOpen = false
         incomingIngress.close()
         incomingDeliveryJob.cancel()
         _incomingData.close()
         windowAvailable.close()
     }
 
+    internal suspend fun onDisconnected() {
+        lifecycle.disconnect()
+        incomingIngress.close()
+        incomingDeliveryJob.cancel()
+        _incomingData.close()
+        windowAvailable.close()
+    }
+
+    internal suspend fun authorizeReceiveRequest(): Boolean = lifecycle.receiveRequest()
+
     suspend fun sendData(data: ByteArray) {
+        if (!lifecycle.sendData()) {
+            throw SshException("Cannot send data after EOF or CLOSE on forwarding channel $localChannelNumber")
+        }
         var offset = 0
         while (offset < data.size) {
             while (window.remoteRemaining <= 0) {
@@ -113,13 +139,12 @@ internal class ForwardingChannel(
     }
 
     suspend fun sendEof() {
+        if (!lifecycle.sendEof()) return
         connection.sendChannelEof(remoteChannelNumber)
     }
 
     suspend fun close() {
-        if (!_isOpen) return
-        closeSent = true
-        _isOpen = false
+        if (!lifecycle.sendClose()) return
         incomingIngress.close()
         incomingDeliveryJob.cancel()
         _incomingData.close()

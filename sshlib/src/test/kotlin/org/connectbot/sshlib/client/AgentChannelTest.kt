@@ -112,7 +112,7 @@ class AgentChannelTest {
     }
 
     @Test
-    fun `onEof does not throw`() {
+    fun `onEof does not throw`() = runTest {
         val agentChannel = newChannel(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
         agentChannel.onEof()
     }

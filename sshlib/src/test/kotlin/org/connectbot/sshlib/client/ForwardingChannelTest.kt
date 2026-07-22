@@ -23,11 +23,13 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 
 class ForwardingChannelTest {
 
@@ -87,7 +89,7 @@ class ForwardingChannelTest {
     }
 
     @Test
-    fun `onEof closes incomingData channel`() {
+    fun `onEof closes incomingData channel`() = runTest {
         val (channel, _) = createChannel()
 
         channel.onEof()
@@ -161,5 +163,17 @@ class ForwardingChannelTest {
         channel.close()
 
         coVerify(exactly = 1) { conn.sendChannelClose(1) }
+    }
+
+    @Test
+    fun `data after remote EOF has no delivery side effect`() = runTest {
+        val (channel, _) = createChannel()
+
+        channel.onEof()
+
+        assertFailsWith<SshException> {
+            channel.onData(byteArrayOf(1))
+        }
+        assertTrue(channel.incomingData.isClosedForReceive)
     }
 }

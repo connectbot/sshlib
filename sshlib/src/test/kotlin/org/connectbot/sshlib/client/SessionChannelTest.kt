@@ -235,4 +235,26 @@ class SessionChannelTest {
             channel.onExtendedData(1, ByteArray(513))
         }
     }
+
+    @Test
+    fun `data after remote EOF is rejected before delivery`() = runTest {
+        val (channel, _) = createChannel()
+
+        channel.onEof()
+
+        assertFailsWith<SshException> {
+            channel.onData(byteArrayOf(1))
+        }
+        assertTrue(channel.stdout.isClosedForReceive)
+    }
+
+    @Test
+    fun `duplicate local EOF sends only one packet`() = runTest {
+        val (channel, conn) = createChannel()
+
+        channel.sendEof()
+        channel.sendEof()
+
+        coVerify(exactly = 1) { conn.sendChannelEof(1) }
+    }
 }
