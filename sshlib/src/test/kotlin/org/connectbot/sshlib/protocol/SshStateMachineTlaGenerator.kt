@@ -63,6 +63,17 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `channel authorization uses sticky authentication across rekey`() {
+        val rendered = createFormalModel().renderTla()
+
+        assertTrue("ChannelOperationAllowed(authenticationEstablished, state," in rendered)
+        assertTrue("ChannelOperationAllowed(isAuthenticated, connectionState, channelState, operation)" in rendered)
+        assertTrue("connectionState # \"Disconnected\"" in rendered)
+        assertTrue("\\/ isAuthenticated" in rendered)
+        assertTrue("connectionState = \"Authenticated\"" !in rendered)
+    }
+
+    @Test
     fun `every KStateMachine transition has unique formal metadata`() {
         val model = createFormalModel()
 

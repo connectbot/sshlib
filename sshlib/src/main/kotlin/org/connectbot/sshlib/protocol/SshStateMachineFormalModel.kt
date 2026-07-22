@@ -331,7 +331,7 @@ internal data class SshStateMachineFormalModel(
                 "activeChannel' = 0"
             } else {
                 "activeChannel' \\in ChannelIDs /\\ " +
-                    "ChannelOperationAllowed(state, channels[activeChannel'], ${quote(operation.tlaName)})"
+                    "ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], ${quote(operation.tlaName)})"
             }
         },
         variable("channelEvent", quote("None")) { quote(it.channelOperationEvent?.tlaName ?: "None") },
@@ -416,10 +416,11 @@ internal data class SshStateMachineFormalModel(
         }
         appendLine("      [] OTHER -> \"None\"")
         appendLine()
-        appendLine("ChannelOperationAllowed(connectionState, channelState, operation) ==")
+        appendLine("ChannelOperationAllowed(isAuthenticated, connectionState, channelState, operation) ==")
         appendLine("    /\\ ChannelTransitionDefined(channelState, operation)")
+        appendLine("    /\\ connectionState # \"Disconnected\"")
         appendLine("    /\\ (<<channelState, operation>> \\notin ChannelAuthenticationRequired")
-        appendLine("        \\/ connectionState = \"Authenticated\")")
+        appendLine("        \\/ isAuthenticated)")
         appendLine()
         appendLine("AttemptChannelOperation ==")
         appendLine("    /\\ activeChannel' \\in ChannelAttemptIDs")
@@ -427,7 +428,7 @@ internal data class SshStateMachineFormalModel(
         appendLine("    /\\ channelOrigin' = ChannelOriginFor(channelEvent')")
         appendLine("    /\\ previousChannels' = channels")
         appendLine("    /\\ IF activeChannel' \\in ChannelIDs")
-        appendLine("          /\\ ChannelOperationAllowed(state, channels[activeChannel'], channelEvent')")
+        appendLine("          /\\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], channelEvent')")
         appendLine("       THEN")
         appendLine("          /\\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], channelEvent')]")
         appendLine("          /\\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], channelEvent')")
