@@ -131,8 +131,10 @@ internal class SshClientStateMachine(
                 formalTransition<SshEvent.BeginAuthentication>(
                     id = SshTransitionId.BEGIN_AUTHENTICATION,
                     targetState = authenticating,
+                    guard = !SshFormalGuard.Fact(SshBooleanFact.AUTH_REQUEST_PENDING),
                     origins = localCommand,
-                )
+                    effects = setOf(SshEffect.SEND_USERAUTH_REQUEST),
+                ) { callbacks.authenticationRequestStarted() }
                 formalTransition<SshEvent.ReceiveUserauthBanner>(
                     id = SshTransitionId.RECEIVE_USERAUTH_BANNER_READY,
                     origins = parsedPacket,
@@ -146,8 +148,10 @@ internal class SshClientStateMachine(
 
                 formalTransition<SshEvent.BeginAuthentication>(
                     id = SshTransitionId.REPEAT_BEGIN_AUTHENTICATION,
+                    guard = !SshFormalGuard.Fact(SshBooleanFact.AUTH_REQUEST_PENDING),
                     origins = localCommand,
-                )
+                    effects = setOf(SshEffect.SEND_USERAUTH_REQUEST),
+                ) { callbacks.authenticationRequestStarted() }
                 formalTransition<SshEvent.AuthenticationSuccess>(
                     id = SshTransitionId.AUTHENTICATION_SUCCESS,
                     targetState = authenticated,
@@ -173,7 +177,7 @@ internal class SshClientStateMachine(
                 formalTransition<SshEvent.AuthorizeAuthenticationPacket>(
                     id = SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
                     origins = parsedPacket,
-                )
+                ) { callbacks.authenticationRequestResponseReceived() }
             }
 
             authenticated {
@@ -531,6 +535,9 @@ internal interface SshClientCallbacks {
     suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
     suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply)
     fun isRekeying(): Boolean
+    fun isAuthenticationRequestPending(): Boolean
+    fun authenticationRequestStarted()
+    fun authenticationRequestResponseReceived()
     fun rekeyStarted()
     fun rekeyComplete()
     suspend fun sendKexDhGexInit()

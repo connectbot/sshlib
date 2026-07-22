@@ -256,6 +256,8 @@ class SshConnection(
         private const val ERROR_SESSION_ID_NOT_ESTABLISHED = "Session ID not established"
         private const val ERROR_CLIENT_PUBLIC_KEY_NOT_GENERATED = "Client public key not generated"
         private const val ERROR_NO_KEX_ALGORITHM_INITIALIZED = "No KEX algorithm initialized"
+        private const val SSH_MSG_USERAUTH_REQUEST_ID = 50
+        private const val MAX_REKEY_IN_FLIGHT_PACKETS = 1_024
 
         private fun stripExtInfoC(kexAlgorithms: String): String = kexAlgorithms.split(",")
             .filter { it.isNotEmpty() && it != KEX_EXT_INFO_C }
@@ -294,6 +296,13 @@ class SshConnection(
         override suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
         override suspend fun receiveKexDhGexReply(msg: SshMsgKexDhGexReply) = this@SshConnection.receiveKexDhGexReply(msg)
         override fun isRekeying(): Boolean = this@SshConnection.isRekeying
+        override fun isAuthenticationRequestPending(): Boolean = this@SshConnection.authRequestPending
+        override fun authenticationRequestStarted() {
+            this@SshConnection.authRequestPending = true
+        }
+        override fun authenticationRequestResponseReceived() {
+            this@SshConnection.authRequestPending = false
+        }
         override fun rekeyStarted() = this@SshConnection.rekeyStarted()
         override fun rekeyComplete() = this@SshConnection.rekeyComplete()
         override suspend fun sendKexDhGexInit() = this@SshConnection.sendKexDhGexInit()
@@ -326,6 +335,7 @@ class SshConnection(
     private val inboundPacketController = InboundPacketController()
     internal val connectionScope = CoroutineScope(SupervisorJob() + coroutineDispatcher)
     private val writeMutex = Mutex()
+    private val outboundPacketController = OutboundPacketController()
 
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
     val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
@@ -461,6 +471,8 @@ class SshConnection(
 
     @Volatile internal var isRekeying = false
 
+    @Volatile private var authRequestPending = false
+
     private var rekeyTimerJob: Job? = null
 
     @Volatile private var pendingConnect: CompletableDeferred<ConnectResult>? = null
@@ -482,13 +494,50 @@ class SshConnection(
         }
     }
 
-    /**
-     * Serialized write to the transport.
-     */
+    /** Serialized write to the transport, subject to the RFC 4253 key-exchange gate. */
     private suspend fun writePacket(messageType: Int, payload: ByteArray = byteArrayOf()) {
-        writeMutex.withLock {
-            packetIO.writePacket(messageType, payload)
+        outboundPacketController.writePacket(messageType, payload)
+    }
+
+    private inner class OutboundPacketController {
+        @Volatile
+        private var kexCompletion = CompletableDeferred(Unit)
+
+        fun beginKex() {
+            check(kexCompletion.isCompleted) { "Key exchange is already in progress" }
+            kexCompletion = CompletableDeferred()
         }
+
+        fun completeKex() {
+            kexCompletion.complete(Unit)
+        }
+
+        suspend fun writePacket(
+            messageType: Int,
+            payload: ByteArray = byteArrayOf(),
+            beforeWrite: () -> Unit = {},
+            afterWrite: () -> Unit = {},
+        ) {
+            while (true) {
+                val observedKex = kexCompletion
+                if (!isAllowedDuringKex(messageType)) {
+                    observedKex.await()
+                }
+
+                var written = false
+                writeMutex.withLock {
+                    if (isAllowedDuringKex(messageType) || kexCompletion.isCompleted) {
+                        beforeWrite()
+                        packetIO.writePacket(messageType, payload)
+                        afterWrite()
+                        written = true
+                    }
+                }
+                if (written) return
+            }
+        }
+
+        private fun isAllowedDuringKex(messageType: Int): Boolean = messageType in 1..4 || messageType in 7..49
     }
 
     /**
@@ -1093,13 +1142,11 @@ class SshConnection(
             configure()
             _check()
         }
-        writeMutex.withLock {
-            currentAuthMethod = AuthMethod.fromString(method)
-            packetIO.writePacket(
-                SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
-                req.toByteArray(),
-            )
-        }
+        outboundPacketController.writePacket(
+            SshEnums.MessageType.SSH_MSG_USERAUTH_REQUEST.id().toInt(),
+            req.toByteArray(),
+            beforeWrite = { currentAuthMethod = AuthMethod.fromString(method) },
+        )
     }
 
     // SshClientCallbacks implementation
@@ -1118,6 +1165,7 @@ class SshConnection(
     }
 
     private suspend fun sendKexInit() {
+        outboundPacketController.beginKex()
         logger.debug("Sending KEX_INIT")
         val localKexAlgorithms = if (isRekeying) kexAlgorithms else initialKexAlgorithms
 
@@ -1456,17 +1504,20 @@ class SshConnection(
         logger.info("Sending NEW_KEYS")
         prepareEncryption()
         try {
-            writeMutex.withLock {
-                packetIO.writePacket(SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt())
-                val protection = pendingProtection
-                    ?: throw SshException("No staged packet protection")
-                protection.installOutbound(packetIO)
-                packetIO.enableSendCompression(pendingSendCompressor, pendingCompressionImmediate)
-                pendingSendCompressor = null
-                if (strictKexEnabled) {
-                    packetIO.resetSendSequenceNumber()
-                }
-            }
+            outboundPacketController.writePacket(
+                SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt(),
+                afterWrite = {
+                    val protection = pendingProtection
+                        ?: throw SshException("No staged packet protection")
+                    protection.installOutbound(packetIO)
+                    packetIO.enableSendCompression(pendingSendCompressor, pendingCompressionImmediate)
+                    pendingSendCompressor = null
+                    if (strictKexEnabled) {
+                        packetIO.resetSendSequenceNumber()
+                    }
+                    outboundPacketController.completeKex()
+                },
+            )
         } catch (e: Exception) {
             discardPendingEncryption()
             throw e
@@ -1764,12 +1815,14 @@ class SshConnection(
 
     private fun authenticationSuccess() {
         logger.info("Authentication successful")
+        authRequestPending = false
         packetIO.activateCompression()
         pendingAuth.complete(true)
     }
 
     private fun authenticationFailure() {
         logger.warn("Authentication failed")
+        authRequestPending = false
         pendingAuth.complete(false)
     }
 
@@ -1807,8 +1860,14 @@ class SshConnection(
 
     private suspend fun disconnect() {
         logger.info("Disconnecting (received SSH_MSG_DISCONNECT from server)")
+        isRekeying = false
+        authRequestPending = false
         _disconnectedFlow.tryEmit(null)
-        transport.close()
+        try {
+            transport.close()
+        } finally {
+            outboundPacketController.completeKex()
+        }
     }
 
     /**
@@ -1985,7 +2044,11 @@ class SshConnection(
     }
 
     suspend fun close() {
-        transport.close()
+        try {
+            transport.close()
+        } finally {
+            outboundPacketController.completeKex()
+        }
         connectionScope.cancel()
         packetLoopJob?.join()
         packetLoopJob = null
@@ -2242,6 +2305,8 @@ class SshConnection(
      * This is the central packet processing loop that converts packets to events.
      */
     private inner class InboundPacketController {
+        private val packetsReceivedDuringRekey = ArrayDeque<UnencryptedPacket.UnencryptedPayload>()
+
         private fun requireAccepted(accepted: Boolean, messageType: Any) {
             if (!accepted) {
                 throw ProtocolViolationException("Unexpected SSH packet $messageType in the current protocol state")
@@ -2249,11 +2314,22 @@ class SshConnection(
         }
 
         suspend fun processNextPacket() {
-            val packet = packetIO.readPacket()
+            val queuedPacket = withContext(stateMachineDispatcher) {
+                if (stateMachine.isKexInProgress()) null else packetsReceivedDuringRekey.removeFirstOrNull()
+            }
+            val packet = queuedPacket ?: packetIO.readPacket()
             val msgType = packet.messageType()
             logger.debug("Received packet: $msgType")
 
             withContext(stateMachineDispatcher) {
+                if (isRekeying && stateMachine.isKexInProgress() && msgType.id().toInt() >= SSH_MSG_USERAUTH_REQUEST_ID) {
+                    if (packetsReceivedDuringRekey.size >= MAX_REKEY_IN_FLIGHT_PACKETS) {
+                        throw ProtocolViolationException("Too many higher-layer packets received during key exchange")
+                    }
+                    packetsReceivedDuringRekey.addLast(packet)
+                    return@withContext
+                }
+
                 when (msgType) {
                     SshEnums.MessageType.SSH_MSG_KEXINIT -> {
                         val kexInitMsgType = msgType.id().toByte()
@@ -2970,18 +3046,20 @@ class SshConnection(
         val data = ByteBuffer.allocate(8).putLong(seq).array()
         val deferred = CompletableDeferred<PingResult>()
 
-        val send: suspend () -> Unit = {
+        val send: suspend () -> Unit = send@{
             try {
-                writeMutex.withLock {
-                    val current = pendingPings[seq] ?: return@withLock
-                    val ping = SshMsgPing()
-                    ping.setData(createByteString(current.payload))
-                    ping._check()
+                val current = pendingPings[seq] ?: return@send
+                val ping = SshMsgPing()
+                ping.setData(createByteString(current.payload))
+                ping._check()
 
-                    val sentTimeNs = System.nanoTime()
-                    pendingPings[seq] = current.copy(sentTimeNs = sentTimeNs)
-                    packetIO.writePacket(SshEnums.MessageType.SSH_MSG_PING.id().toInt(), ping.toByteArray())
-                }
+                outboundPacketController.writePacket(
+                    SshEnums.MessageType.SSH_MSG_PING.id().toInt(),
+                    ping.toByteArray(),
+                    beforeWrite = {
+                        pendingPings[seq] = current.copy(sentTimeNs = System.nanoTime())
+                    },
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

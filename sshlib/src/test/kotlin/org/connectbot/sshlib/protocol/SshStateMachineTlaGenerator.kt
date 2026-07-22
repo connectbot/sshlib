@@ -60,6 +60,28 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `authentication requests are explicit formal side effects`() {
+        val transitions = createFormalModel().transitions.associateBy { it.meta.id }
+
+        assertEquals(
+            setOf(SshEffect.SEND_USERAUTH_REQUEST),
+            transitions.getValue(SshTransitionId.BEGIN_AUTHENTICATION).meta.effects,
+        )
+        assertEquals(
+            setOf(SshEffect.SEND_USERAUTH_REQUEST),
+            transitions.getValue(SshTransitionId.REPEAT_BEGIN_AUTHENTICATION).meta.effects,
+        )
+        assertEquals(
+            "~(authRequestPending)",
+            transitions.getValue(SshTransitionId.BEGIN_AUTHENTICATION).meta.guard.renderTla(),
+        )
+        assertEquals(
+            "~(authRequestPending)",
+            transitions.getValue(SshTransitionId.REPEAT_BEGIN_AUTHENTICATION).meta.guard.renderTla(),
+        )
+    }
+
+    @Test
     fun `checked in TLA model matches KStateMachine declaration`() {
         val expected = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachineGenerated.tla"))
 

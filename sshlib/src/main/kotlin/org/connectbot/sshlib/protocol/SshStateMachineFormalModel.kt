@@ -102,6 +102,7 @@ internal enum class SshEffect {
     SEND_KEX_INIT,
     SEND_NEW_KEYS,
     SEND_SERVICE_REQUEST,
+    SEND_USERAUTH_REQUEST,
     SEND_VERSION,
     START_AUTHENTICATION,
 }
@@ -109,10 +110,12 @@ internal enum class SshEffect {
 internal enum class SshBooleanFact(
     val tlaName: String,
 ) {
+    AUTH_REQUEST_PENDING("authRequestPending"),
     REKEYING("rekeying"),
     ;
 
     fun evaluate(callbacks: SshClientCallbacks): Boolean = when (this) {
+        AUTH_REQUEST_PENDING -> callbacks.isAuthenticationRequestPending()
         REKEYING -> callbacks.isRekeying()
     }
 }
@@ -209,12 +212,15 @@ internal data class SshStateMachineFormalModel(
         val body = buildString {
             appendLine("EXTENDS Naturals")
             appendLine()
-            appendLine("VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying")
+            appendLine("VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying,")
+            appendLine("          authenticationEstablished, authRequestPending, previousAuthRequestPending")
             appendLine()
-            appendLine("vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying>>")
+            appendLine("vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying,")
+            appendLine("          authenticationEstablished, authRequestPending, previousAuthRequestPending>>")
             appendLine()
             appendLine("States == ${renderSet(leafStateNames)}")
             appendLine("PostAuthenticatedStates == ${renderSet(descendantLeaves(POST_AUTHENTICATED_STATE))}")
+            appendLine("KexStates == ${renderSet(KEX_STATE_NAMES)}")
             appendLine("Events == ${renderSet(transitions.mapTo(sortedSetOf()) { it.meta.eventName })}")
             appendLine("Origins == ${renderSet(SshEventOrigin.entries.mapTo(sortedSetOf()) { it.tlaName })}")
             appendLine("Effects == ${renderSet(SshEffect.entries.mapTo(sortedSetOf()) { it.tlaName })}")
@@ -228,6 +234,9 @@ internal data class SshStateMachineFormalModel(
             appendLine("    /\\ packetWasParsed = FALSE")
             appendLine("    /\\ effects = {}")
             appendLine("    /\\ rekeying = FALSE")
+            appendLine("    /\\ authenticationEstablished = FALSE")
+            appendLine("    /\\ authRequestPending = FALSE")
+            appendLine("    /\\ previousAuthRequestPending = FALSE")
             appendLine()
             transitions.sortedBy { it.meta.id.name }.forEach { transition ->
                 appendTransition(transition)
@@ -274,6 +283,9 @@ internal data class SshStateMachineFormalModel(
         appendLine("    /\\ state' = ${renderTarget(meta)}")
         appendLine("    /\\ history' = ${renderHistoryUpdate(meta)}")
         appendLine("    /\\ rekeying' = ${renderRekeyingUpdate(meta)}")
+        appendLine("    /\\ authenticationEstablished' = ${renderAuthenticationEstablishedUpdate(meta)}")
+        appendLine("    /\\ previousAuthRequestPending' = authRequestPending")
+        appendLine("    /\\ authRequestPending' = ${renderAuthRequestPendingUpdate(meta)}")
     }
 
     private fun renderTarget(meta: SshFormalTransitionMeta): String {
@@ -287,7 +299,17 @@ internal data class SshStateMachineFormalModel(
     private fun renderRekeyingUpdate(meta: SshFormalTransitionMeta): String = when {
         SshEffect.REKEY_STARTED in meta.effects -> "TRUE"
         SshEffect.REKEY_COMPLETE in meta.effects -> "FALSE"
+        SshEffect.DISCONNECT in meta.effects -> "FALSE"
         else -> "rekeying"
+    }
+
+    private fun renderAuthenticationEstablishedUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.AUTHENTICATION_SUCCESS in meta.effects) "TRUE" else "authenticationEstablished"
+
+    private fun renderAuthRequestPendingUpdate(meta: SshFormalTransitionMeta): String = when {
+        SshEffect.SEND_USERAUTH_REQUEST in meta.effects -> "TRUE"
+        SshEffect.DISCONNECT in meta.effects -> "FALSE"
+        meta.id in AUTH_REQUEST_RESPONSE_TRANSITIONS -> "FALSE"
+        else -> "authRequestPending"
     }
 
     private fun initialPostAuthenticatedState() = resolveInitialLeaf(POST_AUTHENTICATED_STATE)
@@ -322,6 +344,12 @@ internal data class SshStateMachineFormalModel(
     companion object {
         const val GENERATED_MODULE_NAME = "SshClientStateMachineGenerated"
         private const val POST_AUTHENTICATED_STATE = "PostAuthenticated"
+        private val KEX_STATE_NAMES = sortedSetOf("WaitKexInit", "WaitKex", "WaitKexDhGexInit", "WaitNewKeys")
+        private val AUTH_REQUEST_RESPONSE_TRANSITIONS = setOf(
+            SshTransitionId.AUTHENTICATION_SUCCESS,
+            SshTransitionId.AUTHENTICATION_FAILURE,
+            SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
+        )
     }
 }
 
