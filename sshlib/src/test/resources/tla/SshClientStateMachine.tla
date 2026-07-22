@@ -60,6 +60,7 @@ NoInvalidChannelSideEffects ==
     channelEffects # {} =>
         /\ activeChannel \in ChannelIDs
         /\ ChannelOperationAllowed(
+               authenticationEstablished,
                state,
                previousChannels[activeChannel],
                channelEvent
@@ -79,6 +80,27 @@ DisconnectedClosesChannels ==
     state = "Disconnected" =>
         \A channel \in ChannelIDs :
             channels[channel] \in {"Unallocated", "CLOSED"}
+
+NoChannelsBeforeAuthentication ==
+    ~authenticationEstablished =>
+        \A channel \in ChannelIDs : channels[channel] = "Unallocated"
+
+RekeyTransitionsPreserveChannels ==
+    activeChannel = 0 /\
+        (event = "RekeyStarted" \/ rekeying \/ "RekeyComplete" \in effects) =>
+            channels = previousChannels
+
+AuthenticatedRekeyChannelGuardsRemainEnabled ==
+    authenticationEstablished /\ state \in KexStates =>
+        \A channel \in ChannelIDs :
+            \A operation \in ChannelEvents :
+                ChannelTransitionDefined(channels[channel], operation) =>
+                    ChannelOperationAllowed(
+                        authenticationEstablished,
+                        state,
+                        channels[channel],
+                        operation
+                    )
 
 ModelView ==
     <<state,

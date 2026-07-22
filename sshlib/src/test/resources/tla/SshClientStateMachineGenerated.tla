@@ -1,6 +1,6 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: c29f846affc9a10f29a83a0285652bfc51f6ab3c69ab9a0c9109ea32feef75c7
+\* Model SHA-256: 882c266edfb2fed9a28f79bc2ce7a5d343d87371ecfc9c9ca2ff42c467ed0a5f
 \* Lifecycle states: 11; transitions: 36.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
@@ -155,10 +155,11 @@ ChannelOriginFor(operation) ==
       []  operation = "AllocateLocalOpen" -> "LocalCommand"
       [] OTHER -> "None"
 
-ChannelOperationAllowed(connectionState, channelState, operation) ==
+ChannelOperationAllowed(isAuthenticated, connectionState, channelState, operation) ==
     /\ ChannelTransitionDefined(channelState, operation)
+    /\ connectionState # "Disconnected"
     /\ (<<channelState, operation>> \notin ChannelAuthenticationRequired
-        \/ connectionState = "Authenticated")
+        \/ isAuthenticated)
 
 AttemptChannelOperation ==
     /\ activeChannel' \in ChannelAttemptIDs
@@ -166,7 +167,7 @@ AttemptChannelOperation ==
     /\ channelOrigin' = ChannelOriginFor(channelEvent')
     /\ previousChannels' = channels
     /\ IF activeChannel' \in ChannelIDs
-          /\ ChannelOperationAllowed(state, channels[activeChannel'], channelEvent')
+          /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], channelEvent')
        THEN
           /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], channelEvent')]
           /\ channelEffects' = ChannelEffectsFor(channels[activeChannel'], channelEvent')
@@ -421,7 +422,7 @@ OPEN_CHANNEL ==
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
     /\ previousChannels' = channels
-    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "AllocateLocalOpen")
+    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "AllocateLocalOpen")
     /\ channelEvent' = "AllocateLocalOpen"
     /\ channelOrigin' = ChannelOriginFor("AllocateLocalOpen")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "AllocateLocalOpen")]
@@ -463,7 +464,7 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
     /\ previousChannels' = channels
-    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "OpenConfirmed")
+    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "OpenConfirmed")
     /\ channelEvent' = "OpenConfirmed"
     /\ channelOrigin' = ChannelOriginFor("OpenConfirmed")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "OpenConfirmed")]
@@ -484,7 +485,7 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
     /\ previousChannels' = channels
-    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "OpenFailed")
+    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "OpenFailed")
     /\ channelEvent' = "OpenFailed"
     /\ channelOrigin' = ChannelOriginFor("OpenFailed")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "OpenFailed")]
@@ -886,7 +887,7 @@ SEND_CHANNEL_REQUEST ==
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
     /\ previousChannels' = channels
-    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(state, channels[activeChannel'], "SendRequest")
+    /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "SendRequest")
     /\ channelEvent' = "SendRequest"
     /\ channelOrigin' = ChannelOriginFor("SendRequest")
     /\ channels' = [channels EXCEPT ![activeChannel'] = ChannelTransitionTarget(channels[activeChannel'], "SendRequest")]
