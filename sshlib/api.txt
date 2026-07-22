@@ -366,6 +366,37 @@ package org.connectbot.sshlib {
     property public String type;
   }
 
+  public sealed exhaustive interface SessionExit {
+  }
+
+  public static final class SessionExit.Signal implements org.connectbot.sshlib.SessionExit {
+    ctor public SessionExit.Signal(java.lang.String signalName, boolean coreDumped, java.lang.String errorMessage);
+    method public java.lang.String component1();
+    method public boolean component2();
+    method public java.lang.String component3();
+    method public org.connectbot.sshlib.SessionExit.Signal copy(optional java.lang.String signalName, optional boolean coreDumped, optional java.lang.String errorMessage);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public boolean getCoreDumped();
+    method @InaccessibleFromKotlin public java.lang.String getErrorMessage();
+    method @InaccessibleFromKotlin public java.lang.String getSignalName();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public boolean coreDumped;
+    property public String errorMessage;
+    property public String signalName;
+  }
+
+  public static final class SessionExit.Status implements org.connectbot.sshlib.SessionExit {
+    ctor public SessionExit.Status(long code);
+    method public long component1();
+    method public org.connectbot.sshlib.SessionExit.Status copy(optional long code);
+    method public boolean equals(java.lang.Object? other);
+    method @InaccessibleFromKotlin public long getCode();
+    method public int hashCode();
+    method public java.lang.String toString();
+    property public long code;
+  }
+
   public final class SftpAttributes {
     ctor public SftpAttributes();
     ctor public SftpAttributes(optional java.lang.Long? size, optional java.lang.Integer? uid, optional java.lang.Integer? gid, optional java.lang.Integer? permissions, optional java.lang.Integer? atime, optional java.lang.Integer? mtime);
@@ -674,6 +705,7 @@ package org.connectbot.sshlib {
 
   public interface SshSession {
     method public void close();
+    method @InaccessibleFromKotlin public kotlinx.coroutines.Deferred<org.connectbot.sshlib.SessionExit?> getExitInfo();
     method @InaccessibleFromKotlin public int getLocalChannelNumber();
     method @InaccessibleFromKotlin public int getRemoteChannelNumber();
     method @InaccessibleFromKotlin public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStderr();
@@ -688,6 +720,7 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public abstract kotlinx.coroutines.Deferred<org.connectbot.sshlib.SessionExit?> exitInfo;
     property public abstract boolean isOpen;
     property public abstract int localChannelNumber;
     property public abstract int remoteChannelNumber;
@@ -761,6 +794,7 @@ package org.connectbot.sshlib.client {
 
   public final class SessionChannel implements org.connectbot.sshlib.SshSession {
     method public void close();
+    method @InaccessibleFromKotlin public kotlinx.coroutines.Deferred<org.connectbot.sshlib.SessionExit?> getExitInfo();
     method @InaccessibleFromKotlin public int getLocalChannelNumber();
     method @InaccessibleFromKotlin public int getRemoteChannelNumber();
     method @InaccessibleFromKotlin public kotlinx.coroutines.channels.ReceiveChannel<byte[]> getStderr();
@@ -775,6 +809,7 @@ package org.connectbot.sshlib.client {
     method public suspend java.lang.Object? resizeTerminal(int widthChars, int heightRows, int widthPixels, int heightPixels, kotlin.coroutines.Continuation<? super java.lang.Boolean>);
     method public suspend java.lang.Object? sendEof(kotlin.coroutines.Continuation<? super kotlin.Unit>);
     method public suspend java.lang.Object? write(byte[] data, kotlin.coroutines.Continuation<? super kotlin.Unit>);
+    property public kotlinx.coroutines.Deferred<org.connectbot.sshlib.SessionExit?> exitInfo;
     property public boolean isOpen;
     property public int localChannelNumber;
     property public int remoteChannelNumber;

@@ -17,9 +17,12 @@
 
 package org.connectbot.sshlib.client.sftp
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.SftpResult
 import org.connectbot.sshlib.SshSession
 import org.junit.jupiter.api.Test
@@ -97,6 +100,8 @@ class SftpPacketIOTest {
         override val isOpen: Boolean = true
         override val stdout: ReceiveChannel<ByteArray> = Channel()
         override val stderr: ReceiveChannel<ByteArray> = Channel()
+        override val exitInfo: Deferred<SessionExit?> =
+            CompletableDeferred(null)
 
         fun enqueue(data: ByteArray) {
             reads.trySend(data).getOrThrow()

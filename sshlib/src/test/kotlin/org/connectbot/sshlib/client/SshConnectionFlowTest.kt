@@ -42,6 +42,7 @@ import org.connectbot.sshlib.DestinationConstraint
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.transport.PipedTransport
@@ -448,6 +449,81 @@ class SshConnectionFlowTest {
                     yield()
                 }
             }
+        }
+    }
+
+    @Test
+    fun `exit-status channel request completes exitInfo`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelExitStatus(localChannel, 42L)
+            assertEquals(
+                SessionExit.Status(42L),
+                withTimeout(5_000) { session.exitInfo.await() },
+            )
+        }
+    }
+
+    @Test
+    fun `exit-status supports max uint32 boundary condition`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelExitStatus(localChannel, 0xFFFF_FFFFL)
+            assertEquals(
+                SessionExit.Status(0xFFFF_FFFFL),
+                withTimeout(5_000) { session.exitInfo.await() },
+            )
+        }
+    }
+
+    @Test
+    fun `exit-signal channel request completes exitInfo`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelExitSignal(localChannel, "KILL", coreDumped = true, errorMessage = "killed")
+            assertEquals(
+                SessionExit.Signal("KILL", coreDumped = true, errorMessage = "killed"),
+                withTimeout(5_000) { session.exitInfo.await() },
+            )
+        }
+    }
+
+    @Test
+    fun `exitInfo resolves null when the channel closes without an exit report`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelEof(localChannel)
+            server.sendChannelClose(localChannel)
+            assertNull(withTimeout(5_000) { session.exitInfo.await() })
+        }
+    }
+
+    @Test
+    fun `first exit report wins over a later one`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelExitStatus(localChannel, 7L)
+            server.sendChannelExitSignal(localChannel, "TERM")
+            server.sendChannelClose(localChannel)
+            assertEquals(
+                SessionExit.Status(7L),
+                withTimeout(5_000) { session.exitInfo.await() },
+            )
         }
     }
 

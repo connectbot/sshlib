@@ -17,11 +17,14 @@
 
 package org.connectbot.sshlib.client.sftp
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.SftpAttributes
 import org.connectbot.sshlib.SftpClient
 import org.connectbot.sshlib.SftpDirectoryEntry
@@ -441,6 +444,8 @@ class SftpClientImplTest {
         override val isOpen: Boolean get() = open
         override val stdout: ReceiveChannel<ByteArray> = Channel()
         override val stderr: ReceiveChannel<ByteArray> = Channel()
+        override val exitInfo: Deferred<SessionExit?> =
+            CompletableDeferred(null)
 
         fun enqueueRead(data: ByteArray) {
             reads.trySend(data).getOrThrow()

@@ -54,6 +54,7 @@ import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.KeyboardInteractiveCallback
 import org.connectbot.sshlib.PingResult
 import org.connectbot.sshlib.PublicKey
+import org.connectbot.sshlib.SessionExit
 import org.connectbot.sshlib.SshException
 import org.connectbot.sshlib.crypto.CipherEntry
 import org.connectbot.sshlib.crypto.CompressionEntry
@@ -77,6 +78,8 @@ import org.connectbot.sshlib.protocol.AsciiString
 import org.connectbot.sshlib.protocol.ChannelOpenDirectTcpip
 import org.connectbot.sshlib.protocol.ChannelOpenForwardedTcpip
 import org.connectbot.sshlib.protocol.ChannelOpenSession
+import org.connectbot.sshlib.protocol.ChannelRequestExitSignal
+import org.connectbot.sshlib.protocol.ChannelRequestExitStatus
 import org.connectbot.sshlib.protocol.GlobalRequestCancelTcpipForward
 import org.connectbot.sshlib.protocol.GlobalRequestResponseTcpipForward
 import org.connectbot.sshlib.protocol.GlobalRequestTcpipForward
@@ -2582,9 +2585,31 @@ class SshConnection(
                             logger.debug("Received channel request: ${msg.requestType().value()} (want_reply=${msg.wantReply() != 0})")
                         }
                         val requestAccepted = when (val entry = channelRegistry.findByLocalRecipient(recipientChannel)) {
-                            is SshChannelRegistry.Entry.Established.Session -> entry.channel.receiveRequest(deliverRequest)
+                            is SshChannelRegistry.Entry.Established.Session -> entry.channel.receiveRequest {
+                                deliverRequest()
+                                // RFC 4254 section 6.10: surface how the remote
+                                // process terminated to exitInfo waiters.
+                                when (val fields = msg.requestSpecificFields()) {
+                                    is ChannelRequestExitStatus -> entry.channel.receiveExitInfo(
+                                        SessionExit.Status(fields.exitStatus()),
+                                    )
+
+                                    is ChannelRequestExitSignal -> entry.channel.receiveExitInfo(
+                                        SessionExit.Signal(
+                                            signalName = fields.signalName().data().decodeToString(),
+                                            coreDumped = fields.coreDumped() != 0,
+                                            errorMessage = fields.errorMessage().value(),
+                                        ),
+                                    )
+
+                                    else -> Unit
+                                }
+                            }
+
                             is SshChannelRegistry.Entry.Established.Agent -> entry.channel.receiveRequest(deliverRequest)
+
                             is SshChannelRegistry.Entry.Established.Forwarding -> entry.channel.receiveRequest(deliverRequest)
+
                             null -> throw ProtocolViolationException("Channel request for unknown channel $recipientChannel")
                         }
                         if (!requestAccepted) {
