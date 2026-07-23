@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.4.0][0.4.0]
+
+Changes for library users since `0.3.1`.
+
+### Added
+
+- Added `SshSession.exitInfo` (`Deferred<SessionExit>`) to expose remote execution
+  exit status (`SessionExit.Status`) and exit signal (`SessionExit.Signal`) details
+  sent via `SSH_MSG_CHANNEL_REQUEST` `exit-status` and `exit-signal` messages.
+- Added formal TLA+ specifications and model checking for verifying state machine
+  transitions, channel isolation, and Terrapin attack mitigation.
+
+### Changed
+
+- Converted channel lifecycle management to explicit state machines using `KStateMachine`
+  to support formal modeling and strict state separation.
+- Updated default algorithm preference lists to prioritize modern cryptographic
+  ciphers, key exchanges, and MACs.
+
+### Fixed
+
+- Enforced strict session binding (session ID and host key verification) for forwarded
+  SSH agent signing requests.
+- Implemented receive-window backpressure across channel types (session, port
+  forwarding, and agent) to prevent window overflows.
+- Bounded nested field sizes and entry counts during SFTP response decoding to
+  prevent excessive memory allocation from malformed responses.
+- Verified host-key proof signatures prior to trusting host keys during key exchange.
+- Validated parameter boundaries and key lengths during Diffie-Hellman group exchange.
+- Directionally isolated rekeying state transitions to handle inbound and outbound
+  key exchange independently.
+- Decoupled SSH agent response handling from the main packet loop to prevent connection
+  deadlocks.
+- Hardened connection tear-down to ensure transport closure occurs cleanly and only
+  once under concurrent close requests.
+- Ensured `ssh-rsa` algorithm wishlist selections are honored when explicitly specified.
+- Switched outbound SSH packet padding generation to cryptographically secure random values.
+- Fixed passphrase encryption when exporting Ed25519 private keys to PKCS#8 format.
+
+## [0.3.1][0.3.1]
+
+Changes for library users since `0.3.0`.
+
+### Fixed
+
+- Restricted maximum length constraints on SSH agent messages and packet payload fields
+  to prevent excessive memory allocation when processing untrusted wire data
+  (GHSA-ch3q-cw5r-f4hg).
+- Hardened DER length and integer parsing for ASN.1 private keys to prevent integer
+  overflow and excessive memory allocation (GHSA-vc8p-8pxg-rfwg).
+
 ## [0.3.0][0.3.0]
 
 Changes for library users since `0.2.1`.
@@ -43,4 +94,6 @@ Changes for library users since `0.2.1`.
 - Limited zlib decompression output per packet to reduce decompression-bomb
   denial-of-service risk.
 
+[0.4.0]: https://github.com/connectbot/cbssh/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/connectbot/cbssh/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/connectbot/cbssh/compare/v0.2.1...v0.3.0
