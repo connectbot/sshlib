@@ -392,6 +392,8 @@ internal class SshClientStateMachine(
                 origins = parsedPacket,
                 effects = setOf(
                     SshEffect.RECEIVE_KEX_DH_REPLY,
+                    SshEffect.VERIFY_HOST_KEY_POSSESSION,
+                    SshEffect.VERIFY_KEX_TRANSCRIPT,
                     SshEffect.SEND_NEW_KEYS,
                     SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
                     SshEffect.RESET_OUTBOUND_SEQUENCE,
@@ -406,6 +408,8 @@ internal class SshClientStateMachine(
                 origins = parsedPacket,
                 effects = setOf(
                     SshEffect.RECEIVE_KEX_ECDH_REPLY,
+                    SshEffect.VERIFY_HOST_KEY_POSSESSION,
+                    SshEffect.VERIFY_KEX_TRANSCRIPT,
                     SshEffect.SEND_NEW_KEYS,
                     SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
                     SshEffect.RESET_OUTBOUND_SEQUENCE,
@@ -446,6 +450,8 @@ internal class SshClientStateMachine(
                 origins = parsedPacket,
                 effects = setOf(
                     SshEffect.RECEIVE_KEX_DH_GEX_REPLY,
+                    SshEffect.VERIFY_HOST_KEY_POSSESSION,
+                    SshEffect.VERIFY_KEX_TRANSCRIPT,
                     SshEffect.SEND_NEW_KEYS,
                     SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
                     SshEffect.RESET_OUTBOUND_SEQUENCE,

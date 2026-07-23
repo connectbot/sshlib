@@ -116,6 +116,75 @@ tasks.register<JavaExec>("checkSshStateMachineTla") {
     }
 }
 
+listOf(
+    "OnPath" to "SshClientStateMachineOnPath.cfg",
+    "HostilePeer" to "SshClientStateMachineHostilePeer.cfg",
+).forEach { (profile, configFile) ->
+    tasks.register<JavaExec>("checkSshStateMachine${profile}Tla") {
+        group = "verification"
+        description = "Checks the generated SSH lifecycle model with the $profile hostile environment"
+        mainClass.set("tlc2.TLC")
+        workingDir(tlaModelDirectory)
+        args(
+            "-workers",
+            "1",
+            "-metadir",
+            tlaStateDirectory.get().dir("ssh-${profile.lowercase()}").asFile.absolutePath,
+            "-config",
+            configFile,
+            "SshClientStateMachine.tla",
+        )
+        jvmArgs("-XX:+UseParallelGC")
+        doFirst {
+            val jarPath = tla2toolsJar.orNull
+                ?: throw GradleException(
+                    "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+                )
+            classpath = files(jarPath)
+        }
+    }
+}
+
+val unsafeProofCounterexampleOutput = ByteArrayOutputStream()
+tasks.register<JavaExec>("checkSshStateMachineUnsafeProofTla") {
+    group = "verification"
+    description = "Requires TLC to find a hostile KEX counterexample when proof verification is disabled"
+    mainClass.set("tlc2.TLC")
+    workingDir(tlaModelDirectory)
+    args(
+        "-workers",
+        "1",
+        "-metadir",
+        tlaStateDirectory.get().dir("ssh-unsafe-proof").asFile.absolutePath,
+        "-config",
+        "SshClientStateMachineUnsafeProof.cfg",
+        "SshClientStateMachine.tla",
+    )
+    jvmArgs("-XX:+UseParallelGC")
+    standardOutput = unsafeProofCounterexampleOutput
+    errorOutput = unsafeProofCounterexampleOutput
+    isIgnoreExitValue = true
+    doFirst {
+        unsafeProofCounterexampleOutput.reset()
+        val jarPath = tla2toolsJar.orNull
+            ?: throw GradleException(
+                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+            )
+        classpath = files(jarPath)
+    }
+    doLast {
+        val output = unsafeProofCounterexampleOutput.toString(Charsets.UTF_8)
+        logger.lifecycle(output)
+        val exitValue = executionResult.get().exitValue
+        if (exitValue == 0 || "Invariant HostileKexReplyRequiresPossessionProof is violated" !in output) {
+            throw GradleException(
+                "Expected TLC to find the disabled-proof counterexample; exit=$exitValue",
+            )
+        }
+        logger.lifecycle("Expected disabled-proof counterexample found; treating it as success.")
+    }
+}
+
 tasks.register<JavaExec>("checkSftpStateMachineTla") {
     group = "verification"
     description = "Checks the generated SFTP lifecycle model with TLC"
@@ -219,7 +288,14 @@ tasks.register("generateTla") {
 tasks.register("checkTla") {
     group = "verification"
     description = "Checks all TLA+ formal models (SSH and SFTP) with TLC"
-    dependsOn("checkSshStateMachineTla", "checkSftpStateMachineTla", "checkSshTerrapinTla")
+    dependsOn(
+        "checkSshStateMachineTla",
+        "checkSshStateMachineOnPathTla",
+        "checkSshStateMachineHostilePeerTla",
+        "checkSshStateMachineUnsafeProofTla",
+        "checkSftpStateMachineTla",
+        "checkSshTerrapinTla",
+    )
 }
 
 java {

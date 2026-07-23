@@ -49,6 +49,11 @@ internal class PacketIO(
     private val transport: Transport,
     private val secureRandom: SecureRandom = SecureRandom(),
 ) {
+    internal data class ReceivedPacket(
+        val payload: UnencryptedPacket.UnencryptedPayload,
+        val sequenceNumber: Long,
+        val messageNumber: Int,
+    )
     companion object {
         private val logger = LoggerFactory.getLogger(PacketIO::class.java)
 
@@ -230,7 +235,11 @@ internal class PacketIO(
      * @return Parsed SSH message payload
      * @throws TransportException if packet is malformed or transport fails
      */
-    suspend fun readPacket(): UnencryptedPacket.UnencryptedPayload {
+    suspend fun readPacket(): UnencryptedPacket.UnencryptedPayload = readPacketWithSequence().payload
+
+    /** Read a packet together with the uint32 sequence number that authenticated it. */
+    suspend fun readPacketWithSequence(): ReceivedPacket {
+        val sequenceNumber = receiveSequenceNumber
         val rawPayloadBytes = readRawPayloadBytes()
 
         val compressor = receiveCompressor
@@ -240,7 +249,11 @@ internal class PacketIO(
             rawPayloadBytes
         }
 
-        return parsePayloadBytes(payloadBytes)
+        return ReceivedPacket(
+            payload = parsePayloadBytes(payloadBytes),
+            sequenceNumber = sequenceNumber,
+            messageNumber = payloadBytes.first().toInt() and 0xff,
+        )
     }
 
     /**

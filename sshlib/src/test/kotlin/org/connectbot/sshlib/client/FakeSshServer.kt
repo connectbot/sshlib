@@ -52,6 +52,8 @@ import org.connectbot.sshlib.protocol.SshMsgKexinit
 import org.connectbot.sshlib.protocol.SshMsgPing
 import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
+import org.connectbot.sshlib.protocol.SshMsgServiceRequest
+import org.connectbot.sshlib.protocol.SshMsgUnimplemented
 import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
 import org.connectbot.sshlib.protocol.SshMsgUserauthFailure
 import org.connectbot.sshlib.protocol.SshMsgUserauthInfoRequest
@@ -114,6 +116,7 @@ class FakeSshServer(
     private val receivedChannelOpenConfirmations = Channel<SshMsgChannelOpenConfirmation>(Channel.UNLIMITED)
     private val receivedChannelOpenFailures = Channel<SshMsgChannelOpenFailure>(Channel.UNLIMITED)
     private val receivedChannelData = Channel<SshMsgChannelData>(Channel.UNLIMITED)
+    private val receivedUnimplemented = Channel<SshMsgUnimplemented>(Channel.UNLIMITED)
 
     fun start(ignoreTransportErrors: Boolean = false) {
         scope.launch(coroutineContext) {
@@ -282,6 +285,13 @@ class FakeSshServer(
                             val pongMsg = SshMsgPong(ByteBufferKaitaiStream(bodyBytes))
                             pongMsg._read()
                             receivedPongs.trySend(pongMsg.data().data())
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_UNIMPLEMENTED -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val unimplemented = SshMsgUnimplemented(ByteBufferKaitaiStream(bodyBytes))
+                            unimplemented._read()
+                            receivedUnimplemented.trySend(unimplemented)
                         }
 
                         else -> { /* ignore */ }
@@ -627,6 +637,24 @@ class FakeSshServer(
             serverIo.writePacket(SshEnums.MessageType.SSH_MSG_PONG.id().toInt(), pong.toByteArray())
         }
     }
+
+    suspend fun sendUnexpectedServiceRequest(service: String = "ssh-userauth") {
+        val request = SshMsgServiceRequest().apply {
+            setServiceName(createAsciiString(service))
+            _check()
+        }
+        writeMutex.withLock {
+            serverIo.writePacket(SshEnums.MessageType.SSH_MSG_SERVICE_REQUEST.id().toInt(), request.toByteArray())
+        }
+    }
+
+    suspend fun sendUnknownPacket(messageNumber: Int = 191) {
+        writeMutex.withLock {
+            serverIo.writePacket(messageNumber, byteArrayOf())
+        }
+    }
+
+    suspend fun awaitUnimplemented(): SshMsgUnimplemented = receivedUnimplemented.receive()
 
     suspend fun sendUserauthBanner(message: String) {
         val banner = SshMsgUserauthBanner()

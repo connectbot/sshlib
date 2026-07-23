@@ -117,6 +117,7 @@ import org.connectbot.sshlib.protocol.SshMsgPing
 import org.connectbot.sshlib.protocol.SshMsgPong
 import org.connectbot.sshlib.protocol.SshMsgServiceAccept
 import org.connectbot.sshlib.protocol.SshMsgServiceRequest
+import org.connectbot.sshlib.protocol.SshMsgUnimplemented
 import org.connectbot.sshlib.protocol.SshMsgUserauthBanner
 import org.connectbot.sshlib.protocol.SshMsgUserauthFailure
 import org.connectbot.sshlib.protocol.SshMsgUserauthInfoRequest
@@ -2341,7 +2342,7 @@ class SshConnection(
      * This is the central packet processing loop that converts packets to events.
      */
     private inner class InboundPacketController {
-        private val packetsReceivedDuringRekey = ArrayDeque<UnencryptedPacket.UnencryptedPayload>()
+        private val packetsReceivedDuringRekey = ArrayDeque<PacketIO.ReceivedPacket>()
 
         private fun requireAccepted(accepted: Boolean, messageType: Any) {
             if (!accepted) {
@@ -2353,23 +2354,26 @@ class SshConnection(
             val queuedPacket = withContext(stateMachineDispatcher) {
                 if (stateMachine.isKexInProgress()) null else packetsReceivedDuringRekey.removeFirstOrNull()
             }
-            val packet = queuedPacket ?: packetIO.readPacket()
+            val receivedPacket = queuedPacket ?: packetIO.readPacketWithSequence()
+            val packet = receivedPacket.payload
+            val packetSequenceNumber = receivedPacket.sequenceNumber
+            val messageNumber = receivedPacket.messageNumber
             val msgType = packet.messageType()
             logger.debug("Received packet: $msgType")
 
             withContext(stateMachineDispatcher) {
-                if (!isKeyExchangeMessage(msgType.id().toInt())) {
+                if (!isKeyExchangeMessage(messageNumber)) {
                     val description = "Non-KEX packet $msgType is forbidden during strict initial key exchange"
                     if (!stateMachine.authorizeNonKexPacket(description)) {
                         throw ProtocolViolationException(description, responseSent = true)
                     }
                 }
 
-                if (isRekeying && stateMachine.isKexInProgress() && msgType.id().toInt() >= SSH_MSG_USERAUTH_REQUEST_ID) {
+                if (isRekeying && stateMachine.isKexInProgress() && messageNumber >= SSH_MSG_USERAUTH_REQUEST_ID) {
                     if (packetsReceivedDuringRekey.size >= MAX_REKEY_IN_FLIGHT_PACKETS) {
                         throw ProtocolViolationException("Too many higher-layer packets received during key exchange")
                     }
-                    packetsReceivedDuringRekey.addLast(packet)
+                    packetsReceivedDuringRekey.addLast(receivedPacket)
                     return@withContext
                 }
 
@@ -2408,6 +2412,10 @@ class SshConnection(
 
                     SshEnums.MessageType.SSH_MSG_DEBUG -> {
                         requireAccepted(stateMachine.receiveDebug(packet.body() as SshMsgDebug), msgType)
+                    }
+
+                    SshEnums.MessageType.SSH_MSG_UNIMPLEMENTED -> {
+                        logger.debug("Peer reported packet ${parseBody<SshMsgUnimplemented>(packet).packetSequence()} as unimplemented")
                     }
 
                     SshEnums.MessageType.SSH_MSG_GLOBAL_REQUEST -> {
@@ -2723,8 +2731,8 @@ class SshConnection(
                         // KEX-specific messages 30-49 are not in MessageType enum.
                         // Disambiguate by negotiated KEX type since ECDH reply, DH reply,
                         // and DH-GEX group all share message ID 31.
-                        val msgId = msgType.id().toInt()
-                        val rawBody = byteArrayOf(msgType.id().toByte()) + packet._raw_body()
+                        val msgId = messageNumber
+                        val rawBody = byteArrayOf(messageNumber.toByte()) + packet._raw_body()
                         val kexEntry = negotiatedKex?.let { KexEntry.fromSshName(it) }
                         when {
                             kexEntry?.type == KexType.ECDH &&
@@ -2766,11 +2774,17 @@ class SshConnection(
 
                             else -> {
                                 if (msgId in 30..49) {
-                                    throw ProtocolViolationException(
-                                        "Unexpected key-exchange packet ${packet.messageType()} for negotiated algorithm $negotiatedKex",
-                                    )
+                                    val description =
+                                        "Unexpected key-exchange packet ${packet.messageType()} for negotiated algorithm $negotiatedKex"
+                                    if (stateMachine.isStrictKexEnabled() && !isRekeying) {
+                                        throw ProtocolViolationException(description)
+                                    }
+                                    logger.debug("$description; sending SSH_MSG_UNIMPLEMENTED")
+                                    sendUnimplemented(packetSequenceNumber)
+                                } else {
+                                    logger.debug("Sending SSH_MSG_UNIMPLEMENTED for packet ${packet.messageType()}")
+                                    sendUnimplemented(packetSequenceNumber)
                                 }
-                                logger.warn("Unhandled message type: ${packet.messageType()}")
                             }
                         }
                     }
@@ -2881,6 +2895,17 @@ class SshConnection(
         }
         writePacket(
             SshEnums.MessageType.SSH_MSG_DISCONNECT.id().toInt(),
+            msg.toByteArray(),
+        )
+    }
+
+    private suspend fun sendUnimplemented(packetSequenceNumber: Long) {
+        val msg = SshMsgUnimplemented().apply {
+            setPacketSequence(packetSequenceNumber and 0xffff_ffffL)
+            _check()
+        }
+        writePacket(
+            SshEnums.MessageType.SSH_MSG_UNIMPLEMENTED.id().toInt(),
             msg.toByteArray(),
         )
     }

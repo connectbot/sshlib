@@ -1,25 +1,27 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: a34440960298ca1cd17a21377130492c5d394fe258e172479153503aaf3b61c0
+\* Model SHA-256: 51a83d84a0f081b32e4dfcf4d185ef2c83fec2c9a640b385db78f35607733b78
 \* Lifecycle states: 11; transitions: 43.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
 
-CONSTANT MaxChannels
+CONSTANTS MaxChannels, EnableHostileEnvironment, AdversaryOwnsHostKey, EnforceKexProofVerification
 
 ChannelIDs == 1..MaxChannels
 ChannelAttemptIDs == 0..(MaxChannels + 1)
 
-VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects
+VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, inboundPacket, lastInboundPacket, inboundTranscriptMatches, inboundHostSignatureValid, inboundTransportValid, hostKeyPossessionVerified, transcriptVerified, transportKeysVerified, lastPacketDisposition, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects
 
-vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
+vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, inboundPacket, lastInboundPacket, inboundTranscriptMatches, inboundHostSignatureValid, inboundTransportValid, hostKeyPossessionVerified, transcriptVerified, transportKeysVerified, lastPacketDisposition, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
 
 States == {"Authenticated", "Authenticating", "AuthenticationReady", "Disconnected", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
 PostAuthenticatedStates == {"Authenticated", "Authenticating", "AuthenticationReady"}
 KexStates == {"WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys"}
-Events == {"AuthenticationFailure", "AuthenticationSuccess", "AuthorizeAuthenticatedPacket", "AuthorizeAuthenticationPacket", "AuthorizeConnectionPacket", "AuthorizeExtInfo", "BeginAuthentication", "Connect", "Disconnect", "OpenChannel", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveDebug", "ReceiveGlobalRequest", "ReceiveIgnore", "ReceiveInitialNonStrictKexInit", "ReceiveInitialStrictKexInit", "ReceiveKex.DhGexGroup", "ReceiveKex.DhGexReply", "ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveNewKeys", "ReceiveNonKexPacket", "ReceiveRekeyKexInit", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyStarted", "SendChannelRequest", "UnexpectedKexInit"}
+Events == {"AuthenticationFailure", "AuthenticationSuccess", "AuthorizeAuthenticatedPacket", "AuthorizeAuthenticationPacket", "AuthorizeConnectionPacket", "AuthorizeExtInfo", "BeginAuthentication", "Connect", "Disconnect", "HostilePacketRejected", "OpenChannel", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveDebug", "ReceiveGlobalRequest", "ReceiveIgnore", "ReceiveInitialNonStrictKexInit", "ReceiveInitialStrictKexInit", "ReceiveKex.DhGexGroup", "ReceiveKex.DhGexReply", "ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveNewKeys", "ReceiveNonKexPacket", "ReceiveRekeyKexInit", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyStarted", "SendChannelRequest", "UnexpectedKexInit"}
 Origins == {"Internal", "LocalCommand", "ParsedPacket", "Timer"}
-Effects == {"ActivateEncryption", "ActivateInboundProtection", "ActivateOutboundProtection", "AuthenticationFailure", "AuthenticationSuccess", "ClearNonKexBeforeInitialKexInit", "Debug", "Disconnect", "EnableStrictKex", "Ignore", "NegotiateNonStrictKex", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RecordNonKexBeforeInitialKexInit", "RekeyComplete", "RekeyStarted", "ResetInboundSequence", "ResetOutboundSequence", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendProtocolError", "SendServiceRequest", "SendUserauthRequest", "SendVersion", "StartAuthentication"}
+Effects == {"ActivateEncryption", "ActivateInboundProtection", "ActivateOutboundProtection", "AuthenticationFailure", "AuthenticationSuccess", "ClearNonKexBeforeInitialKexInit", "Debug", "Disconnect", "EnableStrictKex", "Ignore", "NegotiateNonStrictKex", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RecordNonKexBeforeInitialKexInit", "RekeyComplete", "RekeyStarted", "ResetInboundSequence", "ResetOutboundSequence", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendProtocolError", "SendServiceRequest", "SendUnimplemented", "SendUserauthRequest", "SendVersion", "StartAuthentication", "VerifyHostKeyPossession", "VerifyKexTranscript"}
+PacketClasses == {"ChannelOpenReply", "ChannelRequestReply", "ClientConnectionPacket", "ClientKexInit", "ClientServiceRequest", "ClientUserauthRequest", "ConnectionPacket", "Debug", "Disconnect", "ExtInfo", "GlobalRequest", "Ignore", "KexGexGroup", "KexInit", "KexReply", "NewKeys", "ServiceAccept", "Unknown", "UserauthBanner", "UserauthFailure", "UserauthMethodSpecific", "UserauthSuccess"}
+PacketDispositions == {"None", "Client", "Accepted", "Unimplemented", "Disconnected"}
 
 ChannelStates == {"BOTH_EOF", "CLOSED", "CLOSE_SENT", "LOCAL_EOF", "OPEN", "OPENING", "REMOTE_EOF", "Unallocated"}
 ChannelEvents == {"AcceptRemoteOpen", "AllocateLocalOpen", "OpenConfirmed", "OpenFailed", "ReceiveClose", "ReceiveData", "ReceiveEof", "ReceiveRequest", "ReceiveWindowAdjust", "SendClose", "SendData", "SendEof", "SendRequest"}
@@ -174,7 +176,7 @@ AttemptChannelOperation ==
        ELSE
           /\ channels' = channels
           /\ channelEffects' = {}
-    /\ UNCHANGED <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending>>
+    /\ UNCHANGED <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, inboundPacket, lastInboundPacket, inboundTranscriptMatches, inboundHostSignatureValid, inboundTransportValid, hostKeyPossessionVerified, transcriptVerified, transportKeysVerified, lastPacketDisposition>>
 
 Init ==
     /\ state = "Unconnected"
@@ -191,6 +193,15 @@ Init ==
     /\ initialNewKeysActive = FALSE
     /\ authRequestPending = FALSE
     /\ previousAuthRequestPending = FALSE
+    /\ inboundPacket = "None"
+    /\ lastInboundPacket = "None"
+    /\ inboundTranscriptMatches = FALSE
+    /\ inboundHostSignatureValid = FALSE
+    /\ inboundTransportValid = FALSE
+    /\ hostKeyPossessionVerified = FALSE
+    /\ transcriptVerified = FALSE
+    /\ transportKeysVerified = FALSE
+    /\ lastPacketDisposition = "None"
     /\ previousChannels = [c \in ChannelIDs |-> "Unallocated"]
     /\ activeChannel = 0
     /\ channelEvent = "None"
@@ -200,6 +211,10 @@ Init ==
 
 AUTHENTICATION_FAILURE ==
     /\ state \in {"Authenticating"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthFailure"}
+              /\ inboundTransportValid
+       )
     /\ state' = "AuthenticationReady"
     /\ previousState' = state
     /\ history' = history
@@ -214,6 +229,15 @@ AUTHENTICATION_FAILURE ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -223,6 +247,10 @@ AUTHENTICATION_FAILURE ==
 
 AUTHENTICATION_SUCCESS ==
     /\ state \in {"Authenticating"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthSuccess"}
+              /\ inboundTransportValid
+       )
     /\ state' = "Authenticated"
     /\ previousState' = state
     /\ history' = history
@@ -237,6 +265,15 @@ AUTHENTICATION_SUCCESS ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -246,6 +283,10 @@ AUTHENTICATION_SUCCESS ==
 
 AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ConnectionPacket", "ClientConnectionPacket"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -260,6 +301,15 @@ AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -269,6 +319,10 @@ AUTHORIZE_AUTHENTICATED_PACKET ==
 
 AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ state \in {"Authenticating"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthMethodSpecific"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -283,6 +337,15 @@ AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -292,6 +355,10 @@ AUTHORIZE_AUTHENTICATION_PACKET ==
 
 AUTHORIZE_CONNECTION_PACKET ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ConnectionPacket"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -306,6 +373,15 @@ AUTHORIZE_CONNECTION_PACKET ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -315,6 +391,10 @@ AUTHORIZE_CONNECTION_PACKET ==
 
 AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ExtInfo"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -329,6 +409,15 @@ AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -338,6 +427,10 @@ AUTHORIZE_POST_AUTH_EXT_INFO ==
 
 AUTHORIZE_SERVICE_EXT_INFO ==
     /\ state \in {"WaitService"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ExtInfo"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -352,6 +445,15 @@ AUTHORIZE_SERVICE_EXT_INFO ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -376,6 +478,15 @@ BEGIN_AUTHENTICATION ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = TRUE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -399,6 +510,15 @@ CONNECT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -408,6 +528,10 @@ CONNECT ==
 
 DISCONNECT ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"Disconnect"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "Disconnected"
     /\ previousState' = state
     /\ history' = history
@@ -422,6 +546,15 @@ DISCONNECT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -445,6 +578,15 @@ OPEN_CHANNEL ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "AllocateLocalOpen")
     /\ channelEvent' = "AllocateLocalOpen"
@@ -454,6 +596,10 @@ OPEN_CHANNEL ==
 
 RECEIVE_CHANNEL_FAILURE ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ChannelRequestReply"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -468,6 +614,15 @@ RECEIVE_CHANNEL_FAILURE ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -477,6 +632,10 @@ RECEIVE_CHANNEL_FAILURE ==
 
 RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ChannelOpenReply"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -491,6 +650,15 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "OpenConfirmed")
     /\ channelEvent' = "OpenConfirmed"
@@ -500,6 +668,10 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
 
 RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ChannelOpenReply"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -514,6 +686,15 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "OpenFailed")
     /\ channelEvent' = "OpenFailed"
@@ -523,6 +704,10 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
 
 RECEIVE_CHANNEL_SUCCESS ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ChannelRequestReply"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -537,6 +722,15 @@ RECEIVE_CHANNEL_SUCCESS ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -546,6 +740,10 @@ RECEIVE_CHANNEL_SUCCESS ==
 
 RECEIVE_DEBUG ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"Debug"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -560,6 +758,15 @@ RECEIVE_DEBUG ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -569,6 +776,10 @@ RECEIVE_DEBUG ==
 
 RECEIVE_GLOBAL_REQUEST ==
     /\ state \in {"Authenticated"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"GlobalRequest"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -583,6 +794,15 @@ RECEIVE_GLOBAL_REQUEST ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -592,6 +812,10 @@ RECEIVE_GLOBAL_REQUEST ==
 
 RECEIVE_IGNORE ==
     /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"Ignore"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -606,6 +830,15 @@ RECEIVE_IGNORE ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -616,6 +849,12 @@ RECEIVE_IGNORE ==
 RECEIVE_INITIAL_NEW_KEYS ==
     /\ state \in {"WaitNewKeys"}
     /\ ~(rekeying)
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"NewKeys"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
+    /\ (~EnforceKexProofVerification \/ hostKeyPossessionVerified)
+    /\ (~EnforceKexProofVerification \/ transcriptVerified)
     /\ state' = "WaitService"
     /\ previousState' = state
     /\ history' = history
@@ -630,6 +869,15 @@ RECEIVE_INITIAL_NEW_KEYS ==
     /\ initialNewKeysActive' = TRUE
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = TRUE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -640,6 +888,10 @@ RECEIVE_INITIAL_NEW_KEYS ==
 RECEIVE_INITIAL_NON_STRICT_KEX_INIT ==
     /\ state \in {"WaitKexInit"}
     /\ ~(rekeying)
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitKex"
     /\ previousState' = state
     /\ history' = history
@@ -654,6 +906,15 @@ RECEIVE_INITIAL_NON_STRICT_KEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -664,6 +925,10 @@ RECEIVE_INITIAL_NON_STRICT_KEX_INIT ==
 RECEIVE_INITIAL_STRICT_KEX_INIT ==
     /\ state \in {"WaitKexInit"}
     /\ (~(rekeying)) /\ (~(nonKexBeforeInitialKexInit))
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitKex"
     /\ previousState' = state
     /\ history' = history
@@ -678,6 +943,15 @@ RECEIVE_INITIAL_STRICT_KEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -687,6 +961,10 @@ RECEIVE_INITIAL_STRICT_KEX_INIT ==
 
 RECEIVE_KEX_DH_GEX_GROUP ==
     /\ state \in {"WaitKex"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexGexGroup"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitKexDhGexInit"
     /\ previousState' = state
     /\ history' = history
@@ -701,6 +979,15 @@ RECEIVE_KEX_DH_GEX_GROUP ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -710,13 +997,19 @@ RECEIVE_KEX_DH_GEX_GROUP ==
 
 RECEIVE_KEX_DH_GEX_REPLY ==
     /\ state \in {"WaitKexDhGexInit"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexReply"}
+              /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+              /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitNewKeys"
     /\ previousState' = state
     /\ history' = history
     /\ event' = "ReceiveKex.DhGexReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "ResetOutboundSequence", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"}
     /\ rekeying' = rekeying
     /\ strictKex' = strictKex
     /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
@@ -724,6 +1017,15 @@ RECEIVE_KEX_DH_GEX_REPLY ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = TRUE
+    /\ transcriptVerified' = TRUE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -733,13 +1035,19 @@ RECEIVE_KEX_DH_GEX_REPLY ==
 
 RECEIVE_KEX_DH_REPLY ==
     /\ state \in {"WaitKex"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexReply"}
+              /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+              /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitNewKeys"
     /\ previousState' = state
     /\ history' = history
     /\ event' = "ReceiveKex.DhReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhReply", "ResetOutboundSequence", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhReply", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"}
     /\ rekeying' = rekeying
     /\ strictKex' = strictKex
     /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
@@ -747,6 +1055,15 @@ RECEIVE_KEX_DH_REPLY ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = TRUE
+    /\ transcriptVerified' = TRUE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -756,13 +1073,19 @@ RECEIVE_KEX_DH_REPLY ==
 
 RECEIVE_KEX_ECDH_REPLY ==
     /\ state \in {"WaitKex"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexReply"}
+              /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+              /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitNewKeys"
     /\ previousState' = state
     /\ history' = history
     /\ event' = "ReceiveKex.EcdhReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "ResetOutboundSequence", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"} ELSE {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "SendNewKeys", "VerifyHostKeyPossession", "VerifyKexTranscript"}
     /\ rekeying' = rekeying
     /\ strictKex' = strictKex
     /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
@@ -770,6 +1093,15 @@ RECEIVE_KEX_ECDH_REPLY ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = TRUE
+    /\ transcriptVerified' = TRUE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -780,6 +1112,10 @@ RECEIVE_KEX_ECDH_REPLY ==
 RECEIVE_REKEY_KEX_INIT ==
     /\ state \in {"WaitKexInit"}
     /\ rekeying
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "WaitKex"
     /\ previousState' = state
     /\ history' = history
@@ -794,6 +1130,15 @@ RECEIVE_REKEY_KEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -804,6 +1149,12 @@ RECEIVE_REKEY_KEX_INIT ==
 RECEIVE_REKEY_NEW_KEYS ==
     /\ state \in {"WaitNewKeys"}
     /\ rekeying
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"NewKeys"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
+    /\ (~EnforceKexProofVerification \/ hostKeyPossessionVerified)
+    /\ (~EnforceKexProofVerification \/ transcriptVerified)
     /\ state' = history
     /\ previousState' = state
     /\ history' = history
@@ -818,6 +1169,15 @@ RECEIVE_REKEY_NEW_KEYS ==
     /\ initialNewKeysActive' = TRUE
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = TRUE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -827,6 +1187,10 @@ RECEIVE_REKEY_NEW_KEYS ==
 
 RECEIVE_SERVICE_ACCEPT ==
     /\ state \in {"WaitService"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"ServiceAccept"}
+              /\ inboundTransportValid
+       )
     /\ state' = "AuthenticationReady"
     /\ previousState' = state
     /\ history' = history
@@ -841,6 +1205,15 @@ RECEIVE_SERVICE_ACCEPT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -850,6 +1223,10 @@ RECEIVE_SERVICE_ACCEPT ==
 
 RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ state \in {"Authenticating"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthBanner"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -864,6 +1241,15 @@ RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -873,6 +1259,10 @@ RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
 
 RECEIVE_USERAUTH_BANNER_READY ==
     /\ state \in {"AuthenticationReady"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthBanner"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -887,6 +1277,15 @@ RECEIVE_USERAUTH_BANNER_READY ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -896,6 +1295,10 @@ RECEIVE_USERAUTH_BANNER_READY ==
 
 RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ state \in {"Authenticating"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"UserauthMethodSpecific"}
+              /\ inboundTransportValid
+       )
     /\ state' = state
     /\ previousState' = state
     /\ history' = history
@@ -910,6 +1313,15 @@ RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -933,6 +1345,15 @@ RECEIVE_VERSION ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -957,6 +1378,15 @@ RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -981,6 +1411,15 @@ REJECT_NON_KEX_WAIT_KEX ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1005,6 +1444,15 @@ REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1029,6 +1477,15 @@ REJECT_NON_KEX_WAIT_NEW_KEYS ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1039,6 +1496,10 @@ REJECT_NON_KEX_WAIT_NEW_KEYS ==
 REJECT_STRICT_KEX_INIT_NOT_FIRST ==
     /\ state \in {"WaitKexInit"}
     /\ (~(rekeying)) /\ (nonKexBeforeInitialKexInit)
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "Disconnected"
     /\ previousState' = state
     /\ history' = history
@@ -1053,6 +1514,15 @@ REJECT_STRICT_KEX_INIT_NOT_FIRST ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1076,6 +1546,15 @@ REKEY_STARTED ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1100,6 +1579,15 @@ REPEAT_BEGIN_AUTHENTICATION ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = TRUE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1123,6 +1611,15 @@ SEND_CHANNEL_REQUEST ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = inboundPacket
+    /\ lastInboundPacket' = lastInboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = hostKeyPossessionVerified
+    /\ transcriptVerified' = transcriptVerified
+    /\ transportKeysVerified' = transportKeysVerified
+    /\ lastPacketDisposition' = "Client"
     /\ previousChannels' = channels
     /\ activeChannel' \in ChannelIDs /\ ChannelOperationAllowed(authenticationEstablished, state, channels[activeChannel'], "SendRequest")
     /\ channelEvent' = "SendRequest"
@@ -1132,6 +1629,10 @@ SEND_CHANNEL_REQUEST ==
 
 UNEXPECTED_KEX_INIT_WAIT_KEX ==
     /\ state \in {"WaitKex"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "Disconnected"
     /\ previousState' = state
     /\ history' = history
@@ -1146,6 +1647,15 @@ UNEXPECTED_KEX_INIT_WAIT_KEX ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1155,6 +1665,10 @@ UNEXPECTED_KEX_INIT_WAIT_KEX ==
 
 UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT ==
     /\ state \in {"WaitKexDhGexInit"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "Disconnected"
     /\ previousState' = state
     /\ history' = history
@@ -1169,6 +1683,15 @@ UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1178,6 +1701,10 @@ UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT ==
 
 UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS ==
     /\ state \in {"WaitNewKeys"}
+    /\ (inboundPacket = "None"
+        \/ /\ inboundPacket \in {"KexInit"}
+              /\ (~initialNewKeysActive \/ inboundTransportValid)
+       )
     /\ state' = "Disconnected"
     /\ previousState' = state
     /\ history' = history
@@ -1192,6 +1719,15 @@ UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS ==
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
     /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = FALSE
+    /\ transcriptVerified' = FALSE
+    /\ transportKeysVerified' = FALSE
+    /\ lastPacketDisposition' = IF inboundPacket = "None" THEN "Client" ELSE "Accepted"
     /\ previousChannels' = channels
     /\ activeChannel' = 0
     /\ channelEvent' = "None"
@@ -1199,7 +1735,174 @@ UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS ==
     /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 
-Next ==
+PacketTransitionEnabled ==
+    \/ /\ state \in {"Authenticating"}
+       /\ inboundPacket \in {"UserauthFailure"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticating"}
+       /\ inboundPacket \in {"UserauthSuccess"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"ConnectionPacket", "ClientConnectionPacket"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticating"}
+       /\ inboundPacket \in {"UserauthMethodSpecific"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
+       /\ inboundPacket \in {"ConnectionPacket"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady"}
+       /\ inboundPacket \in {"ExtInfo"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"WaitService"}
+       /\ inboundPacket \in {"ExtInfo"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+       /\ inboundPacket \in {"Disconnect"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"ChannelRequestReply"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"ChannelOpenReply"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"ChannelOpenReply"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"ChannelRequestReply"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+       /\ inboundPacket \in {"Debug"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"Authenticated"}
+       /\ inboundPacket \in {"GlobalRequest"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticated", "Authenticating", "AuthenticationReady", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
+       /\ inboundPacket \in {"Ignore"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitNewKeys"}
+       /\ inboundPacket \in {"NewKeys"}
+       /\ ~(rekeying)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+       /\ (~EnforceKexProofVerification \/ hostKeyPossessionVerified)
+       /\ (~EnforceKexProofVerification \/ transcriptVerified)
+    \/ /\ state \in {"WaitKexInit"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ ~(rekeying)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKexInit"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ (~(rekeying)) /\ (~(nonKexBeforeInitialKexInit))
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKex"}
+       /\ inboundPacket \in {"KexGexGroup"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKexDhGexInit"}
+       /\ inboundPacket \in {"KexReply"}
+       /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+       /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKex"}
+       /\ inboundPacket \in {"KexReply"}
+       /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+       /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKex"}
+       /\ inboundPacket \in {"KexReply"}
+       /\ (~EnforceKexProofVerification \/ inboundHostSignatureValid)
+       /\ (~EnforceKexProofVerification \/ inboundTranscriptMatches)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKexInit"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ rekeying
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitNewKeys"}
+       /\ inboundPacket \in {"NewKeys"}
+       /\ rekeying
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+       /\ (~EnforceKexProofVerification \/ hostKeyPossessionVerified)
+       /\ (~EnforceKexProofVerification \/ transcriptVerified)
+    \/ /\ state \in {"WaitService"}
+       /\ inboundPacket \in {"ServiceAccept"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticating"}
+       /\ inboundPacket \in {"UserauthBanner"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"AuthenticationReady"}
+       /\ inboundPacket \in {"UserauthBanner"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"Authenticating"}
+       /\ inboundPacket \in {"UserauthMethodSpecific"}
+       /\ inboundTransportValid
+    \/ /\ state \in {"WaitKexInit"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ (~(rekeying)) /\ (nonKexBeforeInitialKexInit)
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKex"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitKexDhGexInit"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+    \/ /\ state \in {"WaitNewKeys"}
+       /\ inboundPacket \in {"KexInit"}
+       /\ (~initialNewKeysActive \/ inboundTransportValid)
+
+HostilePacketFatal ==
+    \/ /\ strictKex /\ ~rekeying /\ state \in KexStates
+       /\ ~PacketTransitionEnabled
+    \/ /\ inboundPacket = "KexInit"
+       /\ state \in {"WaitKex", "WaitKexDhGexInit", "WaitNewKeys"}
+    \/ /\ inboundPacket = "KexReply"
+       /\ (~inboundHostSignatureValid \/ ~inboundTranscriptMatches)
+    \/ /\ initialNewKeysActive /\ ~inboundTransportValid
+
+RejectHostilePacket ==
+    /\ inboundPacket # "None"
+    /\ ~PacketTransitionEnabled
+    /\ state' = IF HostilePacketFatal THEN "Disconnected" ELSE state
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "HostilePacketRejected"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = TRUE
+    /\ effects' = IF HostilePacketFatal THEN {"Disconnect", "SendProtocolError"} ELSE {"SendUnimplemented"}
+    /\ rekeying' = IF HostilePacketFatal THEN FALSE ELSE rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = IF HostilePacketFatal THEN FALSE ELSE authRequestPending
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ inboundPacket' = "None"
+    /\ lastInboundPacket' = inboundPacket
+    /\ inboundTranscriptMatches' = inboundTranscriptMatches
+    /\ inboundHostSignatureValid' = inboundHostSignatureValid
+    /\ inboundTransportValid' = inboundTransportValid
+    /\ hostKeyPossessionVerified' = IF HostilePacketFatal THEN FALSE ELSE hostKeyPossessionVerified
+    /\ transcriptVerified' = IF HostilePacketFatal THEN FALSE ELSE transcriptVerified
+    /\ transportKeysVerified' = IF HostilePacketFatal THEN FALSE ELSE transportKeysVerified
+    /\ lastPacketDisposition' = IF HostilePacketFatal THEN "Disconnected" ELSE "Unimplemented"
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = IF HostilePacketFatal THEN [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"] ELSE channels
+    /\ channelEffects' = {}
+
+HostileEnvironmentNext ==
+    /\ EnableHostileEnvironment
+    /\ inboundPacket = "None"
+    /\ inboundPacket' \in PacketClasses
+    /\ inboundTranscriptMatches' \in BOOLEAN
+    /\ inboundHostSignatureValid' \in BOOLEAN
+    /\ (inboundHostSignatureValid' => AdversaryOwnsHostKey)
+    /\ inboundTransportValid' \in BOOLEAN
+    /\ (inboundTransportValid' => AdversaryOwnsHostKey /\ transportKeysVerified)
+    /\ UNCHANGED <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, lastInboundPacket, hostKeyPossessionVerified, transcriptVerified, transportKeysVerified, lastPacketDisposition, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
+
+ClientNext ==
     \/ AUTHENTICATION_FAILURE
     \/ AUTHENTICATION_SUCCESS
     \/ AUTHORIZE_AUTHENTICATED_PACKET
@@ -1244,6 +1947,9 @@ Next ==
     \/ UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT
     \/ UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS
     \/ AttemptChannelOperation
+    \/ RejectHostilePacket
+
+Next == ClientNext \/ HostileEnvironmentNext
 
 Spec == Init /\ [][Next]_vars
 ====
