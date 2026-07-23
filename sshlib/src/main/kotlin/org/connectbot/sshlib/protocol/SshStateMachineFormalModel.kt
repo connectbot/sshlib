@@ -50,7 +50,14 @@ internal enum class SshTransitionId {
     AUTHORIZE_CONNECTION_PACKET,
     CONNECT,
     RECEIVE_VERSION,
-    RECEIVE_KEX_INIT,
+    RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT,
+    REJECT_NON_KEX_WAIT_KEX,
+    REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT,
+    REJECT_NON_KEX_WAIT_NEW_KEYS,
+    REJECT_STRICT_KEX_INIT_NOT_FIRST,
+    RECEIVE_INITIAL_STRICT_KEX_INIT,
+    RECEIVE_INITIAL_NON_STRICT_KEX_INIT,
+    RECEIVE_REKEY_KEX_INIT,
     RECEIVE_KEX_DH_REPLY,
     RECEIVE_KEX_ECDH_REPLY,
     RECEIVE_KEX_DH_GEX_GROUP,
@@ -76,11 +83,16 @@ internal enum class SshEventOrigin {
 
 internal enum class SshEffect {
     ACTIVATE_ENCRYPTION,
+    ACTIVATE_INBOUND_PROTECTION,
+    ACTIVATE_OUTBOUND_PROTECTION,
     AUTHENTICATION_FAILURE,
     AUTHENTICATION_SUCCESS,
+    CLEAR_NON_KEX_BEFORE_INITIAL_KEX_INIT,
     DEBUG,
     DISCONNECT,
     IGNORE,
+    ENABLE_STRICT_KEX,
+    NEGOTIATE_NON_STRICT_KEX,
     RECEIVE_CHANNEL_FAILURE,
     RECEIVE_CHANNEL_OPEN_CONFIRMATION,
     RECEIVE_CHANNEL_OPEN_FAILURE,
@@ -95,8 +107,11 @@ internal enum class SshEffect {
     RECEIVE_USERAUTH_BANNER,
     RECEIVE_USERAUTH_INFO_REQUEST,
     RECEIVE_VERSION,
+    RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT,
     REKEY_COMPLETE,
     REKEY_STARTED,
+    RESET_INBOUND_SEQUENCE,
+    RESET_OUTBOUND_SEQUENCE,
     SEND_CHANNEL_OPEN,
     SEND_CHANNEL_REQUEST,
     SEND_CLIENT_EXT_INFO,
@@ -115,22 +130,38 @@ internal enum class SshBooleanFact(
     val tlaName: String,
 ) {
     AUTH_REQUEST_PENDING("authRequestPending"),
+    NON_KEX_BEFORE_INITIAL_KEX_INIT("nonKexBeforeInitialKexInit"),
     REKEYING("rekeying"),
+    STRICT_KEX_ENABLED("strictKex"),
     ;
 
-    fun evaluate(callbacks: SshClientCallbacks): Boolean = when (this) {
+    fun evaluate(
+        callbacks: SshClientCallbacks,
+        strictKexEnabled: Boolean,
+        nonKexBeforeInitialKexInit: Boolean,
+    ): Boolean = when (this) {
         AUTH_REQUEST_PENDING -> callbacks.isAuthenticationRequestPending()
+        NON_KEX_BEFORE_INITIAL_KEX_INIT -> nonKexBeforeInitialKexInit
         REKEYING -> callbacks.isRekeying()
+        STRICT_KEX_ENABLED -> strictKexEnabled
     }
 }
 
 internal sealed interface SshFormalGuard {
-    fun evaluate(callbacks: SshClientCallbacks): Boolean
+    fun evaluate(
+        callbacks: SshClientCallbacks,
+        strictKexEnabled: Boolean,
+        nonKexBeforeInitialKexInit: Boolean,
+    ): Boolean
 
     fun renderTla(): String
 
     data object Always : SshFormalGuard {
-        override fun evaluate(callbacks: SshClientCallbacks) = true
+        override fun evaluate(
+            callbacks: SshClientCallbacks,
+            strictKexEnabled: Boolean,
+            nonKexBeforeInitialKexInit: Boolean,
+        ) = true
 
         override fun renderTla() = "TRUE"
     }
@@ -138,7 +169,11 @@ internal sealed interface SshFormalGuard {
     data class Fact(
         val fact: SshBooleanFact,
     ) : SshFormalGuard {
-        override fun evaluate(callbacks: SshClientCallbacks) = fact.evaluate(callbacks)
+        override fun evaluate(
+            callbacks: SshClientCallbacks,
+            strictKexEnabled: Boolean,
+            nonKexBeforeInitialKexInit: Boolean,
+        ) = fact.evaluate(callbacks, strictKexEnabled, nonKexBeforeInitialKexInit)
 
         override fun renderTla() = fact.tlaName
     }
@@ -146,13 +181,33 @@ internal sealed interface SshFormalGuard {
     data class Not(
         val expression: SshFormalGuard,
     ) : SshFormalGuard {
-        override fun evaluate(callbacks: SshClientCallbacks) = !expression.evaluate(callbacks)
+        override fun evaluate(
+            callbacks: SshClientCallbacks,
+            strictKexEnabled: Boolean,
+            nonKexBeforeInitialKexInit: Boolean,
+        ) = !expression.evaluate(callbacks, strictKexEnabled, nonKexBeforeInitialKexInit)
 
         override fun renderTla() = "~(${expression.renderTla()})"
+    }
+
+    data class And(
+        val left: SshFormalGuard,
+        val right: SshFormalGuard,
+    ) : SshFormalGuard {
+        override fun evaluate(
+            callbacks: SshClientCallbacks,
+            strictKexEnabled: Boolean,
+            nonKexBeforeInitialKexInit: Boolean,
+        ) = left.evaluate(callbacks, strictKexEnabled, nonKexBeforeInitialKexInit) &&
+            right.evaluate(callbacks, strictKexEnabled, nonKexBeforeInitialKexInit)
+
+        override fun renderTla() = "(${left.renderTla()}) /\\ (${right.renderTla()})"
     }
 }
 
 internal operator fun SshFormalGuard.not(): SshFormalGuard = SshFormalGuard.Not(this)
+
+internal infix fun SshFormalGuard.and(other: SshFormalGuard): SshFormalGuard = SshFormalGuard.And(this, other)
 
 internal data class SshFormalTransitionMeta(
     val id: SshTransitionId,
@@ -318,8 +373,16 @@ internal data class SshStateMachineFormalModel(
             }
         },
         variable("packetWasParsed", "FALSE") { "(origin' = ${quote(SshEventOrigin.PARSED_PACKET.tlaName)})" },
-        variable("effects", "{}") { renderSet(it.effects.mapTo(sortedSetOf()) { effect -> effect.tlaName }) },
+        variable("effects", "{}", ::renderEffectsUpdate),
         variable("rekeying", "FALSE", ::renderRekeyingUpdate),
+        FormalVariable("strictKex", "FALSE") { meta ->
+            when {
+                SshEffect.ENABLE_STRICT_KEX in meta.effects -> "strictKex' = TRUE"
+                SshEffect.NEGOTIATE_NON_STRICT_KEX in meta.effects -> "strictKex' = FALSE"
+                else -> "strictKex' = strictKex"
+            }
+        },
+        variable("nonKexBeforeInitialKexInit", "FALSE", ::renderNonKexBeforeInitialKexInitUpdate),
         variable("authenticationEstablished", "FALSE", ::renderAuthenticationEstablishedUpdate),
         variable("initialNewKeysActive", "FALSE", ::renderInitialNewKeysActiveUpdate),
         variable("authRequestPending", "FALSE", ::renderAuthRequestPendingUpdate),
@@ -464,7 +527,25 @@ internal data class SshStateMachineFormalModel(
         else -> "rekeying"
     }
 
+    private fun renderEffectsUpdate(meta: SshFormalTransitionMeta): String {
+        val resetEffects = meta.effects.intersect(STRICT_KEX_SEQUENCE_RESET_EFFECTS)
+        val regularEffects = meta.effects - resetEffects
+        val renderedRegularEffects = renderSet(regularEffects.mapTo(sortedSetOf()) { it.tlaName })
+        if (resetEffects.isEmpty()) return renderedRegularEffects
+
+        val renderedStrictEffects = renderSet(meta.effects.mapTo(sortedSetOf()) { it.tlaName })
+        return "IF strictKex THEN $renderedStrictEffects ELSE $renderedRegularEffects"
+    }
+
     private fun renderAuthenticationEstablishedUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.AUTHENTICATION_SUCCESS in meta.effects) "TRUE" else "authenticationEstablished"
+
+    private fun renderNonKexBeforeInitialKexInitUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT in meta.effects) {
+        "TRUE"
+    } else if (SshEffect.CLEAR_NON_KEX_BEFORE_INITIAL_KEX_INIT in meta.effects) {
+        "FALSE"
+    } else {
+        "nonKexBeforeInitialKexInit"
+    }
 
     private fun renderInitialNewKeysActiveUpdate(meta: SshFormalTransitionMeta): String = if (SshEffect.ACTIVATE_ENCRYPTION in meta.effects) "TRUE" else "initialNewKeysActive"
 
@@ -512,6 +593,10 @@ internal data class SshStateMachineFormalModel(
             SshTransitionId.AUTHENTICATION_SUCCESS,
             SshTransitionId.AUTHENTICATION_FAILURE,
             SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
+        )
+        private val STRICT_KEX_SEQUENCE_RESET_EFFECTS = setOf(
+            SshEffect.RESET_INBOUND_SEQUENCE,
+            SshEffect.RESET_OUTBOUND_SEQUENCE,
         )
         private val CHANNEL_VARIABLE_NAMES = setOf(
             "channels",
