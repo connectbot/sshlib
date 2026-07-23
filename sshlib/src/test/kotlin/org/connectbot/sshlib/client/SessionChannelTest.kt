@@ -21,6 +21,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -257,5 +258,29 @@ class SessionChannelTest {
         channel.sendEof()
 
         coVerify(exactly = 1) { conn.sendChannelEof(1) }
+    }
+
+    @Test
+    fun `receiving CLOSE unregisters the channel so its remote number can be reused`() = runTest {
+        val (channel, connection) = createChannel()
+
+        channel.onClose()
+
+        // The registry indexes channels by the SERVER's channel number. Leaving a
+        // closed channel registered means the next channel the server confirms
+        // with that number - legal to reuse once both sides have sent
+        // CHANNEL_CLOSE (RFC 4254 section 5.3) - is rejected with "Remote channel
+        // N is already registered", which fails the open AND tears down the whole
+        // connection.
+        verify { connection.unregisterSessionChannel(0) }
+    }
+
+    @Test
+    fun `disconnect unregisters the channel too`() = runTest {
+        val (channel, connection) = createChannel()
+
+        channel.onDisconnected()
+
+        verify { connection.unregisterSessionChannel(0) }
     }
 }

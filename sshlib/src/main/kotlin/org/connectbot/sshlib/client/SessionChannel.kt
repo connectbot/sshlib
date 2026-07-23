@@ -215,6 +215,12 @@ class SessionChannel internal constructor(
         // Channel is gone; if the server never reported an exit, resolve
         // waiters with "unknown" rather than leaving them suspended.
         _exitInfo.complete(null)
+        // Release the local/remote numbers now the lifecycle is CLOSED, so the
+        // server may legally reuse this remote number for the next channel
+        // (RFC 4254 §5.3). Every path into here is terminal — receiving CLOSE,
+        // or disconnect — and unregistering an already-removed entry is a no-op,
+        // so the connection-wide teardown in disconnectAll() stays safe.
+        connection.unregisterSessionChannel(localChannelNumber)
     }
 
     internal suspend fun onDisconnected() {

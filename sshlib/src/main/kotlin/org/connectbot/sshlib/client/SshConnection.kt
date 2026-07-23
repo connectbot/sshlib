@@ -356,6 +356,16 @@ class SshConnection(
     private val _disconnectedFlow = MutableSharedFlow<Throwable?>(extraBufferCapacity = 1)
     val disconnectedFlow: SharedFlow<Throwable?> = _disconnectedFlow.asSharedFlow()
 
+    /**
+     * Whether a session channel has ever been established on this connection.
+     *
+     * [checkAllChannelsClosed] used to infer this from a *closed* session channel still sitting in
+     * the registry. Closed channels are now unregistered so the server may reuse their channel
+     * numbers, so the fact is recorded explicitly instead of being a side effect of the leak.
+     */
+    @Volatile
+    private var hadSessionChannel = false
+
     private var serverVersion: String? = null
     private var clientKexInit: ByteArray? = null
     private var serverKexInit: ByteArray? = null
@@ -2320,6 +2330,19 @@ class SshConnection(
         channelRegistry.unregister(channel.localChannelNumber)
     }
 
+    /**
+     * Releases a session channel's local and remote numbers once its lifecycle has reached
+     * [org.connectbot.sshlib.protocol.SshChannelState.CLOSED].
+     *
+     * Without this the registry keeps the closed channel's remote number indexed forever, so the
+     * next channel the server confirms with that number — legal to reuse per RFC 4254 §5.3 once
+     * both sides have sent CHANNEL_CLOSE — is rejected with "Remote channel N is already
+     * registered", taking the whole connection down with it.
+     */
+    internal fun unregisterSessionChannel(localChannelNumber: Int) {
+        channelRegistry.unregister(localChannelNumber)
+    }
+
     internal suspend fun sendChannelOpenConfirmationPublic(
         recipientChannel: Int,
         senderChannel: Int,
@@ -2884,8 +2907,13 @@ class SshConnection(
     private suspend fun checkAllChannelsClosed() {
         val established = channelRegistry.establishedSnapshot()
         val allClosed = established.all { !it.isOpen }
-        logger.debug("checkAllChannelsClosed: established=${established.size}, allClosed=$allClosed")
-        if (allClosed && established.any { it.kind == SshChannelRegistry.Kind.SESSION }) {
+        logger.debug(
+            "checkAllChannelsClosed: established=${established.size}, allClosed=$allClosed, " +
+                "hadSessionChannel=$hadSessionChannel",
+        )
+        // Previously this asked whether a SESSION entry was still present, which only held because
+        // closed channels were never unregistered. Now that they are, ask the question directly.
+        if (allClosed && hadSessionChannel) {
             logger.info("All channels closed, sending disconnect")
             sendDisconnect()
         }
@@ -3076,6 +3104,7 @@ class SshConnection(
         val pending = channelRegistry.findPendingSession(localChannelNumber)
             ?: error("Pending session channel $localChannelNumber disappeared before promotion")
         channelRegistry.promote(pending, channel)
+        hadSessionChannel = true
         logger.debug("Session channel registered: local=$localChannelNumber, remote=$remoteChannelNumber")
 
         return channel
