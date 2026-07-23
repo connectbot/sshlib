@@ -70,43 +70,54 @@ tasks.test {
 
 val tlaModelDirectory = layout.projectDirectory.dir("src/test/resources/tla")
 val tlaStateDirectory = layout.buildDirectory.dir("tla/states")
-
-tasks.register<JavaExec>("generateSshStateMachineTla") {
-    group = "verification"
-    description = "Regenerates the TLA+ lifecycle model from SshClientStateMachine"
-    dependsOn(tasks.testClasses)
-    classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("org.connectbot.sshlib.protocol.SshStateMachineTlaGenerator")
-    args(tlaModelDirectory.file("SshClientStateMachineGenerated.tla").asFile.absolutePath)
-}
-
-tasks.register<JavaExec>("generateSftpStateMachineTla") {
-    group = "verification"
-    description = "Regenerates the TLA+ lifecycle model from SftpStateMachine"
-    dependsOn(tasks.testClasses)
-    classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("org.connectbot.sshlib.protocol.SftpStateMachineTlaGenerator")
-    args(tlaModelDirectory.file("SftpClientStateMachineGenerated.tla").asFile.absolutePath)
-}
-
 val tla2toolsJar = providers.gradleProperty("tla2toolsJar")
     .orElse(providers.environmentVariable("TLA2TOOLS_JAR"))
 
-tasks.register<JavaExec>("checkSshStateMachineTla") {
+listOf(
+    "Ssh" to ("SshClientStateMachine" to "SshStateMachineTlaGenerator"),
+    "Sftp" to ("SftpClientStateMachine" to "SftpStateMachineTlaGenerator"),
+).forEach { (type, config) ->
+    val (modelName, generatorClass) = config
+    tasks.register<JavaExec>("generate${type}StateMachineTla") {
+        group = "verification"
+        description = "Regenerates the TLA+ lifecycle model from $modelName"
+        dependsOn(tasks.testClasses)
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("org.connectbot.sshlib.protocol.$generatorClass")
+        args(tlaModelDirectory.file("${modelName}Generated.tla").asFile.absolutePath)
+    }
+}
+
+fun TaskContainer.registerTlcCheck(
+    name: String,
+    description: String,
+    configFile: String,
+    tlaFile: String,
+    stateSubdir: String? = null,
+    configure: (JavaExec.() -> Unit)? = null,
+): TaskProvider<JavaExec> = register<JavaExec>(name) {
     group = "verification"
-    description = "Checks the generated SSH lifecycle model with TLC"
+    this.description = description
     mainClass.set("tlc2.TLC")
     workingDir(tlaModelDirectory)
+
+    val metaDir = if (stateSubdir != null) {
+        tlaStateDirectory.get().dir(stateSubdir).asFile.absolutePath
+    } else {
+        tlaStateDirectory.get().asFile.absolutePath
+    }
+
     args(
         "-workers",
         "1",
         "-metadir",
-        tlaStateDirectory.get().asFile.absolutePath,
+        metaDir,
         "-config",
-        "SshClientStateMachine.cfg",
-        "SshClientStateMachine.tla",
+        configFile,
+        tlaFile,
     )
     jvmArgs("-XX:+UseParallelGC")
+
     doFirst {
         val jarPath = tla2toolsJar.orNull
             ?: throw GradleException(
@@ -114,164 +125,102 @@ tasks.register<JavaExec>("checkSshStateMachineTla") {
             )
         classpath = files(jarPath)
     }
+
+    configure?.invoke(this)
 }
+
+fun TaskContainer.registerTlcCounterexampleCheck(
+    name: String,
+    description: String,
+    configFile: String,
+    tlaFile: String,
+    stateSubdir: String,
+    expectedViolation: String,
+    failureMessage: String,
+    successMessage: String,
+): TaskProvider<JavaExec> {
+    val outputStream = ByteArrayOutputStream()
+    return registerTlcCheck(
+        name = name,
+        description = description,
+        configFile = configFile,
+        tlaFile = tlaFile,
+        stateSubdir = stateSubdir,
+    ) {
+        standardOutput = outputStream
+        errorOutput = outputStream
+        isIgnoreExitValue = true
+        doFirst {
+            outputStream.reset()
+        }
+        doLast {
+            val output = outputStream.toString(Charsets.UTF_8)
+            logger.lifecycle(output)
+            val exitValue = executionResult.get().exitValue
+            if (exitValue == 0 || expectedViolation !in output) {
+                throw GradleException("$failureMessage; exit=$exitValue")
+            }
+            logger.lifecycle(successMessage)
+        }
+    }
+}
+
+tasks.registerTlcCheck(
+    name = "checkSshStateMachineTla",
+    description = "Checks the generated SSH lifecycle model with TLC",
+    configFile = "SshClientStateMachine.cfg",
+    tlaFile = "SshClientStateMachine.tla",
+)
 
 listOf(
     "OnPath" to "SshClientStateMachineOnPath.cfg",
     "HostilePeer" to "SshClientStateMachineHostilePeer.cfg",
 ).forEach { (profile, configFile) ->
-    tasks.register<JavaExec>("checkSshStateMachine${profile}Tla") {
-        group = "verification"
-        description = "Checks the generated SSH lifecycle model with the $profile hostile environment"
-        mainClass.set("tlc2.TLC")
-        workingDir(tlaModelDirectory)
-        args(
-            "-workers",
-            "1",
-            "-metadir",
-            tlaStateDirectory.get().dir("ssh-${profile.lowercase()}").asFile.absolutePath,
-            "-config",
-            configFile,
-            "SshClientStateMachine.tla",
-        )
-        jvmArgs("-XX:+UseParallelGC")
-        doFirst {
-            val jarPath = tla2toolsJar.orNull
-                ?: throw GradleException(
-                    "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
-                )
-            classpath = files(jarPath)
-        }
-    }
+    tasks.registerTlcCheck(
+        name = "checkSshStateMachine${profile}Tla",
+        description = "Checks the generated SSH lifecycle model with the $profile hostile environment",
+        configFile = configFile,
+        tlaFile = "SshClientStateMachine.tla",
+        stateSubdir = "ssh-${profile.lowercase()}",
+    )
 }
 
-val unsafeProofCounterexampleOutput = ByteArrayOutputStream()
-tasks.register<JavaExec>("checkSshStateMachineUnsafeProofTla") {
-    group = "verification"
-    description = "Requires TLC to find a hostile KEX counterexample when proof verification is disabled"
-    mainClass.set("tlc2.TLC")
-    workingDir(tlaModelDirectory)
-    args(
-        "-workers",
-        "1",
-        "-metadir",
-        tlaStateDirectory.get().dir("ssh-unsafe-proof").asFile.absolutePath,
-        "-config",
-        "SshClientStateMachineUnsafeProof.cfg",
-        "SshClientStateMachine.tla",
-    )
-    jvmArgs("-XX:+UseParallelGC")
-    standardOutput = unsafeProofCounterexampleOutput
-    errorOutput = unsafeProofCounterexampleOutput
-    isIgnoreExitValue = true
-    doFirst {
-        unsafeProofCounterexampleOutput.reset()
-        val jarPath = tla2toolsJar.orNull
-            ?: throw GradleException(
-                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
-            )
-        classpath = files(jarPath)
-    }
-    doLast {
-        val output = unsafeProofCounterexampleOutput.toString(Charsets.UTF_8)
-        logger.lifecycle(output)
-        val exitValue = executionResult.get().exitValue
-        if (exitValue == 0 || "Invariant HostileKexReplyRequiresPossessionProof is violated" !in output) {
-            throw GradleException(
-                "Expected TLC to find the disabled-proof counterexample; exit=$exitValue",
-            )
-        }
-        logger.lifecycle("Expected disabled-proof counterexample found; treating it as success.")
-    }
-}
+tasks.registerTlcCounterexampleCheck(
+    name = "checkSshStateMachineUnsafeProofTla",
+    description = "Requires TLC to find a hostile KEX counterexample when proof verification is disabled",
+    configFile = "SshClientStateMachineUnsafeProof.cfg",
+    tlaFile = "SshClientStateMachine.tla",
+    stateSubdir = "ssh-unsafe-proof",
+    expectedViolation = "Invariant HostileKexReplyRequiresPossessionProof is violated",
+    failureMessage = "Expected TLC to find the disabled-proof counterexample",
+    successMessage = "Expected disabled-proof counterexample found; treating it as success.",
+)
 
-tasks.register<JavaExec>("checkSftpStateMachineTla") {
-    group = "verification"
-    description = "Checks the generated SFTP lifecycle model with TLC"
-    mainClass.set("tlc2.TLC")
-    workingDir(tlaModelDirectory)
-    args(
-        "-workers",
-        "1",
-        "-metadir",
-        tlaStateDirectory.get().asFile.absolutePath,
-        "-config",
-        "SftpClientStateMachine.cfg",
-        "SftpClientStateMachine.tla",
-    )
-    jvmArgs("-XX:+UseParallelGC")
-    doFirst {
-        val jarPath = tla2toolsJar.orNull
-            ?: throw GradleException(
-                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
-            )
-        classpath = files(jarPath)
-    }
-}
+tasks.registerTlcCheck(
+    name = "checkSftpStateMachineTla",
+    description = "Checks the generated SFTP lifecycle model with TLC",
+    configFile = "SftpClientStateMachine.cfg",
+    tlaFile = "SftpClientStateMachine.tla",
+)
 
-val checkSshTerrapinStrictTla = tasks.register<JavaExec>("checkSshTerrapinStrictTla") {
-    group = "verification"
-    description = "Proves that strict KEX prevents the modeled Terrapin prefix truncation attack"
-    mainClass.set("tlc2.TLC")
-    workingDir(tlaModelDirectory)
-    args(
-        "-workers",
-        "1",
-        "-metadir",
-        tlaStateDirectory.get().dir("terrapin-strict").asFile.absolutePath,
-        "-config",
-        "SshTerrapinStrict.cfg",
-        "SshTerrapin.tla",
-    )
-    jvmArgs("-XX:+UseParallelGC")
-    doFirst {
-        val jarPath = tla2toolsJar.orNull
-            ?: throw GradleException(
-                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
-            )
-        classpath = files(jarPath)
-    }
-}
+val checkSshTerrapinStrictTla = tasks.registerTlcCheck(
+    name = "checkSshTerrapinStrictTla",
+    description = "Proves that strict KEX prevents the modeled Terrapin prefix truncation attack",
+    configFile = "SshTerrapinStrict.cfg",
+    tlaFile = "SshTerrapin.tla",
+    stateSubdir = "terrapin-strict",
+)
 
-val terrapinCounterexampleOutput = ByteArrayOutputStream()
-val checkSshTerrapinNonStrictTla = tasks.register<JavaExec>("checkSshTerrapinNonStrictTla") {
-    group = "verification"
-    description = "Requires TLC to find the modeled Terrapin counterexample without failing the build"
-    mainClass.set("tlc2.TLC")
-    workingDir(tlaModelDirectory)
-    args(
-        "-workers",
-        "1",
-        "-metadir",
-        tlaStateDirectory.get().dir("terrapin-non-strict").asFile.absolutePath,
-        "-config",
-        "SshTerrapinNonStrict.cfg",
-        "SshTerrapin.tla",
-    )
-    jvmArgs("-XX:+UseParallelGC")
-    standardOutput = terrapinCounterexampleOutput
-    errorOutput = terrapinCounterexampleOutput
-    isIgnoreExitValue = true
-    doFirst {
-        terrapinCounterexampleOutput.reset()
-        val jarPath = tla2toolsJar.orNull
-            ?: throw GradleException(
-                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
-            )
-        classpath = files(jarPath)
-    }
-    doLast {
-        val output = terrapinCounterexampleOutput.toString(Charsets.UTF_8)
-        logger.lifecycle(output)
-        val exitValue = executionResult.get().exitValue
-        if (exitValue == 0 || "Invariant NoTerrapin is violated" !in output) {
-            throw GradleException(
-                "Expected TLC to find the non-strict Terrapin counterexample; exit=$exitValue",
-            )
-        }
-        logger.lifecycle("Expected non-strict Terrapin counterexample found; treating it as success.")
-    }
-}
+val checkSshTerrapinNonStrictTla = tasks.registerTlcCounterexampleCheck(
+    name = "checkSshTerrapinNonStrictTla",
+    description = "Requires TLC to find the modeled Terrapin counterexample without failing the build",
+    configFile = "SshTerrapinNonStrict.cfg",
+    tlaFile = "SshTerrapin.tla",
+    stateSubdir = "terrapin-non-strict",
+    expectedViolation = "Invariant NoTerrapin is violated",
+    failureMessage = "Expected TLC to find the non-strict Terrapin counterexample",
+    successMessage = "Expected non-strict Terrapin counterexample found; treating it as success.",
+)
 
 tasks.register("checkSshTerrapinTla") {
     group = "verification"
