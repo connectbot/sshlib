@@ -76,6 +76,23 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `wrong direction packet receives unimplemented without advancing state`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            server.sendUnknownPacket()
+            val unknownReply = withTimeout(5_000) { server.awaitUnimplemented() }
+
+            server.sendUnexpectedServiceRequest()
+            val wrongDirectionReply = withTimeout(5_000) { server.awaitUnimplemented() }
+            assertEquals(unknownReply.packetSequence() + 1, wrongDirectionReply.packetSequence())
+
+            val authentication = async(dispatcher) { connection.authenticatePassword("user", "pass") }
+            withTimeout(5_000) { server.awaitUserauthRequest() }
+            server.sendUserauthSuccess()
+            assertEquals(AuthResult.Success, withTimeout(5_000) { authentication.await() })
+        }
+    }
+
+    @Test
     fun `duplicate kex init during rekey is a fatal protocol error`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             val disconnected = async(dispatcher) { connection.disconnectedFlow.first() }

@@ -250,6 +250,21 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `generated model composes client and hostile environment actions`() {
+        val rendered = createFormalModel().renderTla()
+
+        assertTrue("PacketClasses ==" in rendered)
+        assertTrue("PacketTransitionEnabled ==" in rendered)
+        assertTrue("HostileEnvironmentNext ==" in rendered)
+        assertTrue("RejectHostilePacket ==" in rendered)
+        assertTrue("ClientNext ==" in rendered)
+        assertTrue("Next == ClientNext \\/ HostileEnvironmentNext" in rendered)
+        assertTrue("hostKeyPossessionVerified" in rendered)
+        assertTrue("transcriptVerified" in rendered)
+        assertTrue("transportKeysVerified" in rendered)
+    }
+
+    @Test
     fun `checked in TLA model matches KStateMachine declaration`() {
         val expected = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachineGenerated.tla"))
 

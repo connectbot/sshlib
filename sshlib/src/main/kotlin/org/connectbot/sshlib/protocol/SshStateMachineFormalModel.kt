@@ -121,9 +121,45 @@ internal enum class SshEffect {
     SEND_NEW_KEYS,
     SEND_SERVICE_REQUEST,
     SEND_PROTOCOL_ERROR,
+    SEND_UNIMPLEMENTED,
     SEND_USERAUTH_REQUEST,
     SEND_VERSION,
     START_AUTHENTICATION,
+    VERIFY_HOST_KEY_POSSESSION,
+    VERIFY_KEX_TRANSCRIPT,
+}
+
+/**
+ * Lifecycle-relevant packet classes used by the hostile-environment model.
+ *
+ * These deliberately abstract packets that have identical authorization and
+ * state-machine behavior. Client-only classes are included so TLC can check
+ * that receiving a syntactically valid packet never changes the endpoint's
+ * role.
+ */
+internal enum class SshPacketClass {
+    KEX_INIT,
+    KEX_REPLY,
+    KEX_GEX_GROUP,
+    NEW_KEYS,
+    SERVICE_ACCEPT,
+    USERAUTH_SUCCESS,
+    USERAUTH_FAILURE,
+    USERAUTH_METHOD_SPECIFIC,
+    USERAUTH_BANNER,
+    EXT_INFO,
+    CONNECTION_PACKET,
+    CHANNEL_OPEN_REPLY,
+    CHANNEL_REQUEST_REPLY,
+    GLOBAL_REQUEST,
+    DEBUG,
+    IGNORE,
+    DISCONNECT,
+    CLIENT_KEX_INIT,
+    CLIENT_SERVICE_REQUEST,
+    CLIENT_USERAUTH_REQUEST,
+    CLIENT_CONNECTION_PACKET,
+    UNKNOWN,
 }
 
 internal enum class SshBooleanFact(
@@ -296,7 +332,7 @@ internal data class SshStateMachineFormalModel(
         val body = buildString {
             appendLine("EXTENDS Naturals")
             appendLine()
-            appendLine("CONSTANT MaxChannels")
+            appendLine("CONSTANTS MaxChannels, EnableHostileEnvironment, AdversaryOwnsHostKey, EnforceKexProofVerification")
             appendLine()
             appendLine("ChannelIDs == 1..MaxChannels")
             appendLine("ChannelAttemptIDs == 0..(MaxChannels + 1)")
@@ -308,9 +344,14 @@ internal data class SshStateMachineFormalModel(
             appendLine("States == ${renderSet(leafStateNames)}")
             appendLine("PostAuthenticatedStates == ${renderSet(descendantLeaves(POST_AUTHENTICATED_STATE))}")
             appendLine("KexStates == ${renderSet(KEX_STATE_NAMES)}")
-            appendLine("Events == ${renderSet(transitions.mapTo(sortedSetOf()) { it.meta.eventName })}")
+            val eventNames = transitions.mapTo(sortedSetOf()) { it.meta.eventName }.apply {
+                add("HostilePacketRejected")
+            }
+            appendLine("Events == ${renderSet(eventNames)}")
             appendLine("Origins == ${renderSet(SshEventOrigin.entries.mapTo(sortedSetOf()) { it.tlaName })}")
             appendLine("Effects == ${renderSet(SshEffect.entries.mapTo(sortedSetOf()) { it.tlaName })}")
+            appendLine("PacketClasses == ${renderSet(SshPacketClass.entries.mapTo(sortedSetOf()) { it.tlaName })}")
+            appendLine("PacketDispositions == {\"None\", \"Client\", \"Accepted\", \"Unimplemented\", \"Disconnected\"}")
             appendChannelDefinitions()
             appendLine()
             appendLine("Init ==")
@@ -322,11 +363,20 @@ internal data class SshStateMachineFormalModel(
                 appendTransition(transition, variables)
                 appendLine()
             }
-            appendLine("Next ==")
+            appendPacketTransitionEnabled()
+            appendLine()
+            appendRejectHostilePacket(variables)
+            appendLine()
+            appendHostileEnvironmentNext(variables)
+            appendLine()
+            appendLine("ClientNext ==")
             transitions.sortedBy { it.meta.id.name }.forEach { transition ->
                 appendLine("    \\/ ${transition.meta.id.name}")
             }
             appendLine("    \\/ AttemptChannelOperation")
+            appendLine("    \\/ RejectHostilePacket")
+            appendLine()
+            appendLine("Next == ClientNext \\/ HostileEnvironmentNext")
             appendLine()
             appendLine("Spec == Init /\\ [][Next]_vars")
         }
@@ -354,6 +404,19 @@ internal data class SshStateMachineFormalModel(
         appendLine("    /\\ state \\in ${renderSet(transition.sourceStateNames)}")
         if (meta.guard != SshFormalGuard.Always) {
             appendLine("    /\\ ${meta.guard.renderTla()}")
+        }
+        val packets = packetClasses(meta)
+        if (packets.isNotEmpty()) {
+            appendLine("    /\\ (inboundPacket = \"None\"")
+            appendLine("        \\/ /\\ inboundPacket \\in ${renderSet(packets.map { it.tlaName })}")
+            packetSecurityGuards(meta).forEach { guard ->
+                appendLine("              /\\ $guard")
+            }
+            appendLine("       )")
+        }
+        if (meta.id in NEW_KEYS_TRANSITIONS) {
+            appendLine("    /\\ (~EnforceKexProofVerification \\/ hostKeyPossessionVerified)")
+            appendLine("    /\\ (~EnforceKexProofVerification \\/ transcriptVerified)")
         }
         variables.forEach { variable ->
             appendLine("    /\\ ${variable.renderNext(meta)}")
@@ -387,6 +450,31 @@ internal data class SshStateMachineFormalModel(
         variable("initialNewKeysActive", "FALSE", ::renderInitialNewKeysActiveUpdate),
         variable("authRequestPending", "FALSE", ::renderAuthRequestPendingUpdate),
         variable("previousAuthRequestPending", "FALSE") { "authRequestPending" },
+        FormalVariable("inboundPacket", quote("None")) { meta ->
+            if (packetClasses(meta).isEmpty()) "inboundPacket' = inboundPacket" else "inboundPacket' = \"None\""
+        },
+        FormalVariable("lastInboundPacket", quote("None")) { meta ->
+            if (packetClasses(meta).isEmpty()) "lastInboundPacket' = lastInboundPacket" else "lastInboundPacket' = inboundPacket"
+        },
+        FormalVariable("inboundTranscriptMatches", "FALSE") { meta ->
+            "inboundTranscriptMatches' = inboundTranscriptMatches"
+        },
+        FormalVariable("inboundHostSignatureValid", "FALSE") { meta ->
+            "inboundHostSignatureValid' = inboundHostSignatureValid"
+        },
+        FormalVariable("inboundTransportValid", "FALSE") { meta ->
+            "inboundTransportValid' = inboundTransportValid"
+        },
+        variable("hostKeyPossessionVerified", "FALSE", ::renderHostKeyPossessionVerifiedUpdate),
+        variable("transcriptVerified", "FALSE", ::renderTranscriptVerifiedUpdate),
+        variable("transportKeysVerified", "FALSE", ::renderTransportKeysVerifiedUpdate),
+        FormalVariable("lastPacketDisposition", quote("None")) { meta ->
+            if (packetClasses(meta).isEmpty()) {
+                "lastPacketDisposition' = \"Client\""
+            } else {
+                "lastPacketDisposition' = IF inboundPacket = \"None\" THEN \"Client\" ELSE \"Accepted\""
+            }
+        },
         variable("previousChannels", "[c \\in ChannelIDs |-> \"Unallocated\"]") { "channels" },
         FormalVariable("activeChannel", "0") { meta ->
             val operation = meta.channelOperationEvent
@@ -556,6 +644,189 @@ internal data class SshStateMachineFormalModel(
         else -> "authRequestPending"
     }
 
+    private fun renderHostKeyPossessionVerifiedUpdate(meta: SshFormalTransitionMeta): String = when {
+        meta.id in KEX_INIT_TRANSITIONS -> "FALSE"
+        meta.id in KEX_REPLY_TRANSITIONS -> "TRUE"
+        SshEffect.DISCONNECT in meta.effects -> "FALSE"
+        else -> "hostKeyPossessionVerified"
+    }
+
+    private fun renderTranscriptVerifiedUpdate(meta: SshFormalTransitionMeta): String = when {
+        meta.id in KEX_INIT_TRANSITIONS -> "FALSE"
+        meta.id in KEX_REPLY_TRANSITIONS -> "TRUE"
+        SshEffect.DISCONNECT in meta.effects -> "FALSE"
+        else -> "transcriptVerified"
+    }
+
+    private fun renderTransportKeysVerifiedUpdate(meta: SshFormalTransitionMeta): String = when {
+        meta.id in NEW_KEYS_TRANSITIONS -> "TRUE"
+        SshEffect.DISCONNECT in meta.effects -> "FALSE"
+        else -> "transportKeysVerified"
+    }
+
+    private fun packetClasses(meta: SshFormalTransitionMeta): Set<SshPacketClass> = when (meta.id) {
+        SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT,
+        SshTransitionId.RECEIVE_INITIAL_NON_STRICT_KEX_INIT,
+        SshTransitionId.RECEIVE_REKEY_KEX_INIT,
+        SshTransitionId.REJECT_STRICT_KEX_INIT_NOT_FIRST,
+        SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_KEX,
+        SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT,
+        SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS,
+        -> setOf(SshPacketClass.KEX_INIT)
+
+        SshTransitionId.RECEIVE_KEX_DH_REPLY,
+        SshTransitionId.RECEIVE_KEX_ECDH_REPLY,
+        SshTransitionId.RECEIVE_KEX_DH_GEX_REPLY,
+        -> setOf(SshPacketClass.KEX_REPLY)
+
+        SshTransitionId.RECEIVE_KEX_DH_GEX_GROUP -> setOf(SshPacketClass.KEX_GEX_GROUP)
+
+        SshTransitionId.RECEIVE_INITIAL_NEW_KEYS,
+        SshTransitionId.RECEIVE_REKEY_NEW_KEYS,
+        -> setOf(SshPacketClass.NEW_KEYS)
+
+        SshTransitionId.RECEIVE_SERVICE_ACCEPT -> setOf(SshPacketClass.SERVICE_ACCEPT)
+
+        SshTransitionId.AUTHENTICATION_SUCCESS -> setOf(SshPacketClass.USERAUTH_SUCCESS)
+
+        SshTransitionId.AUTHENTICATION_FAILURE -> setOf(SshPacketClass.USERAUTH_FAILURE)
+
+        SshTransitionId.RECEIVE_USERAUTH_INFO_REQUEST,
+        SshTransitionId.AUTHORIZE_AUTHENTICATION_PACKET,
+        -> setOf(SshPacketClass.USERAUTH_METHOD_SPECIFIC)
+
+        SshTransitionId.RECEIVE_USERAUTH_BANNER_READY,
+        SshTransitionId.RECEIVE_USERAUTH_BANNER_AUTHENTICATING,
+        -> setOf(SshPacketClass.USERAUTH_BANNER)
+
+        SshTransitionId.AUTHORIZE_SERVICE_EXT_INFO,
+        SshTransitionId.AUTHORIZE_POST_AUTH_EXT_INFO,
+        -> setOf(SshPacketClass.EXT_INFO)
+
+        SshTransitionId.AUTHORIZE_CONNECTION_PACKET -> setOf(SshPacketClass.CONNECTION_PACKET)
+
+        SshTransitionId.AUTHORIZE_AUTHENTICATED_PACKET -> setOf(
+            SshPacketClass.CONNECTION_PACKET,
+            SshPacketClass.CLIENT_CONNECTION_PACKET,
+        )
+
+        SshTransitionId.RECEIVE_GLOBAL_REQUEST -> setOf(SshPacketClass.GLOBAL_REQUEST)
+
+        SshTransitionId.RECEIVE_CHANNEL_OPEN_CONFIRMATION,
+        SshTransitionId.RECEIVE_CHANNEL_OPEN_FAILURE,
+        -> setOf(SshPacketClass.CHANNEL_OPEN_REPLY)
+
+        SshTransitionId.RECEIVE_CHANNEL_SUCCESS,
+        SshTransitionId.RECEIVE_CHANNEL_FAILURE,
+        -> setOf(SshPacketClass.CHANNEL_REQUEST_REPLY)
+
+        SshTransitionId.RECEIVE_DEBUG -> setOf(SshPacketClass.DEBUG)
+
+        SshTransitionId.RECEIVE_IGNORE -> setOf(SshPacketClass.IGNORE)
+
+        SshTransitionId.DISCONNECT -> setOf(SshPacketClass.DISCONNECT)
+
+        else -> emptySet()
+    }
+
+    private fun packetSecurityGuards(meta: SshFormalTransitionMeta): List<String> {
+        val packets = packetClasses(meta)
+        if (packets.isEmpty()) return emptyList()
+        return when {
+            meta.id in KEX_REPLY_TRANSITIONS -> listOf(
+                "(~EnforceKexProofVerification \\/ inboundHostSignatureValid)",
+                "(~EnforceKexProofVerification \\/ inboundTranscriptMatches)",
+                "(~initialNewKeysActive \\/ inboundTransportValid)",
+            )
+
+            packets.any { it in PRE_NEW_KEYS_PACKET_CLASSES } ->
+                listOf("(~initialNewKeysActive \\/ inboundTransportValid)")
+
+            else -> listOf("inboundTransportValid")
+        }
+    }
+
+    private fun StringBuilder.appendPacketTransitionEnabled() {
+        appendLine("PacketTransitionEnabled ==")
+        transitions
+            .filter { packetClasses(it.meta).isNotEmpty() }
+            .sortedBy { it.meta.id.name }
+            .forEach { transition ->
+                val meta = transition.meta
+                appendLine("    \\/ /\\ state \\in ${renderSet(transition.sourceStateNames)}")
+                appendLine("       /\\ inboundPacket \\in ${renderSet(packetClasses(meta).map { it.tlaName })}")
+                if (meta.guard != SshFormalGuard.Always) {
+                    appendLine("       /\\ ${meta.guard.renderTla()}")
+                }
+                packetSecurityGuards(meta).forEach { appendLine("       /\\ $it") }
+                if (meta.id in NEW_KEYS_TRANSITIONS) {
+                    appendLine("       /\\ (~EnforceKexProofVerification \\/ hostKeyPossessionVerified)")
+                    appendLine("       /\\ (~EnforceKexProofVerification \\/ transcriptVerified)")
+                }
+            }
+    }
+
+    private fun StringBuilder.appendRejectHostilePacket(variables: List<FormalVariable>) {
+        appendLine("HostilePacketFatal ==")
+        appendLine("    \\/ /\\ strictKex /\\ ~rekeying /\\ state \\in KexStates")
+        appendLine("       /\\ ~PacketTransitionEnabled")
+        appendLine("    \\/ /\\ inboundPacket = \"KexInit\"")
+        appendLine("       /\\ state \\in {\"WaitKex\", \"WaitKexDhGexInit\", \"WaitNewKeys\"}")
+        appendLine("    \\/ /\\ inboundPacket = \"KexReply\"")
+        appendLine("       /\\ (~inboundHostSignatureValid \\/ ~inboundTranscriptMatches)")
+        appendLine("    \\/ /\\ initialNewKeysActive /\\ ~inboundTransportValid")
+        appendLine()
+        appendLine("RejectHostilePacket ==")
+        appendLine("    /\\ inboundPacket # \"None\"")
+        appendLine("    /\\ ~PacketTransitionEnabled")
+        variables.forEach { variable ->
+            appendLine("    /\\ ${renderRejectedPacketUpdate(variable.name)}")
+        }
+    }
+
+    private fun renderRejectedPacketUpdate(name: String): String = when (name) {
+        "state" -> "state' = IF HostilePacketFatal THEN \"Disconnected\" ELSE state"
+        "previousState" -> "previousState' = state"
+        "event" -> "event' = \"HostilePacketRejected\""
+        "origin" -> "origin' = \"ParsedPacket\""
+        "packetWasParsed" -> "packetWasParsed' = TRUE"
+        "effects" -> "effects' = IF HostilePacketFatal THEN {\"Disconnect\", \"SendProtocolError\"} ELSE {\"SendUnimplemented\"}"
+        "rekeying" -> "rekeying' = IF HostilePacketFatal THEN FALSE ELSE rekeying"
+        "authenticationEstablished" -> "authenticationEstablished' = authenticationEstablished"
+        "authRequestPending" -> "authRequestPending' = IF HostilePacketFatal THEN FALSE ELSE authRequestPending"
+        "previousAuthRequestPending" -> "previousAuthRequestPending' = authRequestPending"
+        "inboundPacket" -> "inboundPacket' = \"None\""
+        "lastInboundPacket" -> "lastInboundPacket' = inboundPacket"
+        "inboundTranscriptMatches" -> "inboundTranscriptMatches' = inboundTranscriptMatches"
+        "inboundHostSignatureValid" -> "inboundHostSignatureValid' = inboundHostSignatureValid"
+        "inboundTransportValid" -> "inboundTransportValid' = inboundTransportValid"
+        "hostKeyPossessionVerified" -> "hostKeyPossessionVerified' = IF HostilePacketFatal THEN FALSE ELSE hostKeyPossessionVerified"
+        "transcriptVerified" -> "transcriptVerified' = IF HostilePacketFatal THEN FALSE ELSE transcriptVerified"
+        "transportKeysVerified" -> "transportKeysVerified' = IF HostilePacketFatal THEN FALSE ELSE transportKeysVerified"
+        "lastPacketDisposition" -> "lastPacketDisposition' = IF HostilePacketFatal THEN \"Disconnected\" ELSE \"Unimplemented\""
+        "previousChannels" -> "previousChannels' = channels"
+        "activeChannel" -> "activeChannel' = 0"
+        "channelEvent" -> "channelEvent' = \"None\""
+        "channelOrigin" -> "channelOrigin' = \"None\""
+        "channels" -> "channels' = IF HostilePacketFatal THEN [c \\in ChannelIDs |-> IF channels[c] = \"Unallocated\" THEN \"Unallocated\" ELSE \"CLOSED\"] ELSE channels"
+        "channelEffects" -> "channelEffects' = {}"
+        else -> "$name' = $name"
+    }
+
+    private fun StringBuilder.appendHostileEnvironmentNext(variables: List<FormalVariable>) {
+        appendLine("HostileEnvironmentNext ==")
+        appendLine("    /\\ EnableHostileEnvironment")
+        appendLine("    /\\ inboundPacket = \"None\"")
+        appendLine("    /\\ inboundPacket' \\in PacketClasses")
+        appendLine("    /\\ inboundTranscriptMatches' \\in BOOLEAN")
+        appendLine("    /\\ inboundHostSignatureValid' \\in BOOLEAN")
+        appendLine("    /\\ (inboundHostSignatureValid' => AdversaryOwnsHostKey)")
+        appendLine("    /\\ inboundTransportValid' \\in BOOLEAN")
+        appendLine("    /\\ (inboundTransportValid' => AdversaryOwnsHostKey /\\ transportKeysVerified)")
+        val unchanged = variables.map(FormalVariable::name).filterNot { it in HOSTILE_PACKET_VARIABLE_NAMES }
+        appendLine("    /\\ UNCHANGED <<${unchanged.joinToString()}>>")
+    }
+
     private fun initialPostAuthenticatedState() = resolveInitialLeaf(POST_AUTHENTICATED_STATE)
 
     private fun resolveInitialLeaf(stateName: String): String {
@@ -598,6 +869,35 @@ internal data class SshStateMachineFormalModel(
             SshEffect.RESET_INBOUND_SEQUENCE,
             SshEffect.RESET_OUTBOUND_SEQUENCE,
         )
+        private val KEX_INIT_TRANSITIONS = setOf(
+            SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT,
+            SshTransitionId.RECEIVE_INITIAL_NON_STRICT_KEX_INIT,
+            SshTransitionId.RECEIVE_REKEY_KEX_INIT,
+        )
+        private val KEX_REPLY_TRANSITIONS = setOf(
+            SshTransitionId.RECEIVE_KEX_DH_REPLY,
+            SshTransitionId.RECEIVE_KEX_ECDH_REPLY,
+            SshTransitionId.RECEIVE_KEX_DH_GEX_REPLY,
+        )
+        private val NEW_KEYS_TRANSITIONS = setOf(
+            SshTransitionId.RECEIVE_INITIAL_NEW_KEYS,
+            SshTransitionId.RECEIVE_REKEY_NEW_KEYS,
+        )
+        private val PRE_NEW_KEYS_PACKET_CLASSES = setOf(
+            SshPacketClass.KEX_INIT,
+            SshPacketClass.KEX_REPLY,
+            SshPacketClass.KEX_GEX_GROUP,
+            SshPacketClass.NEW_KEYS,
+            SshPacketClass.DEBUG,
+            SshPacketClass.IGNORE,
+            SshPacketClass.DISCONNECT,
+        )
+        private val HOSTILE_PACKET_VARIABLE_NAMES = setOf(
+            "inboundPacket",
+            "inboundTranscriptMatches",
+            "inboundHostSignatureValid",
+            "inboundTransportValid",
+        )
         private val CHANNEL_VARIABLE_NAMES = setOf(
             "channels",
             "previousChannels",
@@ -608,6 +908,9 @@ internal data class SshStateMachineFormalModel(
         )
     }
 }
+
+private val SshPacketClass.tlaName: String
+    get() = name.lowercase().split('_').joinToString("") { it.replaceFirstChar(Char::uppercase) }
 
 private val SshChannelEventOrigin.tlaName: String
     get() = when (this) {

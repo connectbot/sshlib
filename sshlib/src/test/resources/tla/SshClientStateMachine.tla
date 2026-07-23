@@ -50,6 +50,18 @@ TypeOK ==
     /\ initialNewKeysActive \in BOOLEAN
     /\ authRequestPending \in BOOLEAN
     /\ previousAuthRequestPending \in BOOLEAN
+    /\ EnableHostileEnvironment \in BOOLEAN
+    /\ AdversaryOwnsHostKey \in BOOLEAN
+    /\ EnforceKexProofVerification \in BOOLEAN
+    /\ inboundPacket \in PacketClasses \cup {"None"}
+    /\ lastInboundPacket \in PacketClasses \cup {"None"}
+    /\ inboundTranscriptMatches \in BOOLEAN
+    /\ inboundHostSignatureValid \in BOOLEAN
+    /\ inboundTransportValid \in BOOLEAN
+    /\ hostKeyPossessionVerified \in BOOLEAN
+    /\ transcriptVerified \in BOOLEAN
+    /\ transportKeysVerified \in BOOLEAN
+    /\ lastPacketDisposition \in PacketDispositions
     /\ MaxChannels \in Nat \ {0}
     /\ channels \in [ChannelIDs -> ChannelStates]
     /\ previousChannels \in [ChannelIDs -> ChannelStates]
@@ -131,6 +143,15 @@ ModelView ==
       initialNewKeysActive,
       authRequestPending,
       previousAuthRequestPending,
+      inboundPacket,
+      lastInboundPacket,
+      inboundTranscriptMatches,
+      inboundHostSignatureValid,
+      inboundTransportValid,
+      hostKeyPossessionVerified,
+      transcriptVerified,
+      transportKeysVerified,
+      lastPacketDisposition,
       channels,
       NoInvalidChannelSideEffects,
       ChannelIsolation>>
@@ -262,5 +283,58 @@ UnexpectedKexInitIsFatal ==
         /\ state = "Disconnected"
         /\ "SendProtocolError" \in effects
         /\ "Disconnect" \in effects
+
+HostileKexReplyRequiresPossessionProof ==
+    inboundPacket = "None" /\ lastPacketDisposition = "Accepted" /\
+        event \in {"ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveKex.DhGexReply"} =>
+            /\ inboundHostSignatureValid
+            /\ inboundTranscriptMatches
+            /\ hostKeyPossessionVerified
+            /\ transcriptVerified
+
+NewKeysRequiresVerifiedTranscript ==
+    event = "ReceiveNewKeys" =>
+        /\ hostKeyPossessionVerified
+        /\ transcriptVerified
+        /\ transportKeysVerified
+
+ProtectedHostilePacketsRequireTransportAuthentication ==
+    inboundPacket = "None" /\ lastPacketDisposition = "Accepted" /\
+        event \in {
+            "ReceiveServiceAccept",
+            "AuthenticationSuccess",
+            "AuthenticationFailure",
+            "AuthorizeAuthenticationPacket",
+            "AuthorizeAuthenticatedPacket",
+            "AuthorizeConnectionPacket",
+            "AuthorizeExtInfo",
+            "ReceiveGlobalRequest",
+            "ReceiveChannelOpenConfirmation",
+            "ReceiveChannelOpenFailure",
+            "ReceiveChannelSuccess",
+            "ReceiveChannelFailure"
+        } => inboundTransportValid
+
+AuthenticationRequiresVerifiedTransport ==
+    authenticationEstablished /\ state # "Disconnected" => transportKeysVerified
+
+HostileClientRolePacketsNeverAdvance ==
+    inboundPacket = "None" /\ lastPacketDisposition = "Accepted" =>
+        lastInboundPacket \notin {
+            "ClientKexInit",
+            "ClientServiceRequest",
+            "ClientUserauthRequest"
+        }
+
+RejectedHostilePacketsDoNotEstablishSecurity ==
+    inboundPacket = "None" /\ lastPacketDisposition \in {"Unimplemented", "Disconnected"} =>
+        /\ event = "HostilePacketRejected"
+        /\ (lastPacketDisposition = "Unimplemented" =>
+                /\ state = previousState
+                /\ effects = {"SendUnimplemented"})
+
+\* Hostile profiles focus on connection-level packet ordering. The baseline
+\* configuration separately explores the full two-channel product state.
+HostileSecurityActionConstraint == channelEvent' = "None"
 
 ====
