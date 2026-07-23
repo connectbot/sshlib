@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 
 package org.connectbot.sshlib.client.sftp
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.connectbot.sshlib.HostKeyVerifier
 import org.connectbot.sshlib.PublicKey
 import org.connectbot.sshlib.SftpClient
@@ -78,7 +80,10 @@ class SftpClientIntegrationTest {
         override suspend fun verify(key: PublicKey): Boolean = true
     }
 
-    private suspend fun openSftp(): Pair<SshClient, SftpClient> {
+    private suspend fun openSftp(
+        rekeyIntervalMs: Long = 3_600_000L,
+        rekeyBytesLimit: Long = 1_073_741_824L,
+    ): Pair<SshClient, SftpClient> {
         val host = opensshContainer.host
         val port = opensshContainer.getMappedPort(22)
 
@@ -86,6 +91,8 @@ class SftpClientIntegrationTest {
             this.host = host
             this.port = port
             this.hostKeyVerifier = acceptAllVerifier
+            this.rekeyIntervalMs = rekeyIntervalMs
+            this.rekeyBytesLimit = rekeyBytesLimit
         }
         val client = SshClient(config)
 
@@ -290,6 +297,55 @@ class SftpClientIntegrationTest {
             )
 
             sftp.remove(testPath).getOrThrow()
+        } finally {
+            sftp.close()
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `SFTP write continues across byte limit rekey`() = runBlocking {
+        val (client, sftp) = openSftp(
+            rekeyIntervalMs = Long.MAX_VALUE,
+            rekeyBytesLimit = 256L * 1024,
+        )
+        val remoteDirectory = sftp.realpath(".").getOrThrow().trimEnd('/')
+        val testPath = "$remoteDirectory/sftp-rekey-write-${System.currentTimeMillis()}.bin"
+        try {
+            withTimeout(30_000) {
+                val handle = sftp.open(
+                    testPath,
+                    setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
+                ).getOrThrow()
+                val chunk = ByteArray(32 * 1024) { (it % 251).toByte() }
+                repeat(64) { index ->
+                    sftp.write(handle, index.toLong() * chunk.size, chunk).getOrThrow()
+                }
+                sftp.close(handle).getOrThrow()
+
+                val attrs = sftp.stat(testPath).getOrThrow()
+                assertEquals(2L * 1024 * 1024, attrs.size, "All data should be written across rekey")
+            }
+        } finally {
+            sftp.remove(testPath)
+            sftp.close()
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `SFTP operation completes after interval rekey while idle`() = runBlocking {
+        val (client, sftp) = openSftp(
+            rekeyIntervalMs = 1_000L,
+            rekeyBytesLimit = Long.MAX_VALUE,
+        )
+        try {
+            val remoteDirectory = sftp.realpath(".").getOrThrow()
+            delay(2_500L)
+            withTimeout(10_000L) {
+                val handle = sftp.opendir(remoteDirectory).getOrThrow()
+                sftp.close(handle).getOrThrow()
+            }
         } finally {
             sftp.close()
             client.disconnect()
