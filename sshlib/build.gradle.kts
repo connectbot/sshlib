@@ -16,6 +16,7 @@
 
 import com.vanniktech.maven.publish.DeploymentValidation
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.ByteArrayOutputStream
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -139,6 +140,76 @@ tasks.register<JavaExec>("checkSftpStateMachineTla") {
     }
 }
 
+val checkSshTerrapinStrictTla = tasks.register<JavaExec>("checkSshTerrapinStrictTla") {
+    group = "verification"
+    description = "Proves that strict KEX prevents the modeled Terrapin prefix truncation attack"
+    mainClass.set("tlc2.TLC")
+    workingDir(tlaModelDirectory)
+    args(
+        "-workers",
+        "1",
+        "-metadir",
+        tlaStateDirectory.get().dir("terrapin-strict").asFile.absolutePath,
+        "-config",
+        "SshTerrapinStrict.cfg",
+        "SshTerrapin.tla",
+    )
+    jvmArgs("-XX:+UseParallelGC")
+    doFirst {
+        val jarPath = tla2toolsJar.orNull
+            ?: throw GradleException(
+                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+            )
+        classpath = files(jarPath)
+    }
+}
+
+val terrapinCounterexampleOutput = ByteArrayOutputStream()
+val checkSshTerrapinNonStrictTla = tasks.register<JavaExec>("checkSshTerrapinNonStrictTla") {
+    group = "verification"
+    description = "Requires TLC to find the modeled Terrapin counterexample without failing the build"
+    mainClass.set("tlc2.TLC")
+    workingDir(tlaModelDirectory)
+    args(
+        "-workers",
+        "1",
+        "-metadir",
+        tlaStateDirectory.get().dir("terrapin-non-strict").asFile.absolutePath,
+        "-config",
+        "SshTerrapinNonStrict.cfg",
+        "SshTerrapin.tla",
+    )
+    jvmArgs("-XX:+UseParallelGC")
+    standardOutput = terrapinCounterexampleOutput
+    errorOutput = terrapinCounterexampleOutput
+    isIgnoreExitValue = true
+    doFirst {
+        terrapinCounterexampleOutput.reset()
+        val jarPath = tla2toolsJar.orNull
+            ?: throw GradleException(
+                "Set -Ptla2toolsJar=/path/to/tla2tools.jar or TLA2TOOLS_JAR to run TLC",
+            )
+        classpath = files(jarPath)
+    }
+    doLast {
+        val output = terrapinCounterexampleOutput.toString(Charsets.UTF_8)
+        logger.lifecycle(output)
+        val exitValue = executionResult.get().exitValue
+        if (exitValue == 0 || "Invariant NoTerrapin is violated" !in output) {
+            throw GradleException(
+                "Expected TLC to find the non-strict Terrapin counterexample; exit=$exitValue",
+            )
+        }
+        logger.lifecycle("Expected non-strict Terrapin counterexample found; treating it as success.")
+    }
+}
+
+tasks.register("checkSshTerrapinTla") {
+    group = "verification"
+    description = "Checks strict Terrapin resistance and the expected non-strict counterexample"
+    dependsOn(checkSshTerrapinStrictTla, checkSshTerrapinNonStrictTla)
+}
+
 tasks.register("generateTla") {
     group = "verification"
     description = "Regenerates all TLA+ formal models (SSH and SFTP)"
@@ -148,7 +219,7 @@ tasks.register("generateTla") {
 tasks.register("checkTla") {
     group = "verification"
     description = "Checks all TLA+ formal models (SSH and SFTP) with TLC"
-    dependsOn("checkSshStateMachineTla", "checkSftpStateMachineTla")
+    dependsOn("checkSshStateMachineTla", "checkSftpStateMachineTla", "checkSshTerrapinTla")
 }
 
 java {

@@ -1,7 +1,7 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: 882c266edfb2fed9a28f79bc2ce7a5d343d87371ecfc9c9ca2ff42c467ed0a5f
-\* Lifecycle states: 11; transitions: 36.
+\* Model SHA-256: a34440960298ca1cd17a21377130492c5d394fe258e172479153503aaf3b61c0
+\* Lifecycle states: 11; transitions: 43.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
 
@@ -10,16 +10,16 @@ CONSTANT MaxChannels
 ChannelIDs == 1..MaxChannels
 ChannelAttemptIDs == 0..(MaxChannels + 1)
 
-VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects
+VARIABLES state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects
 
-vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
+vars == <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending, previousChannels, activeChannel, channelEvent, channelOrigin, channels, channelEffects>>
 
 States == {"Authenticated", "Authenticating", "AuthenticationReady", "Disconnected", "Unconnected", "WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys", "WaitService", "WaitVersion"}
 PostAuthenticatedStates == {"Authenticated", "Authenticating", "AuthenticationReady"}
 KexStates == {"WaitKex", "WaitKexDhGexInit", "WaitKexInit", "WaitNewKeys"}
-Events == {"AuthenticationFailure", "AuthenticationSuccess", "AuthorizeAuthenticatedPacket", "AuthorizeAuthenticationPacket", "AuthorizeConnectionPacket", "AuthorizeExtInfo", "BeginAuthentication", "Connect", "Disconnect", "OpenChannel", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveDebug", "ReceiveGlobalRequest", "ReceiveIgnore", "ReceiveKex.DhGexGroup", "ReceiveKex.DhGexReply", "ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyStarted", "SendChannelRequest", "UnexpectedKexInit"}
+Events == {"AuthenticationFailure", "AuthenticationSuccess", "AuthorizeAuthenticatedPacket", "AuthorizeAuthenticationPacket", "AuthorizeConnectionPacket", "AuthorizeExtInfo", "BeginAuthentication", "Connect", "Disconnect", "OpenChannel", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveDebug", "ReceiveGlobalRequest", "ReceiveIgnore", "ReceiveInitialNonStrictKexInit", "ReceiveInitialStrictKexInit", "ReceiveKex.DhGexGroup", "ReceiveKex.DhGexReply", "ReceiveKex.DhReply", "ReceiveKex.EcdhReply", "ReceiveNewKeys", "ReceiveNonKexPacket", "ReceiveRekeyKexInit", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyStarted", "SendChannelRequest", "UnexpectedKexInit"}
 Origins == {"Internal", "LocalCommand", "ParsedPacket", "Timer"}
-Effects == {"ActivateEncryption", "AuthenticationFailure", "AuthenticationSuccess", "Debug", "Disconnect", "Ignore", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RekeyComplete", "RekeyStarted", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendProtocolError", "SendServiceRequest", "SendUserauthRequest", "SendVersion", "StartAuthentication"}
+Effects == {"ActivateEncryption", "ActivateInboundProtection", "ActivateOutboundProtection", "AuthenticationFailure", "AuthenticationSuccess", "ClearNonKexBeforeInitialKexInit", "Debug", "Disconnect", "EnableStrictKex", "Ignore", "NegotiateNonStrictKex", "ReceiveChannelFailure", "ReceiveChannelOpenConfirmation", "ReceiveChannelOpenFailure", "ReceiveChannelSuccess", "ReceiveGlobalRequest", "ReceiveKexDhGexReply", "ReceiveKexDhReply", "ReceiveKexEcdhReply", "ReceiveKexInit", "ReceiveNewKeys", "ReceiveServiceAccept", "ReceiveUserauthBanner", "ReceiveUserauthInfoRequest", "ReceiveVersion", "RecordNonKexBeforeInitialKexInit", "RekeyComplete", "RekeyStarted", "ResetInboundSequence", "ResetOutboundSequence", "SendChannelOpen", "SendChannelRequest", "SendClientExtInfo", "SendKexDhGexInit", "SendKexExchangeInit", "SendKexInit", "SendNewKeys", "SendProtocolError", "SendServiceRequest", "SendUserauthRequest", "SendVersion", "StartAuthentication"}
 
 ChannelStates == {"BOTH_EOF", "CLOSED", "CLOSE_SENT", "LOCAL_EOF", "OPEN", "OPENING", "REMOTE_EOF", "Unallocated"}
 ChannelEvents == {"AcceptRemoteOpen", "AllocateLocalOpen", "OpenConfirmed", "OpenFailed", "ReceiveClose", "ReceiveData", "ReceiveEof", "ReceiveRequest", "ReceiveWindowAdjust", "SendClose", "SendData", "SendEof", "SendRequest"}
@@ -174,7 +174,7 @@ AttemptChannelOperation ==
        ELSE
           /\ channels' = channels
           /\ channelEffects' = {}
-    /\ UNCHANGED <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending>>
+    /\ UNCHANGED <<state, previousState, history, event, origin, packetWasParsed, effects, rekeying, strictKex, nonKexBeforeInitialKexInit, authenticationEstablished, initialNewKeysActive, authRequestPending, previousAuthRequestPending>>
 
 Init ==
     /\ state = "Unconnected"
@@ -185,6 +185,8 @@ Init ==
     /\ packetWasParsed = FALSE
     /\ effects = {}
     /\ rekeying = FALSE
+    /\ strictKex = FALSE
+    /\ nonKexBeforeInitialKexInit = FALSE
     /\ authenticationEstablished = FALSE
     /\ initialNewKeysActive = FALSE
     /\ authRequestPending = FALSE
@@ -206,6 +208,8 @@ AUTHENTICATION_FAILURE ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"AuthenticationFailure"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -227,6 +231,8 @@ AUTHENTICATION_SUCCESS ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"AuthenticationSuccess"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = TRUE
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -248,6 +254,8 @@ AUTHORIZE_AUTHENTICATED_PACKET ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -269,6 +277,8 @@ AUTHORIZE_AUTHENTICATION_PACKET ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -290,6 +300,8 @@ AUTHORIZE_CONNECTION_PACKET ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -311,6 +323,8 @@ AUTHORIZE_POST_AUTH_EXT_INFO ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -332,6 +346,8 @@ AUTHORIZE_SERVICE_EXT_INFO ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -354,6 +370,8 @@ BEGIN_AUTHENTICATION ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendUserauthRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = TRUE
@@ -375,6 +393,8 @@ CONNECT ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendVersion"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -396,6 +416,8 @@ DISCONNECT ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Disconnect"}
     /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -417,6 +439,8 @@ OPEN_CHANNEL ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendChannelOpen"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -438,6 +462,8 @@ RECEIVE_CHANNEL_FAILURE ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveChannelFailure"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -459,6 +485,8 @@ RECEIVE_CHANNEL_OPEN_CONFIRMATION ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveChannelOpenConfirmation"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -480,6 +508,8 @@ RECEIVE_CHANNEL_OPEN_FAILURE ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveChannelOpenFailure"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -501,6 +531,8 @@ RECEIVE_CHANNEL_SUCCESS ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveChannelSuccess"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -522,6 +554,8 @@ RECEIVE_DEBUG ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Debug"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -543,6 +577,8 @@ RECEIVE_GLOBAL_REQUEST ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveGlobalRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -564,6 +600,8 @@ RECEIVE_IGNORE ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Ignore"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -584,10 +622,60 @@ RECEIVE_INITIAL_NEW_KEYS ==
     /\ event' = "ReceiveNewKeys"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {"ActivateEncryption", "ReceiveNewKeys", "SendClientExtInfo", "SendServiceRequest"}
+    /\ effects' = IF strictKex THEN {"ActivateEncryption", "ActivateInboundProtection", "ReceiveNewKeys", "ResetInboundSequence", "SendClientExtInfo", "SendServiceRequest"} ELSE {"ActivateEncryption", "ActivateInboundProtection", "ReceiveNewKeys", "SendClientExtInfo", "SendServiceRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = TRUE
+    /\ authRequestPending' = authRequestPending
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = channels
+    /\ channelEffects' = {}
+
+RECEIVE_INITIAL_NON_STRICT_KEX_INIT ==
+    /\ state \in {"WaitKexInit"}
+    /\ ~(rekeying)
+    /\ state' = "WaitKex"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveInitialNonStrictKexInit"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"ClearNonKexBeforeInitialKexInit", "NegotiateNonStrictKex", "ReceiveKexInit", "SendKexExchangeInit"}
+    /\ rekeying' = rekeying
+    /\ strictKex' = FALSE
+    /\ nonKexBeforeInitialKexInit' = FALSE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = authRequestPending
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = channels
+    /\ channelEffects' = {}
+
+RECEIVE_INITIAL_STRICT_KEX_INIT ==
+    /\ state \in {"WaitKexInit"}
+    /\ (~(rekeying)) /\ (~(nonKexBeforeInitialKexInit))
+    /\ state' = "WaitKex"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveInitialStrictKexInit"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"ClearNonKexBeforeInitialKexInit", "EnableStrictKex", "ReceiveKexInit", "SendKexExchangeInit"}
+    /\ rekeying' = rekeying
+    /\ strictKex' = TRUE
+    /\ nonKexBeforeInitialKexInit' = FALSE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
     /\ previousAuthRequestPending' = authRequestPending
     /\ previousChannels' = channels
@@ -607,6 +695,8 @@ RECEIVE_KEX_DH_GEX_GROUP ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendKexDhGexInit"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -626,8 +716,10 @@ RECEIVE_KEX_DH_GEX_REPLY ==
     /\ event' = "ReceiveKex.DhGexReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {"ReceiveKexDhGexReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhGexReply", "SendNewKeys"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -647,8 +739,10 @@ RECEIVE_KEX_DH_REPLY ==
     /\ event' = "ReceiveKex.DhReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {"ReceiveKexDhReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexDhReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexDhReply", "SendNewKeys"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -668,8 +762,10 @@ RECEIVE_KEX_ECDH_REPLY ==
     /\ event' = "ReceiveKex.EcdhReply"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {"ReceiveKexEcdhReply", "SendNewKeys"}
+    /\ effects' = IF strictKex THEN {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "ResetOutboundSequence", "SendNewKeys"} ELSE {"ActivateOutboundProtection", "ReceiveKexEcdhReply", "SendNewKeys"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -681,16 +777,19 @@ RECEIVE_KEX_ECDH_REPLY ==
     /\ channels' = channels
     /\ channelEffects' = {}
 
-RECEIVE_KEX_INIT ==
+RECEIVE_REKEY_KEX_INIT ==
     /\ state \in {"WaitKexInit"}
+    /\ rekeying
     /\ state' = "WaitKex"
     /\ previousState' = state
     /\ history' = history
-    /\ event' = "ReceiveKexInit"
+    /\ event' = "ReceiveRekeyKexInit"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveKexInit", "SendKexExchangeInit"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -711,8 +810,10 @@ RECEIVE_REKEY_NEW_KEYS ==
     /\ event' = "ReceiveNewKeys"
     /\ origin' = "ParsedPacket"
     /\ packetWasParsed' = (origin' = "ParsedPacket")
-    /\ effects' = {"ActivateEncryption", "ReceiveNewKeys", "RekeyComplete"}
+    /\ effects' = IF strictKex THEN {"ActivateEncryption", "ActivateInboundProtection", "ReceiveNewKeys", "RekeyComplete", "ResetInboundSequence"} ELSE {"ActivateEncryption", "ActivateInboundProtection", "ReceiveNewKeys", "RekeyComplete"}
     /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = TRUE
     /\ authRequestPending' = authRequestPending
@@ -734,6 +835,8 @@ RECEIVE_SERVICE_ACCEPT ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveServiceAccept", "StartAuthentication"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -755,6 +858,8 @@ RECEIVE_USERAUTH_BANNER_AUTHENTICATING ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveUserauthBanner"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -776,6 +881,8 @@ RECEIVE_USERAUTH_BANNER_READY ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveUserauthBanner"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -797,6 +904,8 @@ RECEIVE_USERAUTH_INFO_REQUEST ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveUserauthInfoRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -818,6 +927,8 @@ RECEIVE_VERSION ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"ReceiveVersion", "SendKexInit"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -827,6 +938,126 @@ RECEIVE_VERSION ==
     /\ channelEvent' = "None"
     /\ channelOrigin' = "None"
     /\ channels' = channels
+    /\ channelEffects' = {}
+
+RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT ==
+    /\ state \in {"WaitKexInit"}
+    /\ ~(rekeying)
+    /\ state' = state
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveNonKexPacket"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"RecordNonKexBeforeInitialKexInit"}
+    /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = TRUE
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = authRequestPending
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = channels
+    /\ channelEffects' = {}
+
+REJECT_NON_KEX_WAIT_KEX ==
+    /\ state \in {"WaitKex"}
+    /\ (strictKex) /\ (~(rekeying))
+    /\ state' = "Disconnected"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveNonKexPacket"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"Disconnect", "SendProtocolError"}
+    /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = FALSE
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
+    /\ channelEffects' = {}
+
+REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT ==
+    /\ state \in {"WaitKexDhGexInit"}
+    /\ (strictKex) /\ (~(rekeying))
+    /\ state' = "Disconnected"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveNonKexPacket"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"Disconnect", "SendProtocolError"}
+    /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = FALSE
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
+    /\ channelEffects' = {}
+
+REJECT_NON_KEX_WAIT_NEW_KEYS ==
+    /\ state \in {"WaitNewKeys"}
+    /\ (strictKex) /\ (~(rekeying))
+    /\ state' = "Disconnected"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveNonKexPacket"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"Disconnect", "SendProtocolError"}
+    /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = FALSE
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
+    /\ channelEffects' = {}
+
+REJECT_STRICT_KEX_INIT_NOT_FIRST ==
+    /\ state \in {"WaitKexInit"}
+    /\ (~(rekeying)) /\ (nonKexBeforeInitialKexInit)
+    /\ state' = "Disconnected"
+    /\ previousState' = state
+    /\ history' = history
+    /\ event' = "ReceiveInitialStrictKexInit"
+    /\ origin' = "ParsedPacket"
+    /\ packetWasParsed' = (origin' = "ParsedPacket")
+    /\ effects' = {"Disconnect", "EnableStrictKex", "ReceiveKexInit", "SendProtocolError"}
+    /\ rekeying' = FALSE
+    /\ strictKex' = TRUE
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
+    /\ authenticationEstablished' = authenticationEstablished
+    /\ initialNewKeysActive' = initialNewKeysActive
+    /\ authRequestPending' = FALSE
+    /\ previousAuthRequestPending' = authRequestPending
+    /\ previousChannels' = channels
+    /\ activeChannel' = 0
+    /\ channelEvent' = "None"
+    /\ channelOrigin' = "None"
+    /\ channels' = [c \in ChannelIDs |-> IF channels[c] = "Unallocated" THEN "Unallocated" ELSE "CLOSED"]
     /\ channelEffects' = {}
 
 REKEY_STARTED ==
@@ -839,6 +1070,8 @@ REKEY_STARTED ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"RekeyStarted", "SendKexInit"}
     /\ rekeying' = TRUE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -861,6 +1094,8 @@ REPEAT_BEGIN_AUTHENTICATION ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendUserauthRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = TRUE
@@ -882,6 +1117,8 @@ SEND_CHANNEL_REQUEST ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"SendChannelRequest"}
     /\ rekeying' = rekeying
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = authRequestPending
@@ -903,6 +1140,8 @@ UNEXPECTED_KEX_INIT_WAIT_KEX ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Disconnect", "SendProtocolError"}
     /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -924,6 +1163,8 @@ UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Disconnect", "SendProtocolError"}
     /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -945,6 +1186,8 @@ UNEXPECTED_KEX_INIT_WAIT_NEW_KEYS ==
     /\ packetWasParsed' = (origin' = "ParsedPacket")
     /\ effects' = {"Disconnect", "SendProtocolError"}
     /\ rekeying' = FALSE
+    /\ strictKex' = strictKex
+    /\ nonKexBeforeInitialKexInit' = nonKexBeforeInitialKexInit
     /\ authenticationEstablished' = authenticationEstablished
     /\ initialNewKeysActive' = initialNewKeysActive
     /\ authRequestPending' = FALSE
@@ -976,17 +1219,24 @@ Next ==
     \/ RECEIVE_GLOBAL_REQUEST
     \/ RECEIVE_IGNORE
     \/ RECEIVE_INITIAL_NEW_KEYS
+    \/ RECEIVE_INITIAL_NON_STRICT_KEX_INIT
+    \/ RECEIVE_INITIAL_STRICT_KEX_INIT
     \/ RECEIVE_KEX_DH_GEX_GROUP
     \/ RECEIVE_KEX_DH_GEX_REPLY
     \/ RECEIVE_KEX_DH_REPLY
     \/ RECEIVE_KEX_ECDH_REPLY
-    \/ RECEIVE_KEX_INIT
+    \/ RECEIVE_REKEY_KEX_INIT
     \/ RECEIVE_REKEY_NEW_KEYS
     \/ RECEIVE_SERVICE_ACCEPT
     \/ RECEIVE_USERAUTH_BANNER_AUTHENTICATING
     \/ RECEIVE_USERAUTH_BANNER_READY
     \/ RECEIVE_USERAUTH_INFO_REQUEST
     \/ RECEIVE_VERSION
+    \/ RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT
+    \/ REJECT_NON_KEX_WAIT_KEX
+    \/ REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT
+    \/ REJECT_NON_KEX_WAIT_NEW_KEYS
+    \/ REJECT_STRICT_KEX_INIT_NOT_FIRST
     \/ REKEY_STARTED
     \/ REPEAT_BEGIN_AUTHENTICATION
     \/ SEND_CHANNEL_REQUEST

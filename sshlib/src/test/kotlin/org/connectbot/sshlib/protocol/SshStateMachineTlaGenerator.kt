@@ -98,6 +98,96 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `strict kex negotiation and directional protection are explicit effects`() {
+        val transitions = createFormalModel().transitions.associateBy { it.meta.id }
+
+        assertEquals(
+            "(~(rekeying)) /\\ (~(nonKexBeforeInitialKexInit))",
+            transitions.getValue(SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT).meta.guard.renderTla(),
+        )
+        assertTrue(
+            SshEffect.ENABLE_STRICT_KEX in
+                transitions.getValue(SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT).meta.effects,
+        )
+        assertTrue(
+            SshEffect.NEGOTIATE_NON_STRICT_KEX in
+                transitions.getValue(SshTransitionId.RECEIVE_INITIAL_NON_STRICT_KEX_INIT).meta.effects,
+        )
+        assertEquals(
+            "rekeying",
+            transitions.getValue(SshTransitionId.RECEIVE_REKEY_KEX_INIT).meta.guard.renderTla(),
+        )
+        assertTrue(
+            SshEffect.ENABLE_STRICT_KEX !in
+                transitions.getValue(SshTransitionId.RECEIVE_REKEY_KEX_INIT).meta.effects,
+        )
+        assertTrue(
+            SshEffect.ACTIVATE_OUTBOUND_PROTECTION in
+                transitions.getValue(SshTransitionId.RECEIVE_KEX_ECDH_REPLY).meta.effects,
+        )
+        assertTrue(
+            SshEffect.RESET_OUTBOUND_SEQUENCE in
+                transitions.getValue(SshTransitionId.RECEIVE_KEX_ECDH_REPLY).meta.effects,
+        )
+        assertTrue(
+            SshEffect.ACTIVATE_INBOUND_PROTECTION in
+                transitions.getValue(SshTransitionId.RECEIVE_REKEY_NEW_KEYS).meta.effects,
+        )
+        assertTrue(
+            SshEffect.RESET_INBOUND_SEQUENCE in
+                transitions.getValue(SshTransitionId.RECEIVE_REKEY_NEW_KEYS).meta.effects,
+        )
+    }
+
+    @Test
+    fun `strict initial kex rejection is declared by runtime transitions`() {
+        val transitions = createFormalModel().transitions.associateBy { it.meta.id }
+        val rejectionIds = setOf(
+            SshTransitionId.REJECT_NON_KEX_WAIT_KEX,
+            SshTransitionId.REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT,
+            SshTransitionId.REJECT_NON_KEX_WAIT_NEW_KEYS,
+        )
+
+        rejectionIds.forEach { id ->
+            val transition = transitions.getValue(id).meta
+            assertEquals("(strictKex) /\\ (~(rekeying))", transition.guard.renderTla())
+            assertEquals(setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT), transition.effects)
+            assertEquals("Disconnected", transition.targetStateName)
+        }
+
+        val firstPacket = transitions.getValue(SshTransitionId.REJECT_STRICT_KEX_INIT_NOT_FIRST).meta
+        assertEquals(
+            "(~(rekeying)) /\\ (nonKexBeforeInitialKexInit)",
+            firstPacket.guard.renderTla(),
+        )
+        assertEquals(
+            setOf(
+                SshEffect.RECEIVE_KEX_INIT,
+                SshEffect.ENABLE_STRICT_KEX,
+                SshEffect.SEND_PROTOCOL_ERROR,
+                SshEffect.DISCONNECT,
+            ),
+            firstPacket.effects,
+        )
+    }
+
+    @Test
+    fun `focused Terrapin model checks strict safety and expects non-strict counterexample`() {
+        val model = Files.readString(Path.of("src/test/resources/tla/SshTerrapin.tla"))
+        val strictConfig = Files.readString(Path.of("src/test/resources/tla/SshTerrapinStrict.cfg"))
+        val nonStrictConfig = Files.readString(Path.of("src/test/resources/tla/SshTerrapinNonStrict.cfg"))
+
+        assertTrue("InjectUnauthenticatedIgnore ==" in model)
+        assertTrue("DropExtInfo ==" in model)
+        assertTrue("TerrapinSucceeded ==" in model)
+        assertTrue("NoTerrapin == ~TerrapinSucceeded" in model)
+        assertTrue("StrictKex = TRUE" in strictConfig)
+        assertTrue("StrictKex = FALSE" in nonStrictConfig)
+        assertTrue("INVARIANT NoTerrapin" in strictConfig)
+        assertTrue("INVARIANT NoTerrapin" in nonStrictConfig)
+    }
+
+    @Test
     fun `authentication requests are explicit formal side effects`() {
         val transitions = createFormalModel().transitions.associateBy { it.meta.id }
 
@@ -145,6 +235,18 @@ class SshStateMachineFormalModelTest {
         assertTrue("GlobalChannelMutationIsDisconnectCascade ==" in handwritten)
         assertTrue("INVARIANT GlobalOperationsPreserveChannels" in config)
         assertTrue("INVARIANT GlobalChannelMutationIsDisconnectCascade" in config)
+    }
+
+    @Test
+    fun `TLC explores strict and non-strict key exchange`() {
+        val rendered = createFormalModel().renderTla()
+        val config = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.cfg"))
+
+        assertTrue("strictKex' = TRUE" in rendered)
+        assertTrue("strictKex' = FALSE" in rendered)
+        assertTrue("IF strictKex THEN" in rendered)
+        assertTrue("INVARIANT StrictKexProtectionSwitchesResetSequenceNumbers" in config)
+        assertTrue("PROPERTY StrictKexIsSticky" in config)
     }
 
     @Test

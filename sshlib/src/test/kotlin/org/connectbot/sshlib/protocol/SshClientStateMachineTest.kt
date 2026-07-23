@@ -20,6 +20,7 @@ package org.connectbot.sshlib.protocol
 import kotlinx.coroutines.test.runTest
 import java.lang.reflect.Modifier
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -105,6 +106,95 @@ class SshClientStateMachineTest {
     }
 
     @Test
+    fun `strict kex sequence resets remain enabled across rekey`() = runTest {
+        val callbacks = RecordingCallbacks().apply { strictKexNegotiated = true }
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexEcdhReply(SshMsgKexEcdhReply()))
+        assertTrue(machine.receiveNewKeys())
+        assertTrue(machine.receiveServiceAccept("ssh-userauth"))
+        assertTrue(machine.beginAuthentication())
+        assertTrue(machine.authenticationSuccess())
+
+        callbacks.strictKexNegotiated = false
+        assertTrue(machine.requestRekey())
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexEcdhReply(SshMsgKexEcdhReply()))
+        assertTrue(machine.receiveNewKeys())
+
+        assertTrue(machine.isStrictKexEnabled())
+        assertEquals(listOf(true, true), callbacks.outboundSequenceResets)
+        assertEquals(listOf(true, true), callbacks.inboundSequenceResets)
+        assertEquals(listOf(true, false), callbacks.initialKexExchanges)
+    }
+
+    @Test
+    fun `strict initial kex rejects every non-kex packet after kex init`() = runTest {
+        val callbacks = RecordingCallbacks().apply { strictKexNegotiated = true }
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+
+        assertFalse(machine.authorizeNonKexPacket("unexpected non-KEX packet"))
+        assertTrue("sendProtocolError:unexpected non-KEX packet" in callbacks.actions)
+        assertFalse(machine.receiveIgnore())
+    }
+
+    @Test
+    fun `strict kex retrospectively rejects a kex init that was not first`() = runTest {
+        val callbacks = RecordingCallbacks().apply { strictKexNegotiated = true }
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.authorizeNonKexPacket("early IGNORE"))
+        assertTrue(machine.receiveIgnore())
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+
+        assertTrue(machine.isDisconnected())
+        assertTrue(
+            "sendProtocolError:SSH_MSG_KEXINIT was not the first packet during strict initial key exchange" in callbacks.actions,
+        )
+    }
+
+    @Test
+    fun `non-strict initial kex allows non-kex packet handling`() = runTest {
+        val callbacks = RecordingCallbacks()
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.authorizeNonKexPacket("early IGNORE"))
+        assertTrue(machine.receiveIgnore())
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.authorizeNonKexPacket("IGNORE during non-strict KEX"))
+    }
+
+    @Test
+    fun `strict rekey allows non-kex packet handling`() = runTest {
+        val callbacks = RecordingCallbacks().apply { strictKexNegotiated = true }
+        val machine = SshClientStateMachine(callbacks)
+
+        assertTrue(machine.connect())
+        assertTrue(machine.receiveVersion(IdBanner()))
+        assertTrue(machine.receiveKexInit(SshMsgKexinit()))
+        assertTrue(machine.receiveKexEcdhReply(SshMsgKexEcdhReply()))
+        assertTrue(machine.receiveNewKeys())
+        assertTrue(machine.receiveServiceAccept("ssh-userauth"))
+        assertTrue(machine.beginAuthentication())
+        assertTrue(machine.authenticationSuccess())
+
+        assertTrue(machine.requestRekey())
+        assertTrue(machine.authorizeNonKexPacket("IGNORE during rekey"))
+        assertTrue(machine.receiveIgnore())
+    }
+
+    @Test
     fun `a second kex init during key exchange is fatal`() = runTest {
         val callbacks = RecordingCallbacks()
         val machine = SshClientStateMachine(callbacks)
@@ -134,6 +224,10 @@ class SshClientStateMachineTest {
         val actions = mutableListOf<String>()
         var rekeying = false
         var authenticationRequestPending = false
+        var strictKexNegotiated = false
+        val initialKexExchanges = mutableListOf<Boolean>()
+        val outboundSequenceResets = mutableListOf<Boolean>()
+        val inboundSequenceResets = mutableListOf<Boolean>()
 
         override fun sendVersion() {
             actions += "sendVersion"
@@ -144,8 +238,10 @@ class SshClientStateMachineTest {
         override suspend fun sendKexInit() {
             actions += "sendKexInit"
         }
-        override fun receiveKexInit(msg: SshMsgKexinit) {
+        override fun receiveKexInit(msg: SshMsgKexinit, initialExchange: Boolean): Boolean {
             actions += "receiveKexInit"
+            initialKexExchanges += initialExchange
+            return strictKexNegotiated
         }
         override suspend fun sendKexExchangeInit() {
             actions += "sendKexExchangeInit"
@@ -178,11 +274,13 @@ class SshClientStateMachineTest {
         override suspend fun sendKexDhGexInit() {
             actions += "sendKexDhGexInit"
         }
-        override suspend fun sendNewKeys() {
+        override suspend fun sendNewKeys(resetSequenceNumber: Boolean) {
             actions += "sendNewKeys"
+            outboundSequenceResets += resetSequenceNumber
         }
-        override fun receiveNewKeys() {
+        override fun receiveNewKeys(resetSequenceNumber: Boolean) {
             actions += "receiveNewKeys"
+            inboundSequenceResets += resetSequenceNumber
         }
         override fun activateEncryption() {
             actions += "activateEncryption"

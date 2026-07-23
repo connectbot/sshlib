@@ -63,11 +63,17 @@ internal class SshClientStateMachine(
     private val parsedPacket = setOf(SshEventOrigin.PARSED_PACKET)
     private val localCommand = setOf(SshEventOrigin.LOCAL_COMMAND)
     private val rekeying = SshFormalGuard.Fact(SshBooleanFact.REKEYING)
+    private val strictKex = SshFormalGuard.Fact(SshBooleanFact.STRICT_KEX_ENABLED)
+    private val nonKexBeforeInitialKexInit = SshFormalGuard.Fact(SshBooleanFact.NON_KEX_BEFORE_INITIAL_KEX_INIT)
+    private var strictKexEnabled = false
+    private var receivedNonKexBeforeInitialKexInit = false
 
     private sealed class SshEvent : Event {
         object Connect : SshEvent()
         data class ReceiveVersion(val banner: IdBanner) : SshEvent()
-        data class ReceiveKexInit(val msg: SshMsgKexinit) : SshEvent()
+        data class ReceiveInitialStrictKexInit(val msg: SshMsgKexinit) : SshEvent()
+        data class ReceiveInitialNonStrictKexInit(val msg: SshMsgKexinit) : SshEvent()
+        data class ReceiveRekeyKexInit(val msg: SshMsgKexinit) : SshEvent()
         sealed class ReceiveKex : SshEvent() {
             data class DhReply(val msg: SshMsgKexdhReply) : ReceiveKex()
             data class EcdhReply(val msg: SshMsgKexEcdhReply) : ReceiveKex()
@@ -100,6 +106,7 @@ internal class SshClientStateMachine(
         data class ReceiveGlobalRequest(val msg: SshMsgGlobalRequest) : SshEvent()
         data class ReceiveDebug(val msg: SshMsgDebug) : SshEvent()
         object ReceiveIgnore : SshEvent()
+        data class ReceiveNonKexPacket(val description: String) : SshEvent()
         object AuthorizeAuthenticationPacket : SshEvent()
         object AuthorizeAuthenticatedPacket : SshEvent()
         object AuthorizeConnectionPacket : SshEvent()
@@ -300,13 +307,69 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitKexInit") }
             onExit { callbacks.onStateExit("WaitKexInit") }
 
-            formalTransition<SshEvent.ReceiveKexInit>(
-                id = SshTransitionId.RECEIVE_KEX_INIT,
+            formalTransition<SshEvent.ReceiveNonKexPacket>(
+                id = SshTransitionId.RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT,
+                guard = !rekeying,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.RECORD_NON_KEX_BEFORE_INITIAL_KEX_INIT),
+            ) {
+                receivedNonKexBeforeInitialKexInit = true
+            }
+
+            formalTransition<SshEvent.ReceiveInitialStrictKexInit>(
+                id = SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT,
                 targetState = waitKex,
+                guard = !rekeying and !nonKexBeforeInitialKexInit,
+                origins = parsedPacket,
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_INIT,
+                    SshEffect.ENABLE_STRICT_KEX,
+                    SshEffect.CLEAR_NON_KEX_BEFORE_INITIAL_KEX_INIT,
+                    SshEffect.SEND_KEX_EXCHANGE_INIT,
+                ),
+            ) {
+                strictKexEnabled = true
+                receivedNonKexBeforeInitialKexInit = false
+                callbacks.sendKexExchangeInit()
+            }
+            formalTransition<SshEvent.ReceiveInitialStrictKexInit>(
+                id = SshTransitionId.REJECT_STRICT_KEX_INIT_NOT_FIRST,
+                targetState = disconnected,
+                guard = !rekeying and nonKexBeforeInitialKexInit,
+                origins = parsedPacket,
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_INIT,
+                    SshEffect.ENABLE_STRICT_KEX,
+                    SshEffect.SEND_PROTOCOL_ERROR,
+                    SshEffect.DISCONNECT,
+                ),
+            ) {
+                strictKexEnabled = true
+                callbacks.sendProtocolError("SSH_MSG_KEXINIT was not the first packet during strict initial key exchange")
+            }
+            formalTransition<SshEvent.ReceiveInitialNonStrictKexInit>(
+                id = SshTransitionId.RECEIVE_INITIAL_NON_STRICT_KEX_INIT,
+                targetState = waitKex,
+                guard = !rekeying,
+                origins = parsedPacket,
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_INIT,
+                    SshEffect.NEGOTIATE_NON_STRICT_KEX,
+                    SshEffect.CLEAR_NON_KEX_BEFORE_INITIAL_KEX_INIT,
+                    SshEffect.SEND_KEX_EXCHANGE_INIT,
+                ),
+            ) {
+                strictKexEnabled = false
+                receivedNonKexBeforeInitialKexInit = false
+                callbacks.sendKexExchangeInit()
+            }
+            formalTransition<SshEvent.ReceiveRekeyKexInit>(
+                id = SshTransitionId.RECEIVE_REKEY_KEX_INIT,
+                targetState = waitKex,
+                guard = rekeying,
                 origins = parsedPacket,
                 effects = setOf(SshEffect.RECEIVE_KEX_INIT, SshEffect.SEND_KEX_EXCHANGE_INIT),
             ) {
-                callbacks.receiveKexInit(it.event.msg)
                 callbacks.sendKexExchangeInit()
             }
         }
@@ -315,23 +378,41 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitKex") }
             onExit { callbacks.onStateExit("WaitKex") }
 
+            formalTransition<SshEvent.ReceiveNonKexPacket>(
+                id = SshTransitionId.REJECT_NON_KEX_WAIT_KEX,
+                targetState = disconnected,
+                guard = strictKex and !rekeying,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
+
             formalTransition<SshEvent.ReceiveKex.DhReply>(
                 id = SshTransitionId.RECEIVE_KEX_DH_REPLY,
                 targetState = waitNewKeys,
                 origins = parsedPacket,
-                effects = setOf(SshEffect.RECEIVE_KEX_DH_REPLY, SshEffect.SEND_NEW_KEYS),
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_DH_REPLY,
+                    SshEffect.SEND_NEW_KEYS,
+                    SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
+                    SshEffect.RESET_OUTBOUND_SEQUENCE,
+                ),
             ) {
                 callbacks.receiveKexDhReply(it.event.msg)
-                callbacks.sendNewKeys()
+                callbacks.sendNewKeys(strictKexEnabled)
             }
             formalTransition<SshEvent.ReceiveKex.EcdhReply>(
                 id = SshTransitionId.RECEIVE_KEX_ECDH_REPLY,
                 targetState = waitNewKeys,
                 origins = parsedPacket,
-                effects = setOf(SshEffect.RECEIVE_KEX_ECDH_REPLY, SshEffect.SEND_NEW_KEYS),
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_ECDH_REPLY,
+                    SshEffect.SEND_NEW_KEYS,
+                    SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
+                    SshEffect.RESET_OUTBOUND_SEQUENCE,
+                ),
             ) {
                 callbacks.receiveKexEcdhReply(it.event.msg)
-                callbacks.sendNewKeys()
+                callbacks.sendNewKeys(strictKexEnabled)
             }
             formalTransition<SshEvent.ReceiveKex.DhGexGroup>(
                 id = SshTransitionId.RECEIVE_KEX_DH_GEX_GROUP,
@@ -351,14 +432,27 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitKexDhGexInit") }
             onExit { callbacks.onStateExit("WaitKexDhGexInit") }
 
+            formalTransition<SshEvent.ReceiveNonKexPacket>(
+                id = SshTransitionId.REJECT_NON_KEX_WAIT_KEX_DH_GEX_INIT,
+                targetState = disconnected,
+                guard = strictKex and !rekeying,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
+
             formalTransition<SshEvent.ReceiveKex.DhGexReply>(
                 id = SshTransitionId.RECEIVE_KEX_DH_GEX_REPLY,
                 targetState = waitNewKeys,
                 origins = parsedPacket,
-                effects = setOf(SshEffect.RECEIVE_KEX_DH_GEX_REPLY, SshEffect.SEND_NEW_KEYS),
+                effects = setOf(
+                    SshEffect.RECEIVE_KEX_DH_GEX_REPLY,
+                    SshEffect.SEND_NEW_KEYS,
+                    SshEffect.ACTIVATE_OUTBOUND_PROTECTION,
+                    SshEffect.RESET_OUTBOUND_SEQUENCE,
+                ),
             ) {
                 callbacks.receiveKexDhGexReply(it.event.msg)
-                callbacks.sendNewKeys()
+                callbacks.sendNewKeys(strictKexEnabled)
             }
             formalTransition<SshEvent.UnexpectedKexInit>(
                 id = SshTransitionId.UNEXPECTED_KEX_INIT_WAIT_KEX_DH_GEX_INIT,
@@ -372,6 +466,14 @@ internal class SshClientStateMachine(
             onEntry { callbacks.onStateEnter("WaitNewKeys") }
             onExit { callbacks.onStateExit("WaitNewKeys") }
 
+            formalTransition<SshEvent.ReceiveNonKexPacket>(
+                id = SshTransitionId.REJECT_NON_KEX_WAIT_NEW_KEYS,
+                targetState = disconnected,
+                guard = strictKex and !rekeying,
+                origins = parsedPacket,
+                effects = setOf(SshEffect.SEND_PROTOCOL_ERROR, SshEffect.DISCONNECT),
+            ) { callbacks.sendProtocolError(it.event.description) }
+
             formalTransition<SshEvent.ReceiveNewKeys>(
                 id = SshTransitionId.RECEIVE_INITIAL_NEW_KEYS,
                 targetState = waitService,
@@ -379,12 +481,14 @@ internal class SshClientStateMachine(
                 origins = parsedPacket,
                 effects = setOf(
                     SshEffect.RECEIVE_NEW_KEYS,
+                    SshEffect.ACTIVATE_INBOUND_PROTECTION,
+                    SshEffect.RESET_INBOUND_SEQUENCE,
                     SshEffect.ACTIVATE_ENCRYPTION,
                     SshEffect.SEND_CLIENT_EXT_INFO,
                     SshEffect.SEND_SERVICE_REQUEST,
                 ),
             ) {
-                callbacks.receiveNewKeys()
+                callbacks.receiveNewKeys(strictKexEnabled)
                 callbacks.activateEncryption()
                 callbacks.sendClientExtInfo()
                 callbacks.sendServiceRequest("ssh-userauth")
@@ -394,9 +498,15 @@ internal class SshClientStateMachine(
                 targetState = postAuthHistory,
                 guard = rekeying,
                 origins = parsedPacket,
-                effects = setOf(SshEffect.RECEIVE_NEW_KEYS, SshEffect.ACTIVATE_ENCRYPTION, SshEffect.REKEY_COMPLETE),
+                effects = setOf(
+                    SshEffect.RECEIVE_NEW_KEYS,
+                    SshEffect.ACTIVATE_INBOUND_PROTECTION,
+                    SshEffect.RESET_INBOUND_SEQUENCE,
+                    SshEffect.ACTIVATE_ENCRYPTION,
+                    SshEffect.REKEY_COMPLETE,
+                ),
             ) {
-                callbacks.receiveNewKeys()
+                callbacks.receiveNewKeys(strictKexEnabled)
                 callbacks.activateEncryption()
                 callbacks.rekeyComplete()
             }
@@ -468,7 +578,9 @@ internal class SshClientStateMachine(
             this.targetState = targetState
             metaInfo = meta
             if (guard != SshFormalGuard.Always) {
-                this.guard = { guard.evaluate(callbacks) }
+                this.guard = {
+                    guard.evaluate(callbacks, strictKexEnabled, receivedNonKexBeforeInitialKexInit)
+                }
             }
         }
         if (action != null) {
@@ -480,7 +592,18 @@ internal class SshClientStateMachine(
 
     suspend fun receiveVersion(banner: IdBanner): Boolean = process(SshEvent.ReceiveVersion(banner))
 
-    suspend fun receiveKexInit(msg: SshMsgKexinit): Boolean = process(SshEvent.ReceiveKexInit(msg))
+    suspend fun receiveKexInit(msg: SshMsgKexinit): Boolean {
+        if (!isWaitingForKexInit()) return false
+
+        val initialExchange = !callbacks.isRekeying()
+        val strictKexNegotiated = callbacks.receiveKexInit(msg, initialExchange)
+        val event = when {
+            !initialExchange -> SshEvent.ReceiveRekeyKexInit(msg)
+            strictKexNegotiated -> SshEvent.ReceiveInitialStrictKexInit(msg)
+            else -> SshEvent.ReceiveInitialNonStrictKexInit(msg)
+        }
+        return process(event)
+    }
 
     suspend fun receiveKexDhReply(msg: SshMsgKexdhReply): Boolean = process(SshEvent.ReceiveKex.DhReply(msg))
 
@@ -527,6 +650,11 @@ internal class SshClientStateMachine(
 
     suspend fun receiveIgnore(): Boolean = process(SshEvent.ReceiveIgnore)
 
+    suspend fun authorizeNonKexPacket(description: String): Boolean {
+        process(SshEvent.ReceiveNonKexPacket(description))
+        return !isDisconnected()
+    }
+
     suspend fun authorizeAuthenticationPacket(): Boolean = process(SshEvent.AuthorizeAuthenticationPacket)
 
     suspend fun authorizeAuthenticatedPacket(): Boolean = process(SshEvent.AuthorizeAuthenticatedPacket)
@@ -549,6 +677,10 @@ internal class SshClientStateMachine(
 
     fun isWaitingForKexInit(): Boolean = stateMachine.activeStates().any { it.name == "WaitKexInit" }
 
+    fun isDisconnected(): Boolean = stateMachine.activeStates().any { it.name == "Disconnected" }
+
+    fun isStrictKexEnabled(): Boolean = strictKexEnabled
+
     internal fun formalModel(): SshStateMachineFormalModel = stateMachine.toSshFormalModel()
 
     private suspend fun process(event: SshEvent): Boolean = stateMachine.processEvent(event) == ProcessingResult.PROCESSED
@@ -558,7 +690,7 @@ internal interface SshClientCallbacks {
     fun sendVersion()
     fun receiveVersion(banner: IdBanner)
     suspend fun sendKexInit()
-    fun receiveKexInit(msg: SshMsgKexinit)
+    fun receiveKexInit(msg: SshMsgKexinit, initialExchange: Boolean): Boolean
     suspend fun sendKexExchangeInit()
     suspend fun receiveKexDhReply(msg: SshMsgKexdhReply)
     suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply)
@@ -570,8 +702,8 @@ internal interface SshClientCallbacks {
     fun rekeyStarted()
     fun rekeyComplete()
     suspend fun sendKexDhGexInit()
-    suspend fun sendNewKeys()
-    fun receiveNewKeys()
+    suspend fun sendNewKeys(resetSequenceNumber: Boolean)
+    fun receiveNewKeys(resetSequenceNumber: Boolean)
     fun activateEncryption()
     suspend fun sendClientExtInfo()
     suspend fun sendServiceRequest(service: String)

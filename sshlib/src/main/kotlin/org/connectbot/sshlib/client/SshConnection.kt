@@ -156,6 +156,10 @@ internal fun boundRemotePacketSize(packetSize: Long): Int? = when {
     else -> minOf(packetSize, 32L * 1024L).toInt()
 }
 
+internal fun isKeyExchangeMessage(messageId: Int): Boolean = messageId == SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt() ||
+    messageId == SshEnums.MessageType.SSH_MSG_NEWKEYS.id().toInt() ||
+    messageId in 30..49
+
 private sealed interface PendingProtection {
     fun installOutbound(packetIO: PacketIO)
     fun installInbound(packetIO: PacketIO)
@@ -296,7 +300,7 @@ class SshConnection(
         override fun sendVersion() = this@SshConnection.sendVersion()
         override fun receiveVersion(banner: IdBanner) = this@SshConnection.receiveVersion(banner)
         override suspend fun sendKexInit() = this@SshConnection.sendKexInit()
-        override fun receiveKexInit(msg: SshMsgKexinit) = this@SshConnection.receiveKexInit(msg)
+        override fun receiveKexInit(msg: SshMsgKexinit, initialExchange: Boolean) = this@SshConnection.receiveKexInit(msg, initialExchange)
         override suspend fun sendKexExchangeInit() = this@SshConnection.sendKexExchangeInit()
         override suspend fun receiveKexDhReply(msg: SshMsgKexdhReply) = this@SshConnection.receiveKexDhReply(msg)
         override suspend fun receiveKexEcdhReply(msg: SshMsgKexEcdhReply) = this@SshConnection.receiveKexEcdhReply(msg)
@@ -312,8 +316,8 @@ class SshConnection(
         override fun rekeyStarted() = this@SshConnection.rekeyStarted()
         override fun rekeyComplete() = this@SshConnection.rekeyComplete()
         override suspend fun sendKexDhGexInit() = this@SshConnection.sendKexDhGexInit()
-        override suspend fun sendNewKeys() = this@SshConnection.sendNewKeys()
-        override fun receiveNewKeys() = this@SshConnection.receiveNewKeys()
+        override suspend fun sendNewKeys(resetSequenceNumber: Boolean) = this@SshConnection.sendNewKeys(resetSequenceNumber)
+        override fun receiveNewKeys(resetSequenceNumber: Boolean) = this@SshConnection.receiveNewKeys(resetSequenceNumber)
         override fun activateEncryption() = this@SshConnection.activateEncryption()
         override suspend fun sendClientExtInfo() = this@SshConnection.sendClientExtInfo()
         override suspend fun sendServiceRequest(service: String) = this@SshConnection.sendServiceRequest(service)
@@ -366,7 +370,6 @@ class SshConnection(
     private var negotiatedMacS2C: String? = null
     private var negotiatedCompressionC2S: String? = null
     private var negotiatedCompressionS2C: String? = null
-    private var strictKexEnabled: Boolean = false
     private var serverAdvertisesExtInfo: Boolean = false
     private var serverExtInfoReceivedCount: Int = 0
     private var clientExtInfoSent: Boolean = false
@@ -1216,7 +1219,7 @@ class SshConnection(
         writePacket(SshEnums.MessageType.SSH_MSG_KEXINIT.id().toInt(), kexInitPayload)
     }
 
-    private fun receiveKexInit(msg: SshMsgKexinit) {
+    private fun receiveKexInit(msg: SshMsgKexinit, initialExchange: Boolean): Boolean {
         logger.info("Received KEX_INIT from server")
 
         val serverKexAlgs = msg.kexAlgorithms().entries().data()
@@ -1237,17 +1240,17 @@ class SshConnection(
         logger.debug("  Server compression c->s: $serverCompC2S")
         logger.debug("  Server compression s->c: $serverCompS2C")
 
-        val localKexAlgorithms = if (isRekeying) kexAlgorithms else initialKexAlgorithms
+        val localKexAlgorithms = if (initialExchange) initialKexAlgorithms else kexAlgorithms
         val clientKexList = parseNameList(localKexAlgorithms)
         val serverKexList = serverKexAlgs.filter { it.isNotEmpty() }
         val clientKexStrict = "kex-strict-c-v00@openssh.com" in clientKexList
         val serverKexStrict = "kex-strict-s-v00@openssh.com" in serverKexList
-        strictKexEnabled = clientKexStrict && serverKexStrict
-        if (strictKexEnabled) {
+        val strictKexNegotiated = clientKexStrict && serverKexStrict
+        if (strictKexNegotiated) {
             logger.info("  Strict KEX enabled")
         }
 
-        if (!isRekeying) {
+        if (initialExchange) {
             serverAdvertisesExtInfo = "ext-info-s" in serverKexList
             if (serverAdvertisesExtInfo) {
                 logger.info("  Server advertises EXT_INFO support")
@@ -1298,8 +1301,11 @@ class SshConnection(
             ?: throw SshException("No matching compression algorithm (c->s). Client: $compressionAlgorithms, Server: $serverCompC2S")
         negotiatedCompressionS2C = clientCompList.firstOrNull { it in serverCompS2C }
             ?: throw SshException("No matching compression algorithm (s->c). Client: $compressionAlgorithms, Server: $serverCompS2C")
+
         logger.info("  Negotiated compression c->s: $negotiatedCompressionC2S")
         logger.info("  Negotiated compression s->c: $negotiatedCompressionS2C")
+
+        return strictKexNegotiated
     }
 
     private suspend fun sendKexExchangeInit() {
@@ -1518,7 +1524,7 @@ class SshConnection(
         )
     }
 
-    private suspend fun sendNewKeys() {
+    private suspend fun sendNewKeys(resetSequenceNumber: Boolean) {
         logger.info("Sending NEW_KEYS")
         prepareEncryption()
         try {
@@ -1530,7 +1536,7 @@ class SshConnection(
                     protection.installOutbound(packetIO)
                     packetIO.enableSendCompression(pendingSendCompressor, pendingCompressionImmediate)
                     pendingSendCompressor = null
-                    if (strictKexEnabled) {
+                    if (resetSequenceNumber) {
                         packetIO.resetSendSequenceNumber()
                     }
                     outboundPacketController.completeKex()
@@ -1620,14 +1626,14 @@ class SshConnection(
         }
     }
 
-    private fun receiveNewKeys() {
+    private fun receiveNewKeys(resetSequenceNumber: Boolean) {
         logger.info("Received NEW_KEYS from server")
         val protection = pendingProtection
             ?: throw SshException("No staged packet protection")
         protection.installInbound(packetIO)
         packetIO.enableReceiveCompression(pendingReceiveCompressor, pendingCompressionImmediate)
         pendingReceiveCompressor = null
-        if (strictKexEnabled) {
+        if (resetSequenceNumber) {
             packetIO.resetReceiveSequenceNumber()
         }
     }
@@ -2352,6 +2358,13 @@ class SshConnection(
             logger.debug("Received packet: $msgType")
 
             withContext(stateMachineDispatcher) {
+                if (!isKeyExchangeMessage(msgType.id().toInt())) {
+                    val description = "Non-KEX packet $msgType is forbidden during strict initial key exchange"
+                    if (!stateMachine.authorizeNonKexPacket(description)) {
+                        throw ProtocolViolationException(description, responseSent = true)
+                    }
+                }
+
                 if (isRekeying && stateMachine.isKexInProgress() && msgType.id().toInt() >= SSH_MSG_USERAUTH_REQUEST_ID) {
                     if (packetsReceivedDuringRekey.size >= MAX_REKEY_IN_FLIGHT_PACKETS) {
                         throw ProtocolViolationException("Too many higher-layer packets received during key exchange")
@@ -2374,6 +2387,10 @@ class SshConnection(
                             requireAccepted(stateMachine.requestRekey(), msgType)
                         }
                         requireAccepted(stateMachine.receiveKexInit(kexInit), msgType)
+                        if (stateMachine.isDisconnected()) {
+                            val description = "SSH_MSG_KEXINIT was not the first packet during strict initial key exchange"
+                            throw ProtocolViolationException(description, responseSent = true)
+                        }
                     }
 
                     SshEnums.MessageType.SSH_MSG_NEWKEYS -> {
@@ -2386,16 +2403,10 @@ class SshConnection(
                     }
 
                     SshEnums.MessageType.SSH_MSG_IGNORE -> {
-                        if (strictKexEnabled && stateMachine.isKexInProgress()) {
-                            throw ProtocolViolationException("SSH_MSG_IGNORE is forbidden during strict key exchange")
-                        }
                         requireAccepted(stateMachine.receiveIgnore(), msgType)
                     }
 
                     SshEnums.MessageType.SSH_MSG_DEBUG -> {
-                        if (strictKexEnabled && stateMachine.isKexInProgress()) {
-                            throw ProtocolViolationException("SSH_MSG_DEBUG is forbidden during strict key exchange")
-                        }
                         requireAccepted(stateMachine.receiveDebug(packet.body() as SshMsgDebug), msgType)
                     }
 

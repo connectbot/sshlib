@@ -44,6 +44,8 @@ TypeOK ==
     /\ packetWasParsed \in BOOLEAN
     /\ effects \subseteq Effects
     /\ rekeying \in BOOLEAN
+    /\ strictKex \in BOOLEAN
+    /\ nonKexBeforeInitialKexInit \in BOOLEAN
     /\ authenticationEstablished \in BOOLEAN
     /\ initialNewKeysActive \in BOOLEAN
     /\ authRequestPending \in BOOLEAN
@@ -123,6 +125,8 @@ ModelView ==
       packetWasParsed,
       effects,
       rekeying,
+      strictKex,
+      nonKexBeforeInitialKexInit,
       authenticationEstablished,
       initialNewKeysActive,
       authRequestPending,
@@ -194,7 +198,8 @@ AuthenticationRequestResponseClearsPending ==
         ~authRequestPending
 
 KexEventsAreStrictlySequenced ==
-    /\ event = "ReceiveKexInit" =>
+    /\ event \in {"ReceiveInitialStrictKexInit", "ReceiveInitialNonStrictKexInit", "ReceiveRekeyKexInit"} /\
+        "Disconnect" \notin effects =>
         /\ previousState = "WaitKexInit"
         /\ state = "WaitKex"
         /\ "SendKexExchangeInit" \in effects
@@ -202,6 +207,8 @@ KexEventsAreStrictlySequenced ==
         /\ previousState = "WaitKex"
         /\ state = "WaitNewKeys"
         /\ "SendNewKeys" \in effects
+        /\ "ActivateOutboundProtection" \in effects
+        /\ (strictKex => "ResetOutboundSequence" \in effects)
     /\ event = "ReceiveKex.DhGexGroup" =>
         /\ previousState = "WaitKex"
         /\ state = "WaitKexDhGexInit"
@@ -210,9 +217,40 @@ KexEventsAreStrictlySequenced ==
         /\ previousState = "WaitKexDhGexInit"
         /\ state = "WaitNewKeys"
         /\ "SendNewKeys" \in effects
+        /\ "ActivateOutboundProtection" \in effects
+        /\ (strictKex => "ResetOutboundSequence" \in effects)
     /\ event = "ReceiveNewKeys" =>
         /\ previousState = "WaitNewKeys"
         /\ "ActivateEncryption" \in effects
+        /\ "ActivateInboundProtection" \in effects
+        /\ (strictKex => "ResetInboundSequence" \in effects)
+
+StrictKexProtectionSwitchesResetSequenceNumbers ==
+    strictKex =>
+        /\ ("ActivateOutboundProtection" \in effects => "ResetOutboundSequence" \in effects)
+        /\ ("ActivateInboundProtection" \in effects => "ResetInboundSequence" \in effects)
+
+StrictKexIsSticky ==
+    [] (strictKex => [] strictKex)
+
+StrictInitialKexRejectsNonKexPackets ==
+    event = "ReceiveNonKexPacket" /\ previousState \in {"WaitKex", "WaitKexDhGexInit", "WaitNewKeys"} =>
+        /\ strictKex
+        /\ state = "Disconnected"
+        /\ "SendProtocolError" \in effects
+        /\ "Disconnect" \in effects
+
+StrictKexInitMustBeFirst ==
+    event = "ReceiveInitialStrictKexInit" /\ "Disconnect" \in effects =>
+        /\ strictKex
+        /\ nonKexBeforeInitialKexInit
+        /\ previousState = "WaitKexInit"
+        /\ state = "Disconnected"
+
+AcceptedInitialKexPacketOrderClearsHistory ==
+    event \in {"ReceiveInitialStrictKexInit", "ReceiveInitialNonStrictKexInit"} /\ "Disconnect" \notin effects =>
+        /\ state = "WaitKex"
+        /\ ~nonKexBeforeInitialKexInit
 
 UserAuthenticationRequiresInitialNewKeys ==
     event = "BeginAuthentication" \/ "StartAuthentication" \in effects \/ "SendUserauthRequest" \in effects =>
