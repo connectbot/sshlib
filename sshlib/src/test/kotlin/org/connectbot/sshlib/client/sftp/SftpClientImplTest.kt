@@ -294,6 +294,78 @@ class SftpClientImplTest {
     }
 
     @Test
+    fun `create parses extension pairs from the VERSION reply`() = runBlocking {
+        val session = FakeSshSession()
+        session.enqueueRead(
+            packet(
+                SSH_FXP_VERSION,
+                versionPayloadWithExtensions(
+                    3,
+                    "copy-data" to "1",
+                    "posix-rename@openssh.com" to "1",
+                ),
+            ),
+        )
+        val client = assertSuccess(SftpClientImpl.create(session))
+
+        assertEquals(setOf("copy-data", "posix-rename@openssh.com"), client.extensions)
+    }
+
+    @Test
+    fun `create tolerates a VERSION reply with no extensions`() = runBlocking {
+        // Same payload shape createClient() already uses elsewhere in this file:
+        // just the 4-byte version int, nothing trailing.
+        val session = FakeSshSession()
+        val client = createClient(session)
+
+        assertEquals(emptySet(), client.extensions)
+    }
+
+    @Test
+    fun `copyData sends the copy-data extension request and maps responses`() = runBlocking {
+        val srcHandle = SftpFileHandle(byteArrayOf(1, 2))
+        val dstHandle = SftpFileHandle(byteArrayOf(3, 4))
+        var capturedPayload: ByteArray? = null
+
+        val okSession = FakeSshSession(
+            responseFor = { type, payload ->
+                if (type == SSH_FXP_EXTENDED) capturedPayload = payload
+                response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.OK))
+            },
+        )
+        val client = createClient(okSession)
+
+        val result = client.copyData(srcHandle, 10L, 20L, dstHandle, 30L)
+
+        assertEquals(SftpResult.Success(Unit), result)
+        assertEquals(listOf(SSH_FXP_EXTENDED), okSession.requestTypes)
+
+        // Verify the wire payload: string "copy-data", then src handle/offset/length,
+        // then dst handle/offset — matches the OpenSSH PROTOCOL definition.
+        val buf = ByteBuffer.wrap(capturedPayload!!)
+        val nameLen = buf.int
+        val name = ByteArray(nameLen).also { buf.get(it) }
+        assertEquals("copy-data", String(name, Charsets.UTF_8))
+        val srcLen = buf.int
+        val src = ByteArray(srcLen).also { buf.get(it) }
+        assertContentEquals(srcHandle.handle, src)
+        assertEquals(10L, buf.long)
+        assertEquals(20L, buf.long)
+        val dstLen = buf.int
+        val dst = ByteArray(dstLen).also { buf.get(it) }
+        assertContentEquals(dstHandle.handle, dst)
+        assertEquals(30L, buf.long)
+
+        val errorSession = FakeSshSession(
+            responseFor = { _, _ -> response(SSH_FXP_STATUS, statusPayload(SftpStatusCode.OP_UNSUPPORTED, "no copy-data")) },
+        )
+        val errorClient = createClient(errorSession)
+        val errorResult = errorClient.copyData(srcHandle, 0L, 0L, dstHandle, 0L)
+        val serverError = assertIs<SftpResult.ServerError>(errorResult)
+        assertEquals(SftpStatusCode.OP_UNSUPPORTED, serverError.statusCode)
+    }
+
+    @Test
     fun `dispatcher propagates request write failures`() {
         runBlocking {
             val client = createClient(FakeSshSession(failAfterHandshake = IllegalStateException("write failed")))
@@ -381,6 +453,24 @@ class SftpClientImplTest {
         responsePayload.putInt(requestId)
         responsePayload.put(payload)
         return packet(type, responsePayload.array())
+    }
+
+    /** Builds a VERSION reply payload: 4-byte version int + name/data string pairs. */
+    private fun versionPayloadWithExtensions(version: Int, vararg extensions: Pair<String, String>): ByteArray {
+        val encodedPairs = extensions.map { (name, data) ->
+            val nameBytes = name.toByteArray(Charsets.UTF_8)
+            val dataBytes = data.toByteArray(Charsets.UTF_8)
+            ByteBuffer.allocate(4 + nameBytes.size + 4 + dataBytes.size).apply {
+                putInt(nameBytes.size)
+                put(nameBytes)
+                putInt(dataBytes.size)
+                put(dataBytes)
+            }.array()
+        }
+        val payload = ByteBuffer.allocate(4 + encodedPairs.sumOf { it.size })
+        payload.putInt(version)
+        encodedPairs.forEach(payload::put)
+        return payload.array()
     }
 
     private fun stringPayload(data: ByteArray): ByteArray {
@@ -544,5 +634,6 @@ class SftpClientImplTest {
         const val SSH_FXP_DATA = 103
         const val SSH_FXP_NAME = 104
         const val SSH_FXP_ATTRS = 105
+        const val SSH_FXP_EXTENDED = 200
     }
 }

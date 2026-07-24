@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,18 @@ package org.connectbot.sshlib
 interface SftpClient : AutoCloseable {
     /** The negotiated SFTP protocol version (typically 3). */
     val protocolVersion: Int
+
+    /**
+     * SFTP protocol extensions the server advertised as `extension-name`/`extension-data`
+     * pairs trailing its `SSH_FXP_VERSION` reply (draft-ietf-secsh-filexfer-02 section 3).
+     * Only the names are kept; extension-specific data (if any) is discarded.
+     *
+     * Common OpenSSH extensions found here: `"copy-data"` (see [copyData]),
+     * `"posix-rename@openssh.com"`, `"hardlink@openssh.com"`, `"fsync@openssh.com"`,
+     * `"statvfs@openssh.com"`. Empty if the server advertised none (or a server this old
+     * predates extensions entirely).
+     */
+    val extensions: Set<String>
 
     /** Whether this SFTP session is still open. */
     val isOpen: Boolean
@@ -145,6 +157,37 @@ interface SftpClient : AutoCloseable {
 
     /** Rename or move a file. */
     suspend fun rename(oldPath: String, newPath: String): SftpResult<Unit>
+
+    // --- Server-side data copy (OpenSSH extension) ---
+
+    /**
+     * Copies [length] bytes from [srcHandle] at [srcOffset] into [dstHandle] at [dstOffset],
+     * entirely on the server — no data crosses the wire. This is the `"copy-data"` SFTP
+     * protocol extension OpenSSH added in 9.0 (April 2022); it lets the server use an
+     * efficient server-side copy (e.g. `copy_file_range()` on Linux) instead of the client
+     * reading the whole file and writing it back, and works even for accounts restricted to
+     * `internal-sftp` with no shell access (where server-side `cp` via SSH exec cannot run
+     * at all).
+     *
+     * Both handles must already be open ([open] with [SftpOpenFlag.READ] for [srcHandle],
+     * [SftpOpenFlag.WRITE] for [dstHandle]) — this call does not open, create, or close
+     * anything. Only regular files are supported; there is no protocol-level operation for
+     * copying whole directory trees, so recursive copies still need to be driven by the
+     * caller (walk the tree, `mkdir` each directory, `copyData` each regular file).
+     *
+     * Check [extensions] for `"copy-data"` before calling, or be prepared to fall back on an
+     * [SftpResult.ServerError] with [SftpStatusCode.OP_UNSUPPORTED] — older or non-OpenSSH
+     * servers may not implement this extension at all.
+     *
+     * @param length Number of bytes to copy; `0` means "copy through EOF of the source file".
+     */
+    suspend fun copyData(
+        srcHandle: SftpFileHandle,
+        srcOffset: Long,
+        length: Long,
+        dstHandle: SftpFileHandle,
+        dstOffset: Long,
+    ): SftpResult<Unit>
 
     // --- Path operations ---
 

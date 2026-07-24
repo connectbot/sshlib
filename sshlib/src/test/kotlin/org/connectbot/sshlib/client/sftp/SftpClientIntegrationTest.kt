@@ -334,6 +334,24 @@ class SftpClientIntegrationTest {
     }
 
     @Test
+    fun `should advertise the copy-data extension`() = runBlocking {
+        val (client, sftp) = openSftp()
+        try {
+            // OpenSSH added "copy-data" in 9.0; the test container runs 9.9p2, so a real
+            // server should always advertise it here. This is the strongest signal that
+            // VERSION extension-pair parsing (SftpClientImpl.create) works against real
+            // wire bytes, not just the hand-built payloads in SftpClientImplTest.
+            assertTrue(
+                "copy-data" in sftp.extensions,
+                "Expected OpenSSH 9.9p2 to advertise the copy-data extension, got: ${sftp.extensions}",
+            )
+        } finally {
+            sftp.close()
+            client.disconnect()
+        }
+    }
+
+    @Test
     fun `SFTP operation completes after interval rekey while idle`() = runBlocking {
         val (client, sftp) = openSftp(
             rekeyIntervalMs = 1_000L,
@@ -346,6 +364,52 @@ class SftpClientIntegrationTest {
                 val handle = sftp.opendir(remoteDirectory).getOrThrow()
                 sftp.close(handle).getOrThrow()
             }
+        } finally {
+            sftp.close()
+            client.disconnect()
+        }
+    }
+
+    @Test
+    fun `copyData copies bytes entirely on the server`() = runBlocking {
+        val (client, sftp) = openSftp()
+        try {
+            val ts = System.currentTimeMillis()
+            val srcPath = "/tmp/sftp-copydata-src-$ts.bin"
+            val dstPath = "/tmp/sftp-copydata-dst-$ts.bin"
+            val testData = ByteArray(8192) { (it % 256).toByte() }
+
+            val writeHandle = sftp.open(
+                srcPath,
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
+            ).getOrThrow()
+            sftp.write(writeHandle, 0, testData).getOrThrow()
+            sftp.close(writeHandle).getOrThrow()
+
+            val srcHandle = sftp.open(srcPath, setOf(SftpOpenFlag.READ)).getOrThrow()
+            val dstHandle = sftp.open(
+                dstPath,
+                setOf(SftpOpenFlag.WRITE, SftpOpenFlag.CREATE, SftpOpenFlag.TRUNCATE),
+            ).getOrThrow()
+
+            // length=0 means "copy through EOF of the source file" per the extension spec.
+            sftp.copyData(srcHandle, 0L, 0L, dstHandle, 0L).getOrThrow()
+
+            sftp.close(srcHandle).getOrThrow()
+            sftp.close(dstHandle).getOrThrow()
+
+            val dstAttrs = sftp.stat(dstPath).getOrThrow()
+            assertEquals(testData.size.toLong(), dstAttrs.size, "Copied file size should match source")
+
+            val readHandle = sftp.open(dstPath, setOf(SftpOpenFlag.READ)).getOrThrow()
+            val readData = sftp.read(readHandle, 0, testData.size).getOrThrow()
+            sftp.close(readHandle).getOrThrow()
+
+            assertNotNull(readData)
+            assertTrue(testData.contentEquals(readData!!), "Server-side copied bytes should match the source")
+
+            sftp.remove(srcPath).getOrThrow()
+            sftp.remove(dstPath).getOrThrow()
         } finally {
             sftp.close()
             client.disconnect()

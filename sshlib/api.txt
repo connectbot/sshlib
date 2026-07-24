@@ -433,8 +433,10 @@ package org.connectbot.sshlib {
   public interface SftpClient {
     method public void close();
     method public suspend java.lang.Object? close(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    method public suspend java.lang.Object? copyData(org.connectbot.sshlib.SftpFileHandle srcHandle, long srcOffset, long length, org.connectbot.sshlib.SftpFileHandle dstHandle, long dstOffset, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
     method public suspend java.lang.Object? fsetstat(org.connectbot.sshlib.SftpFileHandle handle, org.connectbot.sshlib.SftpAttributes attrs, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
     method public suspend java.lang.Object? fstat(org.connectbot.sshlib.SftpFileHandle handle, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpAttributes>>);
+    method @InaccessibleFromKotlin public java.util.Set<java.lang.String> getExtensions();
     method @InaccessibleFromKotlin public int getProtocolVersion();
     method @InaccessibleFromKotlin public boolean isOpen();
     method public default suspend java.lang.Object? listdir(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<? extends java.util.List<org.connectbot.sshlib.SftpDirectoryEntry>>>);
@@ -453,6 +455,7 @@ package org.connectbot.sshlib {
     method public suspend java.lang.Object? stat(java.lang.String path, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<org.connectbot.sshlib.SftpAttributes>>);
     method public suspend java.lang.Object? symlink(java.lang.String targetPath, java.lang.String linkPath, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
     method public suspend java.lang.Object? write(org.connectbot.sshlib.SftpFileHandle handle, long offset, byte[] data, kotlin.coroutines.Continuation<? super org.connectbot.sshlib.SftpResult<kotlin.Unit>>);
+    property public abstract java.util.Set<java.lang.String> extensions;
     property public abstract boolean isOpen;
     property public abstract int protocolVersion;
   }

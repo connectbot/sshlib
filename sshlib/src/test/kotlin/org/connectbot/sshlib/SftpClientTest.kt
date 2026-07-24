@@ -108,7 +108,16 @@ class SftpClientTest {
         val closedHandles = mutableListOf<SftpFileHandle>()
 
         override val protocolVersion: Int = 3
+        override val extensions: Set<String> = emptySet()
         override val isOpen: Boolean = true
+
+        override suspend fun copyData(
+            srcHandle: SftpFileHandle,
+            srcOffset: Long,
+            length: Long,
+            dstHandle: SftpFileHandle,
+            dstOffset: Long,
+        ): SftpResult<Unit> = throw UnsupportedOperationException()
 
         override suspend fun open(
             path: String,
