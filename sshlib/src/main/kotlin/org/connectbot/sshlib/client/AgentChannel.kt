@@ -104,14 +104,20 @@ internal class AgentChannel(
             requests.close()
             requestWorker.cancelAndJoin()
             windowAvailable.close()
+            if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                connection.notifyChannelClosed(localChannelNumber)
+            }
         }
     }
 
     suspend fun onDisconnected() {
-        lifecycle.disconnect {
+        lifecycle.disconnect { transition ->
             requests.close()
             requestWorker.cancelAndJoin()
             windowAvailable.close()
+            if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                connection.notifyChannelClosed(localChannelNumber)
+            }
         }
     }
 

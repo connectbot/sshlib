@@ -111,18 +111,24 @@ internal class ForwardingChannel(
                 incomingDeliveryJob.cancel()
                 _incomingData.close()
                 windowAvailable.close()
+                if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                    connection.notifyChannelClosed(localChannelNumber)
+                }
             }
         ) {
-            throw SshException("Received duplicate CLOSE on forwarding channel $localChannelNumber")
+            logger.debug("Received duplicate CLOSE on forwarding channel $localChannelNumber")
         }
     }
 
     internal suspend fun onDisconnected() {
-        lifecycle.disconnect {
+        lifecycle.disconnect { transition ->
             incomingIngress.close()
             incomingDeliveryJob.cancel()
             _incomingData.close()
             windowAvailable.close()
+            if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                connection.notifyChannelClosed(localChannelNumber)
+            }
         }
     }
 
@@ -152,11 +158,14 @@ internal class ForwardingChannel(
     }
 
     suspend fun close() {
-        lifecycle.sendClose {
+        lifecycle.sendClose { transition ->
             incomingIngress.close()
             incomingDeliveryJob.cancel()
             _incomingData.close()
             connection.sendChannelClose(remoteChannelNumber)
+            if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                connection.notifyChannelClosed(localChannelNumber)
+            }
         }
     }
 }

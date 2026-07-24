@@ -255,6 +255,7 @@ class SshConnection(
     private val obscureKeystrokeTimingIntervalMs: Long = 20L,
     coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    internal var autoDisconnectOnLastChannelClose: Boolean = true
 
     companion object {
         private val logger = LoggerFactory.getLogger(SshConnection::class.java)
@@ -2560,24 +2561,11 @@ class SshConnection(
                         val recipientChannel = msg.recipientChannel().toInt()
                         logger.debug("Received CHANNEL_CLOSE for local channel $recipientChannel")
                         when (val entry = channelRegistry.findByLocalRecipient(recipientChannel)) {
-                            is SshChannelRegistry.Entry.Established.Session -> {
-                                entry.channel.onClose()
-                                channelRegistry.unregister(recipientChannel)
-                            }
-
-                            is SshChannelRegistry.Entry.Established.Agent -> {
-                                entry.channel.onClose()
-                                channelRegistry.unregister(recipientChannel)
-                            }
-
-                            is SshChannelRegistry.Entry.Established.Forwarding -> {
-                                entry.channel.onClose()
-                                unregisterForwardingChannel(entry.channel)
-                            }
-
+                            is SshChannelRegistry.Entry.Established.Session -> entry.channel.onClose()
+                            is SshChannelRegistry.Entry.Established.Agent -> entry.channel.onClose()
+                            is SshChannelRegistry.Entry.Established.Forwarding -> entry.channel.onClose()
                             null -> throw ProtocolViolationException("Close for unknown channel $recipientChannel")
                         }
-                        checkAllChannelsClosed()
                     }
 
                     SshEnums.MessageType.SSH_MSG_CHANNEL_REQUEST -> {
@@ -2887,11 +2875,20 @@ class SshConnection(
         )
     }
 
-    private suspend fun checkAllChannelsClosed() {
-        val established = channelRegistry.establishedSnapshot()
-        val allClosed = established.all { !it.isOpen }
-        logger.debug("checkAllChannelsClosed: established=${established.size}, allClosed=$allClosed")
-        if (allClosed && established.any { it.kind == SshChannelRegistry.Kind.SESSION }) {
+    internal suspend fun notifyChannelClosed(localChannelNumber: Int) {
+        val entry = channelRegistry.findByLocalRecipient(localChannelNumber)
+        val wasSession = entry is SshChannelRegistry.Entry.Established.Session
+        channelRegistry.unregister(localChannelNumber)
+        if (entry is SshChannelRegistry.Entry.Established.Forwarding) {
+            unregisterForwardingChannel(entry.channel)
+        }
+
+        val snapshot = channelRegistry.snapshot()
+        val allClosed = snapshot.none { it is SshChannelRegistry.Entry.Pending } &&
+            snapshot.filterIsInstance<SshChannelRegistry.Entry.Established>().all { !it.isOpen }
+        val hasSession = snapshot.any { it.kind == SshChannelRegistry.Kind.SESSION }
+
+        if (autoDisconnectOnLastChannelClose && allClosed && (hasSession || wasSession)) {
             logger.info("All channels closed, sending disconnect")
             sendDisconnect()
         }

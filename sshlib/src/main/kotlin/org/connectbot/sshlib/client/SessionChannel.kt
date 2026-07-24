@@ -183,9 +183,12 @@ class SessionChannel internal constructor(
     internal suspend fun onClose() {
         if (!lifecycle.receiveClose { transition ->
                 closeResources(SshChannelEffect.SEND_CLOSE in transition.effects, "Received CLOSE")
+                if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                    connection.notifyChannelClosed(localChannelNumber)
+                }
             }
         ) {
-            throw org.connectbot.sshlib.SshException("Received duplicate CLOSE on channel $localChannelNumber")
+            logger.debug("Received duplicate CLOSE on channel $localChannelNumber")
         }
     }
 
@@ -218,7 +221,12 @@ class SessionChannel internal constructor(
     }
 
     internal suspend fun onDisconnected() {
-        lifecycle.disconnect { closeResources(replyRequired = false, reason = "Disconnected") }
+        lifecycle.disconnect { transition ->
+            closeResources(replyRequired = false, reason = "Disconnected")
+            if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                connection.notifyChannelClosed(localChannelNumber)
+            }
+        }
     }
 
     internal suspend fun receiveRequest(action: suspend () -> Unit): Boolean = lifecycle.receiveRequest { action() }
@@ -449,7 +457,7 @@ class SessionChannel internal constructor(
 
     override fun close() {
         connectionScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            lifecycle.sendClose {
+            lifecycle.sendClose { transition ->
                 logger.debug("Closing channel $localChannelNumber")
                 obfuscatorMutex.withLock { obfuscator?.stop() }
                 chaffJob?.cancel()
@@ -467,6 +475,9 @@ class SessionChannel internal constructor(
                     connection.sendChannelClose(_remoteChannelNumber)
                 } catch (e: Exception) {
                     logger.debug("Failed to send CHANNEL_CLOSE", e)
+                }
+                if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
+                    connection.notifyChannelClosed(localChannelNumber)
                 }
             }
         }

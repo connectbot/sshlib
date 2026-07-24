@@ -530,6 +530,7 @@ class SshConnectionFlowTest {
     @Test
     fun `opening a second session channel after closing the first succeeds when server reuses remote channel number`() = runTest {
         connectedFixture { connection, server, dispatcher ->
+            connection.autoDisconnectOnLastChannelClose = false
             authenticate(connection, server, dispatcher)
 
             val session1 = openSession(connection, server, dispatcher, remoteChannelNumber = 100)

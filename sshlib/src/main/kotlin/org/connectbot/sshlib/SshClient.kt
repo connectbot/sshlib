@@ -184,6 +184,7 @@ class SshClient private constructor(
             rekeyBytesLimit = config.rekeyBytesLimit,
             obscureKeystrokeTimingIntervalMs = config.obscureKeystrokeTimingIntervalMs,
         )
+        sshConnection.autoDisconnectOnLastChannelClose = config.autoDisconnectOnLastChannelClose
         val result = sshConnection.connect()
 
         if (result is ConnectResult.Success) {
