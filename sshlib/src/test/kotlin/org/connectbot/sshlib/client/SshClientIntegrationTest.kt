@@ -1441,4 +1441,37 @@ class SshClientIntegrationTest {
             client.disconnect()
         }
     }
+
+    @Test
+    fun `should support opening multiple session channels sequentially on single connection`() = runBlocking {
+        val host = opensshContainer.host
+        val port = opensshContainer.getMappedPort(22)
+
+        val client = SshClient(
+            SshClientConfig {
+                this.host = host
+                this.port = port
+                this.hostKeyVerifier = acceptAllVerifier
+            },
+        )
+
+        try {
+            assertTrue(client.connect() is ConnectResult.Success, "Should connect to SSH server")
+            assertTrue(
+                client.authenticatePassword(USERNAME, PASSWORD) is AuthResult.Success,
+                "Should authenticate successfully",
+            )
+
+            repeat(5) { attempt ->
+                val session = withTimeout(10_000) { client.openSession() }
+                assertNotNull(session, "openSession returned null on attempt $attempt")
+                val execGranted = withTimeout(10_000) { session!!.requestExec("true") }
+                assertTrue(execGranted, "requestExec failed on attempt $attempt")
+                session!!.close()
+                assertFalse(session.isOpen, "session should be closed on attempt $attempt")
+            }
+        } finally {
+            client.disconnect()
+        }
+    }
 }
