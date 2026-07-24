@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ class SshClientConfig private constructor(
     val rekeyIntervalMs: Long,
     val rekeyBytesLimit: Long,
     val obscureKeystrokeTimingIntervalMs: Long,
+    val autoDisconnectOnLastChannelClose: Boolean,
 ) {
     class Builder {
         /**
@@ -128,6 +129,11 @@ class SshClientConfig private constructor(
          */
         var obscureKeystrokeTimingIntervalMs: Long = 20L
 
+        /**
+         * Whether to automatically disconnect the SSH connection when the last channel is closed.
+         */
+        var autoDisconnectOnLastChannelClose: Boolean = true
+
         fun build(): SshClientConfig {
             val factory = transportFactory ?: run {
                 require(host.isNotBlank()) { "Host must be specified when using default TCP transport" }
@@ -159,6 +165,7 @@ class SshClientConfig private constructor(
                 rekeyIntervalMs,
                 rekeyBytesLimit,
                 obscureKeystrokeTimingIntervalMs,
+                autoDisconnectOnLastChannelClose,
             )
         }
     }

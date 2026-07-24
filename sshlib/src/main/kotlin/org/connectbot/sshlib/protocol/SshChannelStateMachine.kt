@@ -136,6 +136,10 @@ internal enum class SshChannelTransitionId {
     RECEIVE_CLOSE_REMOTE_EOF,
     RECEIVE_CLOSE_BOTH_EOF,
     RECEIVE_CLOSE_CLOSE_SENT,
+    RECEIVE_DATA_CLOSE_SENT,
+    RECEIVE_REQUEST_CLOSE_SENT,
+    RECEIVE_WINDOW_ADJUST_CLOSE_SENT,
+    RECEIVE_EOF_CLOSE_SENT,
     DISCONNECT_OPENING,
     DISCONNECT_OPEN,
     DISCONNECT_LOCAL_EOF,
@@ -304,7 +308,7 @@ internal class SshChannelStateMachine(
         class SendClose(action: suspend (SshChannelAcceptedTransition) -> Unit) :
             ChannelEvent(
                 SshChannelEventId.SEND_CLOSE,
-                setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL),
+                setOf(SshChannelEffect.SEND_CLOSE),
                 SshChannelEventOrigin.LOCAL_COMMAND,
                 action,
             )
@@ -393,6 +397,10 @@ internal class SshChannelStateMachine(
         localEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_LOCAL_EOF, closed)
         remoteEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_REMOTE_EOF, closed)
         bothEof.channelTransition(ChannelEvent.ReceiveClose {}, SshChannelTransitionId.RECEIVE_CLOSE_BOTH_EOF, closed)
+        closeSent.channelTransition(ChannelEvent.ReceiveData {}, SshChannelTransitionId.RECEIVE_DATA_CLOSE_SENT, effects = emptySet())
+        closeSent.channelTransition(ChannelEvent.ReceiveRequest {}, SshChannelTransitionId.RECEIVE_REQUEST_CLOSE_SENT, effects = emptySet())
+        closeSent.channelTransition(ChannelEvent.ReceiveWindowAdjust {}, SshChannelTransitionId.RECEIVE_WINDOW_ADJUST_CLOSE_SENT, effects = emptySet())
+        closeSent.channelTransition(ChannelEvent.ReceiveEof {}, SshChannelTransitionId.RECEIVE_EOF_CLOSE_SENT, effects = emptySet())
         closeSent.channelTransition(
             ChannelEvent.ReceiveClose {},
             SshChannelTransitionId.RECEIVE_CLOSE_CLOSE_SENT,

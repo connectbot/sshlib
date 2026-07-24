@@ -612,6 +612,7 @@ package org.connectbot.sshlib {
   }
 
   public final class SshClientConfig {
+    method @InaccessibleFromKotlin public boolean getAutoDisconnectOnLastChannelClose();
     method @InaccessibleFromKotlin public java.lang.String getClientVersion();
     method @InaccessibleFromKotlin public java.lang.String getEncryptionAlgorithms();
     method @InaccessibleFromKotlin public java.lang.String getHostKeyAlgorithms();
@@ -623,6 +624,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public long getRekeyBytesLimit();
     method @InaccessibleFromKotlin public long getRekeyIntervalMs();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.TransportFactory getTransportFactory();
+    property public boolean autoDisconnectOnLastChannelClose;
     property public String clientVersion;
     property public String encryptionAlgorithms;
     property public String hostKeyAlgorithms;
@@ -640,6 +642,7 @@ package org.connectbot.sshlib {
   public static final class SshClientConfig.Builder {
     ctor public SshClientConfig.Builder();
     method public org.connectbot.sshlib.SshClientConfig build();
+    method @InaccessibleFromKotlin public boolean getAutoDisconnectOnLastChannelClose();
     method @InaccessibleFromKotlin public java.lang.String getClientVersion();
     method @InaccessibleFromKotlin public boolean getEnableCompression();
     method @InaccessibleFromKotlin public java.lang.String getEncryptionAlgorithms();
@@ -655,6 +658,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public long getRekeyBytesLimit();
     method @InaccessibleFromKotlin public long getRekeyIntervalMs();
     method @InaccessibleFromKotlin public org.connectbot.sshlib.transport.TransportFactory? getTransportFactory();
+    method @InaccessibleFromKotlin public void setAutoDisconnectOnLastChannelClose(boolean);
     method @InaccessibleFromKotlin public void setClientVersion(java.lang.String);
     method @InaccessibleFromKotlin public void setEnableCompression(boolean);
     method @InaccessibleFromKotlin public void setEncryptionAlgorithms(java.lang.String);
@@ -670,6 +674,7 @@ package org.connectbot.sshlib {
     method @InaccessibleFromKotlin public void setRekeyBytesLimit(long);
     method @InaccessibleFromKotlin public void setRekeyIntervalMs(long);
     method @InaccessibleFromKotlin public void setTransportFactory(org.connectbot.sshlib.transport.TransportFactory?);
+    property public boolean autoDisconnectOnLastChannelClose;
     property public String clientVersion;
     property public boolean enableCompression;
     property public String encryptionAlgorithms;

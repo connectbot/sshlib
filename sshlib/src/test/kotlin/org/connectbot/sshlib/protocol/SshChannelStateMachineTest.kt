@@ -171,7 +171,7 @@ class SshChannelStateMachineTest {
         assertEquals(SshChannelState.CLOSE_SENT, machine.state)
         assertFalse(machine.isOpen)
         assertFalse(machine.sendData {})
-        assertFalse(machine.receiveData {})
+        assertTrue(machine.receiveData {})
         assertFalse(machine.sendEof {})
         assertTrue(machine.receiveClose {})
         assertEquals(SshChannelState.CLOSED, machine.state)

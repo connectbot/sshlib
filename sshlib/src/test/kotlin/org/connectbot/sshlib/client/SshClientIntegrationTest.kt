@@ -1452,6 +1452,7 @@ class SshClientIntegrationTest {
                 this.host = host
                 this.port = port
                 this.hostKeyVerifier = acceptAllVerifier
+                this.autoDisconnectOnLastChannelClose = false
             },
         )
 
@@ -1468,6 +1469,11 @@ class SshClientIntegrationTest {
                 val execGranted = withTimeout(10_000) { session!!.requestExec("true") }
                 assertTrue(execGranted, "requestExec failed on attempt $attempt")
                 session!!.close()
+                withTimeout(5_000) {
+                    while (session.isOpen) {
+                        yield()
+                    }
+                }
                 assertFalse(session.isOpen, "session should be closed on attempt $attempt")
             }
         } finally {
