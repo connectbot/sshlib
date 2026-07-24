@@ -1,6 +1,6 @@
 ---- MODULE SftpClientStateMachineGenerated ----
 \* Generated from SftpStateMachine. Do not edit.
-\* Model SHA-256: 66c6ecb224482047f6437721e0f69ecc6ad240c631519a17776df4038ef3cff1
+\* Model SHA-256: a7f1fe5d3c3f7cad3881332410271e5cd067ecc1df7c4947f3640602b35946e7
 EXTENDS Naturals
 
 CONSTANT MaxHandles, MaxRequests
@@ -8,15 +8,15 @@ CONSTANT MaxHandles, MaxRequests
 HandleIDs == 1..MaxHandles
 RequestIDs == 1..MaxRequests
 
-VARIABLES state, previousState, event, origin, effects, previousHandles, activeHandle, handles, previousPendingRequests, activeRequest, pendingRequests
+VARIABLES state, previousState, event, origin, effects, previousHandles, activeHandle, handles, previousPendingRequests, activeRequest, pendingRequests, requestHandles
 
-vars == <<state, previousState, event, origin, effects, previousHandles, activeHandle, handles, previousPendingRequests, activeRequest, pendingRequests>>
+vars == <<state, previousState, event, origin, effects, previousHandles, activeHandle, handles, previousPendingRequests, activeRequest, pendingRequests, requestHandles>>
 
 States == {"CLOSED", "READY", "UNINITIALIZED", "WAIT_VERSION"}
 Events == {"CloseHandle", "Disconnect", "OpenDir", "OpenFile", "ReadDir", "ReadFile", "ReceiveAttrs", "ReceiveData", "ReceiveHandle", "ReceiveName", "ReceiveStatus", "ReceiveVersion", "Request", "SendInit", "WriteFile"}
 Origins == {"CONNECTION_CONTROL", "LOCAL_COMMAND", "PARSED_PACKET"}
 Effects == {"DELIVER_ATTRS", "DELIVER_DATA", "DELIVER_HANDLE", "DELIVER_NAME", "DELIVER_STATUS", "DISCONNECT_SFTP", "RECEIVE_VERSION", "SEND_CLOSE_HANDLE", "SEND_INIT", "SEND_OPEN_DIR", "SEND_OPEN_FILE", "SEND_READ", "SEND_READDIR", "SEND_REQUEST", "SEND_WRITE"}
-HandleStates == {"Closed", "OpenDir", "OpenFile", "Unallocated"}
+HandleStates == {"Closed", "OpenDir", "OpenFile", "PendingDir", "PendingFile", "Unallocated"}
 
 Init ==
     /\ state = "UNINITIALIZED"
@@ -30,6 +30,7 @@ Init ==
     /\ previousPendingRequests = [r \in RequestIDs |-> "None"]
     /\ activeRequest = 0
     /\ pendingRequests = [r \in RequestIDs |-> "None"]
+    /\ requestHandles = [r \in RequestIDs |-> 0]
 
 DISCONNECT_READY ==
     /\ state = "READY"
@@ -44,6 +45,7 @@ DISCONNECT_READY ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' = 0
     /\ pendingRequests' = [r \in RequestIDs |-> "None"]
+    /\ requestHandles' = [r \in RequestIDs |-> 0]
 
 DISCONNECT_UNINITIALIZED ==
     /\ state = "UNINITIALIZED"
@@ -58,6 +60,7 @@ DISCONNECT_UNINITIALIZED ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' = 0
     /\ pendingRequests' = [r \in RequestIDs |-> "None"]
+    /\ requestHandles' = [r \in RequestIDs |-> 0]
 
 DISCONNECT_WAIT_VERSION ==
     /\ state = "WAIT_VERSION"
@@ -72,6 +75,7 @@ DISCONNECT_WAIT_VERSION ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' = 0
     /\ pendingRequests' = [r \in RequestIDs |-> "None"]
+    /\ requestHandles' = [r \in RequestIDs |-> 0]
 
 RECEIVE_VERSION_WAIT_VERSION ==
     /\ state = "WAIT_VERSION"
@@ -86,6 +90,7 @@ RECEIVE_VERSION_WAIT_VERSION ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' = 0
     /\ pendingRequests' = pendingRequests
+    /\ requestHandles' = requestHandles
 
 SEND_INIT_UNINITIALIZED ==
     /\ state = "UNINITIALIZED"
@@ -100,6 +105,7 @@ SEND_INIT_UNINITIALIZED ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' = 0
     /\ pendingRequests' = pendingRequests
+    /\ requestHandles' = requestHandles
 
 AllocateHandle ==
     /\ state = "READY"
@@ -110,10 +116,11 @@ AllocateHandle ==
     /\ effects' = {"SEND_OPEN_FILE"}
     /\ previousHandles' = handles
     /\ activeHandle' \in HandleIDs
-    /\ handles' = [handles EXCEPT ![activeHandle'] = "OpenFile"]
+    /\ handles' = [handles EXCEPT ![activeHandle'] = "PendingFile"]
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingOpen"]
+    /\ requestHandles' = [requestHandles EXCEPT ![activeRequest'] = activeHandle']
     /\ handles[activeHandle'] = "Unallocated"
     /\ pendingRequests[activeRequest'] = "None"
 
@@ -126,10 +133,11 @@ AllocateDirHandle ==
     /\ effects' = {"SEND_OPEN_DIR"}
     /\ previousHandles' = handles
     /\ activeHandle' \in HandleIDs
-    /\ handles' = [handles EXCEPT ![activeHandle'] = "OpenDir"]
+    /\ handles' = [handles EXCEPT ![activeHandle'] = "PendingDir"]
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingOpen"]
+    /\ requestHandles' = [requestHandles EXCEPT ![activeRequest'] = activeHandle']
     /\ handles[activeHandle'] = "Unallocated"
     /\ pendingRequests[activeRequest'] = "None"
 
@@ -146,6 +154,7 @@ ReadFileOp ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingRead"]
+    /\ requestHandles' = requestHandles
     /\ handles[activeHandle'] = "OpenFile"
     /\ pendingRequests[activeRequest'] = "None"
 
@@ -162,6 +171,7 @@ WriteFileOp ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingWrite"]
+    /\ requestHandles' = requestHandles
     /\ handles[activeHandle'] = "OpenFile"
     /\ pendingRequests[activeRequest'] = "None"
 
@@ -178,6 +188,7 @@ ReadDirOp ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingReadDir"]
+    /\ requestHandles' = requestHandles
     /\ handles[activeHandle'] = "OpenDir"
     /\ pendingRequests[activeRequest'] = "None"
 
@@ -194,7 +205,8 @@ CloseHandleOp ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingClose"]
-    /\ handles[activeHandle'] \in {"OpenFile", "OpenDir"}
+    /\ requestHandles' = requestHandles
+    /\ handles[activeHandle'] \in {"PendingFile", "PendingDir", "OpenFile", "OpenDir"}
     /\ pendingRequests[activeRequest'] = "None"
 
 RequestOp ==
@@ -210,22 +222,27 @@ RequestOp ==
     /\ previousPendingRequests' = pendingRequests
     /\ activeRequest' \in RequestIDs
     /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "PendingRequest"]
+    /\ requestHandles' = requestHandles
     /\ pendingRequests[activeRequest'] = "None"
 
 FulfillResponse ==
     \/ /\ state = "READY"
-       /\ state' = "READY"
-       /\ previousState' = state
-       /\ event' = "ReceiveHandle"
-       /\ origin' = "PARSED_PACKET"
-       /\ effects' = {"DELIVER_HANDLE"}
-       /\ previousHandles' = handles
-       /\ activeHandle' = 0
-       /\ handles' = handles
-       /\ previousPendingRequests' = pendingRequests
-       /\ activeRequest' \in RequestIDs
-       /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "None"]
-       /\ pendingRequests[activeRequest'] # "None"
+       /\ \E r \in RequestIDs :
+           /\ pendingRequests[r] = "PendingOpen"
+           /\ requestHandles[r] # 0
+           /\ handles[requestHandles[r]] \in {"PendingFile", "PendingDir"}
+           /\ state' = "READY"
+           /\ previousState' = state
+           /\ event' = "ReceiveHandle"
+           /\ origin' = "PARSED_PACKET"
+           /\ effects' = {"DELIVER_HANDLE"}
+           /\ previousHandles' = handles
+           /\ activeHandle' = 0
+           /\ handles' = [handles EXCEPT ![requestHandles[r]] = IF handles[requestHandles[r]] = "PendingFile" THEN "OpenFile" ELSE "OpenDir"]
+           /\ previousPendingRequests' = pendingRequests
+           /\ activeRequest' = r
+           /\ pendingRequests' = [pendingRequests EXCEPT ![r] = "None"]
+           /\ requestHandles' = [requestHandles EXCEPT ![r] = 0]
     \/ /\ state = "READY"
        /\ state' = "READY"
        /\ previousState' = state
@@ -238,7 +255,8 @@ FulfillResponse ==
        /\ previousPendingRequests' = pendingRequests
        /\ activeRequest' \in RequestIDs
        /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "None"]
-       /\ pendingRequests[activeRequest'] # "None"
+       /\ requestHandles' = requestHandles
+       /\ pendingRequests[activeRequest'] = "PendingRead"
     \/ /\ state = "READY"
        /\ state' = "READY"
        /\ previousState' = state
@@ -251,7 +269,8 @@ FulfillResponse ==
        /\ previousPendingRequests' = pendingRequests
        /\ activeRequest' \in RequestIDs
        /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "None"]
-       /\ pendingRequests[activeRequest'] # "None"
+       /\ requestHandles' = requestHandles
+       /\ pendingRequests[activeRequest'] = "PendingReadDir"
     \/ /\ state = "READY"
        /\ state' = "READY"
        /\ previousState' = state
@@ -264,6 +283,7 @@ FulfillResponse ==
        /\ previousPendingRequests' = pendingRequests
        /\ activeRequest' \in RequestIDs
        /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "None"]
+       /\ requestHandles' = requestHandles
        /\ pendingRequests[activeRequest'] # "None"
     \/ /\ state = "READY"
        /\ state' = "READY"
@@ -277,7 +297,8 @@ FulfillResponse ==
        /\ previousPendingRequests' = pendingRequests
        /\ activeRequest' \in RequestIDs
        /\ pendingRequests' = [pendingRequests EXCEPT ![activeRequest'] = "None"]
-       /\ pendingRequests[activeRequest'] # "None"
+       /\ requestHandles' = requestHandles
+       /\ pendingRequests[activeRequest'] = "PendingRequest"
 
 Next ==
     \/ DISCONNECT_READY
