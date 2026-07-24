@@ -34,6 +34,7 @@ internal class SftpStateMachineFormalModel(
         val activeHandle: String = "activeHandle' = 0",
         val pendingRequests: String = "pendingRequests",
         val activeRequest: String = "activeRequest' = 0",
+        val requestHandles: String = "requestHandles",
     )
 
     fun renderTla(moduleName: String = "SftpClientStateMachineGenerated"): String {
@@ -100,6 +101,7 @@ internal class SftpStateMachineFormalModel(
                             "handles"
                         },
                         pendingRequests = if (disconnect) "[r \\in RequestIDs |-> \"None\"]" else "pendingRequests",
+                        requestHandles = if (disconnect) "[r \\in RequestIDs |-> 0]" else "requestHandles",
                     ),
                     variables,
                 )
@@ -110,10 +112,11 @@ internal class SftpStateMachineFormalModel(
                 "AllocateHandle",
                 FormalStep(
                     transition = openFile,
-                    handles = "[handles EXCEPT ![activeHandle'] = \"OpenFile\"]",
+                    handles = "[handles EXCEPT ![activeHandle'] = \"PendingFile\"]",
                     activeHandle = "activeHandle' \\in HandleIDs",
                     pendingRequests = "[pendingRequests EXCEPT ![activeRequest'] = \"PendingOpen\"]",
                     activeRequest = "activeRequest' \\in RequestIDs",
+                    requestHandles = "[requestHandles EXCEPT ![activeRequest'] = activeHandle']",
                 ),
                 variables,
                 "handles[activeHandle'] = \"Unallocated\"",
@@ -125,10 +128,11 @@ internal class SftpStateMachineFormalModel(
                 "AllocateDirHandle",
                 FormalStep(
                     transition = openDir,
-                    handles = "[handles EXCEPT ![activeHandle'] = \"OpenDir\"]",
+                    handles = "[handles EXCEPT ![activeHandle'] = \"PendingDir\"]",
                     activeHandle = "activeHandle' \\in HandleIDs",
                     pendingRequests = "[pendingRequests EXCEPT ![activeRequest'] = \"PendingOpen\"]",
                     activeRequest = "activeRequest' \\in RequestIDs",
+                    requestHandles = "[requestHandles EXCEPT ![activeRequest'] = activeHandle']",
                 ),
                 variables,
                 "handles[activeHandle'] = \"Unallocated\"",
@@ -171,7 +175,7 @@ internal class SftpStateMachineFormalModel(
                     handles = "[handles EXCEPT ![activeHandle'] = \"Closed\"]",
                 ),
                 variables,
-                "handles[activeHandle'] \\in {\"OpenFile\", \"OpenDir\"}",
+                "handles[activeHandle'] \\in {\"PendingFile\", \"PendingDir\", \"OpenFile\", \"OpenDir\"}",
                 "pendingRequests[activeRequest'] = \"None\"",
             )
             appendLine()
@@ -190,16 +194,42 @@ internal class SftpStateMachineFormalModel(
 
             appendLine("FulfillResponse ==")
             responseTransitions.forEach { transition ->
-                val step = FormalStep(
-                    transition = transition,
-                    pendingRequests = "[pendingRequests EXCEPT ![activeRequest'] = \"None\"]",
-                    activeRequest = "activeRequest' \\in RequestIDs",
-                )
-                appendLine("    \\/ /\\ state = ${quote(transition.source.name)}")
-                variables.forEach { variable ->
-                    appendLine("       /\\ ${variable.renderNext(step)}")
+                val isReceiveHandle = transition.eventId == SftpEventId.RECEIVE_HANDLE
+                val pendingGuard = when (val expected = transition.expectsPending) {
+                    null -> "pendingRequests[activeRequest'] # \"None\""
+                    else -> "pendingRequests[activeRequest'] = \"${expected.tlaName}\""
                 }
-                appendLine("       /\\ pendingRequests[activeRequest'] # \"None\"")
+                if (isReceiveHandle) {
+                    // Use \E to bind request ID before referencing requestHandles[r]
+                    appendLine("    \\/ /\\ state = ${quote(transition.source.name)}")
+                    appendLine("       /\\ \\E r \\in RequestIDs :")
+                    appendLine("           /\\ pendingRequests[r] = \"PendingOpen\"")
+                    appendLine("           /\\ requestHandles[r] # 0")
+                    appendLine("           /\\ handles[requestHandles[r]] \\in {\"PendingFile\", \"PendingDir\"}")
+                    appendLine("           /\\ state' = ${quote(transition.target.name)}")
+                    appendLine("           /\\ previousState' = state")
+                    appendLine("           /\\ event' = ${quote(transition.eventId.tlaName)}")
+                    appendLine("           /\\ origin' = ${quote(transition.origin.name)}")
+                    appendLine("           /\\ effects' = ${renderSet(transition.effects.map(SftpEffect::name))}")
+                    appendLine("           /\\ previousHandles' = handles")
+                    appendLine("           /\\ activeHandle' = 0")
+                    appendLine("           /\\ handles' = [handles EXCEPT ![requestHandles[r]] = IF handles[requestHandles[r]] = \"PendingFile\" THEN \"OpenFile\" ELSE \"OpenDir\"]")
+                    appendLine("           /\\ previousPendingRequests' = pendingRequests")
+                    appendLine("           /\\ activeRequest' = r")
+                    appendLine("           /\\ pendingRequests' = [pendingRequests EXCEPT ![r] = \"None\"]")
+                    appendLine("           /\\ requestHandles' = [requestHandles EXCEPT ![r] = 0]")
+                } else {
+                    val step = FormalStep(
+                        transition = transition,
+                        pendingRequests = "[pendingRequests EXCEPT ![activeRequest'] = \"None\"]",
+                        activeRequest = "activeRequest' \\in RequestIDs",
+                    )
+                    appendLine("    \\/ /\\ state = ${quote(transition.source.name)}")
+                    variables.forEach { variable ->
+                        appendLine("       /\\ ${variable.renderNext(step)}")
+                    }
+                    appendLine("       /\\ $pendingGuard")
+                }
             }
             appendLine()
 
@@ -270,6 +300,7 @@ internal class SftpStateMachineFormalModel(
         variable("previousPendingRequests", "[r \\in RequestIDs |-> \"None\"]") { "pendingRequests" },
         FormalVariable("activeRequest", "0", FormalStep::activeRequest),
         variable("pendingRequests", "[r \\in RequestIDs |-> \"None\"]", FormalStep::pendingRequests),
+        variable("requestHandles", "[r \\in RequestIDs |-> 0]", FormalStep::requestHandles),
     )
 
     private fun variable(

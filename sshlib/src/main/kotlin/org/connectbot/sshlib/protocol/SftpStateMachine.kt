@@ -48,6 +48,8 @@ internal enum class SftpState {
  */
 internal enum class SftpHandleState {
     Unallocated,
+    PendingFile,
+    PendingDir,
     OpenFile,
     OpenDir,
     Closed,
@@ -115,6 +117,15 @@ internal enum class SftpTransitionId {
     DISCONNECT_READY,
 }
 
+internal enum class SftpPendingRequest(val tlaName: String) {
+    OPEN("PendingOpen"),
+    READ("PendingRead"),
+    WRITE("PendingWrite"),
+    READ_DIR("PendingReadDir"),
+    CLOSE("PendingClose"),
+    REQUEST("PendingRequest"),
+}
+
 internal data class SftpTransitionMeta(
     val id: SftpTransitionId,
     val eventId: SftpEventId,
@@ -123,6 +134,7 @@ internal data class SftpTransitionMeta(
     val effects: Set<SftpEffect>,
     val origin: SftpEventOrigin,
     val requiresReadySession: Boolean,
+    val expectsPending: SftpPendingRequest? = null,
 ) : MetaInfo
 
 internal data class SftpAcceptedTransition(
@@ -139,6 +151,7 @@ internal data class SftpFormalTransition(
     val effects: Set<SftpEffect>,
     val origin: SftpEventOrigin,
     val requiresReadySession: Boolean,
+    val expectsPending: SftpPendingRequest? = null,
 )
 
 internal data class SftpFormalModel(
@@ -281,7 +294,15 @@ internal class SftpStateMachine {
             )
     }
 
+    private enum class PendingRequestKind {
+        OPEN,
+        READ,
+        READ_DIR,
+        GENERIC,
+    }
+
     private val mutex = Mutex()
+    private val pendingRequests = mutableListOf<PendingRequestKind>()
 
     @Volatile
     private var activeState: SftpState = SftpState.UNINITIALIZED
@@ -297,26 +318,111 @@ internal class SftpStateMachine {
         bindState(ready, SftpState.READY)
         bindState(closed, SftpState.CLOSED)
 
-        uninitialized.sftpTransition(SftpEvent.SendInit {}, SftpTransitionId.SEND_INIT_UNINITIALIZED, waitVersion)
-        waitVersion.sftpTransition(SftpEvent.ReceiveVersion {}, SftpTransitionId.RECEIVE_VERSION_WAIT_VERSION, ready)
+        uninitialized.sftpTransition(
+            SftpEvent.SendInit {},
+            SftpTransitionId.SEND_INIT_UNINITIALIZED,
+            target = waitVersion,
+        )
+        waitVersion.sftpTransition(
+            SftpEvent.ReceiveVersion {},
+            SftpTransitionId.RECEIVE_VERSION_WAIT_VERSION,
+            target = ready,
+        )
 
-        ready.sftpTransition(SftpEvent.OpenFile {}, SftpTransitionId.OPEN_FILE_READY)
-        ready.sftpTransition(SftpEvent.OpenDir {}, SftpTransitionId.OPEN_DIR_READY)
-        ready.sftpTransition(SftpEvent.ReadFile {}, SftpTransitionId.READ_FILE_READY)
-        ready.sftpTransition(SftpEvent.WriteFile {}, SftpTransitionId.WRITE_FILE_READY)
-        ready.sftpTransition(SftpEvent.ReadDir {}, SftpTransitionId.READ_DIR_READY)
-        ready.sftpTransition(SftpEvent.CloseHandle {}, SftpTransitionId.CLOSE_HANDLE_READY)
-        ready.sftpTransition(SftpEvent.Request {}, SftpTransitionId.REQUEST_READY)
+        ready.sftpTransition(
+            SftpEvent.OpenFile {},
+            SftpTransitionId.OPEN_FILE_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.OPEN) },
+        )
+        ready.sftpTransition(
+            SftpEvent.OpenDir {},
+            SftpTransitionId.OPEN_DIR_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.OPEN) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReadFile {},
+            SftpTransitionId.READ_FILE_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.READ) },
+        )
+        ready.sftpTransition(
+            SftpEvent.WriteFile {},
+            SftpTransitionId.WRITE_FILE_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.GENERIC) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReadDir {},
+            SftpTransitionId.READ_DIR_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.READ_DIR) },
+        )
+        ready.sftpTransition(
+            SftpEvent.CloseHandle {},
+            SftpTransitionId.CLOSE_HANDLE_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.GENERIC) },
+        )
+        ready.sftpTransition(
+            SftpEvent.Request {},
+            SftpTransitionId.REQUEST_READY,
+            onEffect = { pendingRequests.add(PendingRequestKind.GENERIC) },
+        )
 
-        ready.sftpTransition(SftpEvent.ReceiveHandle {}, SftpTransitionId.RECEIVE_HANDLE_READY)
-        ready.sftpTransition(SftpEvent.ReceiveData {}, SftpTransitionId.RECEIVE_DATA_READY)
-        ready.sftpTransition(SftpEvent.ReceiveName {}, SftpTransitionId.RECEIVE_NAME_READY)
-        ready.sftpTransition(SftpEvent.ReceiveAttrs {}, SftpTransitionId.RECEIVE_ATTRS_READY)
-        ready.sftpTransition(SftpEvent.ReceiveStatus {}, SftpTransitionId.RECEIVE_STATUS_READY)
+        ready.sftpTransition(
+            SftpEvent.ReceiveHandle {},
+            SftpTransitionId.RECEIVE_HANDLE_READY,
+            expectsPending = SftpPendingRequest.OPEN,
+            guard = { pendingRequests.contains(PendingRequestKind.OPEN) },
+            onEffect = { pendingRequests.remove(PendingRequestKind.OPEN) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReceiveData {},
+            SftpTransitionId.RECEIVE_DATA_READY,
+            expectsPending = SftpPendingRequest.READ,
+            guard = { pendingRequests.contains(PendingRequestKind.READ) },
+            onEffect = { pendingRequests.remove(PendingRequestKind.READ) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReceiveName {},
+            SftpTransitionId.RECEIVE_NAME_READY,
+            expectsPending = SftpPendingRequest.READ_DIR,
+            guard = { pendingRequests.contains(PendingRequestKind.READ_DIR) },
+            onEffect = { pendingRequests.remove(PendingRequestKind.READ_DIR) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReceiveAttrs {},
+            SftpTransitionId.RECEIVE_ATTRS_READY,
+            expectsPending = SftpPendingRequest.REQUEST,
+            guard = { pendingRequests.contains(PendingRequestKind.GENERIC) },
+            onEffect = { pendingRequests.remove(PendingRequestKind.GENERIC) },
+        )
+        ready.sftpTransition(
+            SftpEvent.ReceiveStatus {},
+            SftpTransitionId.RECEIVE_STATUS_READY,
+            expectsPending = null,
+            guard = { pendingRequests.isNotEmpty() },
+            onEffect = {
+                if (pendingRequests.isNotEmpty()) {
+                    pendingRequests.removeAt(0)
+                }
+            },
+        )
 
-        uninitialized.sftpTransition(SftpEvent.Disconnect {}, SftpTransitionId.DISCONNECT_UNINITIALIZED, closed)
-        waitVersion.sftpTransition(SftpEvent.Disconnect {}, SftpTransitionId.DISCONNECT_WAIT_VERSION, closed)
-        ready.sftpTransition(SftpEvent.Disconnect {}, SftpTransitionId.DISCONNECT_READY, closed)
+        uninitialized.sftpTransition(
+            SftpEvent.Disconnect {},
+            SftpTransitionId.DISCONNECT_UNINITIALIZED,
+            target = closed,
+            onEffect = { pendingRequests.clear() },
+        )
+        waitVersion.sftpTransition(
+            SftpEvent.Disconnect {},
+            SftpTransitionId.DISCONNECT_WAIT_VERSION,
+            target = closed,
+            onEffect = { pendingRequests.clear() },
+        )
+        ready.sftpTransition(
+            SftpEvent.Disconnect {},
+            SftpTransitionId.DISCONNECT_READY,
+            target = closed,
+            onEffect = { pendingRequests.clear() },
+        )
     }
 
     val state: SftpState get() = activeState
@@ -350,6 +456,7 @@ internal class SftpStateMachine {
                     meta.effects,
                     meta.origin,
                     meta.requiresReadySession,
+                    meta.expectsPending,
                 )
             }
         }
@@ -360,7 +467,12 @@ internal class SftpStateMachine {
     }
 
     private suspend fun process(event: SftpEvent): Boolean = mutex.withLock {
-        stateMachine.processEvent(event) == ProcessingResult.PROCESSED
+        val result = stateMachine.processEvent(event)
+        if (result == ProcessingResult.PROCESSED) {
+            true
+        } else {
+            false
+        }
     }
 
     private fun bindState(state: IState, lifecycleState: SftpState) {
@@ -372,9 +484,15 @@ internal class SftpStateMachine {
         id: SftpTransitionId,
         target: State? = null,
         effects: Set<SftpEffect> = event.effects,
+        expectsPending: SftpPendingRequest? = null,
+        noinline guard: (() -> Boolean)? = null,
+        noinline onEffect: (() -> Unit)? = null,
     ) {
         transition<E>(id.name) {
             targetState = target
+            if (guard != null) {
+                this.guard = { guard() }
+            }
             metaInfo = SftpTransitionMeta(
                 id = id,
                 eventId = event.id,
@@ -384,8 +502,10 @@ internal class SftpStateMachine {
                 effects = effects,
                 origin = event.origin,
                 requiresReadySession = event.requiresReadySession,
+                expectsPending = expectsPending,
             )
         }.onTriggered {
+            onEffect?.invoke()
             it.event.action(SftpAcceptedTransition(id, effects, event.origin))
         }
     }

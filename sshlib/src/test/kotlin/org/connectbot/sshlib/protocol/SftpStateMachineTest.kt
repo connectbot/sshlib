@@ -133,4 +133,29 @@ class SftpStateMachineTest {
             assertEquals(renderer.renderTla(), fileContent)
         }
     }
+
+    @Test
+    fun `enforces response matching in state machine`() = runBlocking {
+        val machine = SftpStateMachine()
+        assertTrue(machine.sendInit { })
+        assertTrue(machine.receiveVersion { })
+
+        // Issue OpenFile -> expect PendingOpen
+        assertTrue(machine.openFile { })
+
+        // ReceiveData is declined because no READ is pending
+        assertFalse(machine.receiveData { })
+
+        // ReceiveHandle is accepted
+        assertTrue(machine.receiveHandle { })
+
+        // Issue ReadFile -> expect PendingRead
+        assertTrue(machine.readFile { })
+
+        // ReceiveHandle is declined because no OPEN is pending
+        assertFalse(machine.receiveHandle { })
+
+        // ReceiveData is accepted
+        assertTrue(machine.receiveData { })
+    }
 }
