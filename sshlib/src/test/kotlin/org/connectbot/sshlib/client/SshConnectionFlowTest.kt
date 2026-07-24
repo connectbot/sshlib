@@ -528,6 +528,26 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `opening a second session channel after closing the first succeeds when server reuses remote channel number`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+
+            val session1 = openSession(connection, server, dispatcher, remoteChannelNumber = 100)
+            val localChannel1 = session1.localChannelNumber
+
+            server.sendChannelClose(localChannel1)
+            withTimeout(5_000) {
+                while (session1.isOpen) {
+                    yield()
+                }
+            }
+
+            val session2 = openSession(connection, server, dispatcher, remoteChannelNumber = 100)
+            assertTrue(session2.isOpen)
+        }
+    }
+
+    @Test
     fun `direct tcpip channel routes data eof and close`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             authenticate(connection, server, dispatcher)
@@ -745,11 +765,12 @@ class SshConnectionFlowTest {
         connection: SshConnection,
         server: FakeSshServer,
         dispatcher: CoroutineDispatcher,
+        remoteChannelNumber: Int = 100,
     ): SessionChannel {
         val open = CoroutineScope(dispatcher).async { connection.openSessionChannel() }
         val openRequest = withTimeout(5_000) { server.awaitChannelOpen() }
         assertEquals("session", openRequest.channelType().value())
-        server.sendChannelOpenConfirmation(openRequest.senderChannel().toInt(), senderChannel = 100)
+        server.sendChannelOpenConfirmation(openRequest.senderChannel().toInt(), senderChannel = remoteChannelNumber)
         return assertNotNull(withTimeout(5_000) { open.await() })
     }
 

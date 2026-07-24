@@ -2560,9 +2560,15 @@ class SshConnection(
                         val recipientChannel = msg.recipientChannel().toInt()
                         logger.debug("Received CHANNEL_CLOSE for local channel $recipientChannel")
                         when (val entry = channelRegistry.findByLocalRecipient(recipientChannel)) {
-                            is SshChannelRegistry.Entry.Established.Session -> entry.channel.onClose()
+                            is SshChannelRegistry.Entry.Established.Session -> {
+                                entry.channel.onClose()
+                                channelRegistry.unregister(recipientChannel)
+                            }
 
-                            is SshChannelRegistry.Entry.Established.Agent -> entry.channel.onClose()
+                            is SshChannelRegistry.Entry.Established.Agent -> {
+                                entry.channel.onClose()
+                                channelRegistry.unregister(recipientChannel)
+                            }
 
                             is SshChannelRegistry.Entry.Established.Forwarding -> {
                                 entry.channel.onClose()
