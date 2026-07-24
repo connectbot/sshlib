@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.1][0.4.1]
+
+Changes for library users since `0.4.0`.
+
+### Changed
+
+- Bound TLA+ Terrapin model to implementation and tightened up the SFTP model.
+
+### Fixed
+
+- Ensured channels are unregistered and old channels are closed in the registry.
+
 ## [0.4.0][0.4.0]
 
 Changes for library users since `0.3.1`.
@@ -94,6 +106,7 @@ Changes for library users since `0.2.1`.
 - Limited zlib decompression output per packet to reduce decompression-bomb
   denial-of-service risk.
 
+[0.4.1]: https://github.com/connectbot/cbssh/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/connectbot/cbssh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/connectbot/cbssh/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/connectbot/cbssh/compare/v0.2.1...v0.3.0
