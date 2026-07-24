@@ -185,6 +185,19 @@ class SshStateMachineFormalModelTest {
         assertTrue("StrictKex = FALSE" in nonStrictConfig)
         assertTrue("INVARIANT NoTerrapin" in strictConfig)
         assertTrue("INVARIANT NoTerrapin" in nonStrictConfig)
+
+        // Bind SshTerrapin.tla abstractions to SshClientStateMachine formal model declarations
+        val transitions = createFormalModel().transitions.associateBy { it.meta.id }
+        val strictInit = transitions.getValue(SshTransitionId.RECEIVE_INITIAL_STRICT_KEX_INIT).meta
+        assertTrue(SshEffect.ENABLE_STRICT_KEX in strictInit.effects)
+
+        // Sequence number reset on initial KEX completion (modeled in SshTerrapin.CompleteInitialKex)
+        val ecdhReply = transitions.getValue(SshTransitionId.RECEIVE_KEX_ECDH_REPLY).meta
+        assertTrue(SshEffect.RESET_OUTBOUND_SEQUENCE in ecdhReply.effects)
+
+        // Unauthenticated packet injection abort under strict KEX (modeled in SshTerrapin.InjectUnauthenticatedIgnore)
+        val rejectNotFirst = transitions.getValue(SshTransitionId.REJECT_STRICT_KEX_INIT_NOT_FIRST).meta
+        assertTrue(SshEffect.DISCONNECT in rejectNotFirst.effects)
     }
 
     @Test
