@@ -49,13 +49,17 @@ internal class ForwardingChannel(
 
     private val incomingIngress = Channel<ByteArray>(Channel.UNLIMITED)
     private val _incomingData = Channel<ByteArray>(Channel.RENDEZVOUS)
+
+    @Volatile private var inboundDeliveryOpen = true
     val incomingData: ReceiveChannel<ByteArray> get() = _incomingData
     private val incomingDeliveryJob = connectionScope.launch {
         try {
             for (data in incomingIngress) {
                 _incomingData.send(data)
                 val adjust = window.releaseLocal(data.size)
-                connection.sendWindowAdjust(remoteChannelNumber, adjust)
+                if (inboundDeliveryOpen) {
+                    connection.sendWindowAdjust(remoteChannelNumber, adjust)
+                }
             }
         } finally {
             _incomingData.close()
@@ -90,7 +94,7 @@ internal class ForwardingChannel(
     internal suspend fun onEof() {
         if (!lifecycle.receiveEof {
                 logger.debug("Forwarding channel $localChannelNumber received EOF")
-                incomingIngress.close()
+                finishInboundDelivery()
             }
         ) {
             throw SshException("Received duplicate EOF or EOF after CLOSE on forwarding channel $localChannelNumber")
@@ -100,6 +104,7 @@ internal class ForwardingChannel(
     internal suspend fun onClose() {
         if (!lifecycle.receiveClose { transition ->
                 logger.debug("Forwarding channel $localChannelNumber closed")
+                finishInboundDelivery()
                 if (SshChannelEffect.SEND_CLOSE in transition.effects) {
                     try {
                         connection.sendChannelClose(remoteChannelNumber)
@@ -107,9 +112,6 @@ internal class ForwardingChannel(
                         logger.debug("Failed to send CHANNEL_CLOSE reply", e)
                     }
                 }
-                incomingIngress.close()
-                incomingDeliveryJob.cancel()
-                _incomingData.close()
                 windowAvailable.close()
                 if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
                     connection.notifyChannelClosed(localChannelNumber)
@@ -122,9 +124,7 @@ internal class ForwardingChannel(
 
     internal suspend fun onDisconnected() {
         lifecycle.disconnect { transition ->
-            incomingIngress.close()
-            incomingDeliveryJob.cancel()
-            _incomingData.close()
+            abortInboundDelivery()
             windowAvailable.close()
             if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
                 connection.notifyChannelClosed(localChannelNumber)
@@ -133,6 +133,17 @@ internal class ForwardingChannel(
     }
 
     internal suspend fun receiveRequest(action: suspend () -> Unit): Boolean = lifecycle.receiveRequest { action() }
+
+    private fun finishInboundDelivery() {
+        inboundDeliveryOpen = false
+        incomingIngress.close()
+    }
+
+    private fun abortInboundDelivery() {
+        finishInboundDelivery()
+        incomingDeliveryJob.cancel()
+        _incomingData.close()
+    }
 
     suspend fun sendData(data: ByteArray) {
         var offset = 0
@@ -159,13 +170,16 @@ internal class ForwardingChannel(
 
     suspend fun close() {
         lifecycle.sendClose { transition ->
-            incomingIngress.close()
-            incomingDeliveryJob.cancel()
-            _incomingData.close()
+            abortInboundDelivery()
+            windowAvailable.close()
             connection.sendChannelClose(remoteChannelNumber)
             if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
                 connection.notifyChannelClosed(localChannelNumber)
             }
         }
+        // A remote CLOSE makes sendClose a no-op, but close() still owns
+        // releasing any unread delivery job retained for graceful draining.
+        abortInboundDelivery()
+        windowAvailable.close()
     }
 }

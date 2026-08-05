@@ -109,14 +109,18 @@ class SshChannelStateMachineTest {
         val remotelyClosed = SshChannelStateMachine(SshChannelState.OPEN)
         val closeSent = SshChannelStateMachine(SshChannelState.OPEN)
         var remoteCloseEffects = emptySet<SshChannelEffect>()
+        var localCloseEffects = emptySet<SshChannelEffect>()
         var closeReplyEffects = emptySet<SshChannelEffect>()
 
         remotelyClosed.receiveClose { remoteCloseEffects = it.effects }
-        closeSent.sendClose {}
+        closeSent.sendClose { localCloseEffects = it.effects }
         closeSent.receiveClose { closeReplyEffects = it.effects }
 
         assertTrue(SshChannelEffect.SEND_CLOSE in remoteCloseEffects)
+        assertTrue(SshChannelEffect.CLOSE_INBOUND_STREAMS in remoteCloseEffects)
+        assertTrue(SshChannelEffect.CLOSE_INBOUND_STREAMS in localCloseEffects)
         assertFalse(SshChannelEffect.SEND_CLOSE in closeReplyEffects)
+        assertFalse(SshChannelEffect.CLOSE_INBOUND_STREAMS in closeReplyEffects)
         assertEquals(
             SshChannelEventOrigin.PARSED_PACKET,
             closeSent.formalModel().transitions.first {

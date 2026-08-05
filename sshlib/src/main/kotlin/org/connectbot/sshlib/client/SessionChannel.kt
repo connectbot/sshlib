@@ -71,6 +71,8 @@ class SessionChannel internal constructor(
     private val _stderr = Channel<ByteArray>(Channel.RENDEZVOUS)
     private val _extendedData = Channel<Pair<Int, ByteArray>>(Channel.RENDEZVOUS)
 
+    @Volatile private var inboundDeliveryOpen = true
+
     private val stdoutDeliveryJob = connectionScope.launch {
         deliverData(stdoutIngress, _stdout) { it.size }
     }
@@ -150,7 +152,9 @@ class SessionChannel internal constructor(
             for (value in ingress) {
                 output.send(value)
                 val adjust = window.releaseLocal(sizeOf(value))
-                connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+                if (inboundDeliveryOpen) {
+                    connection.sendWindowAdjust(_remoteChannelNumber, adjust)
+                }
             }
         } finally {
             output.close()
@@ -171,9 +175,7 @@ class SessionChannel internal constructor(
     internal suspend fun onEof() {
         if (!lifecycle.receiveEof {
                 logger.debug("Received EOF on channel $localChannelNumber")
-                stdoutIngress.close()
-                stderrIngress.close()
-                extendedDataIngress.close()
+                finishInboundDelivery()
             }
         ) {
             throw org.connectbot.sshlib.SshException("Received duplicate EOF or EOF after CLOSE on channel $localChannelNumber")
@@ -182,7 +184,11 @@ class SessionChannel internal constructor(
 
     internal suspend fun onClose() {
         if (!lifecycle.receiveClose { transition ->
-                closeResources(SshChannelEffect.SEND_CLOSE in transition.effects, "Received CLOSE")
+                closeResources(
+                    replyRequired = SshChannelEffect.SEND_CLOSE in transition.effects,
+                    preserveInbound = SshChannelEffect.CLOSE_INBOUND_STREAMS in transition.effects,
+                    reason = "Received CLOSE",
+                )
                 if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
                     connection.notifyChannelClosed(localChannelNumber)
                 }
@@ -192,12 +198,34 @@ class SessionChannel internal constructor(
         }
     }
 
-    private suspend fun closeResources(replyRequired: Boolean, reason: String) {
+    private fun finishInboundDelivery() {
+        inboundDeliveryOpen = false
+        stdoutIngress.close()
+        stderrIngress.close()
+        extendedDataIngress.close()
+    }
+
+    private fun abortInboundDelivery() {
+        finishInboundDelivery()
+        stdoutDeliveryJob.cancel()
+        stderrDeliveryJob.cancel()
+        extendedDeliveryJob.cancel()
+        _stdout.close()
+        _stderr.close()
+        _extendedData.close()
+    }
+
+    private suspend fun closeResources(replyRequired: Boolean, preserveInbound: Boolean, reason: String) {
         logger.debug("$reason on channel $localChannelNumber")
         obfuscatorMutex.withLock {
             obfuscator?.stop()
         }
         chaffJob?.cancel()
+        if (preserveInbound) {
+            finishInboundDelivery()
+        } else {
+            abortInboundDelivery()
+        }
         if (replyRequired) {
             try {
                 connection.sendChannelClose(_remoteChannelNumber)
@@ -205,15 +233,6 @@ class SessionChannel internal constructor(
                 logger.debug("Failed to send CHANNEL_CLOSE reply", e)
             }
         }
-        stdoutIngress.close()
-        stderrIngress.close()
-        extendedDataIngress.close()
-        stdoutDeliveryJob.cancel()
-        stderrDeliveryJob.cancel()
-        extendedDeliveryJob.cancel()
-        _stdout.close()
-        _stderr.close()
-        _extendedData.close()
         windowAvailable.close()
         // Channel is gone; if the server never reported an exit, resolve
         // waiters with "unknown" rather than leaving them suspended.
@@ -222,7 +241,7 @@ class SessionChannel internal constructor(
 
     internal suspend fun onDisconnected() {
         lifecycle.disconnect { transition ->
-            closeResources(replyRequired = false, reason = "Disconnected")
+            closeResources(replyRequired = false, preserveInbound = false, reason = "Disconnected")
             if (SshChannelEffect.CLOSE_CHANNEL in transition.effects) {
                 connection.notifyChannelClosed(localChannelNumber)
             }
@@ -461,15 +480,8 @@ class SessionChannel internal constructor(
                 logger.debug("Closing channel $localChannelNumber")
                 obfuscatorMutex.withLock { obfuscator?.stop() }
                 chaffJob?.cancel()
-                stdoutIngress.close()
-                stderrIngress.close()
-                extendedDataIngress.close()
-                stdoutDeliveryJob.cancel()
-                stderrDeliveryJob.cancel()
-                extendedDeliveryJob.cancel()
-                _stdout.close()
-                _stderr.close()
-                _extendedData.close()
+                abortInboundDelivery()
+                windowAvailable.close()
                 _exitInfo.complete(null)
                 try {
                     connection.sendChannelClose(_remoteChannelNumber)
@@ -480,6 +492,11 @@ class SessionChannel internal constructor(
                     connection.notifyChannelClosed(localChannelNumber)
                 }
             }
+            // A remote CLOSE makes sendClose a no-op, but close() still owns
+            // releasing any unread delivery job retained for graceful draining.
+            abortInboundDelivery()
+            windowAvailable.close()
+            _exitInfo.complete(null)
         }
     }
 }

@@ -251,6 +251,17 @@ class SshStateMachineFormalModelTest {
     }
 
     @Test
+    fun `TLC checks inbound stream closure effects`() {
+        val handwritten = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.tla"))
+        val config = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.cfg"))
+
+        assertTrue("InboundStreamsCloseOnlyOnTermination ==" in handwritten)
+        assertTrue("InboundTerminationClosesStreams ==" in handwritten)
+        assertTrue("INVARIANT InboundStreamsCloseOnlyOnTermination" in config)
+        assertTrue("INVARIANT InboundTerminationClosesStreams" in config)
+    }
+
+    @Test
     fun `TLC explores strict and non-strict key exchange`() {
         val rendered = createFormalModel().renderTla()
         val config = Files.readString(Path.of("src/test/resources/tla/SshClientStateMachine.cfg"))

@@ -85,6 +85,23 @@ NoInvalidChannelSideEffects ==
            )
         /\ channelOrigin = ChannelOriginFor(channelEvent)
 
+InboundStreamsCloseOnlyOnTermination ==
+    "CLOSE_INBOUND_STREAMS" \in channelEffects =>
+        channelEvent \in {"ReceiveEof", "ReceiveClose", "SendClose"}
+
+InboundTerminationClosesStreams ==
+    activeChannel \in ChannelIDs /\
+        ChannelOperationAllowed(
+            authenticationEstablished,
+            state,
+            previousChannels[activeChannel],
+            channelEvent
+        ) /\
+        (\/ channelEvent \in {"ReceiveEof", "SendClose"}
+         \/ /\ channelEvent = "ReceiveClose"
+            /\ previousChannels[activeChannel] # "CLOSE_SENT") =>
+            "CLOSE_INBOUND_STREAMS" \in channelEffects
+
 ChannelIsolation ==
     activeChannel \in ChannelIDs =>
         \A other \in ChannelIDs \ {activeChannel} :
