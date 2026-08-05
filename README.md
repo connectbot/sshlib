@@ -76,12 +76,14 @@ You can use it by running the following commands:
 
 ```kotlin
 val client = SshClient("example.com", port = 22, hostKeyVerifier = myVerifier)
-client.connect()
-client.authenticatePassword("user", "pass")
+check(client.connect() is ConnectResult.Success) { "SSH connection failed" }
+check(client.authenticatePassword("user", "pass") is AuthResult.Success) {
+    "SSH authentication failed"
+}
 
-val session = client.openSession()
-session.requestPty()
-session.requestShell()
+val session = checkNotNull(client.openSession()) { "Failed to open SSH session" }
+check(session.requestPty()) { "Server rejected PTY request" }
+check(session.requestShell()) { "Server rejected shell request" }
 
 // Read/write
 session.write("ls\n".toByteArray())
@@ -114,8 +116,11 @@ try {
 
     // Read a file
     val handle = sftp.open("/home/user/file.txt", setOf(SftpOpenFlag.READ)).getOrThrow()
-    val data = sftp.read(handle, 0L, 4096).getOrThrow()
-    sftp.close(handle)
+    try {
+        val data = sftp.read(handle, 0L, 4096).getOrThrow() // ByteArray? (null on EOF)
+    } finally {
+        sftp.close(handle).getOrThrow()
+    }
 } finally {
     sftp.close()
 }
@@ -143,7 +148,7 @@ class MyAgentProvider : AgentProvider {
     override suspend fun signData(context: AgentSigningContext): AgentResult<ByteArray?> {
         // Show approval UI to user with session context
         val approved = showSigningPrompt(
-            "Remote server ${context.serverHostKey.toHex()} wants to use your key",
+            "Remote server ${context.serverHostKey.joinToString("") { "%02x".format(it) }} wants to use your key",
             "Session bound: ${context.isBound}"
         )
 
@@ -157,13 +162,15 @@ class MyAgentProvider : AgentProvider {
 
 // Enable agent forwarding
 val client = SshClient("bastion.example.com", hostKeyVerifier = myVerifier)
-client.connect()
-client.authenticatePassword("user", "pass")
+check(client.connect() is ConnectResult.Success) { "SSH connection failed" }
+check(client.authenticatePassword("user", "pass") is AuthResult.Success) {
+    "SSH authentication failed"
+}
 client.enableAgentForwarding(MyAgentProvider())
 
 // Now remote servers can use your agent through forwarding
-val session = client.openSession()
-session.requestShell()
+val session = checkNotNull(client.openSession()) { "Failed to open SSH session" }
+check(session.requestShell()) { "Server rejected shell request" }
 // When you SSH from bastion to another server, it can request signatures
 ```
 
@@ -189,4 +196,4 @@ Apache License 2.0 - See LICENSE file
 
 ## Copyright
 
-Copyright 2019-2025, [Kenny Root](https://github.com/kruton/)
+Copyright 2019-2026, [Kenny Root](https://github.com/kruton/)
