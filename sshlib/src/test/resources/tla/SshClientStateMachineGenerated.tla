@@ -1,6 +1,6 @@
 ---- MODULE SshClientStateMachineGenerated ----
 \* Generated from SshClientStateMachine. Do not edit.
-\* Model SHA-256: 04f78793763d07d60314395341b04de0a29ebc5a024845d80d27599ad75f0214
+\* Model SHA-256: f93b71171b62816926e550b59ad72fa55b567872e0ad9aea52e90d72bbc78501
 \* Lifecycle states: 11; transitions: 43.
 \* TLC distinct states count full variable valuations, not lifecycle nodes.
 EXTENDS Naturals
@@ -114,38 +114,38 @@ ChannelTransitionTarget(channelState, operation) ==
     CHOOSE target \in ChannelStates : <<channelState, operation, target>> \in ChannelTransitions
 
 ChannelEffectsFor(channelState, operation) ==
-    CASE /\ channelState = "BOTH_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_CHANNEL"}
+    CASE /\ channelState = "BOTH_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS", "CLOSE_CHANNEL"}
       [] /\ channelState = "BOTH_EOF" /\ operation = "ReceiveRequest" -> {"DELIVER_REQUEST"}
       [] /\ channelState = "BOTH_EOF" /\ operation = "ReceiveWindowAdjust" -> {"ADJUST_WINDOW"}
-      [] /\ channelState = "BOTH_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE"}
+      [] /\ channelState = "BOTH_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "BOTH_EOF" /\ operation = "SendRequest" -> {"SEND_REQUEST"}
       [] /\ channelState = "CLOSE_SENT" /\ operation = "ReceiveClose" -> {"CLOSE_CHANNEL"}
       [] /\ channelState = "CLOSE_SENT" /\ operation = "ReceiveData" -> {}
       [] /\ channelState = "CLOSE_SENT" /\ operation = "ReceiveEof" -> {}
       [] /\ channelState = "CLOSE_SENT" /\ operation = "ReceiveRequest" -> {}
       [] /\ channelState = "CLOSE_SENT" /\ operation = "ReceiveWindowAdjust" -> {}
-      [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_CHANNEL"}
+      [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS", "CLOSE_CHANNEL"}
       [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveData" -> {"DELIVER_DATA"}
       [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveEof" -> {"CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveRequest" -> {"DELIVER_REQUEST"}
       [] /\ channelState = "LOCAL_EOF" /\ operation = "ReceiveWindowAdjust" -> {"ADJUST_WINDOW"}
-      [] /\ channelState = "LOCAL_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE"}
+      [] /\ channelState = "LOCAL_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "LOCAL_EOF" /\ operation = "SendRequest" -> {"SEND_REQUEST"}
-      [] /\ channelState = "OPEN" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_CHANNEL"}
+      [] /\ channelState = "OPEN" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS", "CLOSE_CHANNEL"}
       [] /\ channelState = "OPEN" /\ operation = "ReceiveData" -> {"DELIVER_DATA"}
       [] /\ channelState = "OPEN" /\ operation = "ReceiveEof" -> {"CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "OPEN" /\ operation = "ReceiveRequest" -> {"DELIVER_REQUEST"}
       [] /\ channelState = "OPEN" /\ operation = "ReceiveWindowAdjust" -> {"ADJUST_WINDOW"}
-      [] /\ channelState = "OPEN" /\ operation = "SendClose" -> {"SEND_CLOSE"}
+      [] /\ channelState = "OPEN" /\ operation = "SendClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "OPEN" /\ operation = "SendData" -> {"SEND_DATA"}
       [] /\ channelState = "OPEN" /\ operation = "SendEof" -> {"SEND_EOF"}
       [] /\ channelState = "OPEN" /\ operation = "SendRequest" -> {"SEND_REQUEST"}
       [] /\ channelState = "OPENING" /\ operation = "OpenConfirmed" -> {"COMPLETE_OPEN"}
       [] /\ channelState = "OPENING" /\ operation = "OpenFailed" -> {"FAIL_OPEN"}
-      [] /\ channelState = "REMOTE_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_CHANNEL"}
+      [] /\ channelState = "REMOTE_EOF" /\ operation = "ReceiveClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS", "CLOSE_CHANNEL"}
       [] /\ channelState = "REMOTE_EOF" /\ operation = "ReceiveRequest" -> {"DELIVER_REQUEST"}
       [] /\ channelState = "REMOTE_EOF" /\ operation = "ReceiveWindowAdjust" -> {"ADJUST_WINDOW"}
-      [] /\ channelState = "REMOTE_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE"}
+      [] /\ channelState = "REMOTE_EOF" /\ operation = "SendClose" -> {"SEND_CLOSE", "CLOSE_INBOUND_STREAMS"}
       [] /\ channelState = "REMOTE_EOF" /\ operation = "SendData" -> {"SEND_DATA"}
       [] /\ channelState = "REMOTE_EOF" /\ operation = "SendEof" -> {"SEND_EOF"}
       [] /\ channelState = "REMOTE_EOF" /\ operation = "SendRequest" -> {"SEND_REQUEST"}

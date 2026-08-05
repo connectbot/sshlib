@@ -308,14 +308,18 @@ internal class SshChannelStateMachine(
         class SendClose(action: suspend (SshChannelAcceptedTransition) -> Unit) :
             ChannelEvent(
                 SshChannelEventId.SEND_CLOSE,
-                setOf(SshChannelEffect.SEND_CLOSE),
+                setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_INBOUND_STREAMS),
                 SshChannelEventOrigin.LOCAL_COMMAND,
                 action,
             )
         class ReceiveClose(action: suspend (SshChannelAcceptedTransition) -> Unit) :
             ChannelEvent(
                 SshChannelEventId.RECEIVE_CLOSE,
-                setOf(SshChannelEffect.SEND_CLOSE, SshChannelEffect.CLOSE_CHANNEL),
+                setOf(
+                    SshChannelEffect.SEND_CLOSE,
+                    SshChannelEffect.CLOSE_INBOUND_STREAMS,
+                    SshChannelEffect.CLOSE_CHANNEL,
+                ),
                 SshChannelEventOrigin.PARSED_PACKET,
                 action,
             )

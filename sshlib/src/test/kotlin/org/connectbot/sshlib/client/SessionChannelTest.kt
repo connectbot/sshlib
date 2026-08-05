@@ -154,6 +154,63 @@ class SessionChannelTest {
     }
 
     @Test
+    fun `remote close preserves unread stdout until consumed`() = runTest {
+        val (channel, conn) = createChannel()
+        val first = "first".toByteArray()
+        val second = "second".toByteArray()
+
+        channel.onData(first)
+        channel.onData(second)
+        channel.onClose()
+
+        assertArrayEquals(first, channel.stdout.receive())
+        assertArrayEquals(second, channel.stdout.receive())
+        assertTrue(channel.stdout.receiveCatching().isClosed)
+        coVerify(exactly = 0) { conn.sendWindowAdjust(any(), any()) }
+    }
+
+    @Test
+    fun `remote close preserves unread stderr and extended data`() = runTest {
+        val (channel, _) = createChannel()
+        val stderr = "error".toByteArray()
+        val extended = "extended".toByteArray()
+
+        channel.onExtendedData(1, stderr)
+        channel.onExtendedData(7, extended)
+        channel.onClose()
+
+        assertArrayEquals(stderr, channel.stderr.receive())
+        val receivedExtended = channel.readExtended()
+        assertEquals(7, receivedExtended?.first)
+        assertArrayEquals(extended, receivedExtended?.second)
+        assertTrue(channel.stderr.receiveCatching().isClosed)
+        assertEquals(null, channel.readExtended())
+    }
+
+    @Test
+    fun `remote EOF preserves unread stdout until consumed`() = runTest {
+        val (channel, _) = createChannel()
+        val data = "tail".toByteArray()
+
+        channel.onData(data)
+        channel.onEof()
+
+        assertArrayEquals(data, channel.stdout.receive())
+        assertTrue(channel.stdout.receiveCatching().isClosed)
+    }
+
+    @Test
+    fun `explicit close after remote close discards abandoned output`() = runTest {
+        val (channel, _) = createChannel()
+
+        channel.onData("abandoned".toByteArray())
+        channel.onClose()
+        channel.close()
+
+        assertTrue(channel.stdout.receiveCatching().isClosed)
+    }
+
+    @Test
     fun `close marks channel not open and sends channel close`() = runTest {
         val (channel, conn) = createChannel()
         assertTrue(channel.isOpen)

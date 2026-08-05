@@ -47,6 +47,7 @@ import org.connectbot.sshlib.crypto.PrivateKeyReader
 import org.connectbot.sshlib.crypto.SshPublicKeyEncoder
 import org.connectbot.sshlib.transport.PipedTransport
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -453,6 +454,82 @@ class SshConnectionFlowTest {
     }
 
     @Test
+    fun `session channel preserves data received before close until consumer reads`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            connection.autoDisconnectOnLastChannelClose = false
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+
+            server.sendChannelData(localChannel, byteArrayOf(1, 2, 3))
+            server.sendChannelExtendedData(localChannel, 1, byteArrayOf(4, 5))
+            server.sendChannelExtendedData(localChannel, 7, byteArrayOf(6, 7))
+            server.sendChannelClose(localChannel)
+            withTimeout(5_000) {
+                while (session.isOpen) yield()
+            }
+
+            assertContentEquals(byteArrayOf(1, 2, 3), withTimeout(5_000) { session.stdout.receive() })
+            assertContentEquals(byteArrayOf(4, 5), withTimeout(5_000) { session.stderr.receive() })
+            val extended = withTimeout(5_000) { session.readExtended() }
+            assertEquals(7, extended?.first)
+            assertContentEquals(byteArrayOf(6, 7), extended?.second)
+            assertNull(withTimeout(5_000) { session.read() })
+            assertNull(withTimeout(5_000) { session.stderr.receiveCatching().getOrNull() })
+            assertNull(withTimeout(5_000) { session.readExtended() })
+        }
+    }
+
+    @Test
+    fun `session channel preserves a multi-window stdout tail when close follows data`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            connection.autoDisconnectOnLastChannelClose = false
+            authenticate(connection, server, dispatcher)
+            val session = openSession(connection, server, dispatcher)
+            val localChannel = session.localChannelNumber
+            val packetSize = 32 * 1024
+            val expected = ByteArray(1024 * 1024) { index -> (index % 251).toByte() }
+            val tailReceiverBlocked = CompletableDeferred<Unit>()
+            val releaseTailReceiver = CompletableDeferred<Unit>()
+            val received = async(dispatcher) {
+                val output = ByteArrayOutputStream(expected.size)
+                for (chunk in session.stdout) {
+                    output.write(chunk)
+                    if (output.size() == expected.size - packetSize) {
+                        tailReceiverBlocked.complete(Unit)
+                        releaseTailReceiver.await()
+                    }
+                    yield()
+                }
+                output.toByteArray()
+            }
+
+            var offset = 0
+            var availableWindow = 64 * 1024L
+            while (offset < expected.size) {
+                if (availableWindow == 0L) {
+                    val adjust = withTimeout(5_000) { server.awaitChannelWindowAdjust() }
+                    assertEquals(100L, adjust.recipientChannel())
+                    availableWindow += adjust.bytesToAdd()
+                }
+                val chunkSize = minOf(packetSize.toLong(), availableWindow, (expected.size - offset).toLong()).toInt()
+                server.sendChannelData(localChannel, expected.copyOfRange(offset, offset + chunkSize))
+                offset += chunkSize
+                availableWindow -= chunkSize
+            }
+            server.sendChannelClose(localChannel)
+
+            withTimeout(5_000) {
+                while (session.isOpen) yield()
+            }
+            assertTrue(tailReceiverBlocked.isCompleted)
+            releaseTailReceiver.complete(Unit)
+            assertContentEquals(expected, withTimeout(5_000) { received.await() })
+            assertNull(withTimeout(5_000) { session.read() })
+        }
+    }
+
+    @Test
     fun `exit-status channel request completes exitInfo`() = runTest {
         connectedFixture { connection, server, dispatcher ->
             authenticate(connection, server, dispatcher)
@@ -574,6 +651,32 @@ class SshConnectionFlowTest {
                     yield()
                 }
             }
+        }
+    }
+
+    @Test
+    fun `direct tcpip channel preserves data received before close until consumer reads`() = runTest {
+        connectedFixture { connection, server, dispatcher ->
+            authenticate(connection, server, dispatcher)
+
+            val open = async(dispatcher) {
+                connection.openDirectTcpipChannel("target", 22, "127.0.0.1", 12345)
+            }
+            val openRequest = withTimeout(5_000) { server.awaitChannelOpen() }
+            server.sendChannelOpenConfirmation(openRequest.senderChannel().toInt(), senderChannel = 200)
+            val channel = assertNotNull(withTimeout(5_000) { open.await() })
+
+            server.sendChannelData(channel.localChannelNumber, byteArrayOf(9, 8, 7))
+            server.sendChannelClose(channel.localChannelNumber)
+            withTimeout(5_000) {
+                while (channel.isOpen) yield()
+            }
+
+            assertContentEquals(
+                byteArrayOf(9, 8, 7),
+                withTimeout(5_000) { channel.incomingData.receive() },
+            )
+            assertNull(withTimeout(5_000) { channel.incomingData.receiveCatching().getOrNull() })
         }
     }
 

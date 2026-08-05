@@ -109,6 +109,33 @@ class ForwardingChannelTest {
     }
 
     @Test
+    fun `remote close preserves unread incoming data until consumed`() = runTest {
+        val (channel, conn) = createChannel()
+        val first = "first".toByteArray()
+        val second = "second".toByteArray()
+
+        channel.onData(first)
+        channel.onData(second)
+        channel.onClose()
+
+        assertArrayEquals(first, channel.incomingData.receive())
+        assertArrayEquals(second, channel.incomingData.receive())
+        assertTrue(channel.incomingData.receiveCatching().isClosed)
+        coVerify(exactly = 0) { conn.sendWindowAdjust(any(), any()) }
+    }
+
+    @Test
+    fun `explicit close after remote close discards abandoned incoming data`() = runTest {
+        val (channel, _) = createChannel()
+
+        channel.onData("abandoned".toByteArray())
+        channel.onClose()
+        channel.close()
+
+        assertTrue(channel.incomingData.receiveCatching().isClosed)
+    }
+
+    @Test
     fun `sendData chunks data by maxPacketSize`() = runTest {
         val conn = mockk<SshConnection>(relaxed = true)
         val sentChunks = mutableListOf<ByteArray>()

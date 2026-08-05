@@ -45,6 +45,7 @@ import org.connectbot.sshlib.protocol.SshMsgChannelOpenConfirmation
 import org.connectbot.sshlib.protocol.SshMsgChannelOpenFailure
 import org.connectbot.sshlib.protocol.SshMsgChannelRequest
 import org.connectbot.sshlib.protocol.SshMsgChannelSuccess
+import org.connectbot.sshlib.protocol.SshMsgChannelWindowAdjust
 import org.connectbot.sshlib.protocol.SshMsgDisconnect
 import org.connectbot.sshlib.protocol.SshMsgExtInfo
 import org.connectbot.sshlib.protocol.SshMsgIgnore
@@ -118,6 +119,7 @@ class FakeSshServer(
     private val receivedChannelOpenConfirmations = Channel<SshMsgChannelOpenConfirmation>(Channel.UNLIMITED)
     private val receivedChannelOpenFailures = Channel<SshMsgChannelOpenFailure>(Channel.UNLIMITED)
     private val receivedChannelData = Channel<SshMsgChannelData>(Channel.UNLIMITED)
+    private val receivedChannelWindowAdjusts = Channel<SshMsgChannelWindowAdjust>(Channel.UNLIMITED)
     private val receivedUnimplemented = Channel<SshMsgUnimplemented>(Channel.UNLIMITED)
 
     fun start(ignoreTransportErrors: Boolean = false) {
@@ -268,6 +270,13 @@ class FakeSshServer(
                             val data = SshMsgChannelData(ByteBufferKaitaiStream(bodyBytes))
                             data._read()
                             receivedChannelData.trySend(data)
+                        }
+
+                        SshEnums.MessageType.SSH_MSG_CHANNEL_WINDOW_ADJUST -> {
+                            val bodyBytes = rawBytes.copyOfRange(1, rawBytes.size)
+                            val adjust = SshMsgChannelWindowAdjust(ByteBufferKaitaiStream(bodyBytes))
+                            adjust._read()
+                            receivedChannelWindowAdjusts.trySend(adjust)
                         }
 
                         SshEnums.MessageType.SSH_MSG_PING -> {
@@ -952,4 +961,6 @@ class FakeSshServer(
     suspend fun awaitChannelOpenFailure(): SshMsgChannelOpenFailure = receivedChannelOpenFailures.receive()
 
     suspend fun awaitChannelData(): SshMsgChannelData = receivedChannelData.receive()
+
+    suspend fun awaitChannelWindowAdjust(): SshMsgChannelWindowAdjust = receivedChannelWindowAdjusts.receive()
 }
