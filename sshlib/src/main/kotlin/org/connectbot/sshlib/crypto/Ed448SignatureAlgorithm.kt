@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import org.connectbot.sshlib.protocol.SshEd448PublicKeyBlob
 import org.connectbot.sshlib.protocol.SshEd448SignatureBlob
 import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
-import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
@@ -42,7 +41,7 @@ internal object Ed448SignatureAlgorithm : SshSignatureAlgorithm {
             }
         }
         val keySpec = X509EncodedKeySpec(x509Key)
-        val jcaKey = KeyFactory.getInstance("Ed448").generatePublic(keySpec)
+        val jcaKey = RawKeyFactory.generatePublic("Ed448", keySpec)
 
         val sigBlob = sig.signatureBlob() as SshEd448SignatureBlob
         val verifier = Signature.getInstance("Ed448")

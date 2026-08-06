@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import org.connectbot.sshlib.protocol.SshRsaPublicKeyBlob
 import org.connectbot.sshlib.protocol.SshRsaSignatureBlob
 import org.connectbot.sshlib.protocol.SshSignature
 import java.math.BigInteger
-import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.Signature
 import java.security.spec.RSAPublicKeySpec
@@ -33,7 +32,7 @@ internal object RsaSignatureAlgorithm : SshSignatureAlgorithm {
         val e = BigInteger(1, keyBlob.e().body())
         val n = BigInteger(1, keyBlob.n().body())
         val spec = RSAPublicKeySpec(n, e)
-        val jcaKey = KeyFactory.getInstance("RSA").generatePublic(spec)
+        val jcaKey = RawKeyFactory.generatePublic("RSA", spec)
 
         val jcaAlgorithm = toJcaAlgorithm(sig.algorithmName())
 

@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import org.connectbot.sshlib.protocol.SshPublicKey
 import org.connectbot.sshlib.protocol.SshSignature
 import java.math.BigInteger
 import java.security.AlgorithmParameters
-import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.Signature
 import java.security.interfaces.ECKey
@@ -52,7 +51,7 @@ internal object EcdsaSignatureAlgorithm : SshSignatureAlgorithm {
 
         val point = decodeEcPoint(qBytes, paramSpec)
         val keySpec = ECPublicKeySpec(point, paramSpec)
-        val jcaKey = KeyFactory.getInstance("EC").generatePublic(keySpec)
+        val jcaKey = RawKeyFactory.generatePublic("EC", keySpec)
 
         val sigBlob = sig.signatureBlob() as EcdsaSignatureBlob
         val r = BigInteger(1, sigBlob.blob().r().body())

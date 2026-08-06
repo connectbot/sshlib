@@ -20,7 +20,6 @@ package org.connectbot.sshlib.crypto
 import org.connectbot.sshlib.SshException
 import java.math.BigInteger
 import java.security.AlgorithmParameters
-import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.interfaces.ECPublicKey
@@ -89,7 +88,7 @@ internal class EcdhKeyExchange(private val curveName: String) : KexAlgorithm {
         try {
             val serverPoint = decodeEcPoint(serverPublicKey)
             val serverPubKeySpec = ECPublicKeySpec(serverPoint, ecParameterSpec)
-            val serverPubKey = KeyFactory.getInstance("EC").generatePublic(serverPubKeySpec)
+            val serverPubKey = RawKeyFactory.generatePublic("EC", serverPubKeySpec)
 
             val agreement = KeyAgreement.getInstance("ECDH")
             agreement.init(kp.private)

@@ -22,7 +22,6 @@ package org.connectbot.sshlib.crypto.ed25519
 import java.security.AccessController
 import java.security.PrivilegedAction
 import java.security.Provider
-import java.security.Security
 
 // Android only has the Provider(String, double, String) constructor.
 internal class Ed25519Provider : Provider(NAME, 1.0, "ConnectBot Ed25519 JCA Provider") {
@@ -52,17 +51,5 @@ internal class Ed25519Provider : Provider(NAME, 1.0, "ConnectBot Ed25519 JCA Pro
     companion object {
         const val NAME = "ConnectBot Ed25519 Provider"
         const val KEY_ALGORITHM = "Ed25519"
-
-        private val initLock = Any()
-        private var initialized = false
-
-        fun insertIfNeeded() {
-            synchronized(initLock) {
-                if (!initialized) {
-                    Security.insertProviderAt(Ed25519Provider(), 1)
-                    initialized = true
-                }
-            }
-        }
     }
 }

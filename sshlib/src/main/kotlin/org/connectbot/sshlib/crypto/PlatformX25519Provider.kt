@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,14 @@ import java.security.InvalidKeyException
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.PrivateKey
+import java.security.Provider
 import java.security.PublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.security.spec.XECPrivateKeySpec
 import javax.crypto.KeyAgreement
 
-internal class PlatformX25519Provider : X25519Provider {
+internal class PlatformX25519Provider(provider: Provider) : X25519Provider {
     companion object {
         private const val ALGORITHM = "X25519"
 
@@ -50,8 +51,11 @@ internal class PlatformX25519Provider : X25519Provider {
         private val BASE_POINT = ByteArray(X25519Provider.KEY_SIZE).apply { this[0] = 9 }
     }
 
-    private val keyPairGenerator = KeyPairGenerator.getInstance(ALGORITHM)
-    private val keyFactory = KeyFactory.getInstance(ALGORITHM)
+    internal val providerName: String = provider.name
+
+    private val keyPairGenerator = KeyPairGenerator.getInstance(ALGORITHM, provider)
+    private val keyFactory = KeyFactory.getInstance(ALGORITHM, provider)
+    private val keyAgreementProvider = provider
 
     override fun generatePrivateKey(): ByteArray {
         val keyPair = keyPairGenerator.generateKeyPair()
@@ -60,7 +64,7 @@ internal class PlatformX25519Provider : X25519Provider {
 
     override fun publicFromPrivate(privateKey: ByteArray): ByteArray {
         val privKey = createPrivateKey(privateKey)
-        val ka = KeyAgreement.getInstance(ALGORITHM)
+        val ka = KeyAgreement.getInstance(ALGORITHM, keyAgreementProvider)
         ka.init(privKey)
         ka.doPhase(createPublicKey(BASE_POINT), true)
         return ka.generateSecret()
@@ -69,7 +73,7 @@ internal class PlatformX25519Provider : X25519Provider {
     override fun computeSharedSecret(privateKey: ByteArray, publicKey: ByteArray): ByteArray {
         val privKey = createPrivateKey(privateKey)
         val pubKey = createPublicKey(publicKey)
-        val ka = KeyAgreement.getInstance(ALGORITHM)
+        val ka = KeyAgreement.getInstance(ALGORITHM, keyAgreementProvider)
         ka.init(privKey)
         ka.doPhase(pubKey, true)
         return ka.generateSecret()
