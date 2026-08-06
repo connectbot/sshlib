@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.2][0.4.2]
+
+Changes for library users since `0.4.1`.
+
+### Changed
+
+- Deprecated `SshKeys.ensureEd25519Support()` because Ed25519 support is now
+  selected automatically without modifying the global JCE provider list.
+
+### Fixed
+
+- Preserved unread session output, error output, extended data, and forwarded
+  channel data when the remote peer closes a channel.
+- Validated JCE providers with raw-key operations before selecting them for
+  Ed25519, Ed448, ECDSA, RSA, and X25519, avoiding failures from providers such
+  as AndroidKeyStore that advertise algorithms but reject non-keystore keys.
+
 ## [0.4.1][0.4.1]
 
 Changes for library users since `0.4.0`.
@@ -106,6 +123,7 @@ Changes for library users since `0.2.1`.
 - Limited zlib decompression output per packet to reduce decompression-bomb
   denial-of-service risk.
 
+[0.4.2]: https://github.com/connectbot/cbssh/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/connectbot/cbssh/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/connectbot/cbssh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/connectbot/cbssh/compare/v0.3.0...v0.3.1
