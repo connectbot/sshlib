@@ -704,7 +704,7 @@ package org.connectbot.sshlib {
     method public KeyPair decodePemPrivateKey(java.lang.String pem, optional java.lang.String? password);
     method public java.lang.String encodeOpenSshPrivateKey(KeyPair keyPair, optional java.lang.String? password);
     method public java.lang.String encodePemPrivateKey(KeyPair keyPair, optional java.lang.String? password);
-    method public void ensureEd25519Support();
+    method @Deprecated public void ensureEd25519Support();
     field public static final org.connectbot.sshlib.SshKeys INSTANCE;
   }
 

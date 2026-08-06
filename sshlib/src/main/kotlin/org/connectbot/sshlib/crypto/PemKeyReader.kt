@@ -17,26 +17,24 @@
 
 package org.connectbot.sshlib.crypto
 
+import com.google.crypto.tink.subtle.Ed25519Sign
 import org.connectbot.sshlib.SshException
+import org.connectbot.sshlib.crypto.ed25519.Ed25519PrivateKey
 import java.math.BigInteger
 import java.security.AlgorithmParameters
-import java.security.KeyFactory
 import java.security.KeyPair
-import java.security.KeyPairGenerator
 import java.security.PublicKey
-import java.security.SecureRandom
 import java.security.interfaces.ECPrivateKey
-import java.security.interfaces.EdECPrivateKey
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPrivateKeySpec
 import java.security.spec.ECPublicKeySpec
 import java.security.spec.InvalidKeySpecException
-import java.security.spec.NamedParameterSpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.RSAPrivateCrtKeySpec
 import java.security.spec.RSAPublicKeySpec
+import java.security.spec.X509EncodedKeySpec
 
 internal object PemKeyReader {
 
@@ -178,8 +176,7 @@ internal object PemKeyReader {
 
             val privSpec = RSAPrivateCrtKeySpec(n, e, d, p, q, dP, dQ, qInv)
             val pubSpec = RSAPublicKeySpec(n, e)
-            val kf = KeyFactory.getInstance("RSA")
-            val keyPair = KeyPair(kf.generatePublic(pubSpec), kf.generatePrivate(privSpec))
+            val keyPair = RawKeyFactory.generateKeyPair("RSA", pubSpec, privSpec)
 
             SshPrivateKey("ssh-rsa", keyPair, "rsa-sha2-512")
         }
@@ -218,8 +215,7 @@ internal object PemKeyReader {
             val privKeySpec = ECPrivateKeySpec(BigInteger(1, privateBytes), paramSpec)
             val pubKeySpec = ECPublicKeySpec(point, paramSpec)
 
-            val kf = KeyFactory.getInstance("EC")
-            val keyPair = KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(privKeySpec))
+            val keyPair = RawKeyFactory.generateKeyPair("EC", pubKeySpec, privKeySpec)
             SshPrivateKey(sshAlg, keyPair, sshAlg)
         }
     }
@@ -227,17 +223,15 @@ internal object PemKeyReader {
     private fun readPkcs8(data: ByteArray): SshPrivateKey {
         // Use JCA's built-in PKCS#8 parsing — try each algorithm
         try {
-            val kf = KeyFactory.getInstance("Ed25519")
-            val privKey = kf.generatePrivate(PKCS8EncodedKeySpec(data))
-            val edPriv = privKey as EdECPrivateKey
-            val seed = edPriv.bytes.orElseThrow { SshException("Cannot extract Ed25519 seed") }
+            val keySpec = PKCS8EncodedKeySpec(data)
+            val privKey = RawKeyFactory.generatePrivate("Ed25519", keySpec)
+            val seed = Ed25519PrivateKey(keySpec).getSeed()
             val pubKey = ed25519PublicKeyFromSeed(seed)
             return SshPrivateKey("ssh-ed25519", KeyPair(pubKey, privKey), "ssh-ed25519")
         } catch (_: InvalidKeySpecException) {}
 
         try {
-            val kf = KeyFactory.getInstance("EC")
-            val privKey = kf.generatePrivate(PKCS8EncodedKeySpec(data)) as ECPrivateKey
+            val privKey = RawKeyFactory.generatePrivate("EC", PKCS8EncodedKeySpec(data)) as ECPrivateKey
             val fieldSize = (privKey.params.order.bitLength() + 7) / 8
             val sshAlg = when (fieldSize) {
                 32 -> "ecdsa-sha2-nistp256"
@@ -250,10 +244,9 @@ internal object PemKeyReader {
         } catch (_: InvalidKeySpecException) {}
 
         try {
-            val kf = KeyFactory.getInstance("RSA")
-            val privKey = kf.generatePrivate(PKCS8EncodedKeySpec(data)) as RSAPrivateCrtKey
+            val privKey = RawKeyFactory.generatePrivate("RSA", PKCS8EncodedKeySpec(data)) as RSAPrivateCrtKey
             val pubSpec = RSAPublicKeySpec(privKey.modulus, privKey.publicExponent)
-            val pubKey = kf.generatePublic(pubSpec)
+            val pubKey = RawKeyFactory.generatePublic("RSA", pubSpec)
             return SshPrivateKey("ssh-rsa", KeyPair(pubKey, privKey), "rsa-sha2-512")
         } catch (_: InvalidKeySpecException) {}
 
@@ -261,28 +254,16 @@ internal object PemKeyReader {
     }
 
     internal fun ed25519PublicKeyFromSeed(seed: ByteArray): PublicKey {
-        // Build PKCS#8 from seed, create private key, then use KPG with deterministic random
-        val pkcs8 = encodeDer {
+        val rawPublicKey = Ed25519Sign.KeyPair.newKeyPairFromSeed(seed).publicKey
+        val x509 = encodeDer {
             sequence {
-                integer(BigInteger.ZERO)
                 sequence {
                     objectIdentifier(byteArrayOf(0x2b, 0x65, 0x70)) // Ed25519
                 }
-                octetString(encodeDer { octetString(seed) })
+                bitString(rawPublicKey)
             }
         }
-        val privKey = KeyFactory.getInstance("Ed25519")
-            .generatePrivate(PKCS8EncodedKeySpec(pkcs8))
-
-        // Use a deterministic SecureRandom that returns our seed
-        val deterministicRandom = object : SecureRandom() {
-            override fun nextBytes(bytes: ByteArray) {
-                System.arraycopy(seed, 0, bytes, 0, minOf(seed.size, bytes.size))
-            }
-        }
-        val kpg = KeyPairGenerator.getInstance("Ed25519")
-        kpg.initialize(NamedParameterSpec.ED25519, deterministicRandom)
-        return kpg.generateKeyPair().public
+        return RawKeyFactory.generatePublic("Ed25519", X509EncodedKeySpec(x509))
     }
 
     private fun ecPublicKeyFromPkcs8(privKey: ECPrivateKey): PublicKey {
@@ -307,7 +288,7 @@ internal object PemKeyReader {
                                 EcdsaSignatureAlgorithm.decodeEcPoint(pubPoint, privKey.params),
                                 privKey.params,
                             )
-                            return@readSequence KeyFactory.getInstance("EC").generatePublic(pubKeySpec)
+                            return@readSequence RawKeyFactory.generatePublic("EC", pubKeySpec)
                         }
 
                         else -> seq.skipTag()

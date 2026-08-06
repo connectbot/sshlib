@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package org.connectbot.sshlib.crypto
 import org.connectbot.sshlib.SshException
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
+import java.security.Security
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -54,6 +55,23 @@ class Curve25519KeyExchangeTest {
         val provider = X25519ProviderFactory.provider
         val secret = provider.computeSharedSecret(alicePrivate, bobPublic)
         assertContentEquals(expectedSharedSecret, secret)
+    }
+
+    @Test
+    fun `platform selection probes providers instead of trusting registration`() {
+        val selected = X25519ProviderFactory.selectPlatformProvider(
+            listOf(RejectingRawKeyProvider()) + Security.getProviders(),
+        )
+
+        if (selected != null) {
+            assertContentEquals(alicePublic, selected.publicFromPrivate(alicePrivate))
+            assertContentEquals(expectedSharedSecret, selected.computeSharedSecret(alicePrivate, bobPublic))
+        }
+    }
+
+    @Test
+    fun `platform selection returns null when no provider is capable`() {
+        assertEquals(null, X25519ProviderFactory.selectPlatformProvider(listOf(RejectingRawKeyProvider())))
     }
 
     @Test

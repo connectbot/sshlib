@@ -1,6 +1,6 @@
 /*
  * ConnectBot SSH Library
- * Copyright 2025 Kenny Root
+ * Copyright 2025-2026 Kenny Root
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import org.connectbot.sshlib.protocol.readString
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.AlgorithmParameters
-import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
@@ -105,9 +104,6 @@ internal object OpenSshKeyReader {
                         octetString(encodeDer { octetString(seed) })
                     }
                 }
-                val privKey = KeyFactory.getInstance("Ed25519")
-                    .generatePrivate(PKCS8EncodedKeySpec(pkcs8))
-
                 val pubKeyBytes = privateBytes.copyOfRange(32, 64)
                 val x509 = encodeDer {
                     sequence {
@@ -117,10 +113,11 @@ internal object OpenSshKeyReader {
                         bitString(pubKeyBytes)
                     }
                 }
-                val pubKey = KeyFactory.getInstance("Ed25519")
-                    .generatePublic(X509EncodedKeySpec(x509))
-
-                keyPair = KeyPair(pubKey, privKey)
+                keyPair = RawKeyFactory.generateKeyPair(
+                    "Ed25519",
+                    X509EncodedKeySpec(x509),
+                    PKCS8EncodedKeySpec(pkcs8),
+                )
                 sigAlgorithm = "ssh-ed25519"
             }
 
@@ -144,8 +141,7 @@ internal object OpenSshKeyReader {
                 val pubKeySpec = ECPublicKeySpec(point, paramSpec)
                 val privKeySpec = ECPrivateKeySpec(privateScalar, paramSpec)
 
-                val kf = KeyFactory.getInstance("EC")
-                keyPair = KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(privKeySpec))
+                keyPair = RawKeyFactory.generateKeyPair("EC", pubKeySpec, privKeySpec)
                 sigAlgorithm = sshAlg
             }
 
@@ -163,8 +159,7 @@ internal object OpenSshKeyReader {
                 val privKeySpec = RSAPrivateCrtKeySpec(n, e, d, p, q, dP, dQ, iqmp)
                 val pubKeySpec = RSAPublicKeySpec(n, e)
 
-                val kf = KeyFactory.getInstance("RSA")
-                keyPair = KeyPair(kf.generatePublic(pubKeySpec), kf.generatePrivate(privKeySpec))
+                keyPair = RawKeyFactory.generateKeyPair("RSA", pubKeySpec, privKeySpec)
                 sigAlgorithm = "rsa-sha2-512"
             }
 

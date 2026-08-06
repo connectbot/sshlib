@@ -20,10 +20,7 @@ package org.connectbot.sshlib
 import org.connectbot.sshlib.crypto.OpenSshKeyWriter
 import org.connectbot.sshlib.crypto.PemKeyWriter
 import org.connectbot.sshlib.crypto.PrivateKeyReader
-import org.connectbot.sshlib.crypto.ed25519.Ed25519Provider
-import java.security.KeyFactory
 import java.security.KeyPair
-import java.security.NoSuchAlgorithmException
 
 /**
  * Key management utilities for SSH private keys.
@@ -75,19 +72,9 @@ object SshKeys {
     fun encodeOpenSshPrivateKey(keyPair: KeyPair, password: String? = null): String = OpenSshKeyWriter.write(keyPair, password)
 
     /**
-     * Ensure Ed25519 JCA support is available.
-     *
-     * On platforms that don't natively support Ed25519 (e.g., older Android versions),
-     * this registers a Tink-backed JCA provider. On platforms with native support,
-     * this is a no-op.
-     *
-     * Call this early in application startup if you need Ed25519 key support.
+     * Ed25519 support is now selected automatically without changing the global
+     * JCE provider list.
      */
-    fun ensureEd25519Support() {
-        try {
-            KeyFactory.getInstance("Ed25519")
-        } catch (_: NoSuchAlgorithmException) {
-            Ed25519Provider.insertIfNeeded()
-        }
-    }
+    @Deprecated("Ed25519 support is selected automatically")
+    fun ensureEd25519Support() = Unit
 }
