@@ -20,7 +20,7 @@ dokka = "2.2.0"
 publish = "0.37.0"
 release = "3.1.0"
 kover = "0.9.9"
-cyclonedx = "3.4.0"
+cyclonedx = "3.4.1"
 sonarqube = "7.3.1.8318"
 
 [libraries]
