@@ -51,6 +51,7 @@ internal class SftpClientImpl private constructor(
     private val readJob: Job,
     override val protocolVersion: Int,
     private val stateMachine: SftpStateMachine,
+    override val extensions: Set<String>,
 ) : SftpClient {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -246,6 +247,31 @@ internal class SftpClientImpl private constructor(
         return dispatchStatusRequest(SSH_FXP_RENAME, payload.array())
     }
 
+    // --- Server-side data copy (OpenSSH extension) ---
+
+    override suspend fun copyData(
+        srcHandle: SftpFileHandle,
+        srcOffset: Long,
+        length: Long,
+        dstHandle: SftpFileHandle,
+        dstOffset: Long,
+    ): SftpResult<Unit> {
+        val nameBytes = EXT_COPY_DATA.toByteArray(StandardCharsets.UTF_8)
+        val payload = ByteBuffer.allocate(
+            4 + nameBytes.size +
+                4 + srcHandle.handle.size + 8 + 8 +
+                4 + dstHandle.handle.size + 8,
+        )
+        putString(payload, nameBytes)
+        putString(payload, srcHandle.handle)
+        payload.putLong(srcOffset)
+        payload.putLong(length)
+        putString(payload, dstHandle.handle)
+        payload.putLong(dstOffset)
+
+        return dispatchStatusRequest(SSH_FXP_EXTENDED, payload.array())
+    }
+
     // --- Path operations ---
 
     override suspend fun realpath(path: String): SftpResult<String> {
@@ -398,7 +424,12 @@ internal class SftpClientImpl private constructor(
         private const val SSH_FXP_NAME = 104
         private const val SSH_FXP_ATTRS = 105
 
+        private const val SSH_FXP_EXTENDED = 200
+
         private const val SFTP_VERSION = 3
+
+        /** OpenSSH SFTP extension (added in OpenSSH 9.0) for server-side data copy. */
+        private const val EXT_COPY_DATA = "copy-data"
 
         /**
          * Create an SFTP client by performing the INIT/VERSION handshake.
@@ -439,15 +470,37 @@ internal class SftpClientImpl private constructor(
             if (versionPacket.payload.size < 4) {
                 return SftpResult.ProtocolError("SSH_FXP_VERSION payload too short")
             }
-            val serverVersion = ByteBuffer.wrap(versionPacket.payload, 0, 4).int
+            val versionBuf = ByteBuffer.wrap(versionPacket.payload)
+            val serverVersion = versionBuf.int
             val negotiatedVersion = minOf(SFTP_VERSION, serverVersion)
             logger.info("SFTP version negotiated: {} (server: {})", negotiatedVersion, serverVersion)
+
+            // The VERSION reply may be followed by zero or more
+            // extension-name/extension-data string pairs (section 3). Only the
+            // names are kept — see [SftpClient.extensions]. Parsed defensively:
+            // a malformed/truncated trailing pair just stops parsing early
+            // rather than failing the whole handshake, since extensions are
+            // optional and servers this old still work fine without them.
+            val extensions = mutableSetOf<String>()
+            try {
+                while (versionBuf.remaining() >= 4) {
+                    val name = String(extractString(versionBuf), StandardCharsets.UTF_8)
+                    if (versionBuf.remaining() < 4) break
+                    extractString(versionBuf) // extension-data, unused for now
+                    extensions.add(name)
+                }
+            } catch (e: Exception) {
+                logger.warn("Failed to parse SFTP VERSION extension pairs, ignoring remainder: {}", e.message)
+            }
+            if (extensions.isNotEmpty()) {
+                logger.info("SFTP server extensions: {}", extensions)
+            }
 
             // Start the background read loop
             val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
             val readJob = dispatcher.startReadLoop(scope)
 
-            return SftpResult.Success(SftpClientImpl(session, dispatcher, readJob, negotiatedVersion, stateMachine))
+            return SftpResult.Success(SftpClientImpl(session, dispatcher, readJob, negotiatedVersion, stateMachine, extensions))
         }
 
         // --- Wire format helpers ---
