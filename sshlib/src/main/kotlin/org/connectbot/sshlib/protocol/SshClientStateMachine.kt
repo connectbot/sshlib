@@ -661,13 +661,13 @@ internal class SshClientStateMachine(
         return !isDisconnected()
     }
 
-    suspend fun authorizeAuthenticationPacket(): Boolean = process(SshEvent.AuthorizeAuthenticationPacket)
+    suspend fun authorizeAuthenticationPacket(): Boolean = authorize(SshEvent.AuthorizeAuthenticationPacket)
 
-    suspend fun authorizeAuthenticatedPacket(): Boolean = process(SshEvent.AuthorizeAuthenticatedPacket)
+    suspend fun authorizeAuthenticatedPacket(): Boolean = authorize(SshEvent.AuthorizeAuthenticatedPacket)
 
-    suspend fun authorizeConnectionPacket(): Boolean = process(SshEvent.AuthorizeConnectionPacket)
+    suspend fun authorizeConnectionPacket(): Boolean = authorize(SshEvent.AuthorizeConnectionPacket)
 
-    suspend fun authorizeExtInfo(): Boolean = process(SshEvent.AuthorizeExtInfo)
+    suspend fun authorizeExtInfo(): Boolean = authorize(SshEvent.AuthorizeExtInfo)
 
     suspend fun disconnect(): Boolean = process(SshEvent.Disconnect)
 
@@ -690,6 +690,17 @@ internal class SshClientStateMachine(
     internal fun formalModel(): SshStateMachineFormalModel = stateMachine.toSshFormalModel()
 
     private suspend fun process(event: SshEvent): Boolean = stateMachine.processEvent(event) == ProcessingResult.PROCESSED
+
+    /**
+     * As guardas de autorização não têm efeito próprio: elas só perguntam "este pacote cabe no
+     * estado atual?". Quando outro evento já está sendo processado (o laço de pacotes entra no meio
+     * de um `OpenChannel`/`SendChannelRequest` que suspendeu para escrever no socket), o
+     * `queuePendingEventHandler` — o padrão do KStateMachine — ENFILEIRA o evento e devolve
+     * `PENDING`. Enfileirado não é recusado; tratar `PENDING` como recusa derruba o transporte
+     * inteiro com `SSH_MSG_CHANNEL_DATA in the current protocol state`.
+     */
+    private suspend fun authorize(event: SshEvent): Boolean =
+        stateMachine.processEvent(event) != ProcessingResult.IGNORED
 }
 
 internal interface SshClientCallbacks {
