@@ -1,6 +1,6 @@
 [tools]
 actionlint = "1.7.12"
 bats = "1.14.0"
-java = "temurin-25.0.4+7.0.LTS"
+java = "temurin-25.0.4+101.0.LTS"
 jq = "1.8.2"
 shellcheck = "0.11.0"
